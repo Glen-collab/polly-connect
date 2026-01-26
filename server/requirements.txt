@@ -1,0 +1,31 @@
+# Polly Connect Server Requirements
+# Python 3.11 recommended (3.12+ has PyTorch issues)
+
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+python-multipart>=0.0.6
+
+# Database
+# SQLite is built-in, no extra package needed
+
+# Speech-to-text (pick one)
+faster-whisper>=0.10.0  # Recommended - faster, less memory
+# openai-whisper>=20231117  # Alternative - official OpenAI
+
+# Text-to-speech (pick one or more)
+pyttsx3>=2.90  # Offline, cross-platform
+# gTTS>=2.5.0  # Google TTS, requires internet
+# pydub>=0.25.1  # For audio format conversion (needed for gTTS)
+
+# NLP (optional - for better intent parsing)
+# spacy>=3.7.0
+# Download model: python -m spacy download en_core_web_sm
+
+# Utilities
+numpy>=1.24.0
+pydantic>=2.5.0
+
+# Development
+python-dotenv>=1.0.0

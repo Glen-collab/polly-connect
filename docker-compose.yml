@@ -1,0 +1,29 @@
+# Polly Connect - Docker Compose
+# For cloud deployment
+
+version: '3.8'
+
+services:
+  polly-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - POLLY_HOST=0.0.0.0
+      - POLLY_PORT=8000
+      - POLLY_DEBUG=false
+      - POLLY_DB_PATH=/data/polly.db
+      - POLLY_WHISPER_MODEL=base
+    volumes:
+      - polly-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  polly-data:

@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Audio test files
+*.wav
+*.mp3
+*.raw
+!wake-word/positive/*.wav
+!wake-word/negative/*.wav
+
+# Models
+*.tflite
+*.onnx
+*.pt
+*.pth
+
+# Arduino build
+firmware/polly-esp32/build/
+firmware/polly-esp32/*.elf
+firmware/polly-esp32/*.bin
+
+# Temp files
+tmp/
+temp/
+*.tmp
