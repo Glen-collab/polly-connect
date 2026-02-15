@@ -1,0 +1,36 @@
+# Home Assistant Automation to Bridge Voice Assistant to Polly Server
+# Place this in your Home Assistant configuration.yaml or automations.yaml
+
+automation:
+  - alias: "Polly Voice Assistant Bridge"
+    description: "Forward voice commands from ESP32 to Polly Connect server"
+    trigger:
+      - platform: event
+        event_type: voice_assistant_transcription
+    condition: []
+    action:
+      - service: rest_command.polly_send_command
+        data:
+          transcription: "{{ trigger.event.data.text }}"
+          device_id: "{{ trigger.event.data.device_id }}"
+
+# REST Command to send to Polly Server
+rest_command:
+  polly_send_command:
+    url: "http://YOUR_POLLY_SERVER_IP:8000/api/commands/process"
+    method: POST
+    content_type: "application/json"
+    payload: >
+      {
+        "transcription": "{{ transcription }}",
+        "device_id": "{{ device_id }}",
+        "source": "home_assistant"
+      }
+
+# Optional: TTS Response back to ESP32
+# This requires enabling the speaker component on the ESP32
+tts:
+  - platform: google_translate
+    cache: true
+    cache_dir: /tmp/tts
+    time_memory: 300

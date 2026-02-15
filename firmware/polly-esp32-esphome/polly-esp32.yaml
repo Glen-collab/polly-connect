@@ -1,0 +1,197 @@
+substitutions:
+  name: polly-esp32
+  friendly_name: Polly ESP32-S3 Wake Word
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  platformio_options:
+    board_build.flash_mode: dio
+  on_boot:
+    - priority: -100
+      then:
+        - wait_until:
+            api.connected:
+        - delay: 1s
+        - if:
+            condition:
+              switch.is_on: use_wake_word
+            then:
+              - voice_assistant.start_continuous:
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    version: recommended
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      CONFIG_AUDIO_BOARD_CUSTOM: "y"
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+# WiFi Configuration
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot in case wifi connection fails
+  ap:
+    ssid: "${name} Fallback"
+    password: "polly12345"
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API (for configuration and control)
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# Enable OTA updates
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# I2S Audio Configuration for INMP441 Microphone
+i2s_audio:
+  - id: i2s_mic
+    i2s_lrclk_pin: GPIO42  # WS pin
+    i2s_bclk_pin: GPIO40   # SCK pin
+
+microphone:
+  - platform: i2s_audio
+    id: mic
+    adc_type: external
+    i2s_din_pin: GPIO41    # SD pin
+    channel: left
+    sample_rate: 16000
+    bits_per_sample: 32bit
+    pdm: false
+
+# microWakeWord Configuration
+micro_wake_word:
+  model: okay_nabu
+  on_wake_word_detected:
+    - voice_assistant.start:
+        wake_word: !lambda return wake_word;
+
+# Voice Assistant Configuration
+# This integrates with your Polly Connect server
+voice_assistant:
+  microphone: mic
+  use_wake_word: false  # We use micro_wake_word instead
+
+  on_listening:
+    - light.turn_on:
+        id: led
+        brightness: 100%
+        red: 0%
+        green: 100%
+        blue: 0%
+
+  on_stt_end:
+    - light.turn_on:
+        id: led
+        brightness: 100%
+        red: 0%
+        green: 0%
+        blue: 100%
+
+  on_tts_start:
+    - light.turn_on:
+        id: led
+        brightness: 100%
+        red: 100%
+        green: 100%
+        blue: 0%
+
+  on_end:
+    - light.turn_off: led
+    - if:
+        condition:
+          switch.is_on: use_wake_word
+        then:
+          - micro_wake_word.start:
+
+  on_error:
+    - light.turn_on:
+        id: led
+        brightness: 100%
+        red: 100%
+        green: 0%
+        blue: 0%
+    - delay: 1s
+    - light.turn_off: led
+    - if:
+        condition:
+          switch.is_on: use_wake_word
+        then:
+          - micro_wake_word.start:
+
+# LED indicator (optional - adjust pin if you have one)
+light:
+  - platform: status_led
+    id: led
+    pin: GPIO48  # Change to your LED pin
+    restore_mode: ALWAYS_OFF
+
+# Control switches
+switch:
+  - platform: template
+    name: Use Wake Word
+    id: use_wake_word
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      - if:
+          condition:
+            lambda: return !id(init_in_progress);
+          then:
+            - lambda: id(va).set_use_wake_word(true);
+            - if:
+                condition:
+                  not:
+                    - voice_assistant.is_running
+                then:
+                  - micro_wake_word.start
+    on_turn_off:
+      - if:
+          condition:
+            lambda: return !id(init_in_progress);
+          then:
+            - voice_assistant.stop
+            - micro_wake_word.stop
+            - lambda: id(va).set_use_wake_word(false);
+
+# Sensors
+binary_sensor:
+  - platform: status
+    name: "ESP32 Status"
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "Connected SSID"
+
+globals:
+  - id: init_in_progress
+    type: bool
+    restore_value: false
+    initial_value: "true"

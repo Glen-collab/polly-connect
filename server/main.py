@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.audio import router as audio_router
 from api.commands import router as commands_router
 from api.devices import router as devices_router
+from api.homeassistant import router as ha_router
 from core.database import PollyDB
 from core.transcription import WhisperTranscriber
 from core.tts import TTSEngine
@@ -45,6 +46,7 @@ app.add_middleware(
 app.include_router(audio_router, prefix="/api/audio", tags=["audio"])
 app.include_router(commands_router, prefix="/api", tags=["commands"])
 app.include_router(devices_router, prefix="/api/devices", tags=["devices"])
+app.include_router(ha_router, prefix="/api/commands", tags=["homeassistant"])
 
 
 @app.get("/")
