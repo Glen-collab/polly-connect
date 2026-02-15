@@ -1,0 +1,21 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "wifi_manager.c"
+        "websocket_client.c"
+        "audio_capture.c"
+        "porcupine_manager.c"
+        "state_machine.c"
+    INCLUDE_DIRS "."
+    REQUIRES
+        nvs_flash
+        esp_wifi
+        esp_netif
+        esp_event
+        esp_http_client
+        esp_websocket_client
+        driver
+        json
+        mbedtls
+        porcupine
+)

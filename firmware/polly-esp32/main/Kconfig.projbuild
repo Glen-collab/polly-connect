@@ -1,0 +1,46 @@
+menu "Polly ESP32 Configuration"
+
+config WIFI_SSID
+    string "WiFi SSID"
+    default "myssid"
+    help
+        SSID (network name) for the ESP32 to connect to.
+
+config WIFI_PASSWORD
+    string "WiFi Password"
+    default "mypassword"
+    help
+        WiFi password (WPA or WPA2) for the ESP32 to use.
+
+config WIFI_MAXIMUM_RETRY
+    int "Maximum retry"
+    default 5
+    help
+        Set the Maximum retry to avoid station reconnecting to the AP unlimited.
+
+config SERVER_URI
+    string "Server WebSocket URI"
+    default "ws://192.168.1.100:8000/api/audio/stream"
+    help
+        WebSocket URI of the Polly Connect server.
+
+config PORCUPINE_ACCESS_KEY
+    string "Picovoice Access Key"
+    default "YOUR_ACCESS_KEY_HERE"
+    help
+        Access key from Picovoice Console (https://console.picovoice.ai/).
+
+config PORCUPINE_SENSITIVITY
+    string "Wake word sensitivity (0.0-1.0)"
+    default "0.5"
+    help
+        Sensitivity for wake word detection. Higher = more sensitive but more false positives.
+
+config AUDIO_BUFFER_SECONDS
+    int "Pre-wake audio buffer (seconds)"
+    default 2
+    range 1 10
+    help
+        Seconds of audio to buffer before wake word for context.
+
+endmenu
