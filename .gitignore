@@ -70,3 +70,8 @@ firmware/polly-esp32/components/porcupine/lib/*.a
 firmware/polly-esp32/components/porcupine/models/*.ppn
 !firmware/polly-esp32/components/porcupine/lib/README.md
 !firmware/polly-esp32/components/porcupine/models/README.md
+
+# ESPHome
+firmware/polly-esp32-esphome/secrets.yaml
+firmware/polly-esp32-esphome/.esphome/
+firmware/polly-esp32-esphome/*.bin
