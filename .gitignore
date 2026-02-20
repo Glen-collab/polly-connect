@@ -43,11 +43,14 @@ logs/
 !wake-word/positive/*.wav
 !wake-word/negative/*.wav
 
-# Models
+# Models (general)
 *.tflite
 *.onnx
 *.pt
 *.pth
+# Keep our trained wake word model
+!wake-word/hey_polly.onnx
+!wake-word/hey_polly.onnx.data
 
 # Arduino build
 firmware/polly-esp32/build/
@@ -71,7 +74,24 @@ firmware/polly-esp32/components/porcupine/models/*.ppn
 !firmware/polly-esp32/components/porcupine/lib/README.md
 !firmware/polly-esp32/components/porcupine/models/README.md
 
+# ESP-IDF build artifacts (polly-s3-wakeword)
+firmware/polly-s3-wakeword/build/
+firmware/polly-s3-wakeword/sdkconfig
+firmware/polly-s3-wakeword/sdkconfig.old
+firmware/polly-s3-wakeword/.cache/
+firmware/polly-s3-wakeword/managed_components/
+firmware/polly-s3-wakeword/dependencies.lock
+
 # ESPHome
 firmware/polly-esp32-esphome/secrets.yaml
 firmware/polly-esp32-esphome/.esphome/
 firmware/polly-esp32-esphome/*.bin
+
+# Claude Code
+.claude/
+
+# Piper sample generator (separate git repo)
+piper-sample-generator/
+
+# Windows artifacts
+nul

@@ -7,3 +7,4 @@ pyttsx3>=2.90
 numpy>=1.24.0
 pydantic>=2.5.0
 python-dotenv>=1.0.0
+openwakeword>=0.6.0

@@ -12,5 +12,17 @@ class Settings:
     SAMPLE_RATE: int = 16000
     CHANNELS: int = 1
 
+    # Wake word detection
+    WAKE_WORD_MODEL_PATH: str = os.getenv(
+        "POLLY_WAKE_WORD_MODEL",
+        os.path.join(os.path.expanduser("~"), "Desktop", "polly-connect", "wake-word", "hey_polly.onnx")
+    )
+    WAKE_WORD_THRESHOLD: float = float(os.getenv("POLLY_WAKE_WORD_THRESHOLD", "0.5"))
+
+    # Silence detection for end-of-command
+    SILENCE_THRESHOLD_RMS: int = int(os.getenv("POLLY_SILENCE_THRESHOLD", "500"))
+    SILENCE_TIMEOUT_S: float = float(os.getenv("POLLY_SILENCE_TIMEOUT", "1.5"))
+    MAX_COMMAND_S: float = float(os.getenv("POLLY_MAX_COMMAND_S", "10.0"))
+
 
 settings = Settings()

@@ -15,6 +15,7 @@ from api.homeassistant import router as ha_router
 from core.database import PollyDB
 from core.transcription import WhisperTranscriber
 from core.tts import TTSEngine
+from core.wakeword import WakeWordDetector
 from config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +29,17 @@ async def lifespan(app: FastAPI):
     logger.info(f"Loading Whisper model: {settings.WHISPER_MODEL}")
     app.state.transcriber = WhisperTranscriber(model_size=settings.WHISPER_MODEL)
     app.state.tts = TTSEngine()
+
+    logger.info(f"Loading wake word model: {settings.WAKE_WORD_MODEL_PATH}")
+    app.state.wake_word_detector = WakeWordDetector(
+        model_path=settings.WAKE_WORD_MODEL_PATH,
+        threshold=settings.WAKE_WORD_THRESHOLD,
+    )
+    if app.state.wake_word_detector.ready:
+        logger.info("Wake word detector ready")
+    else:
+        logger.warning("Wake word detector NOT ready — continuous streaming will not detect wake words")
+
     logger.info("Server ready")
     yield
     logger.info("Shutting down...")
