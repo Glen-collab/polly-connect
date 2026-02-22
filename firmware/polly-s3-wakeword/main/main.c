@@ -85,7 +85,7 @@ static const char *TAG = "POLLY";
 #define LED_PIN         GPIO_NUM_48
 
 // WebSocket
-#define WS_BUFFER_SIZE  16384       // 16KB receive buffer
+#define WS_BUFFER_SIZE  4096        // 4KB buffer (smaller = less memory pressure)
 #define WS_RECONNECT_MS 5000
 
 // Response audio buffer (10 seconds max, in PSRAM)
@@ -330,6 +330,7 @@ static void ws_handle_message(const char *json_str, int len)
     } else if (strcmp(evt, "wake_word_detected") == 0) {
         ESP_LOGI(TAG, "*** WAKE WORD DETECTED BY SERVER ***");
         wake_detected = true;
+        // Don't pause streaming — server needs continuous audio to capture the command
 
     } else if (strcmp(evt, "response") == 0) {
         cJSON *text = cJSON_GetObjectItem(root, "text");
@@ -462,6 +463,7 @@ static esp_err_t ws_init(void)
         .uri = WS_URI,
         .buffer_size = WS_BUFFER_SIZE,
         .reconnect_timeout_ms = WS_RECONNECT_MS,
+        .network_timeout_ms = 10000,
         .task_stack = 8192,
     };
 
@@ -534,17 +536,18 @@ static void mic_stream_task(void *arg)
     uint32_t ping_timer = 0;
 
     while (1) {
-        // Handle wake word detection beep
+        // Handle wake word detection — just LED, keep streaming
         if (wake_detected) {
             wake_detected = false;
             led_set(1);
-            spk_play_wake_sound();
         }
 
         // Handle response playback
         if (response_complete) {
             play_response_audio();
             led_set(0);
+            // Cooldown after playback so speaker audio doesn't trigger wake word
+            vTaskDelay(pdMS_TO_TICKS(1000));
             streaming_paused = false;
             ESP_LOGI(TAG, "Back to streaming...");
         }
@@ -553,20 +556,27 @@ static void mic_stream_task(void *arg)
         if (ws_connected && !streaming_paused) {
             size_t samples = mic_read(audio_chunk, CHUNK_SAMPLES);
             if (samples > 0) {
+                if (!esp_websocket_client_is_connected(ws_client)) {
+                    ws_connected = false;
+                    continue;
+                }
                 int ret = esp_websocket_client_send_bin(
                     ws_client,
                     (const char *)audio_chunk,
                     samples * sizeof(int16_t),
-                    pdMS_TO_TICKS(500)
+                    pdMS_TO_TICKS(2000)
                 );
                 if (ret < 0) {
-                    ESP_LOGW(TAG, "WebSocket send failed");
+                    ESP_LOGW(TAG, "WebSocket send failed (ret=%d), free heap=%u",
+                             ret, (unsigned)esp_get_free_heap_size());
+                    // Back off on failure
+                    vTaskDelay(pdMS_TO_TICKS(100));
                 }
             }
-        } else if (streaming_paused) {
-            // While paused (waiting for response), still read mic to keep I2S flowing
-            // but discard the data
+        } else {
+            // While paused or disconnected, still read mic to keep I2S flowing
             mic_read(audio_chunk, CHUNK_SAMPLES);
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
 
         // Send periodic ping to keep connection alive (every 30 seconds)
@@ -592,8 +602,8 @@ static void mic_stream_task(void *arg)
 void app_main(void)
 {
     ESP_LOGI(TAG, "=== Polly Connect - ESP32-S3 WebSocket Streaming ===");
-    ESP_LOGI(TAG, "Free heap: %"PRIu32" bytes", (uint32_t)esp_get_free_heap_size());
-    ESP_LOGI(TAG, "Free PSRAM: %"PRIu32" bytes", (uint32_t)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    ESP_LOGI(TAG, "Free heap: %u bytes", (unsigned)esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free PSRAM: %u bytes", (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
     // Init NVS (needed for WiFi)
     esp_err_t ret = nvs_flash_init();
@@ -613,10 +623,10 @@ void app_main(void)
     // Init speaker
     ESP_ERROR_CHECK(spk_init());
 
-    // Startup sound
-    spk_play_tone(1000, 100);
-    vTaskDelay(pdMS_TO_TICKS(100));
-    spk_play_tone(1500, 100);
+    // Startup sound disabled — feedback loop with mic
+    // spk_play_tone(1000, 100);
+    // vTaskDelay(pdMS_TO_TICKS(100));
+    // spk_play_tone(1500, 100);
 
     // Init WiFi
     wifi_init();
