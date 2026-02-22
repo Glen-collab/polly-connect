@@ -178,7 +178,9 @@ async def continuous_stream(websocket: WebSocket):
     except WebSocketDisconnect:
         logger.info(f"Continuous stream disconnected: {device_id}")
     except Exception as e:
+        import traceback
         logger.error(f"Continuous stream error: {e}")
+        traceback.print_exc()
 
 
 async def _process_command(
@@ -228,7 +230,7 @@ async def _process_command(
 
     # Generate and send TTS audio
     try:
-        tts_audio = await asyncio.to_thread(tts.speak, response_text)
+        tts_audio = tts.speak(response_text)
         if tts_audio:
             chunk_size = 8000
             for i in range(0, len(tts_audio), chunk_size):
@@ -241,7 +243,9 @@ async def _process_command(
                 })
                 await asyncio.sleep(0.05)
     except Exception as e:
-        logger.error(f"TTS error: {e}")
+         import traceback
+         logger.error(f"TTS error: {e}")
+         traceback.print_exc()
 
 
 # ─── Original Event-Based Stream Handler ─────────────────────────────────────
@@ -328,7 +332,7 @@ async def audio_stream(websocket: WebSocket):
 
                             # Generate and send audio
                             try:
-                                tts_audio = await asyncio.to_thread(tts.speak, response_text)
+                                tts_audio = tts.speak(response_text)
                                 if tts_audio:
                                     chunk_size = 8000
                                     for i in range(0, len(tts_audio), chunk_size):
@@ -396,7 +400,7 @@ async def audio_stream(websocket: WebSocket):
                 })
 
                 try:
-                    tts_audio = await asyncio.to_thread(tts.speak, response_text)
+                    tts_audio = tts.speak(response_text)
                     if tts_audio:
                         chunk_size = 8000
                         for i in range(0, len(tts_audio), chunk_size):

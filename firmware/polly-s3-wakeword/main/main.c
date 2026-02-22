@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <inttypes.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -56,12 +57,12 @@ static const char *TAG = "POLLY";
 /* --- Configuration --- */
 
 // WiFi
-#define WIFI_SSID       "Glen's iPhone"
-#define WIFI_PASSWORD   "Wibar33be!!"
+#define WIFI_SSID       "SpectrumSetup-73"
+#define WIFI_PASSWORD   "orangegate448"
 #define WIFI_MAX_RETRY  10
 
 // Server
-#define SERVER_HOST     "192.168.1.100"
+#define SERVER_HOST     "192.168.1.251"
 #define SERVER_PORT     8000
 #define WS_URI          "ws://" SERVER_HOST ":8000/api/audio/continuous"
 
@@ -241,11 +242,6 @@ static void spk_play_wake_sound(void)
     spk_play_tone(800, 80);
     vTaskDelay(pdMS_TO_TICKS(30));
     spk_play_tone(1200, 80);
-}
-
-static void spk_play_error_sound(void)
-{
-    spk_play_tone(200, 300);
 }
 
 
@@ -596,8 +592,8 @@ static void mic_stream_task(void *arg)
 void app_main(void)
 {
     ESP_LOGI(TAG, "=== Polly Connect - ESP32-S3 WebSocket Streaming ===");
-    ESP_LOGI(TAG, "Free heap: %lu bytes", esp_get_free_heap_size());
-    ESP_LOGI(TAG, "Free PSRAM: %lu bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    ESP_LOGI(TAG, "Free heap: %"PRIu32" bytes", (uint32_t)esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free PSRAM: %"PRIu32" bytes", (uint32_t)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
     // Init NVS (needed for WiFi)
     esp_err_t ret = nvs_flash_init();

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from core.intent_parser import IntentParser
-from core.database import Database
+from core.database import PollyDB
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ async def process_command(request: Request, command: CommandRequest):
     }
 
 
-async def process_intent(intent_result: dict, db: Database, transcription: str) -> str:
+async def process_intent(intent_result: dict, db: PollyDB, transcription: str) -> str:
     """Process intent and return response text"""
     intent = intent_result.get("intent")
 
