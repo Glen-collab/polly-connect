@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Memory Storage - Polly Connect{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Memory Storage</h1>
+
+<!-- Add Item Form -->
+<div class="bg-white rounded-lg shadow p-6 mb-6">
+    <h2 class="text-lg font-semibold mb-4">Store an Item</h2>
+    <form method="POST" action="/web/memory/add" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Item</label>
+            <input type="text" name="item" required class="w-full border rounded px-3 py-2" placeholder="Keys">
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Location</label>
+            <input type="text" name="location" required class="w-full border rounded px-3 py-2" placeholder="Kitchen drawer">
+        </div>
+        <div class="flex items-end">
+            <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700 w-full">Store</button>
+        </div>
+    </form>
+</div>
+
+<!-- Items List -->
+<div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-lg font-semibold mb-4">Stored Items ({{ items|length }})</h2>
+    {% if items %}
+    <table class="w-full">
+        <thead>
+            <tr class="text-left text-sm text-gray-500 border-b">
+                <th class="pb-2">Item</th>
+                <th class="pb-2">Location</th>
+                <th class="pb-2">Last Updated</th>
+                <th class="pb-2"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr class="border-b">
+                <td class="py-2 font-medium">{{ item.item }}</td>
+                <td class="py-2 text-gray-600">{{ item.location }}</td>
+                <td class="py-2 text-gray-400 text-sm">{{ item.updated_at }}</td>
+                <td class="py-2">
+                    <form method="POST" action="/web/memory/delete/{{ item.id }}" class="inline">
+                        <button type="submit" class="text-red-500 hover:text-red-700 text-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-gray-400">No items stored. Say "my keys are in the kitchen" to start.</p>
+    {% endif %}
+</div>
+{% endblock %}

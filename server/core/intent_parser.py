@@ -9,38 +9,128 @@ from typing import Dict, Optional
 class IntentParser:
     def __init__(self, use_spacy: bool = False):
         self.use_spacy = False  # Disabled for simplicity
-        
+
         self.container_words = {
             "drawer", "bin", "box", "shelf", "cabinet", "toolbox", "container",
             "bucket", "tray", "rack", "pegboard", "wall", "corner", "workbench",
             "bench", "table", "floor", "hook", "hanger", "bag", "case"
         }
-        
+
+        # Trigger phrases for non-memory intents (from polly-config)
+        self._tell_joke_phrases = [
+            "tell me a joke", "make me laugh", "say something funny",
+            "i need a laugh", "cheer me up", "tell a joke",
+        ]
+        self._ask_question_phrases = [
+            "ask me a question", "ask me something", "let's talk",
+            "tell me a story", "i want to share", "record my story",
+            "take my story",
+        ]
+        self._repeat_phrases = [
+            "repeat", "say that again", "what did you say", "what was that",
+            "pardon", "come again", "one more time",
+            "can you repeat that", "i didn't hear you", "i didn't catch that",
+        ]
+        self._slower_phrases = [
+            "slower", "slow down", "talk slower", "speak slower",
+            "too fast", "not so fast", "can you slow down",
+        ]
+        self._skip_phrases = [
+            "skip", "next question", "skip this one", "i don't know",
+            "pass", "next one", "move on",
+        ]
+        self._stop_phrases = [
+            "stop", "that's enough", "i'm tired", "let's stop",
+            "no more", "i'm done", "enough for today",
+        ]
+        self._goodbye_phrases = [
+            "goodbye polly", "bye polly", "goodbye", "bye bye",
+            "see you later", "good night",
+        ]
+        self._greeting_phrases = [
+            "hello polly", "hi polly", "hey polly", "good morning",
+            "good afternoon", "good evening", "hello", "hi there",
+        ]
+        self._bible_phrases = [
+            "read me a verse", "bible verse", "today's verse",
+            "give me a verse", "read me today's verse",
+            "verse about", "scripture",
+        ]
+        self._medication_phrases = [
+            "remind me to take", "medication", "my pills",
+            "what medications", "did i take my pills", "medicine",
+            "med reminder",
+        ]
+        self._weather_phrases = [
+            "what's the weather", "weather this week", "weather today",
+            "farmer's almanac", "forecast",
+        ]
+
     def parse(self, text: str) -> Dict:
         text = text.strip()
         if not text:
             return {"intent": "unknown", "confidence": 0.0}
-            
+
         text_lower = text.lower()
-        
+
+        # Check non-memory intents first (they're simpler/faster)
+        if self._matches(text_lower, self._tell_joke_phrases):
+            return {"intent": "tell_joke", "confidence": 0.95}
+
+        if self._matches(text_lower, self._ask_question_phrases):
+            return {"intent": "ask_question", "confidence": 0.95}
+
+        if self._matches(text_lower, self._repeat_phrases):
+            return {"intent": "repeat", "confidence": 0.95}
+
+        if self._matches(text_lower, self._slower_phrases):
+            return {"intent": "slower", "confidence": 0.95}
+
+        if self._matches(text_lower, self._skip_phrases):
+            return {"intent": "skip", "confidence": 0.95}
+
+        if self._matches(text_lower, self._goodbye_phrases):
+            return {"intent": "goodbye", "confidence": 0.95}
+
+        if self._matches(text_lower, self._stop_phrases):
+            return {"intent": "stop", "confidence": 0.95}
+
+        if self._matches(text_lower, self._bible_phrases):
+            # Extract topic if present: "verse about strength"
+            topic = None
+            topic_match = re.search(r"verse about (.+)", text_lower)
+            if topic_match:
+                topic = topic_match.group(1).strip()
+            return {"intent": "bible_verse", "topic": topic, "confidence": 0.9}
+
+        if self._matches(text_lower, self._medication_phrases):
+            return {"intent": "medication", "confidence": 0.9, "raw": text}
+
+        if self._matches(text_lower, self._weather_phrases):
+            return {"intent": "weather", "confidence": 0.9}
+
+        if self._matches(text_lower, self._greeting_phrases):
+            return {"intent": "greeting", "confidence": 0.9}
+
+        # Memory intents (existing)
         if self._is_help(text_lower):
             return {"intent": "help", "confidence": 1.0}
-            
+
         if self._is_list(text_lower):
             return {"intent": "list_all", "confidence": 1.0}
-            
+
         delete_match = self._is_delete(text_lower)
         if delete_match:
             return {"intent": "delete", "item": delete_match, "confidence": 0.9}
-            
+
         location_query = self._is_location_query(text_lower)
         if location_query:
             return {"intent": "retrieve_location", "location": location_query, "confidence": 0.9}
-            
+
         item_query = self._is_item_query(text_lower)
         if item_query:
             return {"intent": "retrieve_item", "item": item_query, "confidence": 0.9}
-            
+
         store_result = self._is_store(text_lower)
         if store_result:
             return {
@@ -50,13 +140,20 @@ class IntentParser:
                 "context": store_result.get("context"),
                 "confidence": 0.85
             }
-            
+
         return {"intent": "unknown", "confidence": 0.0}
-        
+
+    def _matches(self, text: str, phrases: list) -> bool:
+        """Check if text contains any of the trigger phrases."""
+        for phrase in phrases:
+            if phrase in text:
+                return True
+        return False
+
     def _is_help(self, text: str) -> bool:
         patterns = [r"\bhelp\b", r"\bwhat can you do\b", r"\bhow do (i|you)\b"]
         return any(re.search(p, text) for p in patterns)
-        
+
     def _is_list(self, text: str) -> bool:
         patterns = [
             r"\blist (all|everything)\b",
@@ -64,7 +161,7 @@ class IntentParser:
             r"\bwhat do you (know|remember)\b"
         ]
         return any(re.search(p, text) for p in patterns)
-        
+
     def _is_delete(self, text: str) -> Optional[str]:
         patterns = [
             r"(?:forget|remove|delete)(?: about)? (?:the |my )?(.+)",
@@ -74,7 +171,7 @@ class IntentParser:
             if match:
                 return match.group(1).strip()
         return None
-        
+
     def _is_location_query(self, text: str) -> Optional[str]:
         patterns = [
             r"what(?:'s| is| do i have) in (?:the |my )?(.+?)(?:\?|$)",
@@ -87,7 +184,7 @@ class IntentParser:
                 if self._looks_like_location(location):
                     return location
         return None
-        
+
     def _is_item_query(self, text: str) -> Optional[str]:
         patterns = [
             r"where(?:'s| is| are| did i put)(?: the| my)? (.+?)(?:\?|$)",
@@ -102,14 +199,14 @@ class IntentParser:
                 if item and not self._looks_like_location(item):
                     return item
         return None
-        
+
     def _is_store(self, text_lower: str) -> Optional[Dict]:
         patterns = [
             r"(?:the |my )?(.+?) (?:is|are|goes?) (?:in|on|under|behind|inside|next to|near|by|at) (?:the |my )?(.+)",
             r"(?:i )?(?:put|placed|stored|keep|left) (?:the |my )?(.+?) (?:in|on|under|behind|inside|next to|near|by|at) (?:the |my )?(.+)",
-            r"(?:the |my )?(.+?) (?:in|on|under|behind|at) (?:the |my )?(.+)",  # Without "is"
+            r"(?:the |my )?(.+?) (?:in|on|under|behind|at) (?:the |my )?(.+)",
         ]
-        
+
         for pattern in patterns:
             match = re.search(pattern, text_lower)
             if match:
@@ -117,11 +214,11 @@ class IntentParser:
                 if item and location and not self._looks_like_question(item):
                     return {"item": item, "location": location, "context": None}
         return None
-        
+
     def _looks_like_question(self, text: str) -> bool:
         question_words = ["where", "what", "which", "how", "when", "why", "who"]
         return any(text.startswith(w) for w in question_words)
-        
+
     def _looks_like_location(self, text: str) -> bool:
         text_lower = text.lower()
         for word in self.container_words:

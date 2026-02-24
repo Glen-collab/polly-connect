@@ -14,6 +14,7 @@ intent_parser = IntentParser(use_spacy=False)
 
 class CommandRequest(BaseModel):
     text: str
+    device_id: str = "rest_client"
 
 
 class ItemCreate(BaseModel):
@@ -24,47 +25,16 @@ class ItemCreate(BaseModel):
 
 @router.post("/command")
 async def process_command(request: Request, command: CommandRequest):
-    db = request.app.state.db
+    cmd = request.app.state.cmd
     result = intent_parser.parse(command.text)
-    intent = result.get("intent", "unknown")
-    
-    response = {"intent": intent, "input": command.text}
-    
-    if intent == "store":
-        item = result.get("item")
-        location = result.get("location")
-        if item and location:
-            row_id = db.store_item(item, location, result.get("context"), command.text)
-            response["message"] = f"Stored: {item} → {location}"
-            response["item_id"] = row_id
-        else:
-            response["message"] = "Couldn't understand"
-            
-    elif intent == "retrieve_item":
-        item = result.get("item")
-        results = db.find_item(item) if item else []
-        response["results"] = results
-        response["message"] = f"Found {len(results)} results"
-        
-    elif intent == "retrieve_location":
-        location = result.get("location")
-        results = db.find_by_location(location) if location else []
-        response["results"] = results
-        
-    elif intent == "delete":
-        item = result.get("item")
-        if item and db.delete_item(item):
-            response["message"] = f"Deleted: {item}"
-        else:
-            response["message"] = "Not found"
-            
-    elif intent == "list_all":
-        response["results"] = db.list_all()
-        
-    elif intent == "help":
-        response["message"] = "Store items, find items, list all"
-        
-    return response
+
+    response_text = await cmd.process(result, command.text, command.device_id)
+
+    return {
+        "intent": result.get("intent", "unknown"),
+        "input": command.text,
+        "message": response_text,
+    }
 
 
 @router.get("/items")

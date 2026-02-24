@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Stories - Polly Connect{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Stories &amp; Answers</h1>
+
+{% if stories %}
+<div class="space-y-4">
+    {% for story in stories %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex justify-between items-start mb-2">
+            <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">{{ story.source }}</span>
+            <span class="text-xs text-gray-400">{{ story.created_at }}</span>
+        </div>
+        {% if story.speaker_name %}
+        <p class="text-sm text-gray-500 mb-1">Shared by {{ story.speaker_name }}</p>
+        {% endif %}
+        <p class="text-gray-700 whitespace-pre-wrap">{{ story.transcript or "Transcription pending..." }}</p>
+        {% if story.id %}
+        <a href="/web/stories/{{ story.id }}/edit" class="text-sm text-emerald-600 hover:underline mt-2 inline-block">Edit</a>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow p-12 text-center">
+    <p class="text-gray-400 text-lg">No stories yet.</p>
+    <p class="text-gray-400">Say "record my story" or press the WAV button to capture memories.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -12,6 +12,11 @@ class Settings:
     SAMPLE_RATE: int = 16000
     CHANNELS: int = 1
 
+    # Backend selection: "whisper" or "aws_transcribe"
+    STT_BACKEND: str = os.getenv("POLLY_STT_BACKEND", "whisper")
+    # Backend selection: "pyttsx3" or "aws_polly"
+    TTS_BACKEND: str = os.getenv("POLLY_TTS_BACKEND", "pyttsx3")
+
     # Wake word detection
     WAKE_WORD_MODEL_PATH: str = os.getenv(
         "POLLY_WAKE_WORD_MODEL",
@@ -23,6 +28,9 @@ class Settings:
     SILENCE_THRESHOLD_RMS: int = int(os.getenv("POLLY_SILENCE_THRESHOLD", "500"))
     SILENCE_TIMEOUT_S: float = float(os.getenv("POLLY_SILENCE_TIMEOUT", "1.5"))
     MAX_COMMAND_S: float = float(os.getenv("POLLY_MAX_COMMAND_S", "10.0"))
+
+    # Data directory
+    DATA_DIR: str = os.getenv("POLLY_DATA_DIR", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data"))
 
 
 settings = Settings()

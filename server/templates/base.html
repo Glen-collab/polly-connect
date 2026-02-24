@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Polly Connect{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Nav -->
+    <nav class="bg-emerald-600 text-white shadow-md">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/web/dashboard" class="text-xl font-bold">Polly Connect</a>
+            <div class="flex gap-4 text-sm">
+                <a href="/web/dashboard" class="hover:underline">Dashboard</a>
+                <a href="/web/stories" class="hover:underline">Stories</a>
+                <a href="/web/medications" class="hover:underline">Medications</a>
+                <a href="/web/memory" class="hover:underline">Memory</a>
+                <a href="/web/settings" class="hover:underline">Settings</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <main class="max-w-6xl mx-auto px-4 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center text-gray-400 text-xs py-4">
+        Polly Connect &copy; 2026
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

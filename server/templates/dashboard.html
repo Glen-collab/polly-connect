@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Polly Connect{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <!-- Stats Cards -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-gray-500 text-sm">Stories Recorded</h3>
+        <p class="text-3xl font-bold text-emerald-600">{{ story_count }}</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-gray-500 text-sm">Questions Answered</h3>
+        <p class="text-3xl font-bold text-blue-600">{{ question_count }}</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-gray-500 text-sm">Items Remembered</h3>
+        <p class="text-3xl font-bold text-purple-600">{{ item_count }}</p>
+    </div>
+</div>
+
+<!-- Recent Stories -->
+<div class="bg-white rounded-lg shadow p-6 mb-6">
+    <h2 class="text-lg font-semibold mb-4">Recent Stories</h2>
+    {% if stories %}
+    <ul class="space-y-3">
+        {% for story in stories %}
+        <li class="border-b pb-2">
+            <p class="text-gray-700">{{ story.transcript[:200] }}{% if story.transcript|length > 200 %}...{% endif %}</p>
+            <span class="text-xs text-gray-400">{{ story.created_at }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-gray-400">No stories recorded yet. Say "record my story" to get started!</p>
+    {% endif %}
+</div>
+
+<!-- Medication Compliance -->
+<div class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-lg font-semibold mb-4">Medication Schedule</h2>
+    {% if medications %}
+    <ul class="space-y-2">
+        {% for med in medications %}
+        <li class="flex justify-between items-center">
+            <span class="font-medium">{{ med.name }}</span>
+            <span class="text-sm text-gray-500">{{ med.dosage }} &mdash; {{ med.times }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-gray-400">No medications set up. Add them in the Medications tab.</p>
+    {% endif %}
+</div>
+{% endblock %}

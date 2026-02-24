@@ -1,0 +1,36 @@
+[Unit]
+Description=Polly Connect Server
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/opt/polly-connect/server
+ExecStart=/usr/bin/python3.11 main.py
+
+# Backend config — switch to AWS for cloud
+Environment=POLLY_STT_BACKEND=aws_transcribe
+Environment=POLLY_TTS_BACKEND=aws_polly
+Environment=POLLY_S3_BUCKET=polly-connect-data
+Environment=AWS_DEFAULT_REGION=us-east-1
+
+# Server config
+Environment=POLLY_HOST=0.0.0.0
+Environment=POLLY_PORT=8000
+Environment=POLLY_DEBUG=false
+Environment=POLLY_DB_PATH=/opt/polly-connect/polly.db
+Environment=POLLY_DATA_DIR=/opt/polly-connect/data
+
+# Wake word — use VAD on cloud (no ONNX model needed)
+# Set to empty to skip loading OpenWakeWord
+Environment=POLLY_WAKE_WORD_MODEL=
+
+# Silence detection tuning
+Environment=POLLY_SILENCE_THRESHOLD=300
+Environment=POLLY_SILENCE_TIMEOUT=3.0
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

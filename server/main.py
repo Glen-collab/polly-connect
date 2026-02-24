@@ -12,23 +12,51 @@ from api.audio import router as audio_router
 from api.commands import router as commands_router
 from api.devices import router as devices_router
 from api.homeassistant import router as ha_router
+from api.web import router as web_router
 from core.database import PollyDB
-from core.transcription import WhisperTranscriber
-from core.tts import TTSEngine
 from core.wakeword import WakeWordDetector
+from core.data_loader import DataLoader
+from core.command_processor import CommandProcessor
+from core.bible import BibleVerseService
+from core.weather import AlmanacWeather
+from core.medications import MedicationScheduler
+from core.auth import APIKeyMiddleware
 from config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def create_stt_backend():
+    """Factory: select STT backend based on config."""
+    if settings.STT_BACKEND == "aws_transcribe":
+        from core.aws_transcribe import AWSTranscribeSTT
+        return AWSTranscribeSTT()
+    else:
+        from core.transcription import WhisperSTT
+        return WhisperSTT(model_size=settings.WHISPER_MODEL)
+
+
+def create_tts_backend():
+    """Factory: select TTS backend based on config."""
+    if settings.TTS_BACKEND == "aws_polly":
+        from core.aws_polly import AWSPollyTTS
+        return AWSPollyTTS()
+    else:
+        from core.tts import Pyttsx3TTS
+        return Pyttsx3TTS()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting Polly Connect server...")
     app.state.db = PollyDB(settings.DATABASE_PATH)
-    logger.info(f"Loading Whisper model: {settings.WHISPER_MODEL}")
-    app.state.transcriber = WhisperTranscriber(model_size=settings.WHISPER_MODEL)
-    app.state.tts = TTSEngine()
+
+    logger.info(f"STT backend: {settings.STT_BACKEND}")
+    app.state.transcriber = create_stt_backend()
+
+    logger.info(f"TTS backend: {settings.TTS_BACKEND}")
+    app.state.tts = create_tts_backend()
 
     logger.info(f"Loading wake word model: {settings.WAKE_WORD_MODEL_PATH}")
     app.state.wake_word_detector = WakeWordDetector(
@@ -40,13 +68,38 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("Wake word detector NOT ready — continuous streaming will not detect wake words")
 
+    # Load data files (jokes, questions, config)
+    app.state.data = DataLoader(settings.DATA_DIR)
+    logger.info(f"Data loaded: {app.state.data.stats()}")
+
+    # Initialize feature services
+    app.state.bible = BibleVerseService(app.state.db, settings.DATA_DIR)
+    app.state.weather = AlmanacWeather(settings.DATA_DIR)
+    app.state.med_scheduler = MedicationScheduler(app.state.db)
+
+    # Central command processor
+    app.state.cmd = CommandProcessor(
+        db=app.state.db,
+        data=app.state.data,
+        bible_service=app.state.bible,
+        weather_service=app.state.weather,
+        med_scheduler=app.state.med_scheduler,
+    )
+
+    # Start medication reminder background task
+    await app.state.med_scheduler.start()
+
     logger.info("Server ready")
     yield
+
+    # Cleanup
+    await app.state.med_scheduler.stop()
     logger.info("Shutting down...")
 
 
 app = FastAPI(title="Polly Connect", version="0.1.0", lifespan=lifespan)
 
+app.add_middleware(APIKeyMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -59,6 +112,7 @@ app.include_router(audio_router, prefix="/api/audio", tags=["audio"])
 app.include_router(commands_router, prefix="/api", tags=["commands"])
 app.include_router(devices_router, prefix="/api/devices", tags=["devices"])
 app.include_router(ha_router, prefix="/api/commands", tags=["homeassistant"])
+app.include_router(web_router, prefix="/web", tags=["web"])
 
 
 @app.get("/")

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Settings - Polly Connect{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Settings</h1>
+
+<form method="POST" action="/web/settings">
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-lg font-semibold mb-4">User Profile</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Name</label>
+                <input type="text" name="name" value="{{ user.name }}"
+                       class="w-full border rounded px-3 py-2">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Familiar Name (what Polly calls them)</label>
+                <input type="text" name="familiar_name" value="{{ user.familiar_name or '' }}"
+                       class="w-full border rounded px-3 py-2" placeholder="Grandma">
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-lg font-semibold mb-4">Preferences</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Bible Verse Topic</label>
+                <select name="bible_topic_preference" class="w-full border rounded px-3 py-2">
+                    <option value="">Any topic</option>
+                    <option value="comfort" {% if user.bible_topic_preference == 'comfort' %}selected{% endif %}>Comfort</option>
+                    <option value="strength" {% if user.bible_topic_preference == 'strength' %}selected{% endif %}>Strength</option>
+                    <option value="peace" {% if user.bible_topic_preference == 'peace' %}selected{% endif %}>Peace</option>
+                    <option value="love" {% if user.bible_topic_preference == 'love' %}selected{% endif %}>Love</option>
+                    <option value="faith" {% if user.bible_topic_preference == 'faith' %}selected{% endif %}>Faith</option>
+                    <option value="hope" {% if user.bible_topic_preference == 'hope' %}selected{% endif %}>Hope</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Music Genre</label>
+                <select name="music_genre_preference" class="w-full border rounded px-3 py-2">
+                    <option value="">Any genre</option>
+                    <option value="country" {% if user.music_genre_preference == 'country' %}selected{% endif %}>Country</option>
+                    <option value="gospel" {% if user.music_genre_preference == 'gospel' %}selected{% endif %}>Gospel</option>
+                    <option value="folk" {% if user.music_genre_preference == 'folk' %}selected{% endif %}>Folk</option>
+                    <option value="classical" {% if user.music_genre_preference == 'classical' %}selected{% endif %}>Classical</option>
+                </select>
+            </div>
+        </div>
+        <div class="mt-4">
+            <label class="flex items-center gap-2">
+                <input type="checkbox" name="memory_care_mode" value="1"
+                       {% if user.memory_care_mode %}checked{% endif %}>
+                <span class="text-sm text-gray-700">Memory Care Mode (extra patience, gentle redirects)</span>
+            </label>
+        </div>
+    </div>
+
+    <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700">
+        Save Settings
+    </button>
+</form>
+{% endblock %}

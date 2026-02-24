@@ -1,0 +1,5 @@
+# Local development dependencies (Windows/Mac with mic/speaker)
+-r requirements.txt
+faster-whisper>=0.10.0
+pyttsx3>=2.90
+openwakeword>=0.6.0
