@@ -16,14 +16,17 @@ class DataLoader:
         self.data_dir = data_dir
         self.jokes: List[Dict] = []
         self.questions: List[Dict] = []
+        self.family_questions: List[Dict] = []
         self.config: Dict = {}
 
         # Flat lists for random access
         self._all_jokes: List[Dict] = []
         self._all_questions: List[Dict] = []
+        self._all_family_questions: List[Dict] = []
 
         self._load_jokes()
         self._load_questions()
+        self._load_family_questions()
         self._load_config()
 
     def _load_jokes(self):
@@ -54,6 +57,21 @@ class DataLoader:
                 self._all_questions.append(q)
         logger.info(f"Loaded {len(self._all_questions)} questions")
 
+    def _load_family_questions(self):
+        path = os.path.join(self.data_dir, "family_questions.json")
+        if not os.path.exists(path):
+            logger.warning(f"Family questions file not found: {path}")
+            return
+        with open(path, "r", encoding="utf-8") as f:
+            self.family_questions = json.load(f)
+        for theme_block in self.family_questions:
+            for q in theme_block.get("questions", []):
+                q["theme"] = theme_block.get("theme", "general")
+                q["jungian_stage"] = theme_block.get("jungian_stage", "ordinary_world")
+                q["life_phase"] = theme_block.get("life_phase", "childhood")
+                self._all_family_questions.append(q)
+        logger.info(f"Loaded {len(self._all_family_questions)} family questions")
+
     def _load_config(self):
         path = os.path.join(self.data_dir, "polly-config.json")
         if not os.path.exists(path):
@@ -75,6 +93,16 @@ class DataLoader:
             return None
         return random.choice(self._all_questions)
 
+    def get_family_question(self, theme: str = None) -> Optional[Dict]:
+        """Return a random family question dict, optionally filtered by theme."""
+        if not self._all_family_questions:
+            return None
+        if theme:
+            themed = [q for q in self._all_family_questions if q.get("theme") == theme]
+            if themed:
+                return random.choice(themed)
+        return random.choice(self._all_family_questions)
+
     def get_config(self, section: str = None) -> Dict:
         """Return full config or a specific section."""
         if section:
@@ -93,4 +121,5 @@ class DataLoader:
         return self.config.get("trigger_phrases", {}).get(intent, [])
 
     def stats(self) -> str:
-        return f"{len(self._all_jokes)} jokes, {len(self._all_questions)} questions"
+        return (f"{len(self._all_jokes)} jokes, {len(self._all_questions)} questions, "
+                f"{len(self._all_family_questions)} family questions")

@@ -10,6 +10,30 @@ class IntentParser:
     def __init__(self, use_spacy: bool = False):
         self.use_spacy = False  # Disabled for simplicity
 
+        # Family storytelling intents
+        self._introduce_self_phrases = [
+            "this is ", "my name is ", "i'm ",
+        ]
+        self._tell_story_phrases = [
+            "let me tell you about", "i remember when", "i want to tell you",
+            "let me share", "i have a story", "tell me a story",
+            "i want to share", "record my story", "take my story",
+        ]
+        self._hear_stories_phrases = [
+            "tell me about", "what did", "play back",
+            "what stories", "any stories about", "what has",
+        ]
+        self._family_question_phrases = [
+            "ask me about my family", "family question", "ask me a family question",
+            "family story", "ask me something about my life",
+            "ask me about my life", "tell me about my family",
+        ]
+        self._story_progress_phrases = [
+            "how many stories", "my progress", "how are we doing",
+            "story progress", "how many memories", "show my progress",
+            "what have we captured", "book progress",
+        ]
+
         self.container_words = {
             "drawer", "bin", "box", "shelf", "cabinet", "toolbox", "container",
             "bucket", "tray", "rack", "pegboard", "wall", "corner", "workbench",
@@ -23,8 +47,6 @@ class IntentParser:
         ]
         self._ask_question_phrases = [
             "ask me a question", "ask me something", "let's talk",
-            "tell me a story", "i want to share", "record my story",
-            "take my story",
         ]
         self._repeat_phrases = [
             "repeat", "say that again", "what did you say", "what was that",
@@ -73,7 +95,33 @@ class IntentParser:
 
         text_lower = text.lower()
 
-        # Check non-memory intents first (they're simpler/faster)
+        # ── Family storytelling intents (check first, order matters) ──
+
+        if self._matches(text_lower, self._story_progress_phrases):
+            return {"intent": "story_progress", "confidence": 0.95}
+
+        if self._matches(text_lower, self._family_question_phrases):
+            return {"intent": "family_question", "confidence": 0.95}
+
+        if self._matches(text_lower, self._hear_stories_phrases):
+            # Extract who they want to hear about
+            query = None
+            for phrase in ["tell me about", "what did", "any stories about", "what has"]:
+                if phrase in text_lower:
+                    idx = text_lower.index(phrase) + len(phrase)
+                    query = text_lower[idx:].strip().rstrip("?. ")
+                    break
+            return {"intent": "hear_stories", "query": query, "confidence": 0.9}
+
+        if self._matches(text_lower, self._tell_story_phrases):
+            return {"intent": "tell_story", "confidence": 0.95}
+
+        intro = self._parse_introduction(text)
+        if intro:
+            return {"intent": "introduce_self", "name": intro[0],
+                    "relationship": intro[1], "confidence": 0.9}
+
+        # Check non-memory intents (they're simpler/faster)
         if self._matches(text_lower, self._tell_joke_phrases):
             return {"intent": "tell_joke", "confidence": 0.95}
 
@@ -229,3 +277,66 @@ class IntentParser:
         if re.search(r'(left|right|top|bottom|front|back)\s+\w+', text_lower):
             return True
         return False
+
+    def _parse_introduction(self, text: str) -> Optional[tuple]:
+        """
+        Try to parse a self-introduction from text.
+        Returns (name, relationship) or None.
+        """
+        text_lower = text.lower().strip()
+
+        # Must match one of the intro trigger phrases
+        if not any(text_lower.startswith(p) or f" {p}" in text_lower
+                    for p in self._introduce_self_phrases):
+            return None
+
+        # Filter out false positives
+        false_positives = [
+            "this is great", "this is good", "this is nice", "this is fun",
+            "this is hard", "this is easy", "this is it", "this is all",
+            "this is where", "this is what", "this is how", "this is why",
+            "this is the", "this is my", "this is a ", "this is an ",
+        ]
+        for fp in false_positives:
+            if text_lower.startswith(fp):
+                return None
+
+        name = None
+        relationship = None
+
+        # "this is [Name]" with optional relationship
+        match = re.search(
+            r"this is ([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)"
+            r"(?:,?\s+(?:I'?m|she'?s|he'?s)\s+(.+))?",
+            text, re.IGNORECASE
+        )
+        if match:
+            name = match.group(1).strip().title()
+            relationship = match.group(2).strip() if match.group(2) else None
+            return (name, relationship)
+
+        # "my name is [Name]"
+        match = re.search(r"my name is ([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)",
+                          text, re.IGNORECASE)
+        if match:
+            return (match.group(1).strip().title(), None)
+
+        # "I'm [Name]" — filter out non-names
+        skip_words = {
+            "fine", "good", "great", "okay", "ok", "doing", "here", "ready",
+            "back", "home", "tired", "hungry", "happy", "sad", "sorry",
+            "not", "just", "going", "looking", "trying", "telling",
+        }
+        match = re.search(r"I'?m\s+([A-Z][a-z]+)", text)
+        if match:
+            candidate = match.group(1).strip()
+            if candidate.lower() not in skip_words:
+                name = candidate.title()
+                rel_match = re.search(
+                    r"I'?m\s+" + re.escape(candidate) + r",?\s+(.+)",
+                    text, re.IGNORECASE
+                )
+                relationship = rel_match.group(1).strip() if rel_match else None
+                return (name, relationship)
+
+        return None

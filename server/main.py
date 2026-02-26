@@ -20,6 +20,14 @@ from core.command_processor import CommandProcessor
 from core.bible import BibleVerseService
 from core.weather import AlmanacWeather
 from core.medications import MedicationScheduler
+from core.family_identity import FamilyIdentityService
+from core.followup_generator import FollowupGenerator
+from core.echo_bridge_invite import EchoEngine
+from core.narrative_arc import NarrativeArc
+from core.memory_extractor import MemoryExtractor
+from core.engagement import EngagementTracker
+from core.verification import VerificationService
+from core.book_builder import BookBuilder
 from core.auth import APIKeyMiddleware
 from config import settings
 
@@ -77,6 +85,24 @@ async def lifespan(app: FastAPI):
     app.state.weather = AlmanacWeather(settings.DATA_DIR)
     app.state.med_scheduler = MedicationScheduler(app.state.db)
 
+    # Family identity and narrative services
+    app.state.family_identity = FamilyIdentityService(app.state.db)
+    app.state.followup_gen = FollowupGenerator()
+    app.state.narrative_arc = NarrativeArc(app.state.db)
+    app.state.memory_extractor = MemoryExtractor()
+    app.state.echo_engine = EchoEngine(
+        followup_generator=app.state.followup_gen,
+        narrative_arc=app.state.narrative_arc,
+    )
+    app.state.engagement = EngagementTracker(
+        app.state.db, narrative_arc=app.state.narrative_arc,
+    )
+    app.state.verification = VerificationService(app.state.db)
+    app.state.book_builder = BookBuilder(
+        app.state.db, followup_generator=app.state.followup_gen,
+    )
+    logger.info(f"Legacy story system ready (AI: {app.state.followup_gen.available})")
+
     # Central command processor
     app.state.cmd = CommandProcessor(
         db=app.state.db,
@@ -84,6 +110,11 @@ async def lifespan(app: FastAPI):
         bible_service=app.state.bible,
         weather_service=app.state.weather,
         med_scheduler=app.state.med_scheduler,
+        family_identity=app.state.family_identity,
+        echo_engine=app.state.echo_engine,
+        memory_extractor=app.state.memory_extractor,
+        narrative_arc=app.state.narrative_arc,
+        engagement=app.state.engagement,
     )
 
     # Start medication reminder background task

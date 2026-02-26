@@ -2,6 +2,7 @@
 Database module for Polly Connect
 """
 
+import json
 import sqlite3
 import re
 from typing import Optional, List, Dict
@@ -157,6 +158,85 @@ class PollyDB:
                     region TEXT DEFAULT 'general',
                     forecast TEXT NOT NULL,
                     details TEXT
+                )
+            """)
+
+            # ── Family members ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS family_members (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    name_normalized TEXT NOT NULL,
+                    relationship TEXT,
+                    primary_user_id INTEGER REFERENCES user_profiles(id),
+                    visit_count INTEGER DEFAULT 1,
+                    first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_family_name ON family_members(name_normalized)")
+
+            # ── Story tags ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS story_tags (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    story_id INTEGER REFERENCES stories(id),
+                    tag_type TEXT NOT NULL,
+                    tag_value TEXT NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_story_tags ON story_tags(story_id)")
+
+            # ── Structured memories (narrative-enriched) ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS memories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    story_id INTEGER REFERENCES stories(id),
+                    speaker TEXT,
+                    bucket TEXT DEFAULT 'ordinary_world',
+                    life_phase TEXT DEFAULT 'unknown',
+                    text_summary TEXT,
+                    text TEXT,
+                    people TEXT DEFAULT '[]',
+                    locations TEXT DEFAULT '[]',
+                    emotions TEXT DEFAULT '[]',
+                    fingerprint TEXT,
+                    verification_status TEXT DEFAULT 'unverified',
+                    verified_by TEXT,
+                    verified_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_speaker ON memories(speaker)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_bucket ON memories(bucket)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_verification ON memories(verification_status)")
+
+            # ── Memory verifications (audit trail) ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS memory_verifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memory_id INTEGER REFERENCES memories(id),
+                    verifier_name TEXT NOT NULL,
+                    verifier_relationship TEXT,
+                    status TEXT NOT NULL,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # ── Chapter drafts ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS chapter_drafts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chapter_number INTEGER,
+                    title TEXT,
+                    bucket TEXT,
+                    life_phase TEXT,
+                    memory_ids TEXT DEFAULT '[]',
+                    content TEXT,
+                    status TEXT DEFAULT 'draft',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
@@ -454,6 +534,246 @@ class PollyDB:
                 (f"%{topic}%",)
             ).fetchone()
             return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── User profiles ──
+
+    # ── Family members ──
+
+    def add_family_member(self, name: str, relationship: str = None,
+                          primary_user_id: int = None) -> int:
+        name_norm = self._normalize(name)
+        conn = self._get_connection()
+        try:
+            existing = conn.execute(
+                "SELECT id FROM family_members WHERE name_normalized = ?",
+                (name_norm,)
+            ).fetchone()
+            if existing:
+                conn.execute("""
+                    UPDATE family_members SET visit_count = visit_count + 1,
+                    last_seen = CURRENT_TIMESTAMP WHERE id = ?
+                """, (existing[0],))
+                if relationship:
+                    conn.execute(
+                        "UPDATE family_members SET relationship = ? WHERE id = ?",
+                        (relationship, existing[0])
+                    )
+                conn.commit()
+                return existing[0]
+            cursor = conn.execute("""
+                INSERT INTO family_members (name, name_normalized, relationship, primary_user_id)
+                VALUES (?, ?, ?, ?)
+            """, (name, name_norm, relationship, primary_user_id))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def find_family_member(self, name: str) -> Optional[Dict]:
+        name_norm = self._normalize(name)
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM family_members WHERE name_normalized = ?",
+                (name_norm,)
+            ).fetchone()
+            if not result:
+                result = conn.execute(
+                    "SELECT * FROM family_members WHERE name_normalized LIKE ?",
+                    (f"%{name_norm}%",)
+                ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_family_members(self) -> List[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM family_members ORDER BY last_seen DESC"
+            ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_family_member_visit(self, member_id: int):
+        conn = self._get_connection()
+        try:
+            conn.execute("""
+                UPDATE family_members SET visit_count = visit_count + 1,
+                last_seen = CURRENT_TIMESTAMP WHERE id = ?
+            """, (member_id,))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def search_stories_by_speaker_or_topic(self, query: str, limit: int = 20) -> List[Dict]:
+        query_norm = self._normalize(query)
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute("""
+                SELECT s.* FROM stories s
+                LEFT JOIN story_tags st ON s.id = st.story_id
+                WHERE s.speaker_name LIKE ? OR s.transcript LIKE ?
+                   OR st.tag_value LIKE ?
+                GROUP BY s.id ORDER BY s.created_at DESC LIMIT ?
+            """, (f"%{query_norm}%", f"%{query_norm}%", f"%{query_norm}%", limit)).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def add_story_tag(self, story_id: int, tag_type: str, tag_value: str) -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO story_tags (story_id, tag_type, tag_value)
+                VALUES (?, ?, ?)
+            """, (story_id, tag_type, tag_value))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Structured memories ──
+
+    def save_memory(self, story_id: int = None, speaker: str = None,
+                    bucket: str = "ordinary_world", life_phase: str = "unknown",
+                    text_summary: str = "", text: str = "",
+                    people: list = None, locations: list = None,
+                    emotions: list = None, fingerprint: str = None) -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO memories (story_id, speaker, bucket, life_phase,
+                    text_summary, text, people, locations, emotions, fingerprint)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (story_id, speaker, bucket, life_phase, text_summary, text,
+                  json.dumps(people or []),
+                  json.dumps(locations or []),
+                  json.dumps(emotions or []),
+                  fingerprint))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_memories(self, speaker: str = None, bucket: str = None,
+                     life_phase: str = None, verification_status: str = None,
+                     limit: int = 200) -> List[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            query = "SELECT * FROM memories WHERE 1=1"
+            params = []
+            if speaker:
+                query += " AND speaker LIKE ?"
+                params.append(f"%{speaker}%")
+            if bucket:
+                query += " AND bucket = ?"
+                params.append(bucket)
+            if life_phase:
+                query += " AND life_phase = ?"
+                params.append(life_phase)
+            if verification_status:
+                query += " AND verification_status = ?"
+                params.append(verification_status)
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+            results = conn.execute(query, params).fetchall()
+            rows = []
+            for r in results:
+                d = dict(r)
+                # Parse JSON fields
+                for field in ("people", "locations", "emotions"):
+                    try:
+                        d[field] = json.loads(d[field]) if d[field] else []
+                    except (json.JSONDecodeError, TypeError):
+                        d[field] = []
+                rows.append(d)
+            return rows
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_memory_by_id(self, memory_id: int) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM memories WHERE id = ?", (memory_id,)
+            ).fetchone()
+            if not result:
+                return None
+            d = dict(result)
+            for field in ("people", "locations", "emotions"):
+                try:
+                    d[field] = json.loads(d[field]) if d[field] else []
+                except (json.JSONDecodeError, TypeError):
+                    d[field] = []
+            return d
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def verify_memory(self, memory_id: int, verifier_name: str,
+                      verifier_relationship: str = None,
+                      status: str = "verified", notes: str = None) -> bool:
+        conn = self._get_connection()
+        try:
+            conn.execute("""
+                UPDATE memories SET verification_status = ?, verified_by = ?,
+                verified_at = CURRENT_TIMESTAMP WHERE id = ?
+            """, (status, verifier_name, memory_id))
+            conn.execute("""
+                INSERT INTO memory_verifications
+                    (memory_id, verifier_name, verifier_relationship, status, notes)
+                VALUES (?, ?, ?, ?, ?)
+            """, (memory_id, verifier_name, verifier_relationship, status, notes))
+            conn.commit()
+            return True
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Chapter drafts ──
+
+    def save_chapter_draft(self, chapter_number: int, title: str,
+                           bucket: str, life_phase: str,
+                           memory_ids: str, content: str) -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO chapter_drafts
+                    (chapter_number, title, bucket, life_phase, memory_ids, content)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (chapter_number, title, bucket, life_phase, memory_ids, content))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_chapter_drafts(self) -> List[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM chapter_drafts ORDER BY chapter_number"
+            ).fetchall()
+            return [dict(r) for r in results]
         finally:
             if not self._conn:
                 conn.close()

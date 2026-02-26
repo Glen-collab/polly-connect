@@ -18,6 +18,7 @@ import numpy as np
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.intent_parser import IntentParser
+from core.conversation_state import ConversationMode
 from config import settings
 
 router = APIRouter()
@@ -125,7 +126,20 @@ async def continuous_stream(websocket: WebSocket):
                 chunk_int16 = np.frombuffer(chunk_bytes, dtype=np.int16)
 
                 if state == "listening":
-                    if detector.detected(chunk_int16):
+                    # Get live conversation state for dynamic timeouts
+                    conv_state = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+
+                    # In conversational mode, skip wake word — go straight to recording
+                    if conv_state and conv_state.is_conversational:
+                        rms = int(np.sqrt(np.mean(chunk_int16.astype(np.float32) ** 2)))
+                        if rms > settings.SILENCE_THRESHOLD_RMS:
+                            logger.info(f"Voice detected in conversational mode (device: {device_id})")
+                            state = "recording"
+                            command_audio = bytearray(chunk_bytes)
+                            last_voice_time = time.monotonic()
+                            command_start_time = time.monotonic()
+                            await websocket.send_json({"event": "conversation_listening"})
+                    elif detector.detected(chunk_int16):
                         logger.info(f"*** WAKE WORD DETECTED (device: {device_id}) ***")
                         detector.reset()
 
@@ -147,17 +161,28 @@ async def continuous_stream(websocket: WebSocket):
                     silence_duration = now - last_voice_time
                     total_duration = now - command_start_time
 
-                    if silence_duration > settings.SILENCE_TIMEOUT_S or total_duration > settings.MAX_COMMAND_S:
-                        reason = "silence" if silence_duration > settings.SILENCE_TIMEOUT_S else "max_duration"
+                    # Use dynamic timeouts from conversation state
+                    conv_state = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+                    silence_limit = conv_state.silence_timeout if conv_state else settings.SILENCE_TIMEOUT_S
+                    max_duration = conv_state.max_recording if conv_state else settings.MAX_COMMAND_S
+
+                    if silence_duration > silence_limit or total_duration > max_duration:
+                        reason = "silence" if silence_duration > silence_limit else "max_duration"
                         logger.info(f"Command recording ended ({reason}), {len(command_audio)} bytes")
 
                         await _process_command(
                             websocket, command_audio, transcriber, tts, cmd, device_id
                         )
 
-                        state = "listening"
-                        command_audio = bytearray()
-                        detector.reset()
+                        # After processing, check if we should stay in listening-for-voice mode
+                        if conv_state and conv_state.is_conversational:
+                            state = "listening"
+                            command_audio = bytearray()
+                            # Don't reset detector — no wake word needed
+                        else:
+                            state = "listening"
+                            command_audio = bytearray()
+                            detector.reset()
 
     except WebSocketDisconnect:
         logger.info(f"Continuous stream disconnected: {device_id}")
@@ -201,9 +226,14 @@ async def _process_command(
     intent_result = intent_parser.parse(transcription)
     logger.info(f"Intent: {intent_result}")
 
-    # Process via CommandProcessor
-    response_text = await cmd.process(intent_result, transcription, device_id)
-    logger.info(f"Response: {response_text}")
+    # Use conversation-aware processing if available
+    if hasattr(cmd, 'process_in_context'):
+        response_text, new_mode = await cmd.process_in_context(intent_result, transcription, device_id)
+        logger.info(f"Response: {response_text} (mode: {new_mode.value})")
+    else:
+        response_text = await cmd.process(intent_result, transcription, device_id)
+        new_mode = ConversationMode.COMMAND
+        logger.info(f"Response: {response_text}")
 
     # Send text response
     await websocket.send_json({
@@ -211,6 +241,7 @@ async def _process_command(
         "text": response_text,
         "intent": intent_result.get("intent"),
         "transcription": transcription,
+        "mode": new_mode.value,
     })
 
     # Generate and send TTS audio
@@ -298,7 +329,12 @@ async def audio_stream(websocket: WebSocket):
                             intent_result = intent_parser.parse(transcription)
                             logger.info(f"Intent: {intent_result}")
 
-                            response_text = await cmd.process(intent_result, transcription, device_id)
+                            if hasattr(cmd, 'process_in_context'):
+                                response_text, new_mode = await cmd.process_in_context(
+                                    intent_result, transcription, device_id)
+                            else:
+                                response_text = await cmd.process(intent_result, transcription, device_id)
+                                new_mode = ConversationMode.COMMAND
                             logger.info(f"Response: {response_text}")
 
                             await websocket.send_json({
@@ -306,7 +342,8 @@ async def audio_stream(websocket: WebSocket):
                                 "text": response_text,
                                 "audio": None,
                                 "intent": intent_result.get("intent"),
-                                "transcription": transcription
+                                "transcription": transcription,
+                                "mode": new_mode.value,
                             })
 
                             await _send_tts(websocket, tts, response_text)
@@ -350,7 +387,12 @@ async def audio_stream(websocket: WebSocket):
                 intent_result = intent_parser.parse(transcription)
                 logger.info(f"Intent: {intent_result}")
 
-                response_text = await cmd.process(intent_result, transcription, device_id)
+                if hasattr(cmd, 'process_in_context'):
+                    response_text, new_mode = await cmd.process_in_context(
+                        intent_result, transcription, device_id)
+                else:
+                    response_text = await cmd.process(intent_result, transcription, device_id)
+                    new_mode = ConversationMode.COMMAND
                 logger.info(f"Response: {response_text}")
 
                 await websocket.send_json({
@@ -358,7 +400,8 @@ async def audio_stream(websocket: WebSocket):
                     "text": response_text,
                     "audio": None,
                     "intent": intent_result.get("intent"),
-                    "transcription": transcription
+                    "transcription": transcription,
+                    "mode": new_mode.value,
                 })
 
                 await _send_tts(websocket, tts, response_text)

@@ -1,0 +1,142 @@
+[
+  {
+    "theme": "family_kitchen",
+    "jungian_stage": "ordinary_world",
+    "life_phase": "childhood",
+    "questions": [
+      {"id": "fk01", "question": "What's something your mama used to cook that nobody else could get right?"},
+      {"id": "fk02", "question": "Was there a dish that always showed up at holidays, no matter what?"},
+      {"id": "fk03", "question": "Did anybody in your family have a secret recipe they wouldn't share?"},
+      {"id": "fk04", "question": "What's the best meal you remember eating as a kid?"},
+      {"id": "fk05", "question": "Did your family sit down together for supper every night?"},
+      {"id": "fk06", "question": "Who was the best cook in your family growing up?"},
+      {"id": "fk07", "question": "Was there a food you hated as a kid but love now?"}
+    ]
+  },
+  {
+    "theme": "family_characters",
+    "jungian_stage": "ordinary_world",
+    "life_phase": "childhood",
+    "questions": [
+      {"id": "fc01", "question": "Who was the character in your family? The one who always had everybody laughing?"},
+      {"id": "fc02", "question": "Was there somebody in your family who could tell a story like nobody else?"},
+      {"id": "fc03", "question": "Who was the toughest person in your family?"},
+      {"id": "fc04", "question": "Did you have a favorite aunt or uncle growing up?"},
+      {"id": "fc05", "question": "Who did everybody go to when they needed advice?"},
+      {"id": "fc06", "question": "Was there a family member everybody was just a little bit afraid of?"},
+      {"id": "fc07", "question": "Who in your family could fix just about anything?"}
+    ]
+  },
+  {
+    "theme": "holidays",
+    "jungian_stage": "ordinary_world",
+    "life_phase": "childhood",
+    "questions": [
+      {"id": "hd01", "question": "What did Christmas morning look like at your house growing up?"},
+      {"id": "hd02", "question": "Did your family have any holiday traditions that were just yours?"},
+      {"id": "hd03", "question": "What's the best Thanksgiving you can remember?"},
+      {"id": "hd04", "question": "Did your family do anything special for the Fourth of July?"},
+      {"id": "hd05", "question": "Was there a holiday that always seemed to bring everybody together?"},
+      {"id": "hd06", "question": "Did you ever get a birthday present you'll never forget?"},
+      {"id": "hd07", "question": "What's a holiday tradition you wish your family still did?"}
+    ]
+  },
+  {
+    "theme": "growing_up_work",
+    "jungian_stage": "call_to_adventure",
+    "life_phase": "adolescence",
+    "questions": [
+      {"id": "gw01", "question": "What was your first real job?"},
+      {"id": "gw02", "question": "What's the one thing your dad always said?"},
+      {"id": "gw03", "question": "Did you have chores growing up? What was the worst one?"},
+      {"id": "gw04", "question": "What did you want to be when you grew up?"},
+      {"id": "gw05", "question": "Was there a teacher who really made a difference in your life?"},
+      {"id": "gw06", "question": "What's something you learned the hard way?"},
+      {"id": "gw07", "question": "Did your parents ever tell you something that stuck with you your whole life?"}
+    ]
+  },
+  {
+    "theme": "courtship",
+    "jungian_stage": "crossing_threshold",
+    "life_phase": "young_adult",
+    "questions": [
+      {"id": "ct01", "question": "How did you meet your husband or wife?"},
+      {"id": "ct02", "question": "What was your first date like?"},
+      {"id": "ct03", "question": "Was there a moment you knew they were the one?"},
+      {"id": "ct04", "question": "What's the most romantic thing that ever happened to you?"},
+      {"id": "ct05", "question": "Did your parents approve right away, or did they take some convincing?"},
+      {"id": "ct06", "question": "What was your wedding day like?"},
+      {"id": "ct07", "question": "What's the best piece of advice anybody gave you about marriage?"}
+    ]
+  },
+  {
+    "theme": "raising_kids",
+    "jungian_stage": "trials_allies_enemies",
+    "life_phase": "adult",
+    "questions": [
+      {"id": "rk01", "question": "What's something your kids did that you'll never forget?"},
+      {"id": "rk02", "question": "Was there a moment with your kids that made you the proudest?"},
+      {"id": "rk03", "question": "What's the funniest thing one of your kids ever said?"},
+      {"id": "rk04", "question": "Did you raise your kids the same way you were raised, or different?"},
+      {"id": "rk05", "question": "What was the hardest part about being a parent?"},
+      {"id": "rk06", "question": "Is there something you always told your kids, kind of like your own saying?"},
+      {"id": "rk07", "question": "What do you hope your grandkids remember about you?"}
+    ]
+  },
+  {
+    "theme": "neighborhood",
+    "jungian_stage": "ordinary_world",
+    "life_phase": "childhood",
+    "questions": [
+      {"id": "nb01", "question": "What was your neighborhood like when you were growing up?"},
+      {"id": "nb02", "question": "Did you have a best friend as a kid? What did you two get into?"},
+      {"id": "nb03", "question": "Was there a place in your town where everybody hung out?"},
+      {"id": "nb04", "question": "Did you ever get in trouble as a kid? What happened?"},
+      {"id": "nb05", "question": "What games did you play outside when you were little?"},
+      {"id": "nb06", "question": "Did you know all your neighbors? Were they like family?"},
+      {"id": "nb07", "question": "What's one thing about your hometown that doesn't exist anymore?"}
+    ]
+  },
+  {
+    "theme": "faith_and_church",
+    "jungian_stage": "transformation",
+    "life_phase": "reflection",
+    "questions": [
+      {"id": "fa01", "question": "Did your family go to church growing up?"},
+      {"id": "fa02", "question": "Was there a song from church that still gives you goosebumps?"},
+      {"id": "fa03", "question": "Did you have a favorite Bible verse or story growing up?"},
+      {"id": "fa04", "question": "Was there a time your faith really carried you through something hard?"},
+      {"id": "fa05", "question": "Did your family say grace before meals?"},
+      {"id": "fa06", "question": "Was there a preacher or pastor who really touched your life?"},
+      {"id": "fa07", "question": "What's something you pray about most?"}
+    ]
+  },
+  {
+    "theme": "music_and_fun",
+    "jungian_stage": "ordinary_world",
+    "life_phase": "childhood",
+    "questions": [
+      {"id": "mf01", "question": "What kind of music did your family listen to?"},
+      {"id": "mf02", "question": "Did anybody in your family play an instrument?"},
+      {"id": "mf03", "question": "What's a song that takes you right back to being young?"},
+      {"id": "mf04", "question": "Did your family dance at get-togethers?"},
+      {"id": "mf05", "question": "What's the best concert or show you ever went to?"},
+      {"id": "mf06", "question": "Was there a TV show your whole family watched together?"},
+      {"id": "mf07", "question": "What did you do for fun on a Saturday night?"}
+    ]
+  },
+  {
+    "theme": "lessons_and_wisdom",
+    "jungian_stage": "return_with_knowledge",
+    "life_phase": "reflection",
+    "questions": [
+      {"id": "lw01", "question": "If you could tell your younger self one thing, what would it be?"},
+      {"id": "lw02", "question": "What's the best advice anybody ever gave you?"},
+      {"id": "lw03", "question": "Is there a saying you live by?"},
+      {"id": "lw04", "question": "What's something you know now that you wish you knew at twenty?"},
+      {"id": "lw05", "question": "What are you most proud of in your life?"},
+      {"id": "lw06", "question": "What do you want people to remember about you?"},
+      {"id": "lw07", "question": "If you could go back and relive one day, which day would it be?"}
+    ]
+  }
+]
