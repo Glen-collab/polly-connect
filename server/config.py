@@ -45,6 +45,9 @@ class Settings:
     # OpenAI API key (for Vision photo scan + follow-up questions)
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
+    # Web session duration (hours)
+    SESSION_DURATION_HOURS: int = int(os.getenv("POLLY_SESSION_HOURS", "72"))
+
     # Data directory
     DATA_DIR: str = os.getenv("POLLY_DATA_DIR", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data"))
 

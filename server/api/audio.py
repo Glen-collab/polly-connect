@@ -20,6 +20,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from core.intent_parser import IntentParser
 from core.conversation_state import ConversationMode
 from core.vad_wakeword import VADWakeWordDetector
+from core.auth import verify_device_api_key, verify_websocket_key
 from config import settings
 
 router = APIRouter()
@@ -120,7 +121,23 @@ async def continuous_stream(websocket: WebSocket):
 
                 if event == "connect":
                     device_id = msg_data.get("device_id", "unknown")
-                    logger.info(f"Continuous stream device: {device_id}")
+                    # Authenticate device
+                    device_info = verify_device_api_key(msg_data.get("api_key", ""), db)
+                    if device_info:
+                        conv_state = cmd._get_state(device_id)
+                        conv_state.tenant_id = device_info["tenant_id"]
+                        conv_state.user_id = device_info["user_id"]
+                        logger.info(f"Continuous stream device: {device_id} (tenant={device_info['tenant_id']})")
+                    elif not verify_websocket_key(msg_data):
+                        logger.warning(f"Continuous stream auth failed: {device_id}")
+                        await websocket.send_json({"event": "error", "message": "Authentication failed"})
+                        await websocket.close()
+                        return
+                    else:
+                        # Global key fallback → tenant 1
+                        conv_state = cmd._get_state(device_id)
+                        conv_state.tenant_id = 1
+                        logger.info(f"Continuous stream device: {device_id} (global key, tenant=1)")
                     await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
                     continue
 
@@ -396,7 +413,22 @@ async def audio_stream(websocket: WebSocket):
             if event == "connect":
                 device_id = message.get("device_id", "unknown")
                 session = AudioSession(device_id)
-                logger.info(f"Device connected: {device_id}")
+                # Authenticate device
+                device_info = verify_device_api_key(message.get("api_key", ""), app.state.db)
+                if device_info:
+                    conv_state_obj = cmd._get_state(device_id)
+                    conv_state_obj.tenant_id = device_info["tenant_id"]
+                    conv_state_obj.user_id = device_info["user_id"]
+                    logger.info(f"Device connected: {device_id} (tenant={device_info['tenant_id']})")
+                elif not verify_websocket_key(message):
+                    logger.warning(f"Device auth failed: {device_id}")
+                    await websocket.send_json({"event": "error", "message": "Authentication failed"})
+                    await websocket.close()
+                    return
+                else:
+                    conv_state_obj = cmd._get_state(device_id)
+                    conv_state_obj.tenant_id = 1
+                    logger.info(f"Device connected: {device_id} (global key, tenant=1)")
                 await websocket.send_json({"event": "connected", "message": "Ready"})
 
             elif event == "wake_word_detected":

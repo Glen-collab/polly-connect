@@ -48,12 +48,16 @@ class CommandProcessor:
 
         # ── Memory storage ──
 
+        # Get tenant context from conversation state
+        state = self._get_state(device_id)
+        tid = state.tenant_id
+
         if intent == "store":
             item = intent_result.get("item")
             location = intent_result.get("location")
             context = intent_result.get("context")
             if item and location:
-                self.db.store_item(item, location, context, raw_text)
+                self.db.store_item(item, location, context, raw_text, tenant_id=tid)
                 resp = f"Got it. {item} is in the {location}."
                 self._last_response[device_id] = resp
                 return resp
@@ -62,7 +66,7 @@ class CommandProcessor:
         elif intent == "retrieve_item":
             item = intent_result.get("item")
             if item:
-                results = self.db.find_item(item)
+                results = self.db.find_item(item, tenant_id=tid)
                 if results:
                     r = results[0]
                     if r.get("context"):
@@ -77,7 +81,7 @@ class CommandProcessor:
         elif intent == "retrieve_location":
             location = intent_result.get("location")
             if location:
-                results = self.db.find_by_location(location)
+                results = self.db.find_by_location(location, tenant_id=tid)
                 if results:
                     items = [r["item"] for r in results]
                     resp = f"In the {location}, you have: {', '.join(items)}."
@@ -89,13 +93,13 @@ class CommandProcessor:
         elif intent == "delete":
             item = intent_result.get("item")
             if item:
-                if self.db.delete_item(item):
+                if self.db.delete_item(item, tenant_id=tid):
                     return f"Forgot about the {item}."
                 return f"I don't have {item} stored."
             return "What should I forget?"
 
         elif intent == "list_all":
-            items = self.db.list_all()
+            items = self.db.list_all(tenant_id=tid)
             resp = f"You have {len(items)} items stored."
             self._last_response[device_id] = resp
             return resp
@@ -168,15 +172,15 @@ class CommandProcessor:
                 if parsed:
                     if parsed["action"] == "add":
                         import json
-                        user = self.db.get_or_create_user()
+                        user = self.db.get_or_create_user(tenant_id=tid)
                         self.db.add_medication(
                             user["id"], parsed["name"], "",
-                            json.dumps(parsed["times"])
+                            json.dumps(parsed["times"]), tenant_id=tid
                         )
                         times_str = " and ".join(parsed["times"])
                         return f"Got it. I'll remind you to take {parsed['name']} at {times_str}."
                     elif parsed["action"] == "list":
-                        meds = self.db.get_medications()
+                        meds = self.db.get_medications(tenant_id=tid)
                         if meds:
                             names = [m["name"] for m in meds]
                             return f"Your medications: {', '.join(names)}."
@@ -213,7 +217,7 @@ class CommandProcessor:
             return await self._handle_tell_story(device_id)
 
         elif intent == "hear_stories":
-            return await self._handle_hear_stories(intent_result)
+            return await self._handle_hear_stories(intent_result, device_id)
 
         elif intent == "family_question":
             return await self._handle_family_question(device_id)
@@ -231,15 +235,17 @@ class CommandProcessor:
         if not name:
             return "I didn't catch your name. Could you say it again?"
 
+        state = self._get_state(device_id)
+        tid = state.tenant_id
+
         if self.family_identity:
-            member = self.family_identity.register_member(name, relationship)
+            member = self.family_identity.register_member(name, relationship, tenant_id=tid)
             visit_count = member.get("visit_count", 1)
-            state = self._get_state(device_id)
             state.speaker_name = name
 
             # If no relationship and first visit, ask how they know the owner
             if not relationship and visit_count <= 1:
-                owner_name = self.db.get_owner_name() or settings.OWNER_NAME
+                owner_name = self.db.get_owner_name(tenant_id=tid) or settings.OWNER_NAME
                 state.mode = ConversationMode.AWAITING_RELATIONSHIP
                 return f"Nice to meet you, {name}! How do you know {owner_name}?"
 
@@ -257,11 +263,13 @@ class CommandProcessor:
             return f"Go ahead, {name}. I'm listening."
         return "Go ahead, I'm listening."
 
-    async def _handle_hear_stories(self, intent_result: dict) -> str:
+    async def _handle_hear_stories(self, intent_result: dict, device_id: str = "unknown") -> str:
+        state = self._get_state(device_id)
+        tid = state.tenant_id
         query = intent_result.get("query")
         if not query:
             return "Who would you like to hear stories about?"
-        stories = self.db.search_stories_by_speaker_or_topic(query)
+        stories = self.db.search_stories_by_speaker_or_topic(query, tenant_id=tid)
         if not stories:
             return f"I don't have any stories about {query} yet. Maybe you could tell me one?"
         story = stories[0]
@@ -307,7 +315,7 @@ class CommandProcessor:
         if self.narrative_arc:
             return self.narrative_arc.get_progress_summary(speaker)
 
-        count = len(self.db.get_memories(speaker=speaker))
+        count = len(self.db.get_memories(speaker=speaker, tenant_id=state.tenant_id))
         if count == 0:
             return "We haven't started collecting stories yet. Ready when you are."
         return f"You've shared {count} memories so far."
@@ -346,6 +354,7 @@ class CommandProcessor:
         Returns (response_text, new_mode).
         """
         state = self._get_state(device_id)
+        tid = state.tenant_id
 
         # If in COMMAND mode, use normal intent processing
         if state.mode == ConversationMode.COMMAND:
@@ -373,6 +382,7 @@ class CommandProcessor:
                             transcript=clean_text,
                             speaker_name=state.speaker_name,
                             source="family_story",
+                            tenant_id=tid,
                         )
                         if self.memory_extractor:
                             mem_data = self.memory_extractor.extract(
@@ -393,6 +403,7 @@ class CommandProcessor:
                                 locations=mem_data["locations"],
                                 emotions=mem_data["emotions"],
                                 fingerprint=fingerprint,
+                                tenant_id=tid,
                             )
                         saved_story = True
                         logger.info(f"Saved story answer before goodbye ({len(clean_text)} chars)")
@@ -447,7 +458,7 @@ class CommandProcessor:
         # Save the relationship
         relationship = raw_text.strip()
         if self.family_identity:
-            self.family_identity.update_relationship(name, relationship)
+            self.family_identity.update_relationship(name, relationship, tenant_id=state.tenant_id)
 
         state.mode = ConversationMode.COMMAND
         return (f"Wonderful! I'll remember you're {relationship}. It's great to meet you, {name}!",
@@ -457,6 +468,7 @@ class CommandProcessor:
                                     device_id: str) -> Tuple[str, ConversationMode]:
         """Process an answer given during STORY_PROMPT or FOLLOWUP_WAIT mode."""
         state = self._get_state(device_id)
+        tid = state.tenant_id
 
         if not answer_text or not answer_text.strip():
             return ("Take your time. I'm listening.", state.mode)
@@ -469,6 +481,7 @@ class CommandProcessor:
             transcript=answer_text,
             speaker_name=state.speaker_name,
             source="family_story",
+            tenant_id=tid,
         )
 
         # Extract structured memory and save
@@ -491,6 +504,7 @@ class CommandProcessor:
                 locations=mem_data["locations"],
                 emotions=mem_data["emotions"],
                 fingerprint=fingerprint,
+                tenant_id=tid,
             )
             # Update state with detected context
             if not state.current_bucket:
@@ -531,6 +545,7 @@ class CommandProcessor:
                                     device_id: str) -> Tuple[str, ConversationMode]:
         """Process transcript during STORY_LISTEN mode (free-form storytelling)."""
         state = self._get_state(device_id)
+        tid = state.tenant_id
 
         if not transcript or not transcript.strip():
             return ("I'm still listening whenever you're ready.", state.mode)
@@ -542,6 +557,7 @@ class CommandProcessor:
             transcript=transcript,
             speaker_name=state.speaker_name,
             source="family_story",
+            tenant_id=tid,
         )
 
         # Extract and save structured memory
@@ -562,6 +578,7 @@ class CommandProcessor:
                 locations=mem_data["locations"],
                 emotions=mem_data["emotions"],
                 fingerprint=fingerprint,
+                tenant_id=tid,
             )
             state.current_bucket = mem_data["bucket"]
 

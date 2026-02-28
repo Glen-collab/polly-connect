@@ -66,6 +66,10 @@ static const char *TAG = "POLLY";
 #define SERVER_PORT     8000
 #define WS_URI          "ws://" SERVER_HOST ":8000/api/audio/continuous"
 
+// Device identity & API key (change these per-device when flashing)
+#define DEVICE_ID       "polly001"
+#define DEVICE_API_KEY  ""  // Leave empty to use global key, or paste per-device key here
+
 // I2S Microphone (INMP441) pins
 #define I2S_MIC_SCK     GPIO_NUM_6
 #define I2S_MIC_WS      GPIO_NUM_5
@@ -415,9 +419,12 @@ static void ws_event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "WebSocket connected to server");
             ws_connected = true;
 
-            // Send connect event
+            // Send connect event with device identity and API key
             {
-                const char *connect_msg = "{\"event\":\"connect\",\"device_id\":\"polly001\"}";
+                char connect_msg[256];
+                snprintf(connect_msg, sizeof(connect_msg),
+                    "{\"event\":\"connect\",\"device_id\":\"%s\",\"api_key\":\"%s\"}",
+                    DEVICE_ID, DEVICE_API_KEY);
                 esp_websocket_client_send_text(ws_client, connect_msg,
                                                 strlen(connect_msg), pdMS_TO_TICKS(1000));
             }

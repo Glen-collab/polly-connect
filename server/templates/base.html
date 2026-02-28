@@ -21,16 +21,22 @@
                 <a href="/web/dashboard" class="text-xl font-bold">Polly Connect</a>
 
                 <!-- Desktop nav -->
-                <div class="hidden md:flex gap-4 text-sm">
+                {% if session %}
+                <div class="hidden md:flex gap-4 text-sm items-center">
                     <a href="/web/dashboard" class="hover:underline">Dashboard</a>
                     <a href="/web/stories" class="hover:underline">Stories</a>
                     <a href="/web/transcriptions" class="hover:underline">Transcriptions</a>
                     <a href="/web/photos" class="hover:underline">Photos</a>
                     <a href="/web/medications" class="hover:underline">Medications</a>
                     <a href="/web/memory" class="hover:underline">Memory</a>
+                    <a href="/web/devices" class="hover:underline">Devices</a>
                     <a href="/web/setup" class="hover:underline">Setup</a>
                     <a href="/web/settings" class="hover:underline">Settings</a>
+                    <span class="text-emerald-200 text-xs">|</span>
+                    <span class="text-emerald-200 text-xs">{{ session.name }}</span>
+                    <a href="/web/logout" class="hover:underline text-emerald-200">Logout</a>
                 </div>
+                {% endif %}
 
                 <!-- Hamburger button (mobile) -->
                 <button id="menu-btn" class="md:hidden p-2 -mr-2 focus:outline-none" onclick="toggleMenu()">
@@ -43,6 +49,7 @@
 
             <!-- Mobile nav -->
             <div id="mobile-menu" class="md:hidden closed">
+                {% if session %}
                 <div class="pb-4 space-y-1">
                     <a href="/web/dashboard" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Dashboard</a>
                     <a href="/web/stories" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Stories</a>
@@ -50,9 +57,15 @@
                     <a href="/web/photos" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Photos</a>
                     <a href="/web/medications" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Medications</a>
                     <a href="/web/memory" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Memory</a>
+                    <a href="/web/devices" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Devices</a>
                     <a href="/web/setup" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Setup</a>
                     <a href="/web/settings" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Settings</a>
+                    <div class="border-t border-emerald-500 mt-2 pt-2">
+                        <span class="block py-1 px-3 text-emerald-200 text-xs">Signed in as {{ session.name }}</span>
+                        <a href="/web/logout" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Logout</a>
+                    </div>
                 </div>
+                {% endif %}
             </div>
         </div>
     </nav>

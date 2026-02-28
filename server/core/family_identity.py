@@ -17,17 +17,19 @@ class FamilyIdentityService:
         self.db = db
 
     def register_member(self, name: str, relationship: str = None,
-                        primary_user_id: int = None) -> Dict:
+                        primary_user_id: int = None,
+                        tenant_id: int = None) -> Dict:
         """Register or update a family member. Returns member info."""
-        member_id = self.db.add_family_member(name, relationship, primary_user_id)
-        member = self.db.find_family_member(name)
+        member_id = self.db.add_family_member(name, relationship, primary_user_id,
+                                              tenant_id=tenant_id)
+        member = self.db.find_family_member(name, tenant_id=tenant_id)
         if member:
             logger.info(f"Family member registered/updated: {name} (visit #{member['visit_count']})")
         return member or {"id": member_id, "name": name, "relationship": relationship, "visit_count": 1}
 
-    def recognize_member(self, name: str) -> Optional[Dict]:
+    def recognize_member(self, name: str, tenant_id: int = None) -> Optional[Dict]:
         """Try to find a known family member by name (fuzzy match)."""
-        member = self.db.find_family_member(name)
+        member = self.db.find_family_member(name, tenant_id=tenant_id)
         if member:
             self.db.update_family_member_visit(member["id"])
             logger.info(f"Recognized family member: {name}")
@@ -101,9 +103,10 @@ class FamilyIdentityService:
 
         return None
 
-    def update_relationship(self, name: str, relationship: str) -> Optional[Dict]:
+    def update_relationship(self, name: str, relationship: str,
+                            tenant_id: int = None) -> Optional[Dict]:
         """Update the relationship for an existing family member."""
-        member = self.db.find_family_member(name)
+        member = self.db.find_family_member(name, tenant_id=tenant_id)
         if member:
             conn = self.db._get_connection()
             try:

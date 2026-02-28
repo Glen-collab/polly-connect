@@ -48,6 +48,9 @@ class ConversationState:
         self.current_bucket: Optional[str] = None      # Jungian bucket
         self.current_life_phase: Optional[str] = None   # Life phase
         self.critical_thinking_step: int = 1             # 1-6
+        # Multi-tenant context (device-level, persists across reset)
+        self.tenant_id: Optional[int] = None
+        self.user_id: Optional[int] = None
 
     def reset(self):
         self.mode = ConversationMode.COMMAND
@@ -58,6 +61,7 @@ class ConversationState:
         self.current_bucket = None
         self.current_life_phase = None
         self.critical_thinking_step = 1
+        # tenant_id and user_id intentionally NOT reset (device-level)
 
     @property
     def silence_timeout(self) -> float:

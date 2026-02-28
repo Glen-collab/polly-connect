@@ -2,9 +2,12 @@
 Database module for Polly Connect
 """
 
+import hashlib
 import json
 import sqlite3
 import re
+import secrets
+from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 
 
@@ -25,6 +28,9 @@ class PollyDB:
     def _init_db(self):
         conn = self._get_connection()
         try:
+            # Enable WAL mode for better concurrent access
+            conn.execute("PRAGMA journal_mode=WAL")
+
             # ── Original items table ──
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS items (
@@ -272,6 +278,43 @@ class PollyDB:
                 )
             """)
 
+            # ── Multi-tenant tables ──
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS tenants (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS accounts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    tenant_id INTEGER REFERENCES tenants(id),
+                    role TEXT DEFAULT 'caretaker',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_login TIMESTAMP
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_tenant ON accounts(tenant_id)")
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS web_sessions (
+                    id TEXT PRIMARY KEY,
+                    account_id INTEGER REFERENCES accounts(id),
+                    tenant_id INTEGER REFERENCES tenants(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_web_sessions_account ON web_sessions(account_id)")
+
             conn.commit()
         finally:
             if not self._conn:
@@ -305,6 +348,28 @@ class PollyDB:
                 if col not in cols:
                     conn.execute(sql)
 
+            # ── Multi-tenant migrations: add tenant_id to all data tables ──
+            tenant_tables = [
+                "items", "stories", "question_sessions", "medications",
+                "medication_logs", "joke_history", "family_members", "memories",
+                "memory_verifications", "chapter_drafts", "sessions", "photos",
+                "story_tags", "user_profiles", "devices",
+            ]
+            for table in tenant_tables:
+                cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+                if "tenant_id" not in cols:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN tenant_id INTEGER")
+
+            # Add api_key_hash to devices
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(devices)").fetchall()}
+            if "api_key_hash" not in cols:
+                conn.execute("ALTER TABLE devices ADD COLUMN api_key_hash TEXT")
+
+            # Create default tenant #1 and backfill
+            conn.execute("INSERT OR IGNORE INTO tenants (id, name) VALUES (1, 'Default')")
+            for table in tenant_tables:
+                conn.execute(f"UPDATE {table} SET tenant_id = 1 WHERE tenant_id IS NULL")
+
             conn.commit()
         finally:
             if not self._conn:
@@ -319,18 +384,255 @@ class PollyDB:
         text = re.sub(r'\s+', ' ', text).strip()
         return text
 
+    # ── Tenant management ──
+
+    def create_tenant(self, name: str) -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "INSERT INTO tenants (name) VALUES (?)", (name,)
+            )
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_tenant(self, tenant_id: int) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM tenants WHERE id = ?", (tenant_id,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Account management ──
+
+    def create_account(self, email: str, password_hash: str, name: str,
+                       tenant_id: int, role: str = "caretaker") -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO accounts (email, password_hash, name, tenant_id, role)
+                VALUES (?, ?, ?, ?, ?)
+            """, (email, password_hash, name, tenant_id, role))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_account_by_email(self, email: str) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM accounts WHERE email = ?", (email,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_account_by_id(self, account_id: int) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM accounts WHERE id = ?", (account_id,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_account_login(self, account_id: int):
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE accounts SET last_login = CURRENT_TIMESTAMP WHERE id = ?",
+                (account_id,)
+            )
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def has_accounts(self) -> bool:
+        conn = self._get_connection()
+        try:
+            count = conn.execute("SELECT COUNT(*) FROM accounts").fetchone()[0]
+            return count > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Web session management ──
+
+    def create_web_session(self, account_id: int, tenant_id: int,
+                           duration_hours: int = 72) -> str:
+        session_id = secrets.token_urlsafe(32)
+        expires_at = (datetime.utcnow() + timedelta(hours=duration_hours)).isoformat()
+        conn = self._get_connection()
+        try:
+            conn.execute("""
+                INSERT INTO web_sessions (id, account_id, tenant_id, expires_at)
+                VALUES (?, ?, ?, ?)
+            """, (session_id, account_id, tenant_id, expires_at))
+            conn.commit()
+            return session_id
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_web_session(self, session_id: str) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute("""
+                SELECT ws.*, a.name as account_name, a.email as account_email, a.role
+                FROM web_sessions ws
+                JOIN accounts a ON ws.account_id = a.id
+                WHERE ws.id = ? AND ws.expires_at > datetime('now')
+            """, (session_id,)).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def touch_web_session(self, session_id: str):
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE web_sessions SET last_active = CURRENT_TIMESTAMP WHERE id = ?",
+                (session_id,)
+            )
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_web_session(self, session_id: str):
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM web_sessions WHERE id = ?", (session_id,))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def cleanup_expired_sessions(self):
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM web_sessions WHERE expires_at <= datetime('now')")
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Device management (per-tenant) ──
+
+    def register_device(self, device_id: str, tenant_id: int, name: str = None,
+                        api_key: str = None) -> Dict:
+        api_key_hash = hashlib.sha256(api_key.encode()).hexdigest() if api_key else None
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            existing = conn.execute(
+                "SELECT * FROM devices WHERE device_id = ?", (device_id,)
+            ).fetchone()
+            if existing:
+                conn.execute("""
+                    UPDATE devices SET tenant_id = ?, name = ?, api_key_hash = ?,
+                    last_seen = CURRENT_TIMESTAMP WHERE device_id = ?
+                """, (tenant_id, name or existing["name"], api_key_hash or existing["api_key_hash"],
+                      device_id))
+            else:
+                conn.execute("""
+                    INSERT INTO devices (device_id, tenant_id, name, api_key_hash)
+                    VALUES (?, ?, ?, ?)
+                """, (device_id, tenant_id, name, api_key_hash))
+            conn.commit()
+            result = conn.execute(
+                "SELECT * FROM devices WHERE device_id = ?", (device_id,)
+            ).fetchone()
+            return dict(result)
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_device_by_api_key_hash(self, api_key_hash: str) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM devices WHERE api_key_hash = ?", (api_key_hash,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_devices_by_tenant(self, tenant_id: int) -> List[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM devices WHERE tenant_id = ? ORDER BY registered_at DESC",
+                (tenant_id,)
+            ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_device_last_seen(self, device_id: str):
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE devices SET last_seen = CURRENT_TIMESTAMP WHERE device_id = ?",
+                (device_id,)
+            )
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_device(self, device_id: str, tenant_id: int) -> bool:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "DELETE FROM devices WHERE device_id = ? AND tenant_id = ?",
+                (device_id, tenant_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
     # ── Items (memory storage) ──
 
     def store_item(self, item: str, location: str, context: Optional[str] = None,
-                   raw_input: Optional[str] = None) -> int:
+                   raw_input: Optional[str] = None, tenant_id: int = None) -> int:
         item_norm = self._normalize(item)
         location_norm = self._normalize(location)
 
         conn = self._get_connection()
         try:
-            existing = conn.execute(
-                "SELECT id FROM items WHERE item_normalized = ?", (item_norm,)
-            ).fetchone()
+            if tenant_id:
+                existing = conn.execute(
+                    "SELECT id FROM items WHERE item_normalized = ? AND tenant_id = ?",
+                    (item_norm, tenant_id)
+                ).fetchone()
+            else:
+                existing = conn.execute(
+                    "SELECT id FROM items WHERE item_normalized = ?", (item_norm,)
+                ).fetchone()
 
             if existing:
                 conn.execute("""
@@ -343,68 +645,86 @@ class PollyDB:
             else:
                 cursor = conn.execute("""
                     INSERT INTO items (item, item_normalized, location,
-                                      location_normalized, context, raw_input)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (item, item_norm, location, location_norm, context, raw_input))
+                                      location_normalized, context, raw_input, tenant_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (item, item_norm, location, location_norm, context, raw_input, tenant_id))
                 conn.commit()
                 return cursor.lastrowid
         finally:
             if not self._conn:
                 conn.close()
 
-    def find_item(self, item: str) -> List[Dict]:
+    def find_item(self, item: str, tenant_id: int = None) -> List[Dict]:
         item_norm = self._normalize(item)
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            results = conn.execute("""
-                SELECT id, item, location, context, created_at, updated_at
-                FROM items WHERE item_normalized = ?
-            """, (item_norm,)).fetchall()
+            t_clause = " AND tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+
+            results = conn.execute(
+                f"SELECT id, item, location, context, created_at, updated_at FROM items WHERE item_normalized = ?{t_clause}",
+                (item_norm,) + t_params
+            ).fetchall()
 
             if not results:
-                results = conn.execute("""
-                    SELECT id, item, location, context, created_at, updated_at
-                    FROM items WHERE item_normalized LIKE ?
-                """, (f"%{item_norm}%",)).fetchall()
+                results = conn.execute(
+                    f"SELECT id, item, location, context, created_at, updated_at FROM items WHERE item_normalized LIKE ?{t_clause}",
+                    (f"%{item_norm}%",) + t_params
+                ).fetchall()
 
             return [dict(r) for r in results]
         finally:
             if not self._conn:
                 conn.close()
 
-    def find_by_location(self, location: str) -> List[Dict]:
+    def find_by_location(self, location: str, tenant_id: int = None) -> List[Dict]:
         location_norm = self._normalize(location)
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            results = conn.execute("""
-                SELECT id, item, location, context, created_at, updated_at
-                FROM items WHERE location_normalized LIKE ?
-            """, (f"%{location_norm}%",)).fetchall()
+            t_clause = " AND tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+            results = conn.execute(
+                f"SELECT id, item, location, context, created_at, updated_at FROM items WHERE location_normalized LIKE ?{t_clause}",
+                (f"%{location_norm}%",) + t_params
+            ).fetchall()
             return [dict(r) for r in results]
         finally:
             if not self._conn:
                 conn.close()
 
-    def list_all(self) -> List[Dict]:
+    def list_all(self, tenant_id: int = None) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            results = conn.execute("""
-                SELECT id, item, location, context, created_at, updated_at
-                FROM items ORDER BY updated_at DESC
-            """).fetchall()
+            if tenant_id:
+                results = conn.execute(
+                    "SELECT id, item, location, context, created_at, updated_at FROM items WHERE tenant_id = ? ORDER BY updated_at DESC",
+                    (tenant_id,)
+                ).fetchall()
+            else:
+                results = conn.execute(
+                    "SELECT id, item, location, context, created_at, updated_at FROM items ORDER BY updated_at DESC"
+                ).fetchall()
             return [dict(r) for r in results]
         finally:
             if not self._conn:
                 conn.close()
 
-    def delete_item(self, item: str) -> bool:
+    def delete_item(self, item: str, tenant_id: int = None) -> bool:
         item_norm = self._normalize(item)
         conn = self._get_connection()
         try:
-            cursor = conn.execute("DELETE FROM items WHERE item_normalized = ?", (item_norm,))
+            if tenant_id:
+                cursor = conn.execute(
+                    "DELETE FROM items WHERE item_normalized = ? AND tenant_id = ?",
+                    (item_norm, tenant_id)
+                )
+            else:
+                cursor = conn.execute(
+                    "DELETE FROM items WHERE item_normalized = ?", (item_norm,)
+                )
             conn.commit()
             return cursor.rowcount > 0
         finally:
@@ -421,33 +741,37 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def search(self, query: str) -> List[Dict]:
+    def search(self, query: str, tenant_id: int = None) -> List[Dict]:
         query_norm = self._normalize(query)
         if not query_norm:
             return []
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            results = conn.execute("""
-                SELECT id, item, location, context, created_at, updated_at
-                FROM items WHERE item LIKE ? OR location LIKE ? OR context LIKE ?
-                LIMIT 20
-            """, (f"%{query_norm}%",) * 3).fetchall()
+            t_clause = " AND tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+            results = conn.execute(
+                f"SELECT id, item, location, context, created_at, updated_at FROM items WHERE (item LIKE ? OR location LIKE ? OR context LIKE ?){t_clause} LIMIT 20",
+                (f"%{query_norm}%",) * 3 + t_params
+            ).fetchall()
             return [dict(r) for r in results]
         finally:
             if not self._conn:
                 conn.close()
 
-    def get_stats(self) -> Dict:
+    def get_stats(self, tenant_id: int = None) -> Dict:
         conn = self._get_connection()
         try:
-            total = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+            t_clause = " WHERE tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+
+            total = conn.execute(f"SELECT COUNT(*) FROM items{t_clause}", t_params).fetchone()[0]
             locations = conn.execute(
-                "SELECT COUNT(DISTINCT location_normalized) FROM items"
+                f"SELECT COUNT(DISTINCT location_normalized) FROM items{t_clause}", t_params
             ).fetchone()[0]
-            recent = conn.execute("""
-                SELECT item, location FROM items ORDER BY updated_at DESC LIMIT 5
-            """).fetchall()
+            recent = conn.execute(
+                f"SELECT item, location FROM items{t_clause} ORDER BY updated_at DESC LIMIT 5", t_params
+            ).fetchall()
             return {
                 "total_items": total,
                 "unique_locations": locations,
@@ -460,32 +784,33 @@ class PollyDB:
     # ── Medications ──
 
     def add_medication(self, user_id: int, name: str, dosage: str, times: str,
-                       active_days: str = None) -> int:
+                       active_days: str = None, tenant_id: int = None) -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
-                INSERT INTO medications (user_id, name, dosage, times, active_days)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO medications (user_id, name, dosage, times, active_days, tenant_id)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (user_id, name, dosage, times,
-                  active_days or '["mon","tue","wed","thu","fri","sat","sun"]'))
+                  active_days or '["mon","tue","wed","thu","fri","sat","sun"]', tenant_id))
             conn.commit()
             return cursor.lastrowid
         finally:
             if not self._conn:
                 conn.close()
 
-    def get_medications(self, user_id: int = None) -> List[Dict]:
+    def get_medications(self, user_id: int = None, tenant_id: int = None) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
+            query = "SELECT * FROM medications WHERE active = 1"
+            params = []
             if user_id:
-                results = conn.execute(
-                    "SELECT * FROM medications WHERE user_id = ? AND active = 1", (user_id,)
-                ).fetchall()
-            else:
-                results = conn.execute(
-                    "SELECT * FROM medications WHERE active = 1"
-                ).fetchall()
+                query += " AND user_id = ?"
+                params.append(user_id)
+            if tenant_id:
+                query += " AND tenant_id = ?"
+                params.append(tenant_id)
+            results = conn.execute(query, params).fetchall()
             return [dict(r) for r in results]
         finally:
             if not self._conn:
@@ -509,33 +834,38 @@ class PollyDB:
 
     def save_story(self, transcript: str, audio_s3_key: str = None,
                    speaker_name: str = None, source: str = "voice",
-                   duration_seconds: float = None, user_id: int = None) -> int:
+                   duration_seconds: float = None, user_id: int = None,
+                   tenant_id: int = None) -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
                 INSERT INTO stories (user_id, transcript, audio_s3_key, speaker_name,
-                                    source, duration_seconds)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (user_id, transcript, audio_s3_key, speaker_name, source, duration_seconds))
+                                    source, duration_seconds, tenant_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, transcript, audio_s3_key, speaker_name, source,
+                  duration_seconds, tenant_id))
             conn.commit()
             return cursor.lastrowid
         finally:
             if not self._conn:
                 conn.close()
 
-    def get_stories(self, user_id: int = None, limit: int = 50) -> List[Dict]:
+    def get_stories(self, user_id: int = None, limit: int = 50,
+                    tenant_id: int = None) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
+            query = "SELECT * FROM stories WHERE 1=1"
+            params = []
             if user_id:
-                results = conn.execute(
-                    "SELECT * FROM stories WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
-                    (user_id, limit)
-                ).fetchall()
-            else:
-                results = conn.execute(
-                    "SELECT * FROM stories ORDER BY created_at DESC LIMIT ?", (limit,)
-                ).fetchall()
+                query += " AND user_id = ?"
+                params.append(user_id)
+            if tenant_id:
+                query += " AND tenant_id = ?"
+                params.append(tenant_id)
+            query += " ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+            results = conn.execute(query, params).fetchall()
             return [dict(r) for r in results]
         finally:
             if not self._conn:
@@ -546,15 +876,15 @@ class PollyDB:
     def save_question_session(self, question_id: str, question_text: str,
                               answer_text: str = None, audio_s3_key: str = None,
                               week: int = None, theme: str = None,
-                              user_id: int = None) -> int:
+                              user_id: int = None, tenant_id: int = None) -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
                 INSERT INTO question_sessions (user_id, question_id, question_text,
-                    answer_text, audio_s3_key, week, theme, answered)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    answer_text, audio_s3_key, week, theme, answered, tenant_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (user_id, question_id, question_text, answer_text, audio_s3_key,
-                  week, theme, 1 if answer_text else 0))
+                  week, theme, 1 if answer_text else 0, tenant_id))
             conn.commit()
             return cursor.lastrowid
         finally:
@@ -588,18 +918,20 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    # ── User profiles ──
-
     # ── Family members ──
 
     def add_family_member(self, name: str, relationship: str = None,
-                          primary_user_id: int = None) -> int:
+                          primary_user_id: int = None,
+                          tenant_id: int = None) -> int:
         name_norm = self._normalize(name)
         conn = self._get_connection()
         try:
+            t_clause = " AND tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+
             existing = conn.execute(
-                "SELECT id FROM family_members WHERE name_normalized = ?",
-                (name_norm,)
+                f"SELECT id FROM family_members WHERE name_normalized = ?{t_clause}",
+                (name_norm,) + t_params
             ).fetchone()
             if existing:
                 conn.execute("""
@@ -614,41 +946,51 @@ class PollyDB:
                 conn.commit()
                 return existing[0]
             cursor = conn.execute("""
-                INSERT INTO family_members (name, name_normalized, relationship, primary_user_id)
-                VALUES (?, ?, ?, ?)
-            """, (name, name_norm, relationship, primary_user_id))
+                INSERT INTO family_members (name, name_normalized, relationship,
+                                           primary_user_id, tenant_id)
+                VALUES (?, ?, ?, ?, ?)
+            """, (name, name_norm, relationship, primary_user_id, tenant_id))
             conn.commit()
             return cursor.lastrowid
         finally:
             if not self._conn:
                 conn.close()
 
-    def find_family_member(self, name: str) -> Optional[Dict]:
+    def find_family_member(self, name: str, tenant_id: int = None) -> Optional[Dict]:
         name_norm = self._normalize(name)
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
+            t_clause = " AND tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+
             result = conn.execute(
-                "SELECT * FROM family_members WHERE name_normalized = ?",
-                (name_norm,)
+                f"SELECT * FROM family_members WHERE name_normalized = ?{t_clause}",
+                (name_norm,) + t_params
             ).fetchone()
             if not result:
                 result = conn.execute(
-                    "SELECT * FROM family_members WHERE name_normalized LIKE ?",
-                    (f"%{name_norm}%",)
+                    f"SELECT * FROM family_members WHERE name_normalized LIKE ?{t_clause}",
+                    (f"%{name_norm}%",) + t_params
                 ).fetchone()
             return dict(result) if result else None
         finally:
             if not self._conn:
                 conn.close()
 
-    def get_family_members(self) -> List[Dict]:
+    def get_family_members(self, tenant_id: int = None) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            results = conn.execute(
-                "SELECT * FROM family_members ORDER BY last_seen DESC"
-            ).fetchall()
+            if tenant_id:
+                results = conn.execute(
+                    "SELECT * FROM family_members WHERE tenant_id = ? ORDER BY last_seen DESC",
+                    (tenant_id,)
+                ).fetchall()
+            else:
+                results = conn.execute(
+                    "SELECT * FROM family_members ORDER BY last_seen DESC"
+                ).fetchall()
             return [dict(r) for r in results]
         finally:
             if not self._conn:
@@ -666,30 +1008,34 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def search_stories_by_speaker_or_topic(self, query: str, limit: int = 20) -> List[Dict]:
+    def search_stories_by_speaker_or_topic(self, query: str, limit: int = 20,
+                                           tenant_id: int = None) -> List[Dict]:
         query_norm = self._normalize(query)
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            results = conn.execute("""
+            t_clause = " AND s.tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+            results = conn.execute(f"""
                 SELECT s.* FROM stories s
                 LEFT JOIN story_tags st ON s.id = st.story_id
-                WHERE s.speaker_name LIKE ? OR s.transcript LIKE ?
-                   OR st.tag_value LIKE ?
+                WHERE (s.speaker_name LIKE ? OR s.transcript LIKE ?
+                   OR st.tag_value LIKE ?){t_clause}
                 GROUP BY s.id ORDER BY s.created_at DESC LIMIT ?
-            """, (f"%{query_norm}%", f"%{query_norm}%", f"%{query_norm}%", limit)).fetchall()
+            """, (f"%{query_norm}%", f"%{query_norm}%", f"%{query_norm}%") + t_params + (limit,)).fetchall()
             return [dict(r) for r in results]
         finally:
             if not self._conn:
                 conn.close()
 
-    def add_story_tag(self, story_id: int, tag_type: str, tag_value: str) -> int:
+    def add_story_tag(self, story_id: int, tag_type: str, tag_value: str,
+                      tenant_id: int = None) -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
-                INSERT INTO story_tags (story_id, tag_type, tag_value)
-                VALUES (?, ?, ?)
-            """, (story_id, tag_type, tag_value))
+                INSERT INTO story_tags (story_id, tag_type, tag_value, tenant_id)
+                VALUES (?, ?, ?, ?)
+            """, (story_id, tag_type, tag_value, tenant_id))
             conn.commit()
             return cursor.lastrowid
         finally:
@@ -702,18 +1048,19 @@ class PollyDB:
                     bucket: str = "ordinary_world", life_phase: str = "unknown",
                     text_summary: str = "", text: str = "",
                     people: list = None, locations: list = None,
-                    emotions: list = None, fingerprint: str = None) -> int:
+                    emotions: list = None, fingerprint: str = None,
+                    tenant_id: int = None) -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
                 INSERT INTO memories (story_id, speaker, bucket, life_phase,
-                    text_summary, text, people, locations, emotions, fingerprint)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    text_summary, text, people, locations, emotions, fingerprint, tenant_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (story_id, speaker, bucket, life_phase, text_summary, text,
                   json.dumps(people or []),
                   json.dumps(locations or []),
                   json.dumps(emotions or []),
-                  fingerprint))
+                  fingerprint, tenant_id))
             conn.commit()
             return cursor.lastrowid
         finally:
@@ -722,7 +1069,7 @@ class PollyDB:
 
     def get_memories(self, speaker: str = None, bucket: str = None,
                      life_phase: str = None, verification_status: str = None,
-                     limit: int = 200) -> List[Dict]:
+                     limit: int = 200, tenant_id: int = None) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
@@ -740,6 +1087,9 @@ class PollyDB:
             if verification_status:
                 query += " AND verification_status = ?"
                 params.append(verification_status)
+            if tenant_id:
+                query += " AND tenant_id = ?"
+                params.append(tenant_id)
             query += " ORDER BY created_at DESC LIMIT ?"
             params.append(limit)
             results = conn.execute(query, params).fetchall()
@@ -802,27 +1152,34 @@ class PollyDB:
 
     def save_chapter_draft(self, chapter_number: int, title: str,
                            bucket: str, life_phase: str,
-                           memory_ids: str, content: str) -> int:
+                           memory_ids: str, content: str,
+                           tenant_id: int = None) -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
                 INSERT INTO chapter_drafts
-                    (chapter_number, title, bucket, life_phase, memory_ids, content)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (chapter_number, title, bucket, life_phase, memory_ids, content))
+                    (chapter_number, title, bucket, life_phase, memory_ids, content, tenant_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (chapter_number, title, bucket, life_phase, memory_ids, content, tenant_id))
             conn.commit()
             return cursor.lastrowid
         finally:
             if not self._conn:
                 conn.close()
 
-    def get_chapter_drafts(self) -> List[Dict]:
+    def get_chapter_drafts(self, tenant_id: int = None) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            results = conn.execute(
-                "SELECT * FROM chapter_drafts ORDER BY chapter_number"
-            ).fetchall()
+            if tenant_id:
+                results = conn.execute(
+                    "SELECT * FROM chapter_drafts WHERE tenant_id = ? ORDER BY chapter_number",
+                    (tenant_id,)
+                ).fetchall()
+            else:
+                results = conn.execute(
+                    "SELECT * FROM chapter_drafts ORDER BY chapter_number"
+                ).fetchall()
             return [dict(r) for r in results]
         finally:
             if not self._conn:
@@ -830,15 +1187,23 @@ class PollyDB:
 
     # ── User profiles ──
 
-    def get_or_create_user(self, name: str = "Default User") -> Dict:
+    def get_or_create_user(self, name: str = "Default User",
+                           tenant_id: int = None) -> Dict:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            user = conn.execute("SELECT * FROM user_profiles LIMIT 1").fetchone()
+            if tenant_id:
+                user = conn.execute(
+                    "SELECT * FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                    (tenant_id,)
+                ).fetchone()
+            else:
+                user = conn.execute("SELECT * FROM user_profiles LIMIT 1").fetchone()
             if user:
                 return dict(user)
             cursor = conn.execute(
-                "INSERT INTO user_profiles (name) VALUES (?)", (name,)
+                "INSERT INTO user_profiles (name, tenant_id) VALUES (?, ?)",
+                (name, tenant_id)
             )
             conn.commit()
             user = conn.execute(
@@ -865,12 +1230,18 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def get_owner_name(self) -> str:
+    def get_owner_name(self, tenant_id: int = None) -> str:
         """Get the owner's name from user_profiles, or fallback."""
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            user = conn.execute("SELECT name FROM user_profiles LIMIT 1").fetchone()
+            if tenant_id:
+                user = conn.execute(
+                    "SELECT name FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                    (tenant_id,)
+                ).fetchone()
+            else:
+                user = conn.execute("SELECT name FROM user_profiles LIMIT 1").fetchone()
             return user["name"] if user else None
         finally:
             if not self._conn:
@@ -914,28 +1285,35 @@ class PollyDB:
     def save_photo(self, filename: str, original_name: str = None,
                    caption: str = None, date_taken: str = None,
                    tags: str = "[]", story_id: int = None,
-                   uploaded_by: str = None, user_id: int = None) -> int:
+                   uploaded_by: str = None, user_id: int = None,
+                   tenant_id: int = None) -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
                 INSERT INTO photos (user_id, filename, original_name, caption,
-                    date_taken, tags, story_id, uploaded_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    date_taken, tags, story_id, uploaded_by, tenant_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (user_id, filename, original_name, caption, date_taken,
-                  tags, story_id, uploaded_by))
+                  tags, story_id, uploaded_by, tenant_id))
             conn.commit()
             return cursor.lastrowid
         finally:
             if not self._conn:
                 conn.close()
 
-    def get_photos(self, limit: int = 100) -> List[Dict]:
+    def get_photos(self, limit: int = 100, tenant_id: int = None) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            results = conn.execute(
-                "SELECT * FROM photos ORDER BY created_at DESC LIMIT ?", (limit,)
-            ).fetchall()
+            if tenant_id:
+                results = conn.execute(
+                    "SELECT * FROM photos WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?",
+                    (tenant_id, limit)
+                ).fetchall()
+            else:
+                results = conn.execute(
+                    "SELECT * FROM photos ORDER BY created_at DESC LIMIT ?", (limit,)
+                ).fetchall()
             return [dict(r) for r in results]
         finally:
             if not self._conn:

@@ -134,6 +134,10 @@ async def lifespan(app: FastAPI):
     # Start medication reminder background task
     await app.state.med_scheduler.start()
 
+    # Clean up expired web sessions
+    app.state.db.cleanup_expired_sessions()
+    logger.info("Expired web sessions cleaned up")
+
     logger.info("Server ready")
     yield
 
