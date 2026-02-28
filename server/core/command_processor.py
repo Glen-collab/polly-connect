@@ -114,6 +114,12 @@ class CommandProcessor:
             if question:
                 resp = question["question"]
                 self._last_response[device_id] = resp
+                # Enter conversational mode so user can answer without wake word
+                state = self._get_state(device_id)
+                state.mode = ConversationMode.STORY_PROMPT
+                state.current_question = resp
+                state.story_parts = []
+                state.followup_count = 0
                 return resp
             return "I don't have any questions ready right now."
 
