@@ -15,6 +15,7 @@ from api.homeassistant import router as ha_router
 from api.web import router as web_router
 from core.database import PollyDB
 from core.wakeword import WakeWordDetector
+from core.vad_wakeword import VADWakeWordDetector
 from core.data_loader import DataLoader
 from core.command_processor import CommandProcessor
 from core.bible import BibleVerseService
@@ -67,14 +68,18 @@ async def lifespan(app: FastAPI):
     app.state.tts = create_tts_backend()
 
     logger.info(f"Loading wake word model: {settings.WAKE_WORD_MODEL_PATH}")
-    app.state.wake_word_detector = WakeWordDetector(
+    detector = WakeWordDetector(
         model_path=settings.WAKE_WORD_MODEL_PATH,
         threshold=settings.WAKE_WORD_THRESHOLD,
     )
-    if app.state.wake_word_detector.ready:
-        logger.info("Wake word detector ready")
+    if detector.ready:
+        app.state.wake_word_detector = detector
+        logger.info("Wake word detector ready (OpenWakeWord)")
     else:
-        logger.warning("Wake word detector NOT ready — continuous streaming will not detect wake words")
+        logger.info("OpenWakeWord not available — falling back to VAD wake word detector")
+        app.state.wake_word_detector = VADWakeWordDetector(
+            rms_threshold=settings.SILENCE_THRESHOLD_RMS,
+        )
 
     # Load data files (jokes, questions, config)
     app.state.data = DataLoader(settings.DATA_DIR)

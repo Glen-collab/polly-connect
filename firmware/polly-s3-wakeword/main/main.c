@@ -62,7 +62,7 @@ static const char *TAG = "POLLY";
 #define WIFI_MAX_RETRY  10
 
 // Server
-#define SERVER_HOST     "192.168.1.251"
+#define SERVER_HOST     "3.14.130.158"
 #define SERVER_PORT     8000
 #define WS_URI          "ws://" SERVER_HOST ":8000/api/audio/continuous"
 

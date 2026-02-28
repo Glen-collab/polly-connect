@@ -19,6 +19,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.intent_parser import IntentParser
 from core.conversation_state import ConversationMode
+from core.vad_wakeword import VADWakeWordDetector
 from config import settings
 
 router = APIRouter()
@@ -171,7 +172,8 @@ async def continuous_stream(websocket: WebSocket):
                         logger.info(f"Command recording ended ({reason}), {len(command_audio)} bytes")
 
                         await _process_command(
-                            websocket, command_audio, transcriber, tts, cmd, device_id
+                            websocket, command_audio, transcriber, tts, cmd, device_id,
+                            detector=detector,
                         )
 
                         # After processing, check if we should stay in listening-for-voice mode
@@ -199,6 +201,7 @@ async def _process_command(
     tts,
     cmd,
     device_id: str = "unknown",
+    detector=None,
 ):
     """Run STT → intent parse → CommandProcessor → TTS on buffered command audio."""
     if len(command_audio) == 0:
@@ -221,6 +224,15 @@ async def _process_command(
     if not transcription:
         await websocket.send_json({"event": "response", "text": "I didn't catch that.", "audio": None})
         return
+
+    # If using VAD detector, check transcription for wake phrase
+    if detector and isinstance(detector, VADWakeWordDetector):
+        is_wake, cleaned = detector.check_transcription(transcription)
+        if not is_wake:
+            logger.info(f"VAD: no wake phrase in transcription, ignoring: {transcription}")
+            return
+        logger.info(f"VAD: wake phrase found, command: {cleaned}")
+        transcription = cleaned
 
     # Intent parse
     intent_result = intent_parser.parse(transcription)
