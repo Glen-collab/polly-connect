@@ -304,6 +304,16 @@ class CommandProcessor:
             return "We haven't started collecting stories yet. Ready when you are."
         return f"You've shared {count} memories so far."
 
+    def _ends_with_termination(self, text: str) -> bool:
+        """Check if text ENDS with a termination phrase (not in the middle)."""
+        import re
+        return bool(re.search(
+            r"(i'?m done|goodbye|bye bye|bye|that'?s enough|i'?m tired|"
+            r"let'?s stop|no more|enough for today|see you later|good night)"
+            r"[\s,.!?]*$",
+            text.lower()
+        ))
+
     def _strip_termination_phrases(self, text: str) -> str:
         """Remove 'I'm done', 'goodbye', etc. from the end of text."""
         import re
@@ -337,49 +347,56 @@ class CommandProcessor:
         # Check for explicit stop/exit commands even in conversational mode
         intent = intent_result.get("intent", "unknown")
         if intent in ("stop", "goodbye"):
-            # Save any story answer embedded before the termination phrase
-            saved_story = False
-            if state.mode in (ConversationMode.STORY_PROMPT, ConversationMode.FOLLOWUP_WAIT,
-                              ConversationMode.STORY_LISTEN):
-                clean_text = self._strip_termination_phrases(raw_text)
-                if clean_text and len(clean_text) > 20:
-                    state.story_parts.append(clean_text)
-                    story_id = self.db.save_story(
-                        transcript=clean_text,
-                        speaker_name=state.speaker_name,
-                        source="family_story",
-                    )
-                    if self.memory_extractor:
-                        mem_data = self.memory_extractor.extract(
-                            text=clean_text,
-                            question=state.current_question,
-                            speaker=state.speaker_name,
-                            bucket_hint=state.current_bucket,
+            # Only exit if the termination phrase is at the END of what they said.
+            # "I'm done working at the factory" → NOT a stop, it's part of the story.
+            # "...and that's my story. I'm done" → IS a stop.
+            if not self._ends_with_termination(raw_text):
+                logger.info(f"Termination phrase mid-sentence, treating as story answer: {raw_text[:80]}")
+                # Fall through to story answer processing below
+            else:
+                # Save any story answer embedded before the termination phrase
+                saved_story = False
+                if state.mode in (ConversationMode.STORY_PROMPT, ConversationMode.FOLLOWUP_WAIT,
+                                  ConversationMode.STORY_LISTEN):
+                    clean_text = self._strip_termination_phrases(raw_text)
+                    if clean_text and len(clean_text) > 20:
+                        state.story_parts.append(clean_text)
+                        story_id = self.db.save_story(
+                            transcript=clean_text,
+                            speaker_name=state.speaker_name,
+                            source="family_story",
                         )
-                        fingerprint = self.memory_extractor.compute_fingerprint(mem_data)
-                        self.db.save_memory(
-                            story_id=story_id,
-                            speaker=state.speaker_name,
-                            bucket=mem_data["bucket"],
-                            life_phase=mem_data["life_phase"],
-                            text_summary=mem_data["text_summary"],
-                            text=clean_text,
-                            people=mem_data["people"],
-                            locations=mem_data["locations"],
-                            emotions=mem_data["emotions"],
-                            fingerprint=fingerprint,
-                        )
-                    saved_story = True
-                    logger.info(f"Saved story answer before goodbye ({len(clean_text)} chars)")
+                        if self.memory_extractor:
+                            mem_data = self.memory_extractor.extract(
+                                text=clean_text,
+                                question=state.current_question,
+                                speaker=state.speaker_name,
+                                bucket_hint=state.current_bucket,
+                            )
+                            fingerprint = self.memory_extractor.compute_fingerprint(mem_data)
+                            self.db.save_memory(
+                                story_id=story_id,
+                                speaker=state.speaker_name,
+                                bucket=mem_data["bucket"],
+                                life_phase=mem_data["life_phase"],
+                                text_summary=mem_data["text_summary"],
+                                text=clean_text,
+                                people=mem_data["people"],
+                                locations=mem_data["locations"],
+                                emotions=mem_data["emotions"],
+                                fingerprint=fingerprint,
+                            )
+                        saved_story = True
+                        logger.info(f"Saved story answer before goodbye ({len(clean_text)} chars)")
 
-            name = state.speaker_name
-            state.reset()
-            if saved_story:
-                if name:
-                    return (f"Thank you for sharing that, {name}. Goodbye for now, I'll be here when you want to talk again.", ConversationMode.COMMAND)
-                return ("Thank you for sharing. Goodbye for now, I'll be here when you want to talk again.", ConversationMode.COMMAND)
-            response = await self.process(intent_result, raw_text, device_id)
-            return (response, ConversationMode.COMMAND)
+                name = state.speaker_name
+                state.reset()
+                if saved_story:
+                    if name:
+                        return (f"Thank you for sharing that, {name}. Goodbye for now, I'll be here when you want to talk again.", ConversationMode.COMMAND)
+                    return ("Thank you for sharing. Goodbye for now, I'll be here when you want to talk again.", ConversationMode.COMMAND)
+                response = await self.process(intent_result, raw_text, device_id)
+                return (response, ConversationMode.COMMAND)
 
         # Handle thinking — user needs more time
         if intent == "thinking":
