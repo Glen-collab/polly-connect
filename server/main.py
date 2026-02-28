@@ -95,7 +95,7 @@ async def lifespan(app: FastAPI):
     # Initialize feature services
     app.state.bible = BibleVerseService(app.state.db, settings.DATA_DIR)
     app.state.weather = AlmanacWeather(settings.DATA_DIR)
-    app.state.med_scheduler = MedicationScheduler(app.state.db)
+    app.state.med_scheduler = MedicationScheduler(app.state.db, tts=app.state.tts)
 
     # Family identity and narrative services
     app.state.family_identity = FamilyIdentityService(app.state.db)

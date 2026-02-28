@@ -2,7 +2,15 @@
 {% block title %}Medications - Polly Connect{% endblock %}
 
 {% block content %}
-<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Medication Reminders</h1>
+<div class="flex items-center justify-between mb-4 sm:mb-6">
+    <h1 class="text-xl sm:text-2xl font-bold">Medication Reminders</h1>
+    {% if medications %}
+    <a href="/web/medications/calendar"
+       class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-xs sm:text-sm">
+        Download Calendar
+    </a>
+    {% endif %}
+</div>
 
 <!-- Add Medication Form -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
@@ -32,16 +40,30 @@
 <div class="bg-white rounded-lg shadow p-4 sm:p-6">
     <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Current Medications</h2>
     {% if medications %}
-    <!-- Mobile: card layout / Desktop: table -->
+    <!-- Mobile: card layout -->
     <div class="sm:hidden space-y-3">
         {% for med in medications %}
         <div class="border rounded-lg p-3">
-            <p class="font-medium text-sm">{{ med.name }}</p>
-            <p class="text-xs text-gray-500">{{ med.dosage or 'No dosage' }} &mdash; {{ med.times }}</p>
-            <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded mt-1 inline-block">Active</span>
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="font-medium text-sm">{{ med.name }}</p>
+                    <p class="text-xs text-gray-500">{{ med.dosage or 'No dosage' }}</p>
+                    <p class="text-xs text-gray-500 mt-1" id="med-times-m-{{ med.id }}">{{ med.times }}</p>
+                </div>
+                <div class="flex gap-2">
+                    <a href="/web/medications/{{ med.id }}/edit"
+                       class="text-blue-600 hover:text-blue-800 text-xs">Edit</a>
+                    <form method="POST" action="/web/medications/{{ med.id }}/delete"
+                          onsubmit="return confirm('Delete {{ med.name }}?');" class="inline">
+                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs">Delete</button>
+                    </form>
+                </div>
+            </div>
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded mt-2 inline-block">Active</span>
         </div>
         {% endfor %}
     </div>
+    <!-- Desktop: table -->
     <table class="hidden sm:table w-full">
         <thead>
             <tr class="text-left text-sm text-gray-500 border-b">
@@ -49,6 +71,7 @@
                 <th class="pb-2">Dosage</th>
                 <th class="pb-2">Times</th>
                 <th class="pb-2">Status</th>
+                <th class="pb-2 text-right">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -56,9 +79,17 @@
             <tr class="border-b">
                 <td class="py-2 font-medium text-sm">{{ med.name }}</td>
                 <td class="py-2 text-gray-600 text-sm">{{ med.dosage or '-' }}</td>
-                <td class="py-2 text-gray-600 text-sm">{{ med.times }}</td>
+                <td class="py-2 text-gray-600 text-sm" id="med-times-{{ med.id }}">{{ med.times }}</td>
                 <td class="py-2">
                     <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Active</span>
+                </td>
+                <td class="py-2 text-right">
+                    <a href="/web/medications/{{ med.id }}/edit"
+                       class="text-blue-600 hover:text-blue-800 text-xs mr-2">Edit</a>
+                    <form method="POST" action="/web/medications/{{ med.id }}/delete"
+                          onsubmit="return confirm('Delete {{ med.name }}?');" class="inline">
+                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs">Delete</button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}
@@ -68,4 +99,27 @@
     <p class="text-gray-400 text-sm">No medications scheduled. Add one above or say "remind me to take aspirin at 8am".</p>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Convert 24hr times to 12hr display
+function to12hr(t) {
+    var parts = t.trim().split(':');
+    if (parts.length !== 2) return t;
+    var h = parseInt(parts[0]), m = parseInt(parts[1]);
+    var p = h < 12 ? 'AM' : 'PM';
+    h = h % 12 || 12;
+    return h + (m > 0 ? ':' + String(m).padStart(2,'0') : '') + ' ' + p;
+}
+document.querySelectorAll('[id^="med-times"]').forEach(function(el) {
+    try {
+        var raw = el.textContent;
+        // Parse JSON array or comma-separated
+        var times;
+        try { times = JSON.parse(raw); } catch(e) { times = raw.split(','); }
+        el.textContent = times.map(to12hr).join(', ');
+    } catch(e) {}
+});
+</script>
 {% endblock %}

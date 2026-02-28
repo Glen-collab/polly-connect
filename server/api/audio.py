@@ -107,6 +107,9 @@ async def continuous_stream(websocket: WebSocket):
 
     logger.info("Continuous stream connected")
 
+    # Medication scheduler for WebSocket registration
+    med_scheduler = getattr(app.state, "med_scheduler", None)
+
     try:
         while True:
             message = await websocket.receive()
@@ -121,12 +124,14 @@ async def continuous_stream(websocket: WebSocket):
 
                 if event == "connect":
                     device_id = msg_data.get("device_id", "unknown")
+                    tenant_id = 1  # default
                     # Authenticate device
                     device_info = verify_device_api_key(msg_data.get("api_key", ""), db)
                     if device_info:
                         conv_state = cmd._get_state(device_id)
                         conv_state.tenant_id = device_info["tenant_id"]
                         conv_state.user_id = device_info["user_id"]
+                        tenant_id = device_info["tenant_id"]
                         logger.info(f"Continuous stream device: {device_id} (tenant={device_info['tenant_id']})")
                     elif not verify_websocket_key(msg_data):
                         logger.warning(f"Continuous stream auth failed: {device_id}")
@@ -138,6 +143,11 @@ async def continuous_stream(websocket: WebSocket):
                         conv_state = cmd._get_state(device_id)
                         conv_state.tenant_id = 1
                         logger.info(f"Continuous stream device: {device_id} (global key, tenant=1)")
+
+                    # Register for medication reminders
+                    if med_scheduler:
+                        med_scheduler.register_websocket(device_id, websocket, tenant_id)
+
                     await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
                     continue
 
@@ -288,6 +298,9 @@ async def continuous_stream(websocket: WebSocket):
         import traceback
         logger.error(f"Continuous stream error: {e}")
         traceback.print_exc()
+    finally:
+        if med_scheduler:
+            med_scheduler.unregister_websocket(device_id)
 
 
 async def _process_command(
@@ -398,6 +411,7 @@ async def audio_stream(websocket: WebSocket):
     transcriber = app.state.transcriber
     tts = app.state.tts
     cmd = app.state.cmd
+    med_scheduler_ev = getattr(app.state, "med_scheduler", None)
 
     try:
         while True:
@@ -413,12 +427,14 @@ async def audio_stream(websocket: WebSocket):
             if event == "connect":
                 device_id = message.get("device_id", "unknown")
                 session = AudioSession(device_id)
+                tenant_id_ev = 1  # default
                 # Authenticate device
                 device_info = verify_device_api_key(message.get("api_key", ""), app.state.db)
                 if device_info:
                     conv_state_obj = cmd._get_state(device_id)
                     conv_state_obj.tenant_id = device_info["tenant_id"]
                     conv_state_obj.user_id = device_info["user_id"]
+                    tenant_id_ev = device_info["tenant_id"]
                     logger.info(f"Device connected: {device_id} (tenant={device_info['tenant_id']})")
                 elif not verify_websocket_key(message):
                     logger.warning(f"Device auth failed: {device_id}")
@@ -429,6 +445,11 @@ async def audio_stream(websocket: WebSocket):
                     conv_state_obj = cmd._get_state(device_id)
                     conv_state_obj.tenant_id = 1
                     logger.info(f"Device connected: {device_id} (global key, tenant=1)")
+
+                # Register for medication reminders
+                if med_scheduler_ev:
+                    med_scheduler_ev.register_websocket(device_id, websocket, tenant_id_ev)
+
                 await websocket.send_json({"event": "connected", "message": "Ready"})
 
             elif event == "wake_word_detected":
@@ -543,3 +564,6 @@ async def audio_stream(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info(f"Device disconnected: {device_id}")
+    finally:
+        if med_scheduler_ev:
+            med_scheduler_ev.unregister_websocket(device_id)

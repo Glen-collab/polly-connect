@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Edit Medication - Polly Connect{% endblock %}
+
+{% block content %}
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Edit Medication</h1>
+
+<div class="bg-white rounded-lg shadow p-4 sm:p-6">
+    <form method="POST" action="/web/medications/{{ med.id }}/edit">
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Name</label>
+                <input type="text" name="name" value="{{ med.name }}" required
+                       class="w-full border rounded px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Dosage</label>
+                <input type="text" name="dosage" value="{{ med.dosage or '' }}"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g., 100mg">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Times (comma-separated, 24hr format)</label>
+                <input type="text" name="times" value="{{ times_str }}" required
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="08:00, 20:00">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Active Days</label>
+                <div class="flex flex-wrap gap-3 mt-1">
+                    {% set days = [("mon", "Mon"), ("tue", "Tue"), ("wed", "Wed"), ("thu", "Thu"), ("fri", "Fri"), ("sat", "Sat"), ("sun", "Sun")] %}
+                    {% for val, label in days %}
+                    <label class="flex items-center gap-1 text-sm">
+                        <input type="checkbox" name="active_days" value="{{ val }}"
+                               {% if val in active_days %}checked{% endif %}>
+                        {{ label }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="submit"
+                        class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700 text-sm">
+                    Save Changes
+                </button>
+                <a href="/web/medications"
+                   class="px-6 py-2 border rounded text-gray-600 hover:bg-gray-50 text-sm">
+                    Cancel
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -38,20 +38,82 @@
     {% endif %}
 </div>
 
-<!-- Medication Schedule -->
+<!-- Medication Schedule (dynamic) -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6">
-    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Medication Schedule</h2>
-    {% if medications %}
-    <ul class="space-y-2">
-        {% for med in medications %}
-        <li class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b pb-2">
-            <span class="font-medium text-sm sm:text-base">{{ med.name }}</span>
-            <span class="text-xs sm:text-sm text-gray-500">{{ med.dosage }} &mdash; {{ med.times }}</span>
-        </li>
-        {% endfor %}
-    </ul>
-    {% else %}
-    <p class="text-gray-400 text-sm">No medications set up. Add them in the Medications tab.</p>
-    {% endif %}
+    <div class="flex items-center justify-between mb-3 sm:mb-4">
+        <h2 class="text-base sm:text-lg font-semibold">Medication Schedule</h2>
+        <span id="med-time" class="text-xs text-gray-400"></span>
+    </div>
+    <div id="med-list">
+        <!-- Static fallback while JS loads -->
+        {% if medications %}
+        <ul class="space-y-2">
+            {% for med in medications %}
+            <li class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b pb-2">
+                <span class="font-medium text-sm sm:text-base">{{ med.name }}</span>
+                <span class="text-xs sm:text-sm text-gray-500">{{ med.dosage }} &mdash; {{ med.times }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-gray-400 text-sm">No medications set up. Add them in the <a href="/web/medications" class="text-emerald-600 hover:underline">Medications</a> tab.</p>
+        {% endif %}
+    </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadMeds() {
+    fetch('/web/api/medications/upcoming')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) return;
+            var timeEl = document.getElementById('med-time');
+            if (timeEl && data.current_time) timeEl.textContent = data.current_time;
+
+            var list = document.getElementById('med-list');
+            if (!data.medications || data.medications.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 text-sm">No medications set up. Add them in the <a href="/web/medications" class="text-emerald-600 hover:underline">Medications</a> tab.</p>';
+                return;
+            }
+
+            var html = '<ul class="space-y-2">';
+            data.medications.forEach(function(med) {
+                var badgeClass = '';
+                var badgeText = '';
+                if (med.badge === 'overdue') {
+                    badgeClass = 'bg-red-100 text-red-700';
+                    badgeText = 'OVERDUE';
+                } else if (med.badge === 'soon') {
+                    badgeClass = 'bg-yellow-100 text-yellow-700';
+                    var mins = Math.abs(med.countdown_minutes);
+                    badgeText = med.countdown_minutes <= 0 ? 'NOW' : mins + ' min';
+                } else if (med.badge === 'scheduled') {
+                    badgeClass = 'bg-green-100 text-green-700';
+                    badgeText = med.time_display;
+                } else {
+                    badgeClass = 'bg-gray-100 text-gray-500';
+                    badgeText = 'Not today';
+                }
+
+                html += '<li class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b pb-2">';
+                html += '<div><span class="font-medium text-sm sm:text-base">' + med.name + '</span>';
+                if (med.dosage) html += '<span class="text-xs text-gray-500 ml-2">' + med.dosage + '</span>';
+                html += '</div>';
+                html += '<div class="flex items-center gap-2 mt-1 sm:mt-0">';
+                html += '<span class="text-xs sm:text-sm text-gray-500">' + med.time_display + '</span>';
+                html += '<span class="text-xs px-2 py-0.5 rounded ' + badgeClass + '">' + badgeText + '</span>';
+                html += '</div></li>';
+            });
+            html += '</ul>';
+            list.innerHTML = html;
+        })
+        .catch(function(e) { /* keep static fallback */ });
+}
+
+// Load immediately and then every 60 seconds
+loadMeds();
+setInterval(loadMeds, 60000);
+</script>
 {% endblock %}

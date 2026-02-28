@@ -45,6 +45,9 @@ class Settings:
     # OpenAI API key (for Vision photo scan + follow-up questions)
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
+    # Timezone (used for medication reminders, dashboard display)
+    TIMEZONE: str = os.getenv("POLLY_TIMEZONE", "America/Chicago")
+
     # Web session duration (hours)
     SESSION_DURATION_HOURS: int = int(os.getenv("POLLY_SESSION_HOURS", "72"))
 

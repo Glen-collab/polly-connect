@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 from core.web_auth import get_web_session, require_login, hash_password, verify_password
 from core.auth import generate_api_key
+from core.medications import format_time_12hr, _get_local_now
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -293,6 +294,214 @@ async def medication_add(request: Request, name: str = Form(...),
     time_list = [t.strip() for t in times.split(",") if t.strip()]
     db.add_medication(user["id"], name, dosage, json.dumps(time_list), tenant_id=tid)
     return RedirectResponse("/web/medications", status_code=303)
+
+
+@router.get("/medications/{med_id}/edit", response_class=HTMLResponse)
+async def medication_edit(request: Request, med_id: int):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    med = db.get_medication_by_id(med_id, tenant_id=tid)
+    if not med:
+        return RedirectResponse("/web/medications", status_code=302)
+
+    # Parse times/days for the form
+    times = json.loads(med["times"]) if isinstance(med["times"], str) else med["times"]
+    active_days = json.loads(med["active_days"]) if isinstance(med["active_days"], str) else med["active_days"]
+
+    return templates.TemplateResponse("medication_edit.html", {
+        "request": request,
+        "session": session,
+        "med": med,
+        "times_str": ", ".join(times),
+        "active_days": active_days,
+    })
+
+
+@router.post("/medications/{med_id}/edit")
+async def medication_edit_save(request: Request, med_id: int,
+                                name: str = Form(...), dosage: str = Form(""),
+                                times: str = Form(...), active_days: list = Form(None)):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Parse form data
+    time_list = [t.strip() for t in times.split(",") if t.strip()]
+
+    # active_days comes from checkboxes
+    form_data = await request.form()
+    day_list = form_data.getlist("active_days")
+    if not day_list:
+        day_list = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+    db.update_medication(
+        med_id, name, dosage,
+        json.dumps(time_list), json.dumps(day_list),
+        tenant_id=tid,
+    )
+    return RedirectResponse("/web/medications", status_code=303)
+
+
+@router.post("/medications/{med_id}/delete")
+async def medication_delete(request: Request, med_id: int):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    db.delete_medication(med_id, tenant_id=session["tenant_id"])
+    return RedirectResponse("/web/medications", status_code=303)
+
+
+@router.get("/api/medications/upcoming")
+async def medications_upcoming(request: Request):
+    """JSON endpoint: today's medications with countdown and status badges."""
+    from fastapi.responses import JSONResponse
+
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not authenticated"}, status_code=401)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    medications = db.get_medications(tenant_id=tid)
+
+    now = _get_local_now()
+    current_minutes = now.hour * 60 + now.minute
+    current_day = now.strftime("%a").lower()
+
+    result = []
+    for med in medications:
+        times = json.loads(med["times"]) if isinstance(med["times"], str) else med["times"]
+        active_days = json.loads(med["active_days"]) if isinstance(med["active_days"], str) else med["active_days"]
+
+        active_today = current_day in active_days
+
+        for med_time in times:
+            try:
+                h, m = med_time.split(":")
+                med_minutes = int(h) * 60 + int(m)
+            except (ValueError, AttributeError):
+                continue
+
+            diff = med_minutes - current_minutes
+            if active_today:
+                if diff < -30:
+                    badge = "overdue"
+                elif diff <= 30:
+                    badge = "soon"
+                else:
+                    badge = "scheduled"
+            else:
+                badge = "inactive"
+
+            result.append({
+                "id": med["id"],
+                "name": med["name"],
+                "dosage": med.get("dosage", ""),
+                "time_24": med_time,
+                "time_display": format_time_12hr(med_time),
+                "countdown_minutes": diff if active_today else None,
+                "badge": badge,
+            })
+
+    # Sort: overdue first, then by time
+    badge_order = {"overdue": 0, "soon": 1, "scheduled": 2, "inactive": 3}
+    result.sort(key=lambda x: (badge_order.get(x["badge"], 9), x["time_24"]))
+
+    return JSONResponse({"medications": result, "current_time": now.strftime("%I:%M %p")})
+
+
+@router.get("/medications/calendar")
+async def medications_calendar(request: Request):
+    """Generate .ics calendar file with medication reminders."""
+    from fastapi.responses import Response
+
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    medications = db.get_medications(tenant_id=tid)
+
+    now = _get_local_now()
+    tz_name = settings.TIMEZONE
+
+    # Map day abbreviations to ICS RRULE BYDAY values
+    day_map = {"mon": "MO", "tue": "TU", "wed": "WE", "thu": "TH",
+               "fri": "FR", "sat": "SA", "sun": "SU"}
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Polly Connect//Medication Reminders//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-TIMEZONE:{tz_name}",
+    ]
+
+    for med in medications:
+        times = json.loads(med["times"]) if isinstance(med["times"], str) else med["times"]
+        active_days = json.loads(med["active_days"]) if isinstance(med["active_days"], str) else med["active_days"]
+
+        byday = ",".join(day_map.get(d, "") for d in active_days if d in day_map)
+        if not byday:
+            byday = "MO,TU,WE,TH,FR,SA,SU"
+
+        dosage_str = f" ({med.get('dosage', '')})" if med.get("dosage") else ""
+
+        for med_time in times:
+            try:
+                h, m = med_time.split(":")
+                h, m = int(h), int(m)
+            except (ValueError, AttributeError):
+                continue
+
+            time_display = format_time_12hr(med_time)
+            uid = f"polly-med-{med['id']}-{med_time.replace(':', '')}@polly-connect.com"
+            dtstart = now.strftime(f"%Y%m%dT{h:02d}{m:02d}00")
+            # 15-minute event duration
+            end_m = m + 15
+            end_h = h + (end_m // 60)
+            end_m = end_m % 60
+            dtend = now.strftime(f"%Y%m%dT{end_h:02d}{end_m:02d}00")
+
+            lines.extend([
+                "BEGIN:VEVENT",
+                f"UID:{uid}",
+                f"DTSTART;TZID={tz_name}:{dtstart}",
+                f"DTEND;TZID={tz_name}:{dtend}",
+                f"RRULE:FREQ=WEEKLY;BYDAY={byday}",
+                f"SUMMARY:Take {med['name']}{dosage_str}",
+                f"DESCRIPTION:Polly reminder: Take {med['name']}{dosage_str} at {time_display}",
+                "BEGIN:VALARM",
+                "TRIGGER:-PT5M",
+                "ACTION:DISPLAY",
+                f"DESCRIPTION:Time to take {med['name']}{dosage_str}",
+                "END:VALARM",
+                "END:VEVENT",
+            ])
+
+    lines.append("END:VCALENDAR")
+    ics_content = "\r\n".join(lines) + "\r\n"
+
+    return Response(
+        content=ics_content,
+        media_type="text/calendar",
+        headers={"Content-Disposition": "attachment; filename=polly-medications.ics"},
+    )
 
 
 @router.get("/memory", response_class=HTMLResponse)

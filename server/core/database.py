@@ -816,6 +816,56 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def get_medication_by_id(self, medication_id: int, tenant_id: int = None) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            query = "SELECT * FROM medications WHERE id = ?"
+            params = [medication_id]
+            if tenant_id:
+                query += " AND tenant_id = ?"
+                params.append(tenant_id)
+            row = conn.execute(query, params).fetchone()
+            return dict(row) if row else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_medication(self, medication_id: int, name: str, dosage: str,
+                          times: str, active_days: str = None,
+                          tenant_id: int = None):
+        conn = self._get_connection()
+        try:
+            query = "UPDATE medications SET name = ?, dosage = ?, times = ?"
+            params = [name, dosage, times]
+            if active_days is not None:
+                query += ", active_days = ?"
+                params.append(active_days)
+            query += " WHERE id = ?"
+            params.append(medication_id)
+            if tenant_id:
+                query += " AND tenant_id = ?"
+                params.append(tenant_id)
+            conn.execute(query, params)
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_medication(self, medication_id: int, tenant_id: int = None):
+        conn = self._get_connection()
+        try:
+            query = "DELETE FROM medications WHERE id = ?"
+            params = [medication_id]
+            if tenant_id:
+                query += " AND tenant_id = ?"
+                params.append(tenant_id)
+            conn.execute(query, params)
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
     def log_medication(self, medication_id: int, status: str,
                        scheduled_time: str = None, reminder_count: int = 0) -> int:
         conn = self._get_connection()
