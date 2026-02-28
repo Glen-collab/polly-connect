@@ -32,6 +32,15 @@ class VADWakeWordDetector:
             "polly",
             "hey poly",
             "poly",
+            "hey holly",
+            "holly",
+            "hey paulie",
+            "paulie",
+            "hey pauly",
+            "pauly",
+            "hey paul",
+            "play",
+            "hey play",
         ]
         self._ready = True
         logger.info(f"VAD wake word detector initialized (RMS threshold: {rms_threshold}, "

@@ -385,6 +385,13 @@ static void ws_handle_message(const char *json_str, int len)
             response_complete = true;
         }
 
+    } else if (strcmp(evt, "no_wake_word") == 0) {
+        // VAD triggered but no wake phrase in transcription — resume streaming
+        ESP_LOGI(TAG, "No wake phrase detected, resuming...");
+        streaming_paused = false;
+        wake_detected = false;
+        led_set(0);
+
     } else if (strcmp(evt, "pong") == 0) {
         // keepalive ack
     } else if (strcmp(evt, "error") == 0) {

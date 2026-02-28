@@ -230,6 +230,8 @@ async def _process_command(
         is_wake, cleaned = detector.check_transcription(transcription)
         if not is_wake:
             logger.info(f"VAD: no wake phrase in transcription, ignoring: {transcription}")
+            # Tell ESP32 to resume streaming (no command to process)
+            await websocket.send_json({"event": "no_wake_word", "text": transcription})
             return
         logger.info(f"VAD: wake phrase found, command: {cleaned}")
         transcription = cleaned
