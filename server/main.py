@@ -41,6 +41,9 @@ def create_stt_backend():
     if settings.STT_BACKEND == "aws_transcribe":
         from core.aws_transcribe import AWSTranscribeSTT
         return AWSTranscribeSTT()
+    elif settings.STT_BACKEND == "google":
+        from core.google_stt import GoogleSTT
+        return GoogleSTT()
     else:
         from core.transcription import WhisperSTT
         return WhisperSTT(model_size=settings.WHISPER_MODEL)
