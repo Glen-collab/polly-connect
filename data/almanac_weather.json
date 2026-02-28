@@ -1,0 +1,473 @@
+{
+  "description": "Year-long weekly weather almanac — Farmer's Almanac style for Midwest/Ohio",
+  "weeks": [
+    {
+      "week": 1, "start_date": "2026-03-01", "month": "March", "season": "Early Spring",
+      "forecast": "Winter's still hanging on, but you can feel the change coming. A few warm days will tease you, then Old Man Winter sneaks back in for one more round.",
+      "high_range": "42-52°F", "low_range": "26-34°F",
+      "conditions": "Mix of clouds and sun, chance of late snow flurries",
+      "gardening_tip": "Start your tomato and pepper seeds indoors near a sunny window. They need about 6-8 weeks before transplanting.",
+      "folk_wisdom": "If March comes in like a lion, it goes out like a lamb.",
+      "sunrise_trend": "Getting earlier — around 7:00 AM", "sunset_trend": "Getting later — around 6:30 PM"
+    },
+    {
+      "week": 2, "start_date": "2026-03-08", "month": "March", "season": "Early Spring",
+      "forecast": "Temperatures start to swing — could be 55 one day and 30 the next. That's March for you. Keep layers handy and watch for mud season.",
+      "high_range": "44-56°F", "low_range": "28-36°F",
+      "conditions": "Variable — sunshine followed by gray skies and possible rain",
+      "gardening_tip": "Prune your fruit trees and roses before the buds break. A clean cut now means healthier growth later.",
+      "folk_wisdom": "A dry March and a wet May fill the barns with grain and hay.",
+      "sunrise_trend": "Around 6:50 AM — daylight saving time ahead", "sunset_trend": "Around 6:40 PM"
+    },
+    {
+      "week": 3, "start_date": "2026-03-15", "month": "March", "season": "Early Spring",
+      "forecast": "Spring forward! Daylight saving brings longer evenings. Expect a mix of rain and mild temps — perfect weather for the first robins to show up.",
+      "high_range": "48-58°F", "low_range": "30-38°F",
+      "conditions": "Increasing rain showers, mild afternoons",
+      "gardening_tip": "Time to work compost into your garden beds. The soil is thawing and ready to be fed.",
+      "folk_wisdom": "When the robins come, spring is not far behind.",
+      "sunrise_trend": "Around 7:40 AM after spring forward", "sunset_trend": "Around 7:45 PM after spring forward"
+    },
+    {
+      "week": 4, "start_date": "2026-03-22", "month": "March", "season": "Early Spring",
+      "forecast": "The daffodils are pushing through and the grass is starting to green up. Still cool mornings but afternoons are feeling more like spring.",
+      "high_range": "50-60°F", "low_range": "32-40°F",
+      "conditions": "Partly sunny with scattered showers",
+      "gardening_tip": "Plant cold-hardy crops like peas, lettuce, and spinach directly in the garden. They can handle a light frost.",
+      "folk_wisdom": "One swallow does not make a spring.",
+      "sunrise_trend": "Around 7:30 AM", "sunset_trend": "Around 7:50 PM"
+    },
+    {
+      "week": 5, "start_date": "2026-03-29", "month": "March", "season": "Spring",
+      "forecast": "March going out gently this year. Expect pleasant days in the mid-50s with a few sprinkles. The forsythia should be blooming bright yellow.",
+      "high_range": "52-62°F", "low_range": "34-42°F",
+      "conditions": "Mostly pleasant with occasional light rain",
+      "gardening_tip": "When the forsythia blooms, it's time to apply crabgrass preventer to the lawn.",
+      "folk_wisdom": "Plant your peas on St. Patrick's Day and they'll be ready by the Fourth of July.",
+      "sunrise_trend": "Around 7:20 AM", "sunset_trend": "Around 7:55 PM"
+    },
+    {
+      "week": 6, "start_date": "2026-04-05", "month": "April", "season": "Spring",
+      "forecast": "April showers are here right on schedule. Warm rains will green everything up fast. Don't put away the umbrella just yet.",
+      "high_range": "55-65°F", "low_range": "36-44°F",
+      "conditions": "Frequent rain showers, some thunderstorms possible",
+      "gardening_tip": "Direct-sow carrots, beets, and radishes. They like the cool spring soil and steady rain.",
+      "folk_wisdom": "April showers bring May flowers.",
+      "sunrise_trend": "Around 7:10 AM", "sunset_trend": "Around 8:00 PM"
+    },
+    {
+      "week": 7, "start_date": "2026-04-12", "month": "April", "season": "Spring",
+      "forecast": "A beautiful stretch of spring weather is on the way. Dogwoods and redbuds are showing off. Enjoy it — this is Ohio at its finest.",
+      "high_range": "58-68°F", "low_range": "38-46°F",
+      "conditions": "Partly sunny with warm afternoons",
+      "gardening_tip": "Set out your transplants of broccoli, cabbage, and cauliflower. They love this cool-warm balance.",
+      "folk_wisdom": "When the dogwood blossoms, no more frost will come.",
+      "sunrise_trend": "Around 7:00 AM", "sunset_trend": "Around 8:10 PM"
+    },
+    {
+      "week": 8, "start_date": "2026-04-19", "month": "April", "season": "Spring",
+      "forecast": "Mid-spring warmth is settling in. Lawns need their first mowing and the trees are leafing out. Watch for one more chilly night — frost isn't done yet.",
+      "high_range": "60-70°F", "low_range": "40-48°F",
+      "conditions": "Warm days, cool nights, chance of a stray frost",
+      "gardening_tip": "Don't rush the tomatoes outside yet! Wait until after Mother's Day to be safe from frost.",
+      "folk_wisdom": "Ne'er cast a clout till May be out.",
+      "sunrise_trend": "Around 6:50 AM", "sunset_trend": "Around 8:15 PM"
+    },
+    {
+      "week": 9, "start_date": "2026-04-26", "month": "April", "season": "Spring",
+      "forecast": "Late April bringing warm days and cool nights. Perfect sleeping weather with the windows cracked open. Rain is tapering off some.",
+      "high_range": "62-72°F", "low_range": "42-50°F",
+      "conditions": "Pleasant with decreasing rain chances",
+      "gardening_tip": "Mulch your garden beds now to hold in moisture and keep weeds down all summer long.",
+      "folk_wisdom": "A late Easter means a late spring.",
+      "sunrise_trend": "Around 6:40 AM", "sunset_trend": "Around 8:25 PM"
+    },
+    {
+      "week": 10, "start_date": "2026-05-03", "month": "May", "season": "Late Spring",
+      "forecast": "May is busting out all over. Warm and green everywhere you look. Still a slim chance of frost early in the month, so keep an eye on the overnight lows.",
+      "high_range": "65-75°F", "low_range": "44-52°F",
+      "conditions": "Warm and increasingly sunny",
+      "gardening_tip": "Plant your annual flowers — marigolds, petunias, and zinnias brighten up any porch or garden bed.",
+      "folk_wisdom": "Wet May brings plenty of hay.",
+      "sunrise_trend": "Around 6:30 AM", "sunset_trend": "Around 8:30 PM"
+    },
+    {
+      "week": 11, "start_date": "2026-05-10", "month": "May", "season": "Late Spring",
+      "forecast": "Mother's Day weekend — traditionally the last frost date for Ohio. After this week, it's safe to plant just about anything. Warm and lovely.",
+      "high_range": "68-78°F", "low_range": "48-55°F",
+      "conditions": "Mostly sunny and warm, scattered afternoon showers",
+      "gardening_tip": "Now's the time! Get those tomatoes, peppers, squash, and cucumbers in the ground. The soil is warm enough.",
+      "folk_wisdom": "Plant your garden after Mother's Day and you'll rarely lose a thing to frost.",
+      "sunrise_trend": "Around 6:25 AM", "sunset_trend": "Around 8:40 PM"
+    },
+    {
+      "week": 12, "start_date": "2026-05-17", "month": "May", "season": "Late Spring",
+      "forecast": "Warm days settling in for good now. Expect a few afternoon thunderstorms — the kind that roll through fast and leave everything smelling fresh.",
+      "high_range": "70-80°F", "low_range": "50-58°F",
+      "conditions": "Warm with afternoon thunderstorm chances",
+      "gardening_tip": "Keep up with weeding while they're small. A few minutes each morning saves hours later.",
+      "folk_wisdom": "Thunder in spring, cold will bring.",
+      "sunrise_trend": "Around 6:20 AM", "sunset_trend": "Around 8:45 PM"
+    },
+    {
+      "week": 13, "start_date": "2026-05-24", "month": "May", "season": "Late Spring",
+      "forecast": "Memorial Day weekend kicks off summer. Warm and humid with temperatures pushing into the upper 70s. Perfect for cookouts and planting the last of the garden.",
+      "high_range": "74-82°F", "low_range": "54-60°F",
+      "conditions": "Warm and humid, isolated storms",
+      "gardening_tip": "Plant your green beans now — they grow fast in warm soil and you'll be picking in 6 weeks.",
+      "folk_wisdom": "Corn should be knee-high by the Fourth of July.",
+      "sunrise_trend": "Around 6:15 AM", "sunset_trend": "Around 8:55 PM"
+    },
+    {
+      "week": 14, "start_date": "2026-05-31", "month": "June", "season": "Early Summer",
+      "forecast": "Summer is here in everything but name. Long warm days and firefly evenings. The humidity is creeping up but it's not unbearable yet.",
+      "high_range": "76-84°F", "low_range": "56-62°F",
+      "conditions": "Mostly sunny and warm, building humidity",
+      "gardening_tip": "Start harvesting lettuce and spinach before the heat makes them bolt and turn bitter.",
+      "folk_wisdom": "When the June bugs swarm, warm days are the norm.",
+      "sunrise_trend": "Around 6:10 AM", "sunset_trend": "Around 9:00 PM"
+    },
+    {
+      "week": 15, "start_date": "2026-06-07", "month": "June", "season": "Early Summer",
+      "forecast": "Warm and sunny with those classic Ohio summer afternoons. Pop-up thunderstorms in the late afternoon — you can almost set your watch by them.",
+      "high_range": "78-86°F", "low_range": "58-64°F",
+      "conditions": "Hot afternoons, pop-up thunderstorms",
+      "gardening_tip": "Water your garden in the early morning, not at night. It helps prevent fungus and disease on the leaves.",
+      "folk_wisdom": "Red sky at night, sailor's delight. Red sky in morning, sailor's warning.",
+      "sunrise_trend": "Around 6:08 AM — near the earliest sunrise", "sunset_trend": "Around 9:05 PM"
+    },
+    {
+      "week": 16, "start_date": "2026-06-14", "month": "June", "season": "Early Summer",
+      "forecast": "Father's Day week — expect hot and sunny. The kind of week where you want to sit on the porch with a cold glass of lemonade.",
+      "high_range": "80-88°F", "low_range": "60-66°F",
+      "conditions": "Hot and sunny, slight chance of evening storms",
+      "gardening_tip": "Side-dress your corn and tomatoes with a little fertilizer. They're hungry growers this time of year.",
+      "folk_wisdom": "If it rains on June 15th, it means a wet harvest.",
+      "sunrise_trend": "Around 6:08 AM — earliest sunrise of the year", "sunset_trend": "Around 9:08 PM"
+    },
+    {
+      "week": 17, "start_date": "2026-06-21", "month": "June", "season": "Summer",
+      "forecast": "Summer solstice — the longest day of the year! Enjoy every minute of daylight. Hot and steamy with the first real heat wave possible.",
+      "high_range": "82-90°F", "low_range": "62-68°F",
+      "conditions": "Hot and humid, heat advisory possible",
+      "gardening_tip": "Mulch heavily around your tomatoes to keep the soil cool and moist. They'll thank you with bigger fruit.",
+      "folk_wisdom": "The longest day brings the shortest night, and from here the sun begins its flight.",
+      "sunrise_trend": "Around 6:10 AM", "sunset_trend": "Around 9:10 PM — longest evening"
+    },
+    {
+      "week": 18, "start_date": "2026-06-28", "month": "June", "season": "Summer",
+      "forecast": "Hot and sticky as we head into July. Keep hydrated and take it easy during the afternoon heat. Evening walks are the way to go.",
+      "high_range": "84-92°F", "low_range": "64-70°F",
+      "conditions": "Hot and humid with scattered thunderstorms",
+      "gardening_tip": "Pick your zucchini and summer squash when they're small — they taste better and the plant keeps producing.",
+      "folk_wisdom": "When the dew is on the grass, rain will never come to pass.",
+      "sunrise_trend": "Around 6:12 AM", "sunset_trend": "Around 9:08 PM"
+    },
+    {
+      "week": 19, "start_date": "2026-07-05", "month": "July", "season": "Summer",
+      "forecast": "The dog days are setting in. Hot, humid, and hazy. Afternoon storms can be a blessing — they cool things off for a bit. Stay cool out there.",
+      "high_range": "85-93°F", "low_range": "66-72°F",
+      "conditions": "Hot and hazy, afternoon thunderstorms likely",
+      "gardening_tip": "Keep picking those beans, cucumbers, and tomatoes. The more you pick, the more they produce.",
+      "folk_wisdom": "Dog days bright and clear indicate a happy year.",
+      "sunrise_trend": "Around 6:15 AM", "sunset_trend": "Around 9:05 PM"
+    },
+    {
+      "week": 20, "start_date": "2026-07-12", "month": "July", "season": "Summer",
+      "forecast": "Peak summer heat. The kind of week where the pavement shimmers and the cicadas are singing loud. Find some shade and keep a fan going.",
+      "high_range": "86-94°F", "low_range": "68-74°F",
+      "conditions": "Very hot and humid, strong storms possible",
+      "gardening_tip": "If your tomato leaves are curling, don't panic — that's just their way of coping with the heat. Keep watering.",
+      "folk_wisdom": "When the cicadas sing, the heat of summer they bring.",
+      "sunrise_trend": "Around 6:20 AM", "sunset_trend": "Around 9:00 PM"
+    },
+    {
+      "week": 21, "start_date": "2026-07-19", "month": "July", "season": "Summer",
+      "forecast": "Mid to late July — still hot but we might catch a break with a cool front. Enjoy those cooler mornings when they come; they're a preview of what's ahead.",
+      "high_range": "84-92°F", "low_range": "66-72°F",
+      "conditions": "Hot with a possible cool front mid-week",
+      "gardening_tip": "Plant a fall crop of green beans now. They'll be ready to pick in September when the weather cools.",
+      "folk_wisdom": "If July is very hot, the winter will be cold.",
+      "sunrise_trend": "Around 6:25 AM", "sunset_trend": "Around 8:55 PM"
+    },
+    {
+      "week": 22, "start_date": "2026-07-26", "month": "July", "season": "Summer",
+      "forecast": "Late July warmth holding steady. The corn is tasseling and the gardens are in full swing. Evenings are starting to feel just a touch shorter.",
+      "high_range": "83-91°F", "low_range": "64-70°F",
+      "conditions": "Warm and muggy, scattered storms",
+      "gardening_tip": "Start thinking about your fall garden. Order seeds for kale, turnips, and late-season lettuce.",
+      "folk_wisdom": "When corn tassels, summer has reached its peak.",
+      "sunrise_trend": "Around 6:30 AM", "sunset_trend": "Around 8:50 PM"
+    },
+    {
+      "week": 23, "start_date": "2026-08-02", "month": "August", "season": "Late Summer",
+      "forecast": "August heat is on. Everything in the garden is ripening at once — tomatoes, peppers, corn. It's canning season! Stay cool and pace yourself.",
+      "high_range": "82-90°F", "low_range": "62-68°F",
+      "conditions": "Hot and humid, typical summer pattern",
+      "gardening_tip": "Time to start canning and preserving. Tomato sauce, salsa, pickles — put up summer's bounty for winter.",
+      "folk_wisdom": "Dry August and warm does harvest no harm.",
+      "sunrise_trend": "Around 6:35 AM", "sunset_trend": "Around 8:40 PM"
+    },
+    {
+      "week": 24, "start_date": "2026-08-09", "month": "August", "season": "Late Summer",
+      "forecast": "The heat holds but the days are noticeably shorter. You can feel the season starting to turn, even though summer's not ready to let go just yet.",
+      "high_range": "80-88°F", "low_range": "60-66°F",
+      "conditions": "Warm days, pleasant evenings emerging",
+      "gardening_tip": "Plant broccoli and cauliflower transplants now for a fall harvest. They do better in cooler weather anyway.",
+      "folk_wisdom": "When the katydids begin to sing, six weeks until the first frost they bring.",
+      "sunrise_trend": "Around 6:40 AM", "sunset_trend": "Around 8:30 PM"
+    },
+    {
+      "week": 25, "start_date": "2026-08-16", "month": "August", "season": "Late Summer",
+      "forecast": "Late August — the mornings have that first hint of fall crispness. Afternoons are still warm but the edge is off. County fair weather!",
+      "high_range": "78-86°F", "low_range": "58-64°F",
+      "conditions": "Warm but less humid, pleasant evenings",
+      "gardening_tip": "Sow spinach and lettuce for a fall salad garden. The cooler temps coming will be just what they need.",
+      "folk_wisdom": "If the first week of August is unusually warm, the coming winter will be snowy and long.",
+      "sunrise_trend": "Around 6:48 AM", "sunset_trend": "Around 8:20 PM"
+    },
+    {
+      "week": 26, "start_date": "2026-08-23", "month": "August", "season": "Late Summer",
+      "forecast": "Summer's last hurrah. Kids heading back to school and the evenings are drawing in. Enjoy these warm days — they'll be memories before you know it.",
+      "high_range": "76-84°F", "low_range": "56-62°F",
+      "conditions": "Pleasant and warm with lower humidity",
+      "gardening_tip": "Keep watering those fall transplants. They need consistent moisture to get established before cooler weather.",
+      "folk_wisdom": "When you can hear the train from far away, rain is on the way.",
+      "sunrise_trend": "Around 6:55 AM", "sunset_trend": "Around 8:10 PM"
+    },
+    {
+      "week": 27, "start_date": "2026-08-30", "month": "September", "season": "Early Fall",
+      "forecast": "September sneaks in with a gorgeous week. Cool mornings, warm afternoons, and that golden light that makes everything look like a painting.",
+      "high_range": "74-82°F", "low_range": "54-60°F",
+      "conditions": "Beautiful early fall weather, mostly sunny",
+      "gardening_tip": "Plant garlic cloves now — they'll overwinter and give you big beautiful bulbs next summer.",
+      "folk_wisdom": "September dries up ditches or breaks down bridges.",
+      "sunrise_trend": "Around 7:00 AM", "sunset_trend": "Around 8:00 PM"
+    },
+    {
+      "week": 28, "start_date": "2026-09-06", "month": "September", "season": "Early Fall",
+      "forecast": "Labor Day weekend wraps up the unofficial summer. Expect comfortable temps and clear skies. Perfect for one last picnic or a drive to see the first hints of color.",
+      "high_range": "72-80°F", "low_range": "52-58°F",
+      "conditions": "Clear and comfortable, ideal early fall weather",
+      "gardening_tip": "Start pulling out spent summer plants and composting them. Your garden soil will thank you next spring.",
+      "folk_wisdom": "Fair on September first, fair for the month.",
+      "sunrise_trend": "Around 7:08 AM", "sunset_trend": "Around 7:50 PM"
+    },
+    {
+      "week": 29, "start_date": "2026-09-13", "month": "September", "season": "Early Fall",
+      "forecast": "The air has that autumn crispness now. Leaves are just starting to turn at the tips. Apple cider season is here — enjoy every sip.",
+      "high_range": "68-76°F", "low_range": "48-54°F",
+      "conditions": "Cool mornings, warm sunny afternoons",
+      "gardening_tip": "Harvest your winter squash and pumpkins when the stems start to dry. Cure them in the sun for a few days.",
+      "folk_wisdom": "When squirrels gather nuts in a flurry, winter will come in a hurry.",
+      "sunrise_trend": "Around 7:15 AM", "sunset_trend": "Around 7:35 PM"
+    },
+    {
+      "week": 30, "start_date": "2026-09-20", "month": "September", "season": "Fall",
+      "forecast": "Autumn equinox — day and night are equal. The maples are blushing red and orange. Cool nights make for perfect sleeping weather.",
+      "high_range": "65-73°F", "low_range": "44-50°F",
+      "conditions": "Cool and clear with increasing color in the trees",
+      "gardening_tip": "Overseed your lawn now. Fall is the best time — the seeds love the warm soil and cool air.",
+      "folk_wisdom": "As the days shorten, so do the tempers of the weather.",
+      "sunrise_trend": "Around 7:22 AM", "sunset_trend": "Around 7:25 PM"
+    },
+    {
+      "week": 31, "start_date": "2026-09-27", "month": "September", "season": "Fall",
+      "forecast": "Peak fall color is building. Gorgeous drives through the countryside this week. A light frost is possible in the low spots — cover those tender plants.",
+      "high_range": "62-70°F", "low_range": "40-48°F",
+      "conditions": "Cool and colorful, frost possible in valleys",
+      "gardening_tip": "Bring in your houseplants that summered outside before the first frost gets them.",
+      "folk_wisdom": "When leaves fall early, autumn and winter will be mild.",
+      "sunrise_trend": "Around 7:28 AM", "sunset_trend": "Around 7:12 PM"
+    },
+    {
+      "week": 32, "start_date": "2026-10-04", "month": "October", "season": "Fall",
+      "forecast": "October glory! The trees are on fire with color and the air smells like wood smoke and apples. Chilly mornings and warm flannel afternoons.",
+      "high_range": "58-66°F", "low_range": "38-44°F",
+      "conditions": "Cool and crisp, peak fall foliage",
+      "gardening_tip": "Plant spring-blooming bulbs — tulips, daffodils, and crocuses go in the ground now for a beautiful surprise in April.",
+      "folk_wisdom": "Much rain in October, much wind in December.",
+      "sunrise_trend": "Around 7:35 AM", "sunset_trend": "Around 7:00 PM"
+    },
+    {
+      "week": 33, "start_date": "2026-10-11", "month": "October", "season": "Fall",
+      "forecast": "Sweater weather is here to stay. Expect some rainy days mixed with those perfect blue-sky autumn afternoons. The leaves are starting to fall.",
+      "high_range": "55-63°F", "low_range": "36-42°F",
+      "conditions": "Mix of sun and rain, leaves falling",
+      "gardening_tip": "Rake those leaves and compost them or use them as mulch. They're garden gold.",
+      "folk_wisdom": "If October brings heavy frost and wind, then January and February will be mild.",
+      "sunrise_trend": "Around 7:42 AM", "sunset_trend": "Around 6:50 PM"
+    },
+    {
+      "week": 34, "start_date": "2026-10-18", "month": "October", "season": "Fall",
+      "forecast": "The trees are going bare and the sky seems bigger. Chilly rain showers move through. Time to check the furnace and make sure it's ready.",
+      "high_range": "52-60°F", "low_range": "34-40°F",
+      "conditions": "Cool and breezy with passing showers",
+      "gardening_tip": "Clean and oil your garden tools before storing them for winter. A little care now means they'll last for years.",
+      "folk_wisdom": "A warm October means a cold February.",
+      "sunrise_trend": "Around 7:50 AM", "sunset_trend": "Around 6:40 PM"
+    },
+    {
+      "week": 35, "start_date": "2026-10-25", "month": "October", "season": "Late Fall",
+      "forecast": "Halloween week brings gray skies and that damp chill. The last of the leaves are coming down. First hard frost is likely this week if it hasn't come already.",
+      "high_range": "48-56°F", "low_range": "30-38°F",
+      "conditions": "Gray and chilly, hard frost likely",
+      "gardening_tip": "Pull up your tomato cages and bean poles. Store them in the shed so they don't rust over winter.",
+      "folk_wisdom": "When the woolly bear caterpillar's brown band is wide, a mild winter is on the way.",
+      "sunrise_trend": "Around 7:58 AM", "sunset_trend": "Around 6:30 PM"
+    },
+    {
+      "week": 36, "start_date": "2026-11-01", "month": "November", "season": "Late Fall",
+      "forecast": "November arrives with bare trees and steel-gray skies. Fall back on the clocks — enjoy the extra hour. Early sunsets and cozy evenings ahead.",
+      "high_range": "46-54°F", "low_range": "30-36°F",
+      "conditions": "Overcast and cool, chance of rain",
+      "gardening_tip": "Apply a thick layer of mulch over your perennial beds to protect the roots through winter.",
+      "folk_wisdom": "Ice in November to bear a duck, the rest of winter will be rain and muck.",
+      "sunrise_trend": "Around 7:05 AM after fall back", "sunset_trend": "Around 5:25 PM after fall back"
+    },
+    {
+      "week": 37, "start_date": "2026-11-08", "month": "November", "season": "Late Fall",
+      "forecast": "Raw and chilly. The kind of week where a warm bowl of soup hits the spot. Possible flurries toward the weekend — nothing that'll stick yet.",
+      "high_range": "42-50°F", "low_range": "28-34°F",
+      "conditions": "Cloudy and raw, first flurries possible",
+      "gardening_tip": "Drain and store your garden hoses before they freeze and crack. Shut off outdoor faucets too.",
+      "folk_wisdom": "If the first snow falls on unfrozen ground, expect a mild winter ahead.",
+      "sunrise_trend": "Around 7:12 AM", "sunset_trend": "Around 5:18 PM"
+    },
+    {
+      "week": 38, "start_date": "2026-11-15", "month": "November", "season": "Late Fall",
+      "forecast": "Getting colder now. Frost every morning and the ground is starting to harden. But there's beauty in the bare branches against the sunset.",
+      "high_range": "40-48°F", "low_range": "26-32°F",
+      "conditions": "Frosty mornings, cool and breezy afternoons",
+      "gardening_tip": "Now's a great time to test your garden soil. Send a sample to the extension office — you'll get results back before spring planting.",
+      "folk_wisdom": "Wind from the south has rain in its mouth.",
+      "sunrise_trend": "Around 7:20 AM", "sunset_trend": "Around 5:12 PM"
+    },
+    {
+      "week": 39, "start_date": "2026-11-22", "month": "November", "season": "Late Fall",
+      "forecast": "Thanksgiving week. Could go either way — maybe a mild spell for the holiday or maybe the first real snow. Either way, it's a week for gratitude and warm kitchens.",
+      "high_range": "38-48°F", "low_range": "24-32°F",
+      "conditions": "Variable — could be mild or snowy",
+      "gardening_tip": "After Thanksgiving dinner, save those turkey bones and vegetable scraps for compost or garden-bed soup stock.",
+      "folk_wisdom": "A green Thanksgiving means a white Christmas.",
+      "sunrise_trend": "Around 7:28 AM", "sunset_trend": "Around 5:08 PM"
+    },
+    {
+      "week": 40, "start_date": "2026-11-29", "month": "December", "season": "Early Winter",
+      "forecast": "Winter is settling in. Short days and long nights. Bundle up for any outdoor time and keep the bird feeders full — the cardinals and blue jays will brighten your view.",
+      "high_range": "35-44°F", "low_range": "22-30°F",
+      "conditions": "Cold with mix of clouds and occasional snow",
+      "gardening_tip": "Fill your bird feeders with sunflower seeds and suet. The birds will repay you by eating garden pests come spring.",
+      "folk_wisdom": "As the days begin to lengthen, the cold begins to strengthen.",
+      "sunrise_trend": "Around 7:35 AM", "sunset_trend": "Around 5:05 PM"
+    },
+    {
+      "week": 41, "start_date": "2026-12-06", "month": "December", "season": "Early Winter",
+      "forecast": "Cold and gray with that midwinter chill. Snow showers are likely. The kind of week for hot chocolate, good books, and Christmas decorating.",
+      "high_range": "32-40°F", "low_range": "20-28°F",
+      "conditions": "Cold with snow showers, accumulation possible",
+      "gardening_tip": "Enjoy the rest! Winter is your garden's off-season. Browse seed catalogs and dream about next year's garden.",
+      "folk_wisdom": "A heavy December snow keeps the ground warm for spring seeds below.",
+      "sunrise_trend": "Around 7:42 AM", "sunset_trend": "Around 5:02 PM"
+    },
+    {
+      "week": 42, "start_date": "2026-12-13", "month": "December", "season": "Winter",
+      "forecast": "Deep winter cold is here. Highs barely touching freezing some days. Make sure the pipes are protected and the driveway salt is handy.",
+      "high_range": "30-38°F", "low_range": "18-26°F",
+      "conditions": "Cold and snowy, icy patches possible",
+      "gardening_tip": "Check on any root vegetables still in the ground under mulch — carrots and parsnips actually get sweeter after a frost.",
+      "folk_wisdom": "Clear moon, frost soon.",
+      "sunrise_trend": "Around 7:48 AM", "sunset_trend": "Around 5:02 PM — near shortest day"
+    },
+    {
+      "week": 43, "start_date": "2026-12-20", "month": "December", "season": "Winter",
+      "forecast": "Christmas week and the winter solstice — the shortest day of the year. From here, the light slowly returns. Whether it's a white Christmas or not, it's a beautiful time.",
+      "high_range": "28-38°F", "low_range": "16-24°F",
+      "conditions": "Cold, chance of a white Christmas",
+      "gardening_tip": "Give the gift of seeds, garden tools, or a nice houseplant. Gardeners always appreciate something that grows.",
+      "folk_wisdom": "If Christmas Day be bright and clear, there'll be two winters in the year.",
+      "sunrise_trend": "Around 7:52 AM — latest sunrise", "sunset_trend": "Around 5:05 PM — starting to lengthen"
+    },
+    {
+      "week": 44, "start_date": "2026-12-27", "month": "December", "season": "Winter",
+      "forecast": "Year's end. Cold and quiet. A good week for reflection and rest. Watch for ice on the roads and keep the woodpile stocked if you've got a fireplace.",
+      "high_range": "28-36°F", "low_range": "16-24°F",
+      "conditions": "Cold and quiet, possible freezing rain",
+      "gardening_tip": "Start planning next year's garden on paper. Rotate where you plant things to keep the soil healthy.",
+      "folk_wisdom": "If New Year's Eve wind blows south, it betokens warmth and growth.",
+      "sunrise_trend": "Around 7:52 AM", "sunset_trend": "Around 5:10 PM"
+    },
+    {
+      "week": 45, "start_date": "2027-01-03", "month": "January", "season": "Winter",
+      "forecast": "Welcome to the new year. January in Ohio means business — cold, snowy, and not much daylight. But the days ARE getting longer, one minute at a time.",
+      "high_range": "26-34°F", "low_range": "14-22°F",
+      "conditions": "Cold and snowy, below-average temps possible",
+      "gardening_tip": "Order your seed catalogs if you haven't already. Burpee, Baker Creek, and Johnny's are all good ones.",
+      "folk_wisdom": "If January is mild, the rest of winter will be wild.",
+      "sunrise_trend": "Around 7:50 AM", "sunset_trend": "Around 5:15 PM"
+    },
+    {
+      "week": 46, "start_date": "2027-01-10", "month": "January", "season": "Winter",
+      "forecast": "This is often the coldest week of the year in Ohio. Single digits overnight are possible. Stay inside where it's warm and let the furnace earn its keep.",
+      "high_range": "24-32°F", "low_range": "10-20°F",
+      "conditions": "Bitterly cold, wind chill advisory possible",
+      "gardening_tip": "Check on your stored potatoes, onions, and squash. Remove any that are going soft before they spoil the others.",
+      "folk_wisdom": "When the cat lies on its brain, it's going to rain. When it sits with its back to the fire, cold weather is near.",
+      "sunrise_trend": "Around 7:48 AM", "sunset_trend": "Around 5:22 PM"
+    },
+    {
+      "week": 47, "start_date": "2027-01-17", "month": "January", "season": "Winter",
+      "forecast": "Still deep in winter but the light is noticeably returning. Sunsets are later and that counts for something. Expect snow and cold but spring is only 8 weeks away.",
+      "high_range": "26-34°F", "low_range": "14-22°F",
+      "conditions": "Cold with periodic snow, some sunny breaks",
+      "gardening_tip": "Start onion seeds indoors now. They need a long growing season and benefit from an early start.",
+      "folk_wisdom": "A January fog will freeze a hog.",
+      "sunrise_trend": "Around 7:45 AM", "sunset_trend": "Around 5:30 PM"
+    },
+    {
+      "week": 48, "start_date": "2027-01-24", "month": "January", "season": "Winter",
+      "forecast": "Late January — we're past the worst of it. Still cold, but there's a stubborn hopefulness in the air. Watch for a January thaw — a few days of 40s that tease you.",
+      "high_range": "28-38°F", "low_range": "16-24°F",
+      "conditions": "Cold with possible January thaw mid-week",
+      "gardening_tip": "Clean and sharpen your pruning shears. You'll need them in about 6 weeks when it's time to prune.",
+      "folk_wisdom": "The January thaw is nature's way of reminding us that spring always comes.",
+      "sunrise_trend": "Around 7:42 AM", "sunset_trend": "Around 5:38 PM"
+    },
+    {
+      "week": 49, "start_date": "2027-01-31", "month": "February", "season": "Late Winter",
+      "forecast": "February starts cold but there's a shift in the air. The sun feels warmer on your face even when the thermometer says otherwise. Groundhog Day is coming!",
+      "high_range": "30-40°F", "low_range": "18-26°F",
+      "conditions": "Cold but gradually moderating, snow showers",
+      "gardening_tip": "Start your herb seeds indoors — basil, parsley, and chives. Put them under a grow light or your sunniest window.",
+      "folk_wisdom": "If Candlemas Day be fair and bright, winter will have another flight. If it be dark with clouds and rain, winter is gone and won't come again.",
+      "sunrise_trend": "Around 7:38 AM", "sunset_trend": "Around 5:48 PM"
+    },
+    {
+      "week": 50, "start_date": "2027-02-07", "month": "February", "season": "Late Winter",
+      "forecast": "Valentine's week. Cold outside but warm hearts inside. We might see a mix of snow and rain — that slushy February weather that means winter is loosening its grip.",
+      "high_range": "32-42°F", "low_range": "20-28°F",
+      "conditions": "Mix of snow and rain, slush on the roads",
+      "gardening_tip": "Start your pepper and eggplant seeds indoors. They need 8-10 weeks before transplanting.",
+      "folk_wisdom": "February sunshine is not always what it seems; it lights but does not warm.",
+      "sunrise_trend": "Around 7:30 AM", "sunset_trend": "Around 5:58 PM"
+    },
+    {
+      "week": 51, "start_date": "2027-02-14", "month": "February", "season": "Late Winter",
+      "forecast": "The back of winter is breaking. Longer days, occasional warm spells in the 40s and 50s. The sap is starting to run in the maple trees — sugaring season!",
+      "high_range": "36-48°F", "low_range": "22-30°F",
+      "conditions": "Variable — cold snaps mixed with mild days",
+      "gardening_tip": "Prune your grape vines and berry bushes while they're still dormant. The sap hasn't risen yet.",
+      "folk_wisdom": "When maple sap runs, spring is not far behind.",
+      "sunrise_trend": "Around 7:22 AM", "sunset_trend": "Around 6:08 PM"
+    },
+    {
+      "week": 52, "start_date": "2027-02-21", "month": "February", "season": "Late Winter",
+      "forecast": "The final week of winter. The crocuses might be brave enough to poke through the snow. March is right around the corner and with it, a new beginning.",
+      "high_range": "38-50°F", "low_range": "24-32°F",
+      "conditions": "Moderating temperatures, early crocuses possible",
+      "gardening_tip": "Start your tomato seeds indoors now! Six to eight weeks before the last frost is perfect timing.",
+      "folk_wisdom": "No matter how long the winter, spring is sure to follow.",
+      "sunrise_trend": "Around 7:12 AM", "sunset_trend": "Around 6:18 PM"
+    }
+  ]
+}

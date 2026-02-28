@@ -34,7 +34,15 @@ class BibleVerseService:
 
         try:
             with open(path, "r", encoding="utf-8") as f:
-                verses = json.load(f)
+                data = json.load(f)
+
+            # Support both flat array and nested {months: [{weeks: [{days: []}]}]} format
+            if isinstance(data, list):
+                verses = data
+            elif isinstance(data, dict) and "months" in data:
+                verses = self._flatten_nested(data)
+            else:
+                verses = data
 
             conn = self.db._get_connection()
             try:
@@ -52,6 +60,24 @@ class BibleVerseService:
                     conn.close()
         except Exception as e:
             logger.error(f"Error loading bible verses: {e}")
+
+    def _flatten_nested(self, data: dict) -> list:
+        """Flatten nested month/week/day bible verse structure to flat array."""
+        verses = []
+        day_counter = 1
+        for month in data.get("months", []):
+            topic = month.get("theme", "general").lower().replace(" and ", "_").replace(" ", "_")
+            for week in month.get("weeks", []):
+                for day_entry in week.get("days", []):
+                    verses.append({
+                        "reference": day_entry.get("reference", ""),
+                        "text": day_entry.get("verse", day_entry.get("text", "")),
+                        "reflection": day_entry.get("reflection", ""),
+                        "topic": topic,
+                        "day_of_year": day_counter,
+                    })
+                    day_counter += 1
+        return verses
 
     def get_daily_verse(self) -> Optional[str]:
         """Get today's bible verse with reflection."""

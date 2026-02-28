@@ -27,25 +27,64 @@ class AlmanacWeather:
 
         try:
             with open(path, "r", encoding="utf-8") as f:
-                self._forecasts = json.load(f)
+                data = json.load(f)
+            # Support both {"weeks": [...]} and flat array formats
+            if isinstance(data, dict) and "weeks" in data:
+                self._forecasts = data["weeks"]
+            else:
+                self._forecasts = data
             logger.info(f"Loaded {len(self._forecasts)} almanac forecasts")
         except Exception as e:
             logger.error(f"Error loading almanac weather: {e}")
 
     def get_weekly_forecast(self) -> str:
         """Get this week's forecast."""
+        from datetime import timedelta
         now = datetime.now()
-        week_num = now.isocalendar()[1]
 
-        # Try loaded data first
+        # Try to match by start_date first (handles year-spanning data)
+        for entry in self._forecasts:
+            start = entry.get("start_date")
+            if start:
+                try:
+                    start_dt = datetime.strptime(start, "%Y-%m-%d")
+                    if start_dt <= now < start_dt + timedelta(days=7):
+                        return self._format_forecast(entry)
+                except ValueError:
+                    continue
+
+        # Fallback: match by ISO week number
+        week_num = now.isocalendar()[1]
         for entry in self._forecasts:
             if entry.get("week") == week_num:
-                forecast = entry.get("forecast", "")
-                details = entry.get("details", "")
-                return f"{forecast} {details}".strip()
+                return self._format_forecast(entry)
 
-        # Fallback: seasonal defaults
+        # Last resort: seasonal defaults
         return self._seasonal_default(now.month)
+
+    def _format_forecast(self, entry: dict) -> str:
+        """Build a conversational forecast from rich almanac data."""
+        parts = []
+
+        forecast = entry.get("forecast", "")
+        if forecast:
+            parts.append(forecast)
+
+        high = entry.get("high_range")
+        low = entry.get("low_range")
+        if high and low:
+            parts.append(f"Highs around {high} and lows around {low}.")
+
+        wisdom = entry.get("folk_wisdom")
+        if wisdom:
+            parts.append(f"And as they say, {wisdom}")
+
+        # Fallback for simple format
+        if not parts:
+            details = entry.get("details", "")
+            return f"{entry.get('forecast', '')} {details}".strip()
+
+        return " ".join(parts)
 
     def _seasonal_default(self, month: int) -> str:
         """Friendly seasonal weather when no specific data loaded."""

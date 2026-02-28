@@ -1,0 +1,701 @@
+{
+  "description": "Year-long daily Bible verse system organized by monthly themes (March 2026 - February 2027)",
+  "months": [
+    {
+      "month": 3, "name": "March", "theme": "Faith and Trust",
+      "description": "Trusting God through life's uncertainties",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "Trusting God's Plan",
+          "message": "This week we reflect on how God guides our steps even when the path is unclear.",
+          "days": [
+            {"day": 1, "verse": "Trust in the LORD with all your heart and lean not on your own understanding.", "reference": "Proverbs 3:5", "reflection": "Sometimes the hardest thing is letting go and trusting that God sees what we cannot."},
+            {"day": 2, "verse": "In all your ways submit to him, and he will make your paths straight.", "reference": "Proverbs 3:6", "reflection": "When we include God in every decision, He straightens the road before us."},
+            {"day": 3, "verse": "For I know the plans I have for you, declares the LORD, plans to prosper you and not to harm you, plans to give you hope and a future.", "reference": "Jeremiah 29:11", "reflection": "No matter what today looks like, God's plans for you are good."},
+            {"day": 4, "verse": "The LORD himself goes before you and will be with you; he will never leave you nor forsake you.", "reference": "Deuteronomy 31:8", "reflection": "You are never walking alone — God is already ahead of you on the path."},
+            {"day": 5, "verse": "Commit to the LORD whatever you do, and he will establish your plans.", "reference": "Proverbs 16:3", "reflection": "When we hand our plans to God, He builds something even better."},
+            {"day": 6, "verse": "The heart of man plans his way, but the LORD establishes his steps.", "reference": "Proverbs 16:9", "reflection": "We can make our plans, but God's direction is what truly matters."},
+            {"day": 7, "verse": "Many are the plans in a person's heart, but it is the LORD's purpose that prevails.", "reference": "Proverbs 19:21", "reflection": "Rest easy knowing that God's purpose will always win out over our worries."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "Faith Over Fear",
+          "message": "When fear creeps in, faith reminds us who holds tomorrow.",
+          "days": [
+            {"day": 1, "verse": "For God has not given us a spirit of fear, but of power, and of love, and of a sound mind.", "reference": "2 Timothy 1:7", "reflection": "Fear doesn't come from God — He gave us strength, love, and clear thinking instead."},
+            {"day": 2, "verse": "When I am afraid, I put my trust in you.", "reference": "Psalm 56:3", "reflection": "It's okay to feel afraid — what matters is where we turn when we do."},
+            {"day": 3, "verse": "The LORD is my light and my salvation — whom shall I fear?", "reference": "Psalm 27:1", "reflection": "With God as your light, no darkness can overcome you."},
+            {"day": 4, "verse": "Fear not, for I am with you; be not dismayed, for I am your God.", "reference": "Isaiah 41:10", "reflection": "These words have comforted God's people for thousands of years — and they're for you too."},
+            {"day": 5, "verse": "Even though I walk through the darkest valley, I will fear no evil, for you are with me.", "reference": "Psalm 23:4", "reflection": "The valley is just a passage — you're walking through it, not staying in it."},
+            {"day": 6, "verse": "Peace I leave with you; my peace I give you. Do not let your hearts be troubled and do not be afraid.", "reference": "John 14:27", "reflection": "Jesus offers a peace that the world can't give — and can't take away."},
+            {"day": 7, "verse": "So do not fear, for I am with you; be not dismayed, for I am your God. I will strengthen you and help you.", "reference": "Isaiah 41:10", "reflection": "God promises three things here: His presence, His strength, and His help. What more could we need?"}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Walking by Faith",
+          "message": "Faith is taking the next step even when you can't see the whole staircase.",
+          "days": [
+            {"day": 1, "verse": "Now faith is confidence in what we hope for and assurance about what we do not see.", "reference": "Hebrews 11:1", "reflection": "Faith isn't about seeing — it's about believing in the goodness that's coming."},
+            {"day": 2, "verse": "We live by faith, not by sight.", "reference": "2 Corinthians 5:7", "reflection": "Some of the most beautiful things in life can't be seen — only felt and believed."},
+            {"day": 3, "verse": "Without faith it is impossible to please God, because anyone who comes to him must believe that he exists and that he rewards those who earnestly seek him.", "reference": "Hebrews 11:6", "reflection": "God rewards those who seek Him — keep seeking."},
+            {"day": 4, "verse": "If you have faith as small as a mustard seed, you can say to this mountain, 'Move from here to there,' and it will move.", "reference": "Matthew 17:20", "reflection": "It doesn't take big faith — just real faith, even if it's tiny."},
+            {"day": 5, "verse": "I have fought the good fight, I have finished the race, I have kept the faith.", "reference": "2 Timothy 4:7", "reflection": "What a beautiful thing to be able to say at the end of a life well lived."},
+            {"day": 6, "verse": "Be on your guard; stand firm in the faith; be courageous; be strong.", "reference": "1 Corinthians 16:13", "reflection": "Faith and courage go hand in hand — one feeds the other."},
+            {"day": 7, "verse": "The righteous will live by faith.", "reference": "Romans 1:17", "reflection": "Faith isn't just for Sundays — it's how we live every single day."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Believing in God's Promises",
+          "message": "Every promise God has made, He will keep. Not one has ever failed.",
+          "days": [
+            {"day": 1, "verse": "God is not human, that he should lie, nor a human being, that he should change his mind. Does he speak and then not act?", "reference": "Numbers 23:19", "reflection": "When God makes a promise, you can take it to the bank."},
+            {"day": 2, "verse": "The LORD is faithful to all his promises and loving toward all he has made.", "reference": "Psalm 145:13", "reflection": "God's faithfulness extends to every corner of His creation — including you."},
+            {"day": 3, "verse": "Let us hold unswervingly to the hope we profess, for he who promised is faithful.", "reference": "Hebrews 10:23", "reflection": "Hold on tight to hope — the One who promised is absolutely trustworthy."},
+            {"day": 4, "verse": "And we know that in all things God works for the good of those who love him.", "reference": "Romans 8:28", "reflection": "Even the hard things are being woven into something good by God's loving hands."},
+            {"day": 5, "verse": "He who began a good work in you will carry it on to completion until the day of Christ Jesus.", "reference": "Philippians 1:6", "reflection": "God isn't finished with you yet — He's still working on His masterpiece."},
+            {"day": 6, "verse": "The Lord is not slow in keeping his promise, as some understand slowness.", "reference": "2 Peter 3:9", "reflection": "God's timing is perfect, even when it feels like He's taking His time."},
+            {"day": 7, "verse": "For no word from God will ever fail.", "reference": "Luke 1:37", "reflection": "Not one promise, not one word — God keeps them all."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 4, "name": "April", "theme": "Renewal and Resurrection",
+      "description": "The promise of new life and fresh starts through Christ",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "New Life in Christ",
+          "message": "Just as spring brings new growth, God brings new life to our hearts.",
+          "days": [
+            {"day": 1, "verse": "Therefore, if anyone is in Christ, the new creation has come: The old has gone, the new is here!", "reference": "2 Corinthians 5:17", "reflection": "Every morning is a chance to start fresh with God."},
+            {"day": 2, "verse": "He has made everything beautiful in its time.", "reference": "Ecclesiastes 3:11", "reflection": "Like flowers blooming in spring, God makes beautiful things in His perfect timing."},
+            {"day": 3, "verse": "See, I am doing a new thing! Now it springs up; do you not perceive it?", "reference": "Isaiah 43:19", "reflection": "God is always at work doing something new — keep your eyes open for it."},
+            {"day": 4, "verse": "Create in me a pure heart, O God, and renew a steadfast spirit within me.", "reference": "Psalm 51:10", "reflection": "A prayer that's always welcome — asking God to refresh your heart."},
+            {"day": 5, "verse": "But those who hope in the LORD will renew their strength. They will soar on wings like eagles.", "reference": "Isaiah 40:31", "reflection": "When you feel worn out, hope in God lifts you back up again."},
+            {"day": 6, "verse": "The steadfast love of the LORD never ceases; his mercies never come to an end; they are new every morning.", "reference": "Lamentations 3:22-23", "reflection": "Every sunrise brings a fresh supply of God's mercy — brand new, just for today."},
+            {"day": 7, "verse": "Forget the former things; do not dwell on the past.", "reference": "Isaiah 43:18", "reflection": "God doesn't want you stuck in yesterday — He's got something wonderful ahead."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "The Power of the Resurrection",
+          "message": "Because Jesus rose, we have hope that conquers even death.",
+          "days": [
+            {"day": 1, "verse": "He is not here; he has risen, just as he said.", "reference": "Matthew 28:6", "reflection": "The most powerful words in history — He is risen!"},
+            {"day": 2, "verse": "I am the resurrection and the life. The one who believes in me will live, even though they die.", "reference": "John 11:25", "reflection": "Jesus didn't just talk about life after death — He proved it."},
+            {"day": 3, "verse": "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.", "reference": "John 3:16", "reflection": "The greatest love story ever told, in just one verse."},
+            {"day": 4, "verse": "Death has been swallowed up in victory. Where, O death, is your victory? Where, O death, is your sting?", "reference": "1 Corinthians 15:54-55", "reflection": "Because of Jesus, death lost its power over us."},
+            {"day": 5, "verse": "Praise be to the God and Father of our Lord Jesus Christ! In his great mercy he has given us new birth into a living hope through the resurrection of Jesus Christ.", "reference": "1 Peter 1:3", "reflection": "Our hope isn't wishful thinking — it's alive and powerful because Jesus is alive."},
+            {"day": 6, "verse": "I have been crucified with Christ and I no longer live, but Christ lives in me.", "reference": "Galatians 2:20", "reflection": "When Christ lives in us, everything changes from the inside out."},
+            {"day": 7, "verse": "But God demonstrates his own love for us in this: While we were still sinners, Christ died for us.", "reference": "Romans 5:8", "reflection": "God didn't wait for us to be perfect — He loved us right where we were."}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Restoration and Healing",
+          "message": "God restores what is broken and heals what hurts.",
+          "days": [
+            {"day": 1, "verse": "He heals the brokenhearted and binds up their wounds.", "reference": "Psalm 147:3", "reflection": "Whatever is broken in your heart, God can mend it with His gentle hands."},
+            {"day": 2, "verse": "The LORD is close to the brokenhearted and saves those who are crushed in spirit.", "reference": "Psalm 34:18", "reflection": "When you're at your lowest, God is at His closest."},
+            {"day": 3, "verse": "Come to me, all you who are weary and burdened, and I will give you rest.", "reference": "Matthew 11:28", "reflection": "Jesus invites the tired and heavy-laden — that means all of us at some point."},
+            {"day": 4, "verse": "He restores my soul. He guides me along the right paths for his name's sake.", "reference": "Psalm 23:3", "reflection": "Like a good shepherd, God leads us to green pastures where our souls can heal."},
+            {"day": 5, "verse": "I will restore to you the years that the swarming locust has eaten.", "reference": "Joel 2:25", "reflection": "God can redeem the lost years and make something beautiful from them."},
+            {"day": 6, "verse": "And the God of all grace, who called you to his eternal glory in Christ, after you have suffered a little while, will himself restore you and make you strong.", "reference": "1 Peter 5:10", "reflection": "Suffering is temporary, but God's restoration is forever."},
+            {"day": 7, "verse": "He makes me lie down in green pastures, he leads me beside quiet waters.", "reference": "Psalm 23:2", "reflection": "Sometimes God's greatest gift is simply a peaceful place to rest."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Growing in Grace",
+          "message": "Like plants in spring, we grow a little more each day in God's grace.",
+          "days": [
+            {"day": 1, "verse": "But grow in the grace and knowledge of our Lord and Savior Jesus Christ.", "reference": "2 Peter 3:18", "reflection": "Growth in faith is a lifelong journey — and you're still on it."},
+            {"day": 2, "verse": "For it is by grace you have been saved, through faith — and this is not from yourselves, it is the gift of God.", "reference": "Ephesians 2:8", "reflection": "Grace isn't earned — it's a gift. All you have to do is receive it."},
+            {"day": 3, "verse": "My grace is sufficient for you, for my power is made perfect in weakness.", "reference": "2 Corinthians 12:9", "reflection": "Our weakness is where God's strength shines brightest."},
+            {"day": 4, "verse": "The LORD your God is gracious and compassionate. He will not turn his face from you.", "reference": "2 Chronicles 30:9", "reflection": "God never turns away from you — His face is always toward you."},
+            {"day": 5, "verse": "From his fullness we have all received, grace upon grace.", "reference": "John 1:16", "reflection": "God's grace doesn't run out — it just keeps coming, layer upon layer."},
+            {"day": 6, "verse": "Let us then approach God's throne of grace with confidence, so that we may receive mercy and find grace to help us in our time of need.", "reference": "Hebrews 4:16", "reflection": "You don't need an appointment to come to God — His door is always open."},
+            {"day": 7, "verse": "The grace of the Lord Jesus Christ be with your spirit.", "reference": "Philippians 4:23", "reflection": "A beautiful blessing to carry with you into a new week."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 5, "name": "May", "theme": "Family and Mothers",
+      "description": "Celebrating the gift of family and the love of mothers",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "The Gift of Family",
+          "message": "Family is one of God's greatest blessings — imperfect but irreplaceable.",
+          "days": [
+            {"day": 1, "verse": "As for me and my household, we will serve the LORD.", "reference": "Joshua 24:15", "reflection": "A family that serves God together finds strength that lasts generations."},
+            {"day": 2, "verse": "Children are a heritage from the LORD, offspring a reward from him.", "reference": "Psalm 127:3", "reflection": "Every child is a gift from God — a living treasure."},
+            {"day": 3, "verse": "How good and pleasant it is when God's people live together in unity!", "reference": "Psalm 133:1", "reflection": "Family harmony is one of life's sweetest blessings."},
+            {"day": 4, "verse": "Train up a child in the way he should go; even when he is old he will not depart from it.", "reference": "Proverbs 22:6", "reflection": "The seeds you plant in a child's heart bloom for a lifetime."},
+            {"day": 5, "verse": "God sets the lonely in families.", "reference": "Psalm 68:6", "reflection": "God knew we weren't meant to walk through life alone."},
+            {"day": 6, "verse": "Be completely humble and gentle; be patient, bearing with one another in love.", "reference": "Ephesians 4:2", "reflection": "Patience and love — the glue that holds a family together."},
+            {"day": 7, "verse": "Love is patient, love is kind. It does not envy, it does not boast.", "reference": "1 Corinthians 13:4", "reflection": "This is the kind of love that builds a family that lasts."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "A Mother's Love",
+          "message": "A mother's love reflects the tender heart of God.",
+          "days": [
+            {"day": 1, "verse": "Her children arise and call her blessed; her husband also, and he praises her.", "reference": "Proverbs 31:28", "reflection": "The legacy of a good mother echoes through every generation."},
+            {"day": 2, "verse": "As a mother comforts her child, so will I comfort you.", "reference": "Isaiah 66:13", "reflection": "God's comfort is like a mother's embrace — warm, safe, and unconditional."},
+            {"day": 3, "verse": "She speaks with wisdom, and faithful instruction is on her tongue.", "reference": "Proverbs 31:26", "reflection": "A mother's words shape hearts and minds for a lifetime."},
+            {"day": 4, "verse": "Honor your father and your mother, so that you may live long in the land the LORD your God is giving you.", "reference": "Exodus 20:12", "reflection": "Honoring our parents is one of God's oldest and most important commandments."},
+            {"day": 5, "verse": "She is clothed with strength and dignity; she can laugh at the days to come.", "reference": "Proverbs 31:25", "reflection": "A woman of faith faces the future with confidence and joy."},
+            {"day": 6, "verse": "Can a mother forget the baby at her breast? Though she may forget, I will not forget you!", "reference": "Isaiah 49:15", "reflection": "Even stronger than a mother's bond is God's love for you."},
+            {"day": 7, "verse": "I am reminded of your sincere faith, which first lived in your grandmother Lois and in your mother Eunice.", "reference": "2 Timothy 1:5", "reflection": "Faith passed from grandmother to mother to child — that's a beautiful legacy."}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Generations of Blessing",
+          "message": "The blessings we receive, we pass on to those who come after us.",
+          "days": [
+            {"day": 1, "verse": "One generation commends your works to another; they tell of your mighty acts.", "reference": "Psalm 145:4", "reflection": "Sharing God's goodness with the next generation is one of life's greatest joys."},
+            {"day": 2, "verse": "Even when I am old and gray, do not forsake me, my God, till I declare your power to the next generation.", "reference": "Psalm 71:18", "reflection": "Your stories of God's faithfulness are priceless gifts to those who come after you."},
+            {"day": 3, "verse": "A good person leaves an inheritance for their children's children.", "reference": "Proverbs 13:22", "reflection": "The best inheritance isn't money — it's faith, love, and wisdom."},
+            {"day": 4, "verse": "Remember the days of old; consider the generations long past. Ask your father and he will tell you, your elders, and they will explain to you.", "reference": "Deuteronomy 32:7", "reflection": "There is wisdom in the stories of those who came before us."},
+            {"day": 5, "verse": "The righteous lead blameless lives; blessed are their children after them.", "reference": "Proverbs 20:7", "reflection": "Living right isn't just for you — it blesses your children and grandchildren too."},
+            {"day": 6, "verse": "Tell it to your children, and let your children tell it to their children, and their children to the next generation.", "reference": "Joel 1:3", "reflection": "Every story you share carries a piece of your heart into the future."},
+            {"day": 7, "verse": "Gray hair is a crown of splendor; it is attained in the way of righteousness.", "reference": "Proverbs 16:31", "reflection": "Your years of life and faith are a crown of glory."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Home and Belonging",
+          "message": "Home isn't just a place — it's wherever love lives.",
+          "days": [
+            {"day": 1, "verse": "Unless the LORD builds the house, the builders labor in vain.", "reference": "Psalm 127:1", "reflection": "A home built on God's foundation stands through any storm."},
+            {"day": 2, "verse": "In My Father's house are many mansions; if it were not so, I would have told you.", "reference": "John 14:2", "reflection": "Our earthly home is just a preview of the eternal home God is preparing."},
+            {"day": 3, "verse": "By wisdom a house is built, and through understanding it is established.", "reference": "Proverbs 24:3", "reflection": "Every kind word and act of love adds another brick to a strong home."},
+            {"day": 4, "verse": "Where you go I will go, and where you stay I will stay. Your people will be my people and your God my God.", "reference": "Ruth 1:16", "reflection": "Ruth's devotion to Naomi — a beautiful picture of family loyalty."},
+            {"day": 5, "verse": "Better is a dry morsel with quiet than a house full of feasting with strife.", "reference": "Proverbs 17:1", "reflection": "A peaceful home is worth more than any mansion."},
+            {"day": 6, "verse": "The LORD bless you and keep you; the LORD make his face shine on you and be gracious to you.", "reference": "Numbers 6:24-25", "reflection": "This ancient blessing is perfect for speaking over your family every day."},
+            {"day": 7, "verse": "May the Lord of peace himself give you peace at all times and in every way.", "reference": "2 Thessalonians 3:16", "reflection": "Peace in your home comes from the Lord of peace Himself."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 6, "name": "June", "theme": "Strength and Fathers",
+      "description": "Finding strength in God and honoring the fathers in our lives",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "God Our Strength",
+          "message": "When our own strength fails, God's strength is just beginning.",
+          "days": [
+            {"day": 1, "verse": "I can do all things through Christ who strengthens me.", "reference": "Philippians 4:13", "reflection": "Not some things — all things. Christ's strength has no limits."},
+            {"day": 2, "verse": "The LORD is my strength and my shield; my heart trusts in him, and he helps me.", "reference": "Psalm 28:7", "reflection": "God is both our strength to fight and our shield to protect."},
+            {"day": 3, "verse": "Be strong and courageous. Do not be afraid; do not be discouraged, for the LORD your God will be with you wherever you go.", "reference": "Joshua 1:9", "reflection": "God's presence makes us brave in any situation."},
+            {"day": 4, "verse": "The joy of the LORD is your strength.", "reference": "Nehemiah 8:10", "reflection": "Joy isn't just a feeling — it's a source of strength that carries you through."},
+            {"day": 5, "verse": "God is our refuge and strength, an ever-present help in trouble.", "reference": "Psalm 46:1", "reflection": "When trouble comes, God isn't far away — He's an ever-present help."},
+            {"day": 6, "verse": "He gives strength to the weary and increases the power of the weak.", "reference": "Isaiah 40:29", "reflection": "Feeling tired? God specializes in renewing the weary."},
+            {"day": 7, "verse": "The LORD is my rock, my fortress and my deliverer; my God is my rock, in whom I take refuge.", "reference": "Psalm 18:2", "reflection": "God is as solid and reliable as a mountain — unmovable and eternal."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "A Father's Heart",
+          "message": "Earthly fathers reflect our Heavenly Father's love — imperfect but powerful.",
+          "days": [
+            {"day": 1, "verse": "A father to the fatherless, a defender of widows, is God in his holy dwelling.", "reference": "Psalm 68:5", "reflection": "God is the perfect Father — He defends and provides for all His children."},
+            {"day": 2, "verse": "As a father has compassion on his children, so the LORD has compassion on those who fear him.", "reference": "Psalm 103:13", "reflection": "God's compassion for us is like a father's tender care — but infinitely deeper."},
+            {"day": 3, "verse": "Fathers, do not exasperate your children; instead, bring them up in the training and instruction of the Lord.", "reference": "Ephesians 6:4", "reflection": "The best gift a father gives is pointing his children toward God."},
+            {"day": 4, "verse": "The father of a righteous child has great joy; a man who fathers a wise son rejoices in him.", "reference": "Proverbs 23:24", "reflection": "A father's greatest pride is seeing his children walk in wisdom."},
+            {"day": 5, "verse": "See what great love the Father has lavished on us, that we should be called children of God!", "reference": "1 John 3:1", "reflection": "We aren't servants — we're God's beloved children. What an honor!"},
+            {"day": 6, "verse": "My son, keep your father's command and do not forsake your mother's teaching.", "reference": "Proverbs 6:20", "reflection": "The wisdom of our parents stays with us long after we leave home."},
+            {"day": 7, "verse": "Every good and perfect gift is from above, coming down from the Father of lights.", "reference": "James 1:17", "reflection": "Every blessing in your life traces back to your Heavenly Father's generous hand."}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Endurance and Perseverance",
+          "message": "Life's race isn't a sprint — it's a long, beautiful journey of endurance.",
+          "days": [
+            {"day": 1, "verse": "Let us run with perseverance the race marked out for us, fixing our eyes on Jesus.", "reference": "Hebrews 12:1-2", "reflection": "Keep your eyes on Jesus and keep putting one foot in front of the other."},
+            {"day": 2, "verse": "Blessed is the one who perseveres under trial because, having stood the test, that person will receive the crown of life.", "reference": "James 1:12", "reflection": "Every trial you endure is building a crown you'll wear forever."},
+            {"day": 3, "verse": "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.", "reference": "Galatians 6:9", "reflection": "Don't give up — harvest time is coming."},
+            {"day": 4, "verse": "Consider it pure joy, my brothers and sisters, whenever you face trials of many kinds.", "reference": "James 1:2", "reflection": "Trials aren't punishments — they're training that makes us stronger."},
+            {"day": 5, "verse": "We also glory in our sufferings, because we know that suffering produces perseverance; perseverance, character; and character, hope.", "reference": "Romans 5:3-4", "reflection": "There's a chain reaction: suffering leads to character, and character leads to hope."},
+            {"day": 6, "verse": "I have fought the good fight, I have finished the race, I have kept the faith.", "reference": "2 Timothy 4:7", "reflection": "May we all be able to say these words when our race is run."},
+            {"day": 7, "verse": "But the one who stands firm to the end will be saved.", "reference": "Matthew 24:13", "reflection": "Standing firm isn't about being perfect — it's about not giving up."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "God's Protection",
+          "message": "Like a mighty fortress, God stands guard over His children.",
+          "days": [
+            {"day": 1, "verse": "The LORD will fight for you; you need only to be still.", "reference": "Exodus 14:14", "reflection": "Sometimes the bravest thing we can do is be still and let God fight for us."},
+            {"day": 2, "verse": "He who dwells in the shelter of the Most High will rest in the shadow of the Almighty.", "reference": "Psalm 91:1", "reflection": "Under God's wing is the safest place you can be."},
+            {"day": 3, "verse": "The LORD is faithful, and he will strengthen you and protect you from the evil one.", "reference": "2 Thessalonians 3:3", "reflection": "God's protection is as reliable as His faithfulness — and that never fails."},
+            {"day": 4, "verse": "No weapon forged against you will prevail.", "reference": "Isaiah 54:17", "reflection": "Whatever comes against you, it cannot overcome God's protection over your life."},
+            {"day": 5, "verse": "The name of the LORD is a fortified tower; the righteous run to it and are safe.", "reference": "Proverbs 18:10", "reflection": "In times of trouble, call on God's name — it's your fortress."},
+            {"day": 6, "verse": "He will cover you with his feathers, and under his wings you will find refuge.", "reference": "Psalm 91:4", "reflection": "Like a mother hen covering her chicks — that's how God shelters you."},
+            {"day": 7, "verse": "The LORD watches over you — the LORD is your shade at your right hand.", "reference": "Psalm 121:5", "reflection": "God is always watching over you, closer than a shadow."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 7, "name": "July", "theme": "Freedom and Joy",
+      "description": "Celebrating the freedom and joy we have in Christ",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "Freedom in Christ",
+          "message": "True freedom isn't about circumstances — it's about who set you free.",
+          "days": [
+            {"day": 1, "verse": "So if the Son sets you free, you will be free indeed.", "reference": "John 8:36", "reflection": "The freedom Jesus gives isn't temporary — it's the real thing."},
+            {"day": 2, "verse": "It is for freedom that Christ has set us free. Stand firm, then, and do not let yourselves be burdened again by a yoke of slavery.", "reference": "Galatians 5:1", "reflection": "Christ didn't free us so we could carry heavy burdens — He freed us to live fully."},
+            {"day": 3, "verse": "Now the Lord is the Spirit, and where the Spirit of the Lord is, there is freedom.", "reference": "2 Corinthians 3:17", "reflection": "God's Spirit brings freedom wherever He goes — including into your heart."},
+            {"day": 4, "verse": "You will know the truth, and the truth will set you free.", "reference": "John 8:32", "reflection": "Truth is the key that unlocks every chain."},
+            {"day": 5, "verse": "The Spirit of the Lord is on me, because he has anointed me to proclaim good news to the poor. He has sent me to proclaim freedom for the prisoners.", "reference": "Luke 4:18", "reflection": "Jesus came to set captives free — whatever prison you're in, He has the key."},
+            {"day": 6, "verse": "I will walk about in freedom, for I have sought out your precepts.", "reference": "Psalm 119:45", "reflection": "Following God's ways doesn't restrict us — it sets us free to walk in the open."},
+            {"day": 7, "verse": "Live as free people, but do not use your freedom as a cover-up for evil; live as God's servants.", "reference": "1 Peter 2:16", "reflection": "True freedom is the power to choose what is good and right."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "Choosing Joy",
+          "message": "Joy isn't about what happens to us — it's about who lives in us.",
+          "days": [
+            {"day": 1, "verse": "The LORD has done great things for us, and we are filled with joy.", "reference": "Psalm 126:3", "reflection": "When we count God's blessings, joy overflows naturally."},
+            {"day": 2, "verse": "Rejoice in the Lord always. I will say it again: Rejoice!", "reference": "Philippians 4:4", "reflection": "Paul said it twice because he meant it — rejoice, no matter what!"},
+            {"day": 3, "verse": "You make known to me the path of life; you will fill me with joy in your presence.", "reference": "Psalm 16:11", "reflection": "The closer we are to God, the more joy we find."},
+            {"day": 4, "verse": "A cheerful heart is good medicine, but a crushed spirit dries up the bones.", "reference": "Proverbs 17:22", "reflection": "Joy and laughter truly are the best medicine."},
+            {"day": 5, "verse": "This is the day that the LORD has made; let us rejoice and be glad in it.", "reference": "Psalm 118:24", "reflection": "Today is a gift from God — that alone is reason to celebrate."},
+            {"day": 6, "verse": "Weeping may stay for the night, but rejoicing comes in the morning.", "reference": "Psalm 30:5", "reflection": "No matter how dark the night, joy comes with the dawn."},
+            {"day": 7, "verse": "You have turned my mourning into joyful dancing. You have taken away my clothes of mourning and clothed me with joy.", "reference": "Psalm 30:11", "reflection": "God transforms sorrow into dancing — that's just what He does."}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Contentment and Peace",
+          "message": "Peace isn't having everything — it's being content with what God provides.",
+          "days": [
+            {"day": 1, "verse": "I have learned to be content whatever the circumstances.", "reference": "Philippians 4:11", "reflection": "Contentment is a skill Paul learned — and so can we, one day at a time."},
+            {"day": 2, "verse": "The peace of God, which transcends all understanding, will guard your hearts and your minds in Christ Jesus.", "reference": "Philippians 4:7", "reflection": "God's peace doesn't always make sense — it just works."},
+            {"day": 3, "verse": "Be still, and know that I am God.", "reference": "Psalm 46:10", "reflection": "In the quiet moments, God speaks the loudest."},
+            {"day": 4, "verse": "You will keep in perfect peace those whose minds are steadfast, because they trust in you.", "reference": "Isaiah 26:3", "reflection": "A mind focused on God finds perfect peace — even in chaos."},
+            {"day": 5, "verse": "Cast all your anxiety on him because he cares for you.", "reference": "1 Peter 5:7", "reflection": "God doesn't just tolerate your worries — He actively wants to carry them for you."},
+            {"day": 6, "verse": "Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God.", "reference": "Philippians 4:6", "reflection": "Prayer is the antidote to anxiety — bring everything to God."},
+            {"day": 7, "verse": "Come to me, all you who are weary and burdened, and I will give you rest.", "reference": "Matthew 11:28", "reflection": "Jesus' invitation is always open — bring your burdens and find rest."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Celebrating God's Goodness",
+          "message": "Every good thing in our lives is a gift from a generous God.",
+          "days": [
+            {"day": 1, "verse": "Taste and see that the LORD is good; blessed is the one who takes refuge in him.", "reference": "Psalm 34:8", "reflection": "God's goodness isn't just a concept — it's something you can experience firsthand."},
+            {"day": 2, "verse": "Give thanks to the LORD, for he is good; his love endures forever.", "reference": "Psalm 107:1", "reflection": "A simple prayer of thanks opens the door to experiencing more of God's goodness."},
+            {"day": 3, "verse": "The LORD is good to all; he has compassion on all he has made.", "reference": "Psalm 145:9", "reflection": "God's goodness isn't just for a chosen few — it extends to everyone He made."},
+            {"day": 4, "verse": "How abundant are the good things that you have stored up for those who fear you.", "reference": "Psalm 31:19", "reflection": "God has good things stored up for you — more than you can imagine."},
+            {"day": 5, "verse": "Surely your goodness and love will follow me all the days of my life.", "reference": "Psalm 23:6", "reflection": "God's goodness doesn't just visit — it follows you every single day."},
+            {"day": 6, "verse": "The earth is full of the goodness of the LORD.", "reference": "Psalm 33:5", "reflection": "Look around — God's goodness is everywhere if we have eyes to see it."},
+            {"day": 7, "verse": "Oh give thanks to the LORD, for he is good, for his steadfast love endures forever!", "reference": "Psalm 136:1", "reflection": "His love endures forever — not just today, not just tomorrow, but forever."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 8, "name": "August", "theme": "Wisdom and Knowledge",
+      "description": "Seeking God's wisdom for daily living",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "The Beginning of Wisdom",
+          "message": "True wisdom starts with knowing who God is.",
+          "days": [
+            {"day": 1, "verse": "The fear of the LORD is the beginning of wisdom, and knowledge of the Holy One is understanding.", "reference": "Proverbs 9:10", "reflection": "Wisdom doesn't start in a classroom — it starts on your knees."},
+            {"day": 2, "verse": "If any of you lacks wisdom, you should ask God, who gives generously to all without finding fault.", "reference": "James 1:5", "reflection": "God never scolds you for asking for wisdom — He gives it freely."},
+            {"day": 3, "verse": "The fear of the LORD is the beginning of knowledge, but fools despise wisdom and instruction.", "reference": "Proverbs 1:7", "reflection": "Being open to learning is the first sign of a wise heart."},
+            {"day": 4, "verse": "For the LORD gives wisdom; from his mouth come knowledge and understanding.", "reference": "Proverbs 2:6", "reflection": "The smartest thing we can do is listen to what God has to say."},
+            {"day": 5, "verse": "Get wisdom, get understanding; do not forget my words or turn away from them.", "reference": "Proverbs 4:5", "reflection": "Wisdom is worth pursuing — it's more valuable than gold."},
+            {"day": 6, "verse": "Wisdom is more precious than rubies, and nothing you desire can compare with her.", "reference": "Proverbs 8:11", "reflection": "All the riches in the world can't buy what wisdom freely gives."},
+            {"day": 7, "verse": "The wise in heart accept commands, but a chattering fool comes to ruin.", "reference": "Proverbs 10:8", "reflection": "The wisest people are often the best listeners."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "Words of Wisdom",
+          "message": "Our words have the power to build up or tear down — choose wisely.",
+          "days": [
+            {"day": 1, "verse": "The tongue has the power of life and death, and those who love it will eat its fruit.", "reference": "Proverbs 18:21", "reflection": "Every word we speak either plants seeds of life or seeds of destruction."},
+            {"day": 2, "verse": "A gentle answer turns away wrath, but a harsh word stirs up anger.", "reference": "Proverbs 15:1", "reflection": "A soft word can calm the fiercest storm."},
+            {"day": 3, "verse": "Let your conversation be always full of grace, seasoned with salt.", "reference": "Colossians 4:6", "reflection": "Grace-filled words are like a good meal — nourishing and satisfying."},
+            {"day": 4, "verse": "The words of the reckless pierce like swords, but the tongue of the wise brings healing.", "reference": "Proverbs 12:18", "reflection": "Choose words that heal, not words that hurt."},
+            {"day": 5, "verse": "Do not let any unwholesome talk come out of your mouths, but only what is helpful for building others up.", "reference": "Ephesians 4:29", "reflection": "Before you speak, ask yourself: will this build someone up?"},
+            {"day": 6, "verse": "Even fools are thought wise if they keep silent, and discerning if they hold their tongues.", "reference": "Proverbs 17:28", "reflection": "Sometimes the wisest thing to say is nothing at all."},
+            {"day": 7, "verse": "Pleasant words are a honeycomb, sweet to the soul and healing to the bones.", "reference": "Proverbs 16:24", "reflection": "Kind words are medicine for the soul — give them generously."}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Learning from Life",
+          "message": "Every experience — good or hard — teaches us something valuable.",
+          "days": [
+            {"day": 1, "verse": "Show me your ways, LORD, teach me your paths.", "reference": "Psalm 25:4", "reflection": "A willingness to learn from God is the mark of a humble heart."},
+            {"day": 2, "verse": "Your word is a lamp for my feet, a light on my path.", "reference": "Psalm 119:105", "reflection": "God's Word lights the way — one step at a time."},
+            {"day": 3, "verse": "All Scripture is God-breathed and is useful for teaching, rebuking, correcting and training in righteousness.", "reference": "2 Timothy 3:16", "reflection": "The Bible isn't just a book — it's God's personal instruction manual for life."},
+            {"day": 4, "verse": "Apply your heart to instruction and your ears to words of knowledge.", "reference": "Proverbs 23:12", "reflection": "Learning never stops — and every day brings a new lesson."},
+            {"day": 5, "verse": "The wise store up knowledge, but the mouth of a fool invites ruin.", "reference": "Proverbs 10:14", "reflection": "Collect wisdom like treasure — you'll need it when the time comes."},
+            {"day": 6, "verse": "Plans fail for lack of counsel, but with many advisers they succeed.", "reference": "Proverbs 15:22", "reflection": "Don't be too proud to ask for advice — wisdom often comes through others."},
+            {"day": 7, "verse": "Teach us to number our days, that we may gain a heart of wisdom.", "reference": "Psalm 90:12", "reflection": "When we realize our days are precious, we use them more wisely."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Living Wisely",
+          "message": "Wisdom isn't just knowing the right thing — it's doing it.",
+          "days": [
+            {"day": 1, "verse": "Be very careful, then, how you live — not as unwise but as wise, making the most of every opportunity.", "reference": "Ephesians 5:15-16", "reflection": "Every day is an opportunity — don't let it slip by."},
+            {"day": 2, "verse": "Who is wise and understanding among you? Let them show it by their good life, by deeds done in the humility that comes from wisdom.", "reference": "James 3:13", "reflection": "True wisdom shows up in how we live, not just what we know."},
+            {"day": 3, "verse": "Therefore everyone who hears these words of mine and puts them into practice is like a wise man who built his house on the rock.", "reference": "Matthew 7:24", "reflection": "Building your life on God's Word is the wisest foundation there is."},
+            {"day": 4, "verse": "But the wisdom that comes from heaven is first of all pure; then peace-loving, considerate, submissive, full of mercy and good fruit.", "reference": "James 3:17", "reflection": "Heavenly wisdom is gentle, merciful, and fruitful — just like God Himself."},
+            {"day": 5, "verse": "The prudent see danger and take refuge, but the simple keep going and pay the penalty.", "reference": "Proverbs 22:3", "reflection": "Wisdom sees ahead and prepares — that's not worry, that's good sense."},
+            {"day": 6, "verse": "Walk with the wise and become wise, for a companion of fools suffers harm.", "reference": "Proverbs 13:20", "reflection": "The people you surround yourself with shape who you become."},
+            {"day": 7, "verse": "How much better to get wisdom than gold, to get insight rather than silver!", "reference": "Proverbs 16:16", "reflection": "Wisdom enriches your life in ways money never could."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 9, "name": "September", "theme": "Harvest and Purpose",
+      "description": "Reaping the fruits of faithfulness and living with purpose",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "Sowing and Reaping",
+          "message": "What we plant today, we harvest tomorrow — in every area of life.",
+          "days": [
+            {"day": 1, "verse": "Do not be deceived: God cannot be mocked. A man reaps what he sows.", "reference": "Galatians 6:7", "reflection": "The seeds we plant — good or bad — always produce a harvest."},
+            {"day": 2, "verse": "Those who sow with tears will reap with songs of joy.", "reference": "Psalm 126:5", "reflection": "Sometimes the hardest seasons produce the most beautiful harvests."},
+            {"day": 3, "verse": "The one who sows righteousness reaps a sure reward.", "reference": "Proverbs 11:18", "reflection": "Every act of kindness and integrity is a seed that will bear fruit."},
+            {"day": 4, "verse": "Remember this: Whoever sows sparingly will also reap sparingly, and whoever sows generously will also reap generously.", "reference": "2 Corinthians 9:6", "reflection": "Generosity always comes back — multiplied."},
+            {"day": 5, "verse": "Still other seed fell on good soil, where it produced a crop — a hundred, sixty or thirty times what was sown.", "reference": "Matthew 13:8", "reflection": "Good soil and good seeds create an abundant life."},
+            {"day": 6, "verse": "The seed falling on good soil refers to someone who hears the word and understands it. This is the one who produces a crop.", "reference": "Matthew 13:23", "reflection": "When God's Word takes root in a ready heart, amazing things grow."},
+            {"day": 7, "verse": "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.", "reference": "Galatians 6:9", "reflection": "Keep planting, keep watering, keep going — harvest time is coming."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "Finding Your Purpose",
+          "message": "God created you for a reason — and that purpose still burns bright.",
+          "days": [
+            {"day": 1, "verse": "For we are God's handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do.", "reference": "Ephesians 2:10", "reflection": "You are God's masterpiece — handcrafted with purpose and love."},
+            {"day": 2, "verse": "The LORD will fulfill his purpose for me; your steadfast love, O LORD, endures forever.", "reference": "Psalm 138:8", "reflection": "God's purpose for you isn't finished — He's still writing your story."},
+            {"day": 3, "verse": "Before I formed you in the womb I knew you, before you were born I set you apart.", "reference": "Jeremiah 1:5", "reflection": "God knew you and loved you before you took your first breath."},
+            {"day": 4, "verse": "In their hearts humans plan their course, but the LORD establishes their steps.", "reference": "Proverbs 16:9", "reflection": "Make your plans, but trust that God is directing your path."},
+            {"day": 5, "verse": "For everything there is a season, and a time for every matter under heaven.", "reference": "Ecclesiastes 3:1", "reflection": "Every season of life has its purpose — even this one."},
+            {"day": 6, "verse": "I press on toward the goal to win the prize for which God has called me heavenward in Christ Jesus.", "reference": "Philippians 3:14", "reflection": "Keep pressing forward — the best is yet to come."},
+            {"day": 7, "verse": "Delight yourself in the LORD, and he will give you the desires of your heart.", "reference": "Psalm 37:4", "reflection": "When our hearts are aligned with God, our deepest desires reflect His will."}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Bearing Good Fruit",
+          "message": "A life well-lived produces fruit that blesses everyone around it.",
+          "days": [
+            {"day": 1, "verse": "But the fruit of the Spirit is love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness and self-control.", "reference": "Galatians 5:22-23", "reflection": "These nine qualities are the hallmarks of a life lived close to God."},
+            {"day": 2, "verse": "By their fruit you will recognize them.", "reference": "Matthew 7:16", "reflection": "What grows in our lives tells the world who we really are."},
+            {"day": 3, "verse": "I am the vine; you are the branches. If you remain in me and I in you, you will bear much fruit.", "reference": "John 15:5", "reflection": "Stay connected to Jesus and the fruit comes naturally."},
+            {"day": 4, "verse": "The righteous will flourish like a palm tree, they will grow like a cedar of Lebanon.", "reference": "Psalm 92:12", "reflection": "Those who trust God grow tall, strong, and beautiful over time."},
+            {"day": 5, "verse": "Blessed is the one who trusts in the LORD. They will be like a tree planted by the water that sends out its roots by the stream.", "reference": "Jeremiah 17:7-8", "reflection": "A life rooted in God never dries up — it stays green and fruitful."},
+            {"day": 6, "verse": "This is to my Father's glory, that you bear much fruit, showing yourselves to be my disciples.", "reference": "John 15:8", "reflection": "Bearing fruit brings glory to God — and that's a life worth living."},
+            {"day": 7, "verse": "They will still bear fruit in old age, they will stay fresh and green.", "reference": "Psalm 92:14", "reflection": "Age doesn't stop fruitfulness — some of the sweetest fruit comes from the oldest trees."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Giving Thanks for the Harvest",
+          "message": "As we gather the harvest, we give thanks for God's faithful provision.",
+          "days": [
+            {"day": 1, "verse": "Give thanks to the LORD, for he is good; his love endures forever.", "reference": "1 Chronicles 16:34", "reflection": "Gratitude opens our eyes to see how good God has been."},
+            {"day": 2, "verse": "The LORD is my shepherd, I lack nothing.", "reference": "Psalm 23:1", "reflection": "With God as your shepherd, you have everything you truly need."},
+            {"day": 3, "verse": "And my God will meet all your needs according to the riches of his glory in Christ Jesus.", "reference": "Philippians 4:19", "reflection": "God's resources are unlimited — He can provide for every need."},
+            {"day": 4, "verse": "He who supplies seed to the sower and bread for food will also supply and increase your store of seed.", "reference": "2 Corinthians 9:10", "reflection": "God provides not just for today, but seeds for tomorrow's harvest too."},
+            {"day": 5, "verse": "You crown the year with your bounty, and your carts overflow with abundance.", "reference": "Psalm 65:11", "reflection": "Look back over the year — God's bounty is everywhere."},
+            {"day": 6, "verse": "Every good and perfect gift is from above.", "reference": "James 1:17", "reflection": "Every blessing, big and small, is a gift from your Heavenly Father."},
+            {"day": 7, "verse": "Enter his gates with thanksgiving and his courts with praise; give thanks to him and praise his name.", "reference": "Psalm 100:4", "reflection": "Thanksgiving is the doorway into God's presence."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 10, "name": "October", "theme": "Courage and Overcoming Fear",
+      "description": "Standing bold in faith when the world feels uncertain",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "God's Courage",
+          "message": "Courage isn't the absence of fear — it's trusting God in the middle of it.",
+          "days": [
+            {"day": 1, "verse": "Have I not commanded you? Be strong and courageous. Do not be afraid; do not be discouraged.", "reference": "Joshua 1:9", "reflection": "God doesn't suggest courage — He commands it, because He knows He'll be right there with you."},
+            {"day": 2, "verse": "Be strong and take heart, all you who hope in the LORD.", "reference": "Psalm 31:24", "reflection": "Hope in God gives us the strength to face anything."},
+            {"day": 3, "verse": "Wait for the LORD; be strong and take heart and wait for the LORD.", "reference": "Psalm 27:14", "reflection": "Sometimes courage means being patient and trusting God's timing."},
+            {"day": 4, "verse": "The wicked flee though no one pursues, but the righteous are as bold as a lion.", "reference": "Proverbs 28:1", "reflection": "Living right gives you a boldness that nothing else can."},
+            {"day": 5, "verse": "Be on your guard; stand firm in the faith; be courageous; be strong.", "reference": "1 Corinthians 16:13", "reflection": "Stand firm, stand strong — God is standing with you."},
+            {"day": 6, "verse": "I sought the LORD, and he answered me; he delivered me from all my fears.", "reference": "Psalm 34:4", "reflection": "When you call on God, He doesn't just calm you down — He delivers you."},
+            {"day": 7, "verse": "The LORD is with me; I will not be afraid. What can mere mortals do to me?", "reference": "Psalm 118:6", "reflection": "With God on your side, there is nothing to fear."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "Overcoming Life's Battles",
+          "message": "Every battle you face, God has already planned the victory.",
+          "days": [
+            {"day": 1, "verse": "In all these things we are more than conquerors through him who loved us.", "reference": "Romans 8:37", "reflection": "Through God's love, we don't just survive — we triumph."},
+            {"day": 2, "verse": "The battle is not yours, but God's.", "reference": "2 Chronicles 20:15", "reflection": "Let God fight the battles you were never meant to carry alone."},
+            {"day": 3, "verse": "If God is for us, who can be against us?", "reference": "Romans 8:31", "reflection": "The God of the universe is on your side — that changes everything."},
+            {"day": 4, "verse": "But thanks be to God! He gives us the victory through our Lord Jesus Christ.", "reference": "1 Corinthians 15:57", "reflection": "Victory isn't something we earn — it's something God gives."},
+            {"day": 5, "verse": "For everyone born of God overcomes the world. This is the victory that has overcome the world, even our faith.", "reference": "1 John 5:4", "reflection": "Faith is the weapon that overcomes every obstacle the world throws at us."},
+            {"day": 6, "verse": "The LORD your God is the one who goes with you to fight for you against your enemies to give you victory.", "reference": "Deuteronomy 20:4", "reflection": "You are never fighting alone — God is fighting right beside you."},
+            {"day": 7, "verse": "I have told you these things, so that in me you may have peace. In this world you will have trouble. But take heart! I have overcome the world.", "reference": "John 16:33", "reflection": "Jesus was honest — trouble will come. But He's already won the war."}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Standing Strong in Hard Times",
+          "message": "Trials don't break us — they reveal how strong God has made us.",
+          "days": [
+            {"day": 1, "verse": "When you pass through the waters, I will be with you; and when you pass through the rivers, they will not sweep over you.", "reference": "Isaiah 43:2", "reflection": "God doesn't promise we won't face floods — He promises to be right there in them with us."},
+            {"day": 2, "verse": "The LORD is near to all who call on him, to all who call on him in truth.", "reference": "Psalm 145:18", "reflection": "Call on God — He's closer than you think."},
+            {"day": 3, "verse": "Cast your cares on the LORD and he will sustain you; he will never let the righteous be shaken.", "reference": "Psalm 55:22", "reflection": "Give your worries to God — He can handle every single one."},
+            {"day": 4, "verse": "The righteous person may have many troubles, but the LORD delivers him from them all.", "reference": "Psalm 34:19", "reflection": "Troubles may be many, but God's deliverances are more."},
+            {"day": 5, "verse": "He will wipe every tear from their eyes. There will be no more death or mourning or crying or pain.", "reference": "Revelation 21:4", "reflection": "A day is coming when every tear will be wiped away forever."},
+            {"day": 6, "verse": "My flesh and my heart may fail, but God is the strength of my heart and my portion forever.", "reference": "Psalm 73:26", "reflection": "Even when your body and heart are failing, God remains your strength."},
+            {"day": 7, "verse": "The Lord stood at my side and gave me strength.", "reference": "2 Timothy 4:17", "reflection": "In Paul's hardest moment, the Lord was right there. He'll be there for you too."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Light in the Darkness",
+          "message": "No darkness is too dark for God's light to shine through.",
+          "days": [
+            {"day": 1, "verse": "The light shines in the darkness, and the darkness has not overcome it.", "reference": "John 1:5", "reflection": "Darkness can never put out God's light — never has, never will."},
+            {"day": 2, "verse": "You, LORD, are my lamp; the LORD turns my darkness into light.", "reference": "2 Samuel 22:29", "reflection": "When your world feels dark, God Himself becomes your light."},
+            {"day": 3, "verse": "The people walking in darkness have seen a great light; on those living in the land of deep darkness a light has dawned.", "reference": "Isaiah 9:2", "reflection": "No matter how deep the darkness, God's light always breaks through."},
+            {"day": 4, "verse": "You are the light of the world. A town built on a hill cannot be hidden.", "reference": "Matthew 5:14", "reflection": "You carry God's light — and the world needs to see it shining."},
+            {"day": 5, "verse": "For you were once darkness, but now you are light in the Lord. Live as children of light.", "reference": "Ephesians 5:8", "reflection": "You aren't just carrying light — you ARE light in the Lord."},
+            {"day": 6, "verse": "Send me your light and your faithful care, let them lead me.", "reference": "Psalm 43:3", "reflection": "God's light and faithfulness are your guides through any dark valley."},
+            {"day": 7, "verse": "The LORD is my light and my salvation — whom shall I fear?", "reference": "Psalm 27:1", "reflection": "With God as your light and your salvation, fear has no foothold."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 11, "name": "November", "theme": "Gratitude and Thanksgiving",
+      "description": "Counting our blessings and giving thanks in all circumstances",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "A Heart of Gratitude",
+          "message": "Gratitude changes how we see everything — it turns what we have into enough.",
+          "days": [
+            {"day": 1, "verse": "Give thanks in all circumstances; for this is God's will for you in Christ Jesus.", "reference": "1 Thessalonians 5:18", "reflection": "Thankfulness in every situation — that's God's will for your life."},
+            {"day": 2, "verse": "Let the peace of Christ rule in your hearts, since as members of one body you were called to peace. And be thankful.", "reference": "Colossians 3:15", "reflection": "Peace and thankfulness go hand in hand — one feeds the other."},
+            {"day": 3, "verse": "I will give thanks to you, LORD, with all my heart; I will tell of all your wonderful deeds.", "reference": "Psalm 9:1", "reflection": "When we start counting God's wonderful deeds, the list never ends."},
+            {"day": 4, "verse": "Let them give thanks to the LORD for his unfailing love and his wonderful deeds for mankind.", "reference": "Psalm 107:8", "reflection": "God's love never fails — and that's always worth celebrating."},
+            {"day": 5, "verse": "Devote yourselves to prayer, being watchful and thankful.", "reference": "Colossians 4:2", "reflection": "A thankful prayer is the most powerful prayer there is."},
+            {"day": 6, "verse": "I always thank my God for you because of his grace given you in Christ Jesus.", "reference": "1 Corinthians 1:4", "reflection": "Don't forget to thank God for the people in your life too."},
+            {"day": 7, "verse": "Thanks be to God for his indescribable gift!", "reference": "2 Corinthians 9:15", "reflection": "Some gifts are so wonderful, words can't do them justice."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "Counting Our Blessings",
+          "message": "When we count our blessings, we realize how rich we truly are.",
+          "days": [
+            {"day": 1, "verse": "Praise the LORD, my soul, and forget not all his benefits.", "reference": "Psalm 103:2", "reflection": "Take a moment today to remember all the ways God has blessed you."},
+            {"day": 2, "verse": "Every good and perfect gift is from above, coming down from the Father of heavenly lights.", "reference": "James 1:17", "reflection": "Trace every good thing back to its source — your loving Father above."},
+            {"day": 3, "verse": "The LORD has done great things for us, and we are filled with joy.", "reference": "Psalm 126:3", "reflection": "Joy flows naturally when we recognize how great God has been to us."},
+            {"day": 4, "verse": "Bless the LORD, O my soul, and all that is within me, bless his holy name!", "reference": "Psalm 103:1", "reflection": "Let everything within you rise up in praise and gratitude."},
+            {"day": 5, "verse": "The LORD bless you and keep you; the LORD make his face shine on you.", "reference": "Numbers 6:24-25", "reflection": "Receive this blessing today — God's face is shining on you."},
+            {"day": 6, "verse": "Praise be to the God and Father of our Lord Jesus Christ, who has blessed us in the heavenly realms with every spiritual blessing in Christ.", "reference": "Ephesians 1:3", "reflection": "We are blessed beyond measure — more than we can even count."},
+            {"day": 7, "verse": "How precious to me are your thoughts, God! How vast is the sum of them!", "reference": "Psalm 139:17", "reflection": "God thinks about you more often than the grains of sand — imagine that!"}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Giving Generously",
+          "message": "A generous heart overflows with the same generosity God shows us.",
+          "days": [
+            {"day": 1, "verse": "It is more blessed to give than to receive.", "reference": "Acts 20:35", "reflection": "The joy of giving always outshines the thrill of receiving."},
+            {"day": 2, "verse": "Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver.", "reference": "2 Corinthians 9:7", "reflection": "Give with a smile — that's the kind of giving God treasures."},
+            {"day": 3, "verse": "Give, and it will be given to you. A good measure, pressed down, shaken together and running over.", "reference": "Luke 6:38", "reflection": "You can't out-give God — He always gives back more than we put in."},
+            {"day": 4, "verse": "Whoever is kind to the poor lends to the LORD, and he will reward them for what they have done.", "reference": "Proverbs 19:17", "reflection": "When we help those in need, we're lending to God Himself."},
+            {"day": 5, "verse": "Do not forget to do good and to share with others, for with such sacrifices God is pleased.", "reference": "Hebrews 13:16", "reflection": "Simple acts of sharing please God's heart."},
+            {"day": 6, "verse": "Freely you have received; freely give.", "reference": "Matthew 10:8", "reflection": "Everything we have was freely given — let's pass it on the same way."},
+            {"day": 7, "verse": "The generous will themselves be blessed, for they share their food with the poor.", "reference": "Proverbs 22:9", "reflection": "Generosity blesses both the giver and the receiver."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Thanking God for His Faithfulness",
+          "message": "God has been faithful through every season — and He always will be.",
+          "days": [
+            {"day": 1, "verse": "Great is thy faithfulness, O God my Father; there is no shadow of turning with thee.", "reference": "Lamentations 3:23", "reflection": "God never changes direction on us — His faithfulness is rock-solid."},
+            {"day": 2, "verse": "Know therefore that the LORD your God is God; he is the faithful God, keeping his covenant of love to a thousand generations.", "reference": "Deuteronomy 7:9", "reflection": "God's faithfulness extends to a thousand generations — yours included."},
+            {"day": 3, "verse": "Your faithfulness endures to all generations; you established the earth, and it endures.", "reference": "Psalm 119:90", "reflection": "As long as the earth stands, God's faithfulness stands with it."},
+            {"day": 4, "verse": "If we are faithless, he remains faithful, for he cannot disown himself.", "reference": "2 Timothy 2:13", "reflection": "Even on our worst days, God remains faithful — it's in His nature."},
+            {"day": 5, "verse": "The LORD is righteous in all his ways and faithful in all he does.", "reference": "Psalm 145:17", "reflection": "Everything God does is right and faithful — every single thing."},
+            {"day": 6, "verse": "Because of the LORD's great love we are not consumed, for his compassions never fail.", "reference": "Lamentations 3:22", "reflection": "We're still standing because of God's unfailing compassion."},
+            {"day": 7, "verse": "I will sing of the LORD's great love forever; with my mouth I will make your faithfulness known through all generations.", "reference": "Psalm 89:1", "reflection": "Tell the next generation about God's faithfulness — your stories matter."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 12, "name": "December", "theme": "Hope and Christmas",
+      "description": "The hope of Christ's coming — for the world and for our hearts",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "The Promise of a Savior",
+          "message": "Long before Bethlehem, God promised that hope was on the way.",
+          "days": [
+            {"day": 1, "verse": "For to us a child is born, to us a son is given, and the government will be on his shoulders.", "reference": "Isaiah 9:6", "reflection": "Centuries before Christmas, God promised a child who would change everything."},
+            {"day": 2, "verse": "The virgin will conceive and give birth to a son, and will call him Immanuel.", "reference": "Isaiah 7:14", "reflection": "Immanuel — God with us. The greatest name for the greatest gift."},
+            {"day": 3, "verse": "But you, Bethlehem, though you are small among the clans of Judah, out of you will come a ruler over Israel.", "reference": "Micah 5:2", "reflection": "God chose a tiny town for the biggest event in history."},
+            {"day": 4, "verse": "The people walking in darkness have seen a great light.", "reference": "Isaiah 9:2", "reflection": "Into the world's darkest night, God sent His brightest light."},
+            {"day": 5, "verse": "He will be called Wonderful Counselor, Mighty God, Everlasting Father, Prince of Peace.", "reference": "Isaiah 9:6", "reflection": "Every one of those names reveals something beautiful about who Jesus is."},
+            {"day": 6, "verse": "There will be no more gloom for those who were in distress.", "reference": "Isaiah 9:1", "reflection": "The promise of Christ is the end of hopelessness."},
+            {"day": 7, "verse": "A shoot will come up from the stump of Jesse; from his roots a Branch will bear fruit.", "reference": "Isaiah 11:1", "reflection": "From an ordinary family tree, God grew something extraordinary."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "The Birth of Jesus",
+          "message": "The night God came to earth as a baby in a manger.",
+          "days": [
+            {"day": 1, "verse": "She gave birth to her firstborn, a son. She wrapped him in cloths and placed him in a manger, because there was no guest room available for them.", "reference": "Luke 2:7", "reflection": "The King of Kings came into the world in the humblest way possible."},
+            {"day": 2, "verse": "Today in the town of David a Savior has been born to you; he is the Messiah, the Lord.", "reference": "Luke 2:11", "reflection": "The announcement that changed the world — a Savior is born!"},
+            {"day": 3, "verse": "Glory to God in the highest heaven, and on earth peace to those on whom his favor rests.", "reference": "Luke 2:14", "reflection": "The angels couldn't contain their joy — and neither should we."},
+            {"day": 4, "verse": "The Word became flesh and made his dwelling among us.", "reference": "John 1:14", "reflection": "God didn't stay far away — He came close enough to touch."},
+            {"day": 5, "verse": "When they saw the star, they were overjoyed.", "reference": "Matthew 2:10", "reflection": "The wise men followed a star to find their King — what a journey of faith."},
+            {"day": 6, "verse": "They opened their treasures and presented him with gifts of gold, frankincense and myrrh.", "reference": "Matthew 2:11", "reflection": "The wise men gave their best to Jesus — and so can we."},
+            {"day": 7, "verse": "For God so loved the world that he gave his one and only Son.", "reference": "John 3:16", "reflection": "Christmas is the story of the greatest gift ever given."}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "The Light of the World",
+          "message": "In the darkest time of year, the Light of the World shines brightest.",
+          "days": [
+            {"day": 1, "verse": "I am the light of the world. Whoever follows me will never walk in darkness, but will have the light of life.", "reference": "John 8:12", "reflection": "Following Jesus means you always have a light to guide your way."},
+            {"day": 2, "verse": "In him was life, and that life was the light of all mankind.", "reference": "John 1:4", "reflection": "The life of Jesus illuminates every heart that welcomes Him."},
+            {"day": 3, "verse": "Arise, shine, for your light has come, and the glory of the LORD rises upon you.", "reference": "Isaiah 60:1", "reflection": "Your light has come — rise and let it shine!"},
+            {"day": 4, "verse": "The true light that gives light to everyone was coming into the world.", "reference": "John 1:9", "reflection": "Jesus didn't come for a select few — His light is for everyone."},
+            {"day": 5, "verse": "Let your light shine before others, that they may see your good deeds and glorify your Father in heaven.", "reference": "Matthew 5:16", "reflection": "Your good deeds are a reflection of God's light in you."},
+            {"day": 6, "verse": "For with you is the fountain of life; in your light we see light.", "reference": "Psalm 36:9", "reflection": "In God's light, everything becomes clearer and more beautiful."},
+            {"day": 7, "verse": "The light shines in the darkness, and the darkness has not overcome it.", "reference": "John 1:5", "reflection": "Christmas reminds us that light always wins over darkness."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Hope for the Future",
+          "message": "As one year ends and another begins, our hope in God remains unshaken.",
+          "days": [
+            {"day": 1, "verse": "May the God of hope fill you with all joy and peace as you trust in him.", "reference": "Romans 15:13", "reflection": "Hope, joy, and peace — God wraps them all together as a gift for you."},
+            {"day": 2, "verse": "For I am convinced that neither death nor life, neither angels nor demons, neither the present nor the future, can separate us from the love of God.", "reference": "Romans 8:38-39", "reflection": "Nothing — absolutely nothing — can separate you from God's love."},
+            {"day": 3, "verse": "He has made everything beautiful in its time. He has also set eternity in the human heart.", "reference": "Ecclesiastes 3:11", "reflection": "That longing for something more — that's eternity calling your name."},
+            {"day": 4, "verse": "Behold, I am making all things new.", "reference": "Revelation 21:5", "reflection": "God is in the business of making things new — including you and me."},
+            {"day": 5, "verse": "But those who hope in the LORD will renew their strength.", "reference": "Isaiah 40:31", "reflection": "Hope in God isn't wishful thinking — it's a source of real, renewable strength."},
+            {"day": 6, "verse": "Now faith is confidence in what we hope for and assurance about what we do not see.", "reference": "Hebrews 11:1", "reflection": "Hope sees what faith believes — even before it arrives."},
+            {"day": 7, "verse": "Jesus Christ is the same yesterday and today and forever.", "reference": "Hebrews 13:8", "reflection": "As the year turns, Jesus stays the same — faithful, loving, and true."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 1, "name": "January", "theme": "New Beginnings",
+      "description": "Starting fresh with God's promises for a new year",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "A Fresh Start",
+          "message": "Every new year is a chance to begin again with God.",
+          "days": [
+            {"day": 1, "verse": "Therefore, if anyone is in Christ, the new creation has come: The old has gone, the new is here!", "reference": "2 Corinthians 5:17", "reflection": "In Christ, every day can be a brand-new start."},
+            {"day": 2, "verse": "Forget the former things; do not dwell on the past. See, I am doing a new thing!", "reference": "Isaiah 43:18-19", "reflection": "Let go of what's behind — God has something new ahead."},
+            {"day": 3, "verse": "Because of the LORD's great love we are not consumed, for his compassions never fail. They are new every morning.", "reference": "Lamentations 3:22-23", "reflection": "Every sunrise brings a fresh batch of God's mercy."},
+            {"day": 4, "verse": "He who was seated on the throne said, 'I am making everything new!'", "reference": "Revelation 21:5", "reflection": "God specializes in making all things new — including your story."},
+            {"day": 5, "verse": "Do not conform to the pattern of this world, but be transformed by the renewing of your mind.", "reference": "Romans 12:2", "reflection": "A renewed mind sees the world through God's eyes."},
+            {"day": 6, "verse": "I will give you a new heart and put a new spirit in you.", "reference": "Ezekiel 36:26", "reflection": "God doesn't just fix our old hearts — He gives us brand new ones."},
+            {"day": 7, "verse": "The one who calls you is faithful, and he will do it.", "reference": "1 Thessalonians 5:24", "reflection": "Whatever God has called you to in this new year, He'll see it through."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "God's Unchanging Love",
+          "message": "In a world full of change, God's love stays constant and sure.",
+          "days": [
+            {"day": 1, "verse": "The LORD appeared to us in the past, saying: I have loved you with an everlasting love.", "reference": "Jeremiah 31:3", "reflection": "God's love for you didn't start yesterday — it's been there since forever."},
+            {"day": 2, "verse": "Give thanks to the LORD, for he is good. His love endures forever.", "reference": "Psalm 136:1", "reflection": "His love endures forever — say it, believe it, rest in it."},
+            {"day": 3, "verse": "For great is his love toward us, and the faithfulness of the LORD endures forever.", "reference": "Psalm 117:2", "reflection": "Great love and eternal faithfulness — that's our God."},
+            {"day": 4, "verse": "I am the LORD, I change not.", "reference": "Malachi 3:6", "reflection": "Everything else may change, but God remains the same — always loving, always faithful."},
+            {"day": 5, "verse": "Who shall separate us from the love of Christ? Shall trouble or hardship or persecution or famine or nakedness or danger or sword?", "reference": "Romans 8:35", "reflection": "Paul's list covers every possible threat — and none of them can separate you from God's love."},
+            {"day": 6, "verse": "And so we know and rely on the love God has for us. God is love.", "reference": "1 John 4:16", "reflection": "God doesn't just love — He IS love. It's His very nature."},
+            {"day": 7, "verse": "The LORD your God is with you, the Mighty Warrior who saves. He will take great delight in you; in his love he will quiet you with his singing.", "reference": "Zephaniah 3:17", "reflection": "Imagine — God sings over you with delight. What a beautiful picture."}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Walking with God Daily",
+          "message": "A walk with God isn't a sprint — it's a daily, step-by-step journey.",
+          "days": [
+            {"day": 1, "verse": "This is the day the LORD has made; we will rejoice and be glad in it.", "reference": "Psalm 118:24", "reflection": "Today is a gift — unwrap it with joy and gratitude."},
+            {"day": 2, "verse": "Seek the LORD while he may be found; call on him while he is near.", "reference": "Isaiah 55:6", "reflection": "Don't wait for tomorrow — God is near right now, today."},
+            {"day": 3, "verse": "Draw near to God, and he will draw near to you.", "reference": "James 4:8", "reflection": "Take one step toward God, and He takes ten toward you."},
+            {"day": 4, "verse": "In the morning, LORD, you hear my voice; in the morning I lay my requests before you and wait expectantly.", "reference": "Psalm 5:3", "reflection": "Start each morning with a conversation with God — He's already listening."},
+            {"day": 5, "verse": "He has shown you, O mortal, what is good. And what does the LORD require of you? To act justly and to love mercy and to walk humbly with your God.", "reference": "Micah 6:8", "reflection": "Justice, mercy, and humility — three simple things that make all the difference."},
+            {"day": 6, "verse": "Whether you turn to the right or to the left, your ears will hear a voice behind you, saying, 'This is the way; walk in it.'", "reference": "Isaiah 30:21", "reflection": "When you're unsure which way to go, listen — God is guiding you."},
+            {"day": 7, "verse": "Thy word is a lamp unto my feet, and a light unto my path.", "reference": "Psalm 119:105", "reflection": "God's Word shows you the next step — and that's all you need."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Setting Our Hearts on God",
+          "message": "When our hearts are set on God, everything else falls into place.",
+          "days": [
+            {"day": 1, "verse": "But seek first his kingdom and his righteousness, and all these things will be given to you as well.", "reference": "Matthew 6:33", "reflection": "Put God first and watch Him take care of everything else."},
+            {"day": 2, "verse": "Set your minds on things above, not on earthly things.", "reference": "Colossians 3:2", "reflection": "Where your mind goes, your heart follows — aim it heavenward."},
+            {"day": 3, "verse": "Above all else, guard your heart, for everything you do flows from it.", "reference": "Proverbs 4:23", "reflection": "Your heart is the wellspring of your life — protect it with God's truth."},
+            {"day": 4, "verse": "Search me, God, and know my heart; test me and know my anxious thoughts.", "reference": "Psalm 139:23", "reflection": "Invite God to search your heart — He does it gently and with love."},
+            {"day": 5, "verse": "Delight yourself also in the LORD, and He shall give you the desires of your heart.", "reference": "Psalm 37:4", "reflection": "When God is your delight, your desires line up with His good plans."},
+            {"day": 6, "verse": "Trust in the LORD with all your heart and lean not on your own understanding.", "reference": "Proverbs 3:5", "reflection": "Full trust means letting go of our need to figure everything out."},
+            {"day": 7, "verse": "Create in me a clean heart, O God, and renew a right spirit within me.", "reference": "Psalm 51:10", "reflection": "A clean heart and a renewed spirit — the best way to start any season."}
+          ]
+        }
+      ]
+    },
+    {
+      "month": 2, "name": "February", "theme": "Love and Compassion",
+      "description": "The greatest of these is love — exploring God's love and sharing it with others",
+      "weeks": [
+        {
+          "week": 1, "sub_theme": "God's Love for Us",
+          "message": "Before we ever loved God, He loved us first — completely and unconditionally.",
+          "days": [
+            {"day": 1, "verse": "We love because he first loved us.", "reference": "1 John 4:19", "reflection": "Our ability to love comes from being loved first by God."},
+            {"day": 2, "verse": "But God demonstrates his own love for us in this: While we were still sinners, Christ died for us.", "reference": "Romans 5:8", "reflection": "God's love didn't wait for us to clean up — it met us right where we were."},
+            {"day": 3, "verse": "See what great love the Father has lavished on us, that we should be called children of God!", "reference": "1 John 3:1", "reflection": "God didn't just love us a little — He lavished His love on us."},
+            {"day": 4, "verse": "For God so loved the world that he gave his one and only Son.", "reference": "John 3:16", "reflection": "The greatest love story ever told — God gave everything for you."},
+            {"day": 5, "verse": "The LORD your God is in your midst, a mighty one who will save; he will rejoice over you with gladness.", "reference": "Zephaniah 3:17", "reflection": "God doesn't just tolerate you — He rejoices over you with singing."},
+            {"day": 6, "verse": "How great is the love the Father has lavished on us, that we should be called children of God! And that is what we are!", "reference": "1 John 3:1", "reflection": "You are a child of God — loved, chosen, and cherished."},
+            {"day": 7, "verse": "I have loved you with an everlasting love; I have drawn you with unfailing kindness.", "reference": "Jeremiah 31:3", "reflection": "God's love isn't temporary — it's everlasting, and it draws us gently to Him."}
+          ]
+        },
+        {
+          "week": 2, "sub_theme": "Loving One Another",
+          "message": "The love we receive from God is meant to overflow into the lives of others.",
+          "days": [
+            {"day": 1, "verse": "A new command I give you: Love one another. As I have loved you, so you must love one another.", "reference": "John 13:34", "reflection": "Love like Jesus loved — selflessly, generously, and without conditions."},
+            {"day": 2, "verse": "Dear friends, let us love one another, for love comes from God.", "reference": "1 John 4:7", "reflection": "Every act of love is a reflection of God's heart in the world."},
+            {"day": 3, "verse": "Above all, love each other deeply, because love covers over a multitude of sins.", "reference": "1 Peter 4:8", "reflection": "Deep love doesn't ignore faults — it covers them with grace."},
+            {"day": 4, "verse": "Be kind and compassionate to one another, forgiving each other, just as in Christ God forgave you.", "reference": "Ephesians 4:32", "reflection": "Kindness, compassion, and forgiveness — the three pillars of love in action."},
+            {"day": 5, "verse": "Do everything in love.", "reference": "1 Corinthians 16:14", "reflection": "Four simple words that can transform every single thing we do."},
+            {"day": 6, "verse": "And now these three remain: faith, hope and love. But the greatest of these is love.", "reference": "1 Corinthians 13:13", "reflection": "Of all the good things in life, love stands tallest."},
+            {"day": 7, "verse": "Let no debt remain outstanding, except the continuing debt to love one another.", "reference": "Romans 13:8", "reflection": "The debt of love is one we'll happily never finish paying."}
+          ]
+        },
+        {
+          "week": 3, "sub_theme": "Compassion and Mercy",
+          "message": "Compassion is love in action — seeing someone's need and reaching out.",
+          "days": [
+            {"day": 1, "verse": "The LORD is gracious and compassionate, slow to anger and rich in love.", "reference": "Psalm 145:8", "reflection": "God is patient with us — can we be patient with others?"},
+            {"day": 2, "verse": "Blessed are the merciful, for they will be shown mercy.", "reference": "Matthew 5:7", "reflection": "The mercy we give comes back to us — multiplied."},
+            {"day": 3, "verse": "Therefore, as God's chosen people, holy and dearly loved, clothe yourselves with compassion, kindness, humility, gentleness and patience.", "reference": "Colossians 3:12", "reflection": "Put on compassion like your favorite outfit — wear it every day."},
+            {"day": 4, "verse": "When he saw the crowds, he had compassion on them, because they were harassed and helpless, like sheep without a shepherd.", "reference": "Matthew 9:36", "reflection": "Jesus saw people's struggles and his heart went out to them — may ours do the same."},
+            {"day": 5, "verse": "Carry each other's burdens, and in this way you will fulfill the law of Christ.", "reference": "Galatians 6:2", "reflection": "When we help carry someone else's load, we're doing exactly what Jesus asked."},
+            {"day": 6, "verse": "Be merciful, just as your Father is merciful.", "reference": "Luke 6:36", "reflection": "Mercy isn't weakness — it's strength wrapped in tenderness."},
+            {"day": 7, "verse": "He has shown you, O mortal, what is good. And what does the LORD require of you? To act justly and to love mercy and to walk humbly with your God.", "reference": "Micah 6:8", "reflection": "Three things God asks: do right, love mercy, walk humbly. Simple but life-changing."}
+          ]
+        },
+        {
+          "week": 4, "sub_theme": "Love That Lasts Forever",
+          "message": "God's love never ends — and neither does the love we share with others.",
+          "days": [
+            {"day": 1, "verse": "Love is patient, love is kind. It does not envy, it does not boast, it is not proud.", "reference": "1 Corinthians 13:4", "reflection": "Real love is patient and kind — it's not about us, it's about others."},
+            {"day": 2, "verse": "Love does not delight in evil but rejoices with the truth. It always protects, always trusts, always hopes, always perseveres.", "reference": "1 Corinthians 13:6-7", "reflection": "Love always — always — always perseveres. What a promise."},
+            {"day": 3, "verse": "Love never fails.", "reference": "1 Corinthians 13:8", "reflection": "Three words that say it all — love never fails."},
+            {"day": 4, "verse": "Many waters cannot quench love; rivers cannot sweep it away.", "reference": "Song of Solomon 8:7", "reflection": "True love is stronger than any flood — nothing can wash it away."},
+            {"day": 5, "verse": "Place me like a seal over your heart, like a seal on your arm; for love is as strong as death.", "reference": "Song of Solomon 8:6", "reflection": "Love's grip is unbreakable — it holds on through everything."},
+            {"day": 6, "verse": "For I am convinced that neither death nor life, neither angels nor demons, can separate us from the love of God.", "reference": "Romans 8:38-39", "reflection": "Nothing in all creation can separate you from God's love — not now, not ever."},
+            {"day": 7, "verse": "And over all these virtues put on love, which binds them all together in perfect unity.", "reference": "Colossians 3:14", "reflection": "Love is the thread that ties everything together — the final and most beautiful virtue."}
+          ]
+        }
+      ]
+    }
+  ]
+}
