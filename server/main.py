@@ -78,7 +78,8 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("OpenWakeWord not available — falling back to VAD wake word detector")
         app.state.wake_word_detector = VADWakeWordDetector(
-            rms_threshold=settings.SILENCE_THRESHOLD_RMS,
+            rms_threshold=1500,
+            consecutive_frames=4,
         )
 
     # Load data files (jokes, questions, config)

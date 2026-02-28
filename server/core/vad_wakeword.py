@@ -17,11 +17,16 @@ class VADWakeWordDetector:
     """
     Two-phase wake word detection:
     1. detect() / detected() — RMS energy threshold (is someone speaking?)
+       Requires multiple consecutive loud frames to avoid false triggers.
     2. check_transcription() — does the text start with the wake word?
     """
 
-    def __init__(self, rms_threshold: int = 500, wake_phrases: list = None):
+    def __init__(self, rms_threshold: int = 500, wake_phrases: list = None,
+                 consecutive_frames: int = 4):
         self.rms_threshold = rms_threshold
+        self.consecutive_frames = consecutive_frames  # need N consecutive loud frames
+        self._loud_count = 0
+        self._log_counter = 0
         self.wake_phrases = wake_phrases or [
             "hey polly",
             "polly",
@@ -29,7 +34,8 @@ class VADWakeWordDetector:
             "poly",
         ]
         self._ready = True
-        logger.info(f"VAD wake word detector initialized (RMS threshold: {rms_threshold})")
+        logger.info(f"VAD wake word detector initialized (RMS threshold: {rms_threshold}, "
+                     f"consecutive frames: {consecutive_frames})")
 
     @property
     def ready(self) -> bool:
@@ -42,9 +48,26 @@ class VADWakeWordDetector:
         return min(rms / 5000.0, 1.0)
 
     def detected(self, audio_chunk: np.ndarray) -> bool:
-        """Returns True if audio RMS exceeds speech threshold."""
+        """Returns True if audio RMS exceeds speech threshold for N consecutive frames."""
         rms = int(np.sqrt(np.mean(audio_chunk.astype(np.float32) ** 2)))
-        return rms > self.rms_threshold
+
+        # Log RMS periodically so we can tune the threshold
+        self._log_counter += 1
+        if self._log_counter % 50 == 0:  # every ~4 seconds
+            logger.info(f"VAD RMS sample: {rms} (threshold: {self.rms_threshold}, "
+                        f"loud_streak: {self._loud_count}/{self.consecutive_frames})")
+
+        if rms > self.rms_threshold:
+            self._loud_count += 1
+            if self._loud_count >= self.consecutive_frames:
+                logger.info(f"VAD triggered: {self.consecutive_frames} consecutive frames "
+                            f"above {self.rms_threshold} (last RMS: {rms})")
+                self._loud_count = 0
+                return True
+        else:
+            self._loud_count = 0
+
+        return False
 
     def check_transcription(self, text: str) -> tuple:
         """
