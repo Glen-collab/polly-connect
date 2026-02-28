@@ -88,6 +88,8 @@ async def continuous_stream(websocket: WebSocket):
     command_audio = bytearray()
     last_voice_time = 0.0
     command_start_time = 0.0
+    last_response_time = 0.0  # cooldown after response to avoid speaker feedback
+    RESPONSE_COOLDOWN = 3.0   # ignore triggers for 3s after a response
 
     # Pre-roll: keep last ~1.5 seconds of audio so we capture the wake phrase
     # 16kHz * 2 bytes * 1.5s = 48000 bytes
@@ -155,6 +157,9 @@ async def continuous_stream(websocket: WebSocket):
                             command_start_time = time.monotonic()
                             await websocket.send_json({"event": "conversation_listening"})
                     elif detector.detected(chunk_int16):
+                        # Ignore triggers during cooldown after response (speaker feedback)
+                        if time.monotonic() - last_response_time < RESPONSE_COOLDOWN:
+                            continue
                         logger.info(f"*** WAKE WORD DETECTED (device: {device_id}) ***")
                         detector.reset()
 
@@ -191,7 +196,8 @@ async def continuous_stream(websocket: WebSocket):
                             detector=detector,
                         )
 
-                        # After processing, check if we should stay in listening-for-voice mode
+                        # After processing, reset state
+                        last_response_time = time.monotonic()
                         pre_roll = bytearray()  # clear pre-roll after processing
                         if conv_state and conv_state.is_conversational:
                             state = "listening"

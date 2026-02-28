@@ -517,6 +517,15 @@ static void play_response_audio(void)
     i2s_channel_write(spk_handle, response_audio + offset,
                       play_len, &written, pdMS_TO_TICKS(15000));
 
+    // Flush DMA with silence to stop audio looping
+    size_t silence_len = SAMPLE_RATE * sizeof(int16_t) / 4;  // 0.25s of silence
+    uint8_t *silence = heap_caps_calloc(1, silence_len, MALLOC_CAP_SPIRAM);
+    if (silence) {
+        size_t sil_written = 0;
+        i2s_channel_write(spk_handle, silence, silence_len, &sil_written, pdMS_TO_TICKS(1000));
+        heap_caps_free(silence);
+    }
+
     ESP_LOGI(TAG, "Playback complete (%d bytes written)", (int)written);
 
     // Reset buffer
@@ -553,8 +562,11 @@ static void mic_stream_task(void *arg)
         if (response_complete) {
             play_response_audio();
             led_set(0);
-            // Cooldown after playback so speaker audio doesn't trigger wake word
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            // Cooldown: drain mic buffer so residual speaker audio doesn't trigger wake word
+            for (int i = 0; i < 30; i++) {  // ~2 seconds of draining
+                mic_read(audio_chunk, CHUNK_SAMPLES);
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
             streaming_paused = false;
             ESP_LOGI(TAG, "Back to streaming...");
         }
