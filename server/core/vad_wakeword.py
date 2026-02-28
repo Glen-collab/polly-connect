@@ -53,7 +53,7 @@ class VADWakeWordDetector:
 
         # Log RMS periodically so we can tune the threshold
         self._log_counter += 1
-        if self._log_counter % 50 == 0:  # every ~4 seconds
+        if self._log_counter % 25 == 0:  # every ~2 seconds
             logger.info(f"VAD RMS sample: {rms} (threshold: {self.rms_threshold}, "
                         f"loud_streak: {self._loud_count}/{self.consecutive_frames})")
 
