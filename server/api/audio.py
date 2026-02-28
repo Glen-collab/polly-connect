@@ -152,6 +152,7 @@ async def continuous_stream(websocket: WebSocket):
                         if rms > vad_threshold:
                             logger.info(f"Voice detected in conversational mode (device: {device_id})")
                             state = "recording"
+                            skip_wake_check = True  # don't require wake phrase
                             command_audio = bytearray(pre_roll)  # include pre-roll
                             last_voice_time = time.monotonic()
                             command_start_time = time.monotonic()
@@ -164,6 +165,7 @@ async def continuous_stream(websocket: WebSocket):
                         detector.reset()
 
                         state = "recording"
+                        skip_wake_check = False  # require wake phrase
                         # Include pre-roll so we capture "Hey Polly" before trigger
                         command_audio = bytearray(pre_roll)
                         last_voice_time = time.monotonic()
@@ -194,6 +196,7 @@ async def continuous_stream(websocket: WebSocket):
                         await _process_command(
                             websocket, command_audio, transcriber, tts, cmd, device_id,
                             detector=detector,
+                            skip_wake_check=skip_wake_check,
                         )
 
                         # After processing, reset state
@@ -224,6 +227,7 @@ async def _process_command(
     cmd,
     device_id: str = "unknown",
     detector=None,
+    skip_wake_check: bool = False,
 ):
     """Run STT → intent parse → CommandProcessor → TTS on buffered command audio."""
     if len(command_audio) == 0:
@@ -247,8 +251,8 @@ async def _process_command(
         await websocket.send_json({"event": "response", "text": "I didn't catch that.", "audio": None})
         return
 
-    # If using VAD detector, check transcription for wake phrase
-    if detector and isinstance(detector, VADWakeWordDetector):
+    # If using VAD detector, check transcription for wake phrase (skip in conversational mode)
+    if detector and isinstance(detector, VADWakeWordDetector) and not skip_wake_check:
         is_wake, cleaned = detector.check_transcription(transcription)
         if not is_wake:
             logger.info(f"VAD: no wake phrase in transcription, ignoring: {transcription}")
