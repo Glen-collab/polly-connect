@@ -4,9 +4,11 @@ Polly Connect - Cloud Brain Server
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from api.audio import router as audio_router
 from api.commands import router as commands_router
@@ -29,6 +31,7 @@ from core.memory_extractor import MemoryExtractor
 from core.engagement import EngagementTracker
 from core.verification import VerificationService
 from core.book_builder import BookBuilder
+from core.vision import VisionService
 from core.auth import APIKeyMiddleware
 from config import settings
 
@@ -107,6 +110,8 @@ async def lifespan(app: FastAPI):
         app.state.db, narrative_arc=app.state.narrative_arc,
     )
     app.state.verification = VerificationService(app.state.db)
+    app.state.vision = VisionService()
+    logger.info(f"Vision service ready: {app.state.vision.available}")
     app.state.book_builder = BookBuilder(
         app.state.db, followup_generator=app.state.followup_gen,
     )
@@ -153,6 +158,12 @@ app.include_router(commands_router, prefix="/api", tags=["commands"])
 app.include_router(devices_router, prefix="/api/devices", tags=["devices"])
 app.include_router(ha_router, prefix="/api/commands", tags=["homeassistant"])
 app.include_router(web_router, prefix="/web", tags=["web"])
+
+# Static files for photo uploads
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+uploads_dir = os.path.join(static_dir, "uploads")
+os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
 @app.get("/")

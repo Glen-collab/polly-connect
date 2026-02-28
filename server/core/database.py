@@ -15,6 +15,7 @@ class PollyDB:
         if db_path == ":memory:":
             self._conn = sqlite3.connect(":memory:", check_same_thread=False)
         self._init_db()
+        self._run_migrations()
 
     def _get_connection(self):
         if self._conn:
@@ -254,6 +255,55 @@ class PollyDB:
                     ended_at TIMESTAMP
                 )
             """)
+
+            # ── Photos ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS photos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER REFERENCES user_profiles(id),
+                    filename TEXT NOT NULL,
+                    original_name TEXT,
+                    caption TEXT,
+                    date_taken TEXT,
+                    tags TEXT DEFAULT '[]',
+                    story_id INTEGER REFERENCES stories(id),
+                    uploaded_by TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def _run_migrations(self):
+        """Add columns to existing tables (safe to run repeatedly)."""
+        conn = self._get_connection()
+        try:
+            # Get existing columns for user_profiles
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(user_profiles)").fetchall()}
+            migrations = {
+                "owner_email": "ALTER TABLE user_profiles ADD COLUMN owner_email TEXT",
+                "caretaker_name": "ALTER TABLE user_profiles ADD COLUMN caretaker_name TEXT",
+                "caretaker_email": "ALTER TABLE user_profiles ADD COLUMN caretaker_email TEXT",
+                "setup_complete": "ALTER TABLE user_profiles ADD COLUMN setup_complete INTEGER DEFAULT 0",
+            }
+            for col, sql in migrations.items():
+                if col not in cols:
+                    conn.execute(sql)
+
+            # Get existing columns for stories
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(stories)").fetchall()}
+            migrations = {
+                "verified": "ALTER TABLE stories ADD COLUMN verified INTEGER DEFAULT 0",
+                "verified_by": "ALTER TABLE stories ADD COLUMN verified_by TEXT",
+                "verified_at": "ALTER TABLE stories ADD COLUMN verified_at TIMESTAMP",
+                "corrected_transcript": "ALTER TABLE stories ADD COLUMN corrected_transcript TEXT",
+            }
+            for col, sql in migrations.items():
+                if col not in cols:
+                    conn.execute(sql)
 
             conn.commit()
         finally:
@@ -795,6 +845,133 @@ class PollyDB:
                 "SELECT * FROM user_profiles WHERE id = ?", (cursor.lastrowid,)
             ).fetchone()
             return dict(user)
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_user_setup(self, user_id: int, name: str, owner_email: str,
+                          caretaker_name: str, caretaker_email: str) -> None:
+        conn = self._get_connection()
+        try:
+            conn.execute("""
+                UPDATE user_profiles SET name = ?, owner_email = ?,
+                caretaker_name = ?, caretaker_email = ?,
+                setup_complete = 1, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (name, owner_email or None, caretaker_name or None,
+                  caretaker_email or None, user_id))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_owner_name(self) -> str:
+        """Get the owner's name from user_profiles, or fallback."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            user = conn.execute("SELECT name FROM user_profiles LIMIT 1").fetchone()
+            return user["name"] if user else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Story verification ──
+
+    def get_story_by_id(self, story_id: int) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute("SELECT * FROM stories WHERE id = ?", (story_id,)).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def verify_story(self, story_id: int, verified_by: str,
+                     corrected_transcript: str = None) -> bool:
+        conn = self._get_connection()
+        try:
+            if corrected_transcript:
+                conn.execute("""
+                    UPDATE stories SET verified = 1, verified_by = ?,
+                    verified_at = CURRENT_TIMESTAMP, corrected_transcript = ?
+                    WHERE id = ?
+                """, (verified_by, corrected_transcript, story_id))
+            else:
+                conn.execute("""
+                    UPDATE stories SET verified = 1, verified_by = ?,
+                    verified_at = CURRENT_TIMESTAMP WHERE id = ?
+                """, (verified_by, story_id))
+            conn.commit()
+            return True
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Photos ──
+
+    def save_photo(self, filename: str, original_name: str = None,
+                   caption: str = None, date_taken: str = None,
+                   tags: str = "[]", story_id: int = None,
+                   uploaded_by: str = None, user_id: int = None) -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO photos (user_id, filename, original_name, caption,
+                    date_taken, tags, story_id, uploaded_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, filename, original_name, caption, date_taken,
+                  tags, story_id, uploaded_by))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_photos(self, limit: int = 100) -> List[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM photos ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_photo_by_id(self, photo_id: int) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute("SELECT * FROM photos WHERE id = ?", (photo_id,)).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_photo(self, photo_id: int, caption: str = None,
+                     date_taken: str = None, tags: str = None,
+                     story_id: int = None) -> bool:
+        conn = self._get_connection()
+        try:
+            conn.execute("""
+                UPDATE photos SET caption = ?, date_taken = ?, tags = ?,
+                story_id = ? WHERE id = ?
+            """, (caption, date_taken, tags, story_id, photo_id))
+            conn.commit()
+            return True
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_photo(self, photo_id: int) -> bool:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
+            conn.commit()
+            return cursor.rowcount > 0
         finally:
             if not self._conn:
                 conn.close()

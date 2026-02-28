@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Transcriptions - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+    <h1 class="text-xl sm:text-2xl font-bold">Transcription Review</h1>
+    <div class="flex gap-2 text-sm">
+        <a href="/web/transcriptions?filter=all"
+           class="px-3 py-1.5 rounded {% if filter == 'all' %}bg-emerald-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">All</a>
+        <a href="/web/transcriptions?filter=unverified"
+           class="px-3 py-1.5 rounded {% if filter == 'unverified' %}bg-amber-500 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">Unverified</a>
+        <a href="/web/transcriptions?filter=verified"
+           class="px-3 py-1.5 rounded {% if filter == 'verified' %}bg-emerald-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">Verified</a>
+    </div>
+</div>
+
+{% if stories %}
+<div class="space-y-3 sm:space-y-4">
+    {% for story in stories %}
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6" id="story-{{ story.id }}">
+        <div class="flex flex-wrap justify-between items-start gap-2 mb-3">
+            <div class="flex flex-wrap items-center gap-2">
+                {% if story.speaker_name %}
+                <span class="text-sm font-medium text-gray-700">{{ story.speaker_name }}</span>
+                {% endif %}
+                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">{{ story.source }}</span>
+                {% if story.verified %}
+                <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded font-medium">Verified</span>
+                {% else %}
+                <span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded font-medium">Unverified</span>
+                {% endif %}
+            </div>
+            <span class="text-xs text-gray-400">{{ story.created_at }}</span>
+        </div>
+
+        <!-- Display mode -->
+        <div id="display-{{ story.id }}">
+            <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap mb-3">{{ story.corrected_transcript or story.transcript or "No transcript" }}</p>
+            {% if story.corrected_transcript and story.transcript != story.corrected_transcript %}
+            <details class="mb-3">
+                <summary class="text-xs text-gray-400 cursor-pointer">Show original transcript</summary>
+                <p class="text-gray-400 text-xs sm:text-sm mt-1 whitespace-pre-wrap">{{ story.transcript }}</p>
+            </details>
+            {% endif %}
+            {% if story.verified_by %}
+            <p class="text-xs text-gray-400">Verified by {{ story.verified_by }}{% if story.verified_at %} on {{ story.verified_at }}{% endif %}</p>
+            {% endif %}
+            <button onclick="toggleEdit({{ story.id }})"
+                    class="text-sm text-emerald-600 hover:underline mt-2 py-1">Edit &amp; Verify</button>
+        </div>
+
+        <!-- Edit mode (hidden by default) -->
+        <div id="edit-{{ story.id }}" class="hidden">
+            <form method="POST" action="/web/transcriptions/{{ story.id }}/verify">
+                <div class="mb-3">
+                    <label class="block text-sm text-gray-600 mb-1">Speaker Name</label>
+                    <input type="text" name="speaker_name" value="{{ story.speaker_name or '' }}"
+                           class="w-full border rounded px-3 py-2 text-sm">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm text-gray-600 mb-1">Corrected Transcript</label>
+                    <textarea name="corrected_transcript" rows="4"
+                              class="w-full border rounded px-3 py-2 text-sm">{{ story.corrected_transcript or story.transcript or '' }}</textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm text-gray-600 mb-1">Verified By</label>
+                    <input type="text" name="verified_by" value="{{ story.verified_by or '' }}"
+                           class="w-full border rounded px-3 py-2 text-sm" placeholder="Your name" required>
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit"
+                            class="flex-1 sm:flex-none bg-emerald-600 text-white px-4 py-2.5 sm:py-2 rounded text-sm hover:bg-emerald-700">
+                        Mark Verified
+                    </button>
+                    <button type="button" onclick="toggleEdit({{ story.id }})"
+                            class="flex-1 sm:flex-none bg-gray-200 text-gray-700 px-4 py-2.5 sm:py-2 rounded text-sm hover:bg-gray-300">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow p-8 sm:p-12 text-center">
+    <p class="text-gray-400 text-base sm:text-lg">No transcriptions to review.</p>
+    <p class="text-gray-400 text-sm">Stories will appear here after Polly records conversations.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleEdit(id) {
+    document.getElementById('display-' + id).classList.toggle('hidden');
+    document.getElementById('edit-' + id).classList.toggle('hidden');
+}
+</script>
+{% endblock %}

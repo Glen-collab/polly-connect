@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Setup - Polly Connect{% endblock %}
+
+{% block content %}
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Device Setup</h1>
+
+{% if user.setup_complete %}
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+    <p class="text-emerald-700 font-medium text-sm">Setup complete! You can update your information below.</p>
+</div>
+{% else %}
+<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+    <p class="text-amber-700 text-sm">Welcome! Let's get Polly set up. Fill in the details below so Polly knows who's who.</p>
+</div>
+{% endif %}
+
+<form method="POST" action="/web/setup">
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+        <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Owner (Who Polly is for)</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Owner Name</label>
+                <input type="text" name="owner_name" value="{{ user.name or '' }}"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="Grandma Evelyn" required>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Owner Email (optional)</label>
+                <input type="email" name="owner_email" value="{{ user.owner_email or '' }}"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="evelyn@example.com">
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+        <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Primary Caretaker</h2>
+        <p class="text-xs sm:text-sm text-gray-500 mb-3">The family member or caretaker who manages Polly and reviews transcriptions.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Caretaker Name</label>
+                <input type="text" name="caretaker_name" value="{{ user.caretaker_name or '' }}"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="Glen">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Caretaker Email</label>
+                <input type="email" name="caretaker_email" value="{{ user.caretaker_email or '' }}"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="glen@example.com">
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-emerald-700 text-sm">
+        {% if user.setup_complete %}Update Setup{% else %}Complete Setup{% endif %}
+    </button>
+</form>
+{% endblock %}

@@ -7,25 +7,58 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Segoe UI', system-ui, sans-serif; }
+        /* Smooth hamburger animation */
+        #mobile-menu { transition: max-height 0.3s ease-out; overflow: hidden; }
+        #mobile-menu.closed { max-height: 0; }
+        #mobile-menu.open { max-height: 500px; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- Nav -->
     <nav class="bg-emerald-600 text-white shadow-md">
-        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <a href="/web/dashboard" class="text-xl font-bold">Polly Connect</a>
-            <div class="flex gap-4 text-sm">
-                <a href="/web/dashboard" class="hover:underline">Dashboard</a>
-                <a href="/web/stories" class="hover:underline">Stories</a>
-                <a href="/web/medications" class="hover:underline">Medications</a>
-                <a href="/web/memory" class="hover:underline">Memory</a>
-                <a href="/web/settings" class="hover:underline">Settings</a>
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex items-center justify-between py-3">
+                <a href="/web/dashboard" class="text-xl font-bold">Polly Connect</a>
+
+                <!-- Desktop nav -->
+                <div class="hidden md:flex gap-4 text-sm">
+                    <a href="/web/dashboard" class="hover:underline">Dashboard</a>
+                    <a href="/web/stories" class="hover:underline">Stories</a>
+                    <a href="/web/transcriptions" class="hover:underline">Transcriptions</a>
+                    <a href="/web/photos" class="hover:underline">Photos</a>
+                    <a href="/web/medications" class="hover:underline">Medications</a>
+                    <a href="/web/memory" class="hover:underline">Memory</a>
+                    <a href="/web/setup" class="hover:underline">Setup</a>
+                    <a href="/web/settings" class="hover:underline">Settings</a>
+                </div>
+
+                <!-- Hamburger button (mobile) -->
+                <button id="menu-btn" class="md:hidden p-2 -mr-2 focus:outline-none" onclick="toggleMenu()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path id="menu-open-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        <path id="menu-close-icon" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Mobile nav -->
+            <div id="mobile-menu" class="md:hidden closed">
+                <div class="pb-4 space-y-1">
+                    <a href="/web/dashboard" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Dashboard</a>
+                    <a href="/web/stories" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Stories</a>
+                    <a href="/web/transcriptions" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Transcriptions</a>
+                    <a href="/web/photos" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Photos</a>
+                    <a href="/web/medications" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Medications</a>
+                    <a href="/web/memory" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Memory</a>
+                    <a href="/web/setup" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Setup</a>
+                    <a href="/web/settings" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Settings</a>
+                </div>
             </div>
         </div>
     </nav>
 
     <!-- Content -->
-    <main class="max-w-6xl mx-auto px-4 py-6">
+    <main class="max-w-6xl mx-auto px-4 py-4 sm:py-6">
         {% block content %}{% endblock %}
     </main>
 
@@ -34,6 +67,24 @@
         Polly Connect &copy; 2026
     </footer>
 
+    <script>
+    function toggleMenu() {
+        var menu = document.getElementById('mobile-menu');
+        var openIcon = document.getElementById('menu-open-icon');
+        var closeIcon = document.getElementById('menu-close-icon');
+        if (menu.classList.contains('closed')) {
+            menu.classList.remove('closed');
+            menu.classList.add('open');
+            openIcon.classList.add('hidden');
+            closeIcon.classList.remove('hidden');
+        } else {
+            menu.classList.remove('open');
+            menu.classList.add('closed');
+            openIcon.classList.remove('hidden');
+            closeIcon.classList.add('hidden');
+        }
+    }
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

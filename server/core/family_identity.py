@@ -101,6 +101,25 @@ class FamilyIdentityService:
 
         return None
 
+    def update_relationship(self, name: str, relationship: str) -> Optional[Dict]:
+        """Update the relationship for an existing family member."""
+        member = self.db.find_family_member(name)
+        if member:
+            conn = self.db._get_connection()
+            try:
+                conn.execute(
+                    "UPDATE family_members SET relationship = ? WHERE id = ?",
+                    (relationship, member["id"])
+                )
+                conn.commit()
+            finally:
+                if not self.db._conn:
+                    conn.close()
+            member["relationship"] = relationship
+            logger.info(f"Updated relationship for {name}: {relationship}")
+            return member
+        return None
+
     def build_greeting(self, name: str, relationship: str = None,
                        visit_count: int = 1) -> str:
         """Build a warm greeting for a family member."""

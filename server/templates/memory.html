@@ -2,31 +2,117 @@
 {% block title %}Memory Storage - Polly Connect{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-6">Memory Storage</h1>
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Memory Storage</h1>
 
-<!-- Add Item Form -->
-<div class="bg-white rounded-lg shadow p-6 mb-6">
-    <h2 class="text-lg font-semibold mb-4">Store an Item</h2>
-    <form method="POST" action="/web/memory/add" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">Item</label>
-            <input type="text" name="item" required class="w-full border rounded px-3 py-2" placeholder="Keys">
+<!-- Photo Scan Section -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-3">Scan a Photo</h2>
+    <p class="text-xs sm:text-sm text-gray-500 mb-3">Take a photo of a shelf, wall, drawer, etc. and AI will identify items for you to save.</p>
+
+    <div class="flex flex-col sm:flex-row gap-3 mb-3">
+        <label class="flex-1 cursor-pointer">
+            <div id="photo-drop" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-emerald-400 transition">
+                <svg class="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <p class="text-sm text-gray-500" id="photo-label">Tap to take photo or choose file</p>
+            </div>
+            <input type="file" id="photo-input" accept="image/*" capture="environment" class="hidden">
+        </label>
+        <div class="flex flex-col gap-2 sm:w-48">
+            <div>
+                <label class="block text-xs text-gray-600 mb-1">Default Location</label>
+                <input type="text" id="default-location" list="location-suggestions"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Garage north wall">
+            </div>
+            <button type="button" id="scan-btn" disabled
+                    class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm">
+                Scan Photo
+            </button>
         </div>
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">Location</label>
-            <input type="text" name="location" required class="w-full border rounded px-3 py-2" placeholder="Kitchen drawer">
+    </div>
+
+    <!-- Preview -->
+    <div id="photo-preview" class="hidden mb-3">
+        <img id="preview-img" class="max-h-48 rounded-lg mx-auto" alt="Preview">
+    </div>
+
+    <!-- Scanning indicator -->
+    <div id="scan-loading" class="hidden text-center py-6">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-600 border-t-transparent"></div>
+        <p class="text-sm text-gray-500 mt-2">AI is identifying items...</p>
+    </div>
+
+    <!-- Detected items (editable cards) -->
+    <div id="detected-items" class="hidden">
+        <h3 class="text-sm font-semibold text-gray-700 mb-2">Detected Items <span class="font-normal text-gray-400">(edit names &amp; locations before saving)</span></h3>
+        <div id="items-list" class="space-y-2 mb-3"></div>
+        <div class="flex gap-2">
+            <button type="button" id="save-all-btn" onclick="saveAllItems()"
+                    class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm flex-1 sm:flex-none">
+                Save All Items
+            </button>
+            <button type="button" onclick="addBlankItem()"
+                    class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 text-sm">
+                + Add Item
+            </button>
         </div>
-        <div class="flex items-end">
-            <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700 w-full">Store</button>
+    </div>
+
+    <!-- Save result -->
+    <div id="save-result" class="hidden mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-emerald-700 text-sm"></div>
+</div>
+
+<!-- Manual Add Item Form -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-3">Store an Item Manually</h2>
+    <form method="POST" action="/web/memory/add">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Item</label>
+                <input type="text" name="item" required class="w-full border rounded px-3 py-2 text-sm" placeholder="Keys">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Location</label>
+                <input type="text" name="location" required list="location-suggestions"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="Kitchen drawer">
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700 w-full text-sm">Store</button>
+            </div>
         </div>
     </form>
 </div>
 
+<!-- Location suggestions datalist -->
+<datalist id="location-suggestions">
+    {% for loc in locations %}
+    <option value="{{ loc }}">
+    {% endfor %}
+</datalist>
+
 <!-- Items List -->
-<div class="bg-white rounded-lg shadow p-6">
-    <h2 class="text-lg font-semibold mb-4">Stored Items ({{ items|length }})</h2>
+<div class="bg-white rounded-lg shadow p-4 sm:p-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-3">Stored Items ({{ items|length }})</h2>
     {% if items %}
-    <table class="w-full">
+    <!-- Mobile: card layout -->
+    <div class="sm:hidden space-y-2">
+        {% for item in items %}
+        <div class="border rounded-lg p-3 flex justify-between items-start">
+            <div>
+                <p class="font-medium text-sm">{{ item.item }}</p>
+                <p class="text-xs text-gray-500">{{ item.location }}</p>
+                <p class="text-xs text-gray-400">{{ item.updated_at }}</p>
+            </div>
+            <form method="POST" action="/web/memory/delete/{{ item.id }}">
+                <button type="submit" class="text-red-400 hover:text-red-600 text-xs p-1">Delete</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    <!-- Desktop: table -->
+    <table class="hidden sm:table w-full">
         <thead>
             <tr class="text-left text-sm text-gray-500 border-b">
                 <th class="pb-2">Item</th>
@@ -38,12 +124,12 @@
         <tbody>
             {% for item in items %}
             <tr class="border-b">
-                <td class="py-2 font-medium">{{ item.item }}</td>
-                <td class="py-2 text-gray-600">{{ item.location }}</td>
-                <td class="py-2 text-gray-400 text-sm">{{ item.updated_at }}</td>
+                <td class="py-2 font-medium text-sm">{{ item.item }}</td>
+                <td class="py-2 text-gray-600 text-sm">{{ item.location }}</td>
+                <td class="py-2 text-gray-400 text-xs">{{ item.updated_at }}</td>
                 <td class="py-2">
                     <form method="POST" action="/web/memory/delete/{{ item.id }}" class="inline">
-                        <button type="submit" class="text-red-500 hover:text-red-700 text-sm">Delete</button>
+                        <button type="submit" class="text-red-500 hover:text-red-700 text-xs">Delete</button>
                     </form>
                 </td>
             </tr>
@@ -51,7 +137,136 @@
         </tbody>
     </table>
     {% else %}
-    <p class="text-gray-400">No items stored. Say "my keys are in the kitchen" to start.</p>
+    <p class="text-gray-400 text-sm">No items stored. Scan a photo or say "my keys are in the kitchen" to start.</p>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var photoInput = document.getElementById('photo-input');
+var scanBtn = document.getElementById('scan-btn');
+var photoFile = null;
+
+photoInput.addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    photoFile = file;
+    scanBtn.disabled = false;
+    document.getElementById('photo-label').textContent = file.name;
+
+    // Show preview
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        document.getElementById('preview-img').src = ev.target.result;
+        document.getElementById('photo-preview').classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+});
+
+scanBtn.addEventListener('click', function() {
+    if (!photoFile) return;
+    scanBtn.disabled = true;
+    document.getElementById('scan-loading').classList.remove('hidden');
+    document.getElementById('detected-items').classList.add('hidden');
+    document.getElementById('save-result').classList.add('hidden');
+
+    var formData = new FormData();
+    formData.append('photo', photoFile);
+    var defaultLoc = document.getElementById('default-location').value;
+    if (defaultLoc) formData.append('default_location', defaultLoc);
+
+    fetch('/web/memory/scan', { method: 'POST', body: formData })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('scan-loading').classList.add('hidden');
+            if (data.items && data.items.length > 0) {
+                showDetectedItems(data.items, defaultLoc);
+            } else {
+                document.getElementById('save-result').textContent = data.error || 'No items detected. Try a clearer photo.';
+                document.getElementById('save-result').classList.remove('hidden');
+            }
+            scanBtn.disabled = false;
+        })
+        .catch(function(err) {
+            document.getElementById('scan-loading').classList.add('hidden');
+            document.getElementById('save-result').textContent = 'Error scanning photo. Please try again.';
+            document.getElementById('save-result').classList.remove('hidden');
+            scanBtn.disabled = false;
+        });
+});
+
+function showDetectedItems(items, defaultLoc) {
+    var list = document.getElementById('items-list');
+    list.innerHTML = '';
+    items.forEach(function(item, i) {
+        var div = document.createElement('div');
+        div.className = 'flex flex-col sm:flex-row gap-2 items-start sm:items-center border rounded-lg p-3 bg-gray-50';
+        div.innerHTML =
+            '<input type="text" class="item-name flex-1 w-full sm:w-auto border rounded px-3 py-2 text-sm font-medium" value="' + escapeHtml(item) + '">' +
+            '<input type="text" class="item-location flex-1 w-full sm:w-auto border rounded px-3 py-2 text-sm" list="location-suggestions" placeholder="Location" value="' + escapeHtml(defaultLoc || '') + '">' +
+            '<button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-xs px-2 py-1 self-end sm:self-center">Remove</button>';
+        list.appendChild(div);
+    });
+    document.getElementById('detected-items').classList.remove('hidden');
+}
+
+function addBlankItem() {
+    var list = document.getElementById('items-list');
+    var defaultLoc = document.getElementById('default-location').value;
+    var div = document.createElement('div');
+    div.className = 'flex flex-col sm:flex-row gap-2 items-start sm:items-center border rounded-lg p-3 bg-gray-50';
+    div.innerHTML =
+        '<input type="text" class="item-name flex-1 w-full sm:w-auto border rounded px-3 py-2 text-sm font-medium" placeholder="Item name">' +
+        '<input type="text" class="item-location flex-1 w-full sm:w-auto border rounded px-3 py-2 text-sm" list="location-suggestions" placeholder="Location" value="' + escapeHtml(defaultLoc || '') + '">' +
+        '<button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-xs px-2 py-1 self-end sm:self-center">Remove</button>';
+    list.appendChild(div);
+    document.getElementById('detected-items').classList.remove('hidden');
+}
+
+function saveAllItems() {
+    var names = document.querySelectorAll('.item-name');
+    var locations = document.querySelectorAll('.item-location');
+    var items = [];
+    for (var i = 0; i < names.length; i++) {
+        var n = names[i].value.trim();
+        var l = locations[i].value.trim();
+        if (n && l) items.push({ item: n, location: l });
+    }
+    if (items.length === 0) {
+        alert('Add at least one item with a location.');
+        return;
+    }
+    document.getElementById('save-all-btn').disabled = true;
+    document.getElementById('save-all-btn').textContent = 'Saving...';
+
+    fetch('/web/memory/save-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: items })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        document.getElementById('save-result').textContent = 'Saved ' + data.count + ' items! Polly will remember them.';
+        document.getElementById('save-result').classList.remove('hidden');
+        document.getElementById('detected-items').classList.add('hidden');
+        document.getElementById('save-all-btn').disabled = false;
+        document.getElementById('save-all-btn').textContent = 'Save All Items';
+        // Reload to show new items
+        setTimeout(function() { window.location.reload(); }, 1500);
+    })
+    .catch(function() {
+        document.getElementById('save-result').textContent = 'Error saving items. Please try again.';
+        document.getElementById('save-result').classList.remove('hidden');
+        document.getElementById('save-all-btn').disabled = false;
+        document.getElementById('save-all-btn').textContent = 'Save All Items';
+    });
+}
+
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML.replace(/"/g, '&quot;');
+}
+</script>
 {% endblock %}

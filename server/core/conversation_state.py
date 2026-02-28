@@ -8,10 +8,11 @@ from typing import List, Optional
 
 
 class ConversationMode(Enum):
-    COMMAND = "command"              # Normal wake-word mode
-    STORY_PROMPT = "story_prompt"    # Asked a question, waiting for answer
-    STORY_LISTEN = "story_listen"    # User is telling a story
-    FOLLOWUP_WAIT = "followup_wait"  # Asked follow-up, waiting for answer
+    COMMAND = "command"                        # Normal wake-word mode
+    STORY_PROMPT = "story_prompt"              # Asked a question, waiting for answer
+    STORY_LISTEN = "story_listen"              # User is telling a story
+    FOLLOWUP_WAIT = "followup_wait"            # Asked follow-up, waiting for answer
+    AWAITING_RELATIONSHIP = "awaiting_relationship"  # Asked how they know the owner
 
 
 # Dynamic timeouts per mode
@@ -21,6 +22,7 @@ SILENCE_TIMEOUTS = {
     ConversationMode.STORY_PROMPT: 8.0,
     ConversationMode.STORY_LISTEN: 8.0,
     ConversationMode.FOLLOWUP_WAIT: 8.0,
+    ConversationMode.AWAITING_RELATIONSHIP: 8.0,
 }
 
 MAX_RECORDING_TIMES = {
@@ -28,6 +30,7 @@ MAX_RECORDING_TIMES = {
     ConversationMode.STORY_PROMPT: 300.0,
     ConversationMode.STORY_LISTEN: 300.0,
     ConversationMode.FOLLOWUP_WAIT: 300.0,
+    ConversationMode.AWAITING_RELATIONSHIP: 30.0,
 }
 
 
@@ -74,4 +77,5 @@ class ConversationState:
             ConversationMode.STORY_PROMPT,
             ConversationMode.STORY_LISTEN,
             ConversationMode.FOLLOWUP_WAIT,
+            ConversationMode.AWAITING_RELATIONSHIP,
         )

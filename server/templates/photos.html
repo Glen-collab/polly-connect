@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Photos - Polly Connect{% endblock %}
+
+{% block content %}
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Photo Gallery</h1>
+
+<!-- Upload form -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Upload a Photo</h2>
+    <form method="POST" action="/web/photos/upload" enctype="multipart/form-data">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Photo</label>
+                <input type="file" name="photo" accept="image/*" capture="environment" required
+                       class="w-full border rounded px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Caption</label>
+                <input type="text" name="caption" class="w-full border rounded px-3 py-2 text-sm"
+                       placeholder="Grandma at the lake house, 1978">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Date Taken</label>
+                <input type="text" name="date_taken" class="w-full border rounded px-3 py-2 text-sm"
+                       placeholder="Summer 1978 or 1978-06-15">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Tags (comma-separated)</label>
+                <input type="text" name="tags" class="w-full border rounded px-3 py-2 text-sm"
+                       placeholder="grandma, lake house, family reunion">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Link to Story</label>
+                <select name="story_id" class="w-full border rounded px-3 py-2 text-sm">
+                    <option value="">-- None --</option>
+                    {% for story in stories %}
+                    <option value="{{ story.id }}">
+                        #{{ story.id }} - {{ (story.transcript or "Untitled")[:50] }}{% if story.speaker_name %} ({{ story.speaker_name }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Uploaded By</label>
+                <input type="text" name="uploaded_by" class="w-full border rounded px-3 py-2 text-sm"
+                       placeholder="Your name">
+            </div>
+        </div>
+        <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-emerald-700 text-sm">
+            Upload Photo
+        </button>
+    </form>
+</div>
+
+<!-- Gallery grid -->
+{% if photos %}
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+    {% for photo in photos %}
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <a href="/static/uploads/{{ photo.filename }}" target="_blank">
+            <img src="/static/uploads/{{ photo.filename }}" alt="{{ photo.caption or photo.original_name }}"
+                 class="w-full h-32 sm:h-48 object-cover hover:opacity-90 transition" loading="lazy">
+        </a>
+        <div class="p-2 sm:p-3">
+            {% if photo.caption %}
+            <p class="text-xs sm:text-sm text-gray-700 font-medium mb-1 line-clamp-2">{{ photo.caption }}</p>
+            {% endif %}
+            {% if photo.date_taken %}
+            <p class="text-xs text-gray-400">{{ photo.date_taken }}</p>
+            {% endif %}
+            {% if photo.tags and photo.tags != '[]' %}
+            <div class="flex flex-wrap gap-1 mt-1">
+                {% for tag in photo.tag_list %}
+                <span class="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">{{ tag }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if photo.story_id %}
+            <a href="/web/stories/{{ photo.story_id }}/edit" class="text-xs text-emerald-600 hover:underline mt-1 block">Story #{{ photo.story_id }}</a>
+            {% endif %}
+            <div class="flex justify-between items-center mt-2">
+                {% if photo.uploaded_by %}
+                <span class="text-xs text-gray-400">{{ photo.uploaded_by }}</span>
+                {% else %}
+                <span></span>
+                {% endif %}
+                <form method="POST" action="/web/photos/{{ photo.id }}/delete" class="inline"
+                      onsubmit="return confirm('Delete this photo?')">
+                    <button type="submit" class="text-xs text-red-400 hover:text-red-600 py-1">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow p-8 sm:p-12 text-center">
+    <p class="text-gray-400 text-base sm:text-lg">No photos yet.</p>
+    <p class="text-gray-400 text-sm">Upload family photos to pair with stories for the legacy book.</p>
+</div>
+{% endif %}
+{% endblock %}

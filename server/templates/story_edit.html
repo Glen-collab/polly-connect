@@ -3,25 +3,25 @@
 
 {% block content %}
 <div class="mb-4">
-    <a href="/web/stories" class="text-emerald-600 hover:underline">&larr; Back to Stories</a>
+    <a href="/web/stories" class="text-emerald-600 hover:underline text-sm">&larr; Back to Stories</a>
 </div>
 
-<h1 class="text-2xl font-bold mb-6">Edit Story</h1>
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Edit Story</h1>
 
 <form method="POST" action="/web/stories/{{ story.id }}/edit">
-    <div class="bg-white rounded-lg shadow p-6">
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6">
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Speaker Name</label>
             <input type="text" name="speaker_name" value="{{ story.speaker_name or '' }}"
-                   class="w-full border rounded px-3 py-2" placeholder="Who shared this story?">
+                   class="w-full border rounded px-3 py-2 text-sm sm:text-base" placeholder="Who shared this story?">
         </div>
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Transcript</label>
-            <textarea name="transcript" rows="12"
-                      class="w-full border rounded px-3 py-2">{{ story.transcript or '' }}</textarea>
+            <textarea name="transcript" rows="8"
+                      class="w-full border rounded px-3 py-2 text-sm sm:text-base">{{ story.transcript or '' }}</textarea>
         </div>
         <button type="submit"
-                class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700">
+                class="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-emerald-700 text-sm sm:text-base">
             Save Changes
         </button>
     </div>

@@ -2,55 +2,56 @@
 {% block title %}Dashboard - Polly Connect{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Dashboard</h1>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <!-- Stats Cards -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-gray-500 text-sm">Stories Recorded</h3>
-        <p class="text-3xl font-bold text-emerald-600">{{ story_count }}</p>
+<!-- Stats Cards -->
+<div class="grid grid-cols-3 gap-3 sm:gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
+        <h3 class="text-gray-500 text-xs sm:text-sm">Stories</h3>
+        <p class="text-2xl sm:text-3xl font-bold text-emerald-600">{{ story_count }}</p>
     </div>
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-gray-500 text-sm">Questions Answered</h3>
-        <p class="text-3xl font-bold text-blue-600">{{ question_count }}</p>
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
+        <h3 class="text-gray-500 text-xs sm:text-sm">Questions</h3>
+        <p class="text-2xl sm:text-3xl font-bold text-blue-600">{{ question_count }}</p>
     </div>
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-gray-500 text-sm">Items Remembered</h3>
-        <p class="text-3xl font-bold text-purple-600">{{ item_count }}</p>
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
+        <h3 class="text-gray-500 text-xs sm:text-sm">Items</h3>
+        <p class="text-2xl sm:text-3xl font-bold text-purple-600">{{ item_count }}</p>
     </div>
 </div>
 
 <!-- Recent Stories -->
-<div class="bg-white rounded-lg shadow p-6 mb-6">
-    <h2 class="text-lg font-semibold mb-4">Recent Stories</h2>
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Recent Stories</h2>
     {% if stories %}
     <ul class="space-y-3">
         {% for story in stories %}
         <li class="border-b pb-2">
-            <p class="text-gray-700">{{ story.transcript[:200] }}{% if story.transcript|length > 200 %}...{% endif %}</p>
+            <p class="text-sm sm:text-base text-gray-700">{{ story.transcript[:200] }}{% if story.transcript|length > 200 %}...{% endif %}</p>
             <span class="text-xs text-gray-400">{{ story.created_at }}</span>
         </li>
         {% endfor %}
     </ul>
+    <a href="/web/stories" class="block text-center text-emerald-600 text-sm mt-3 hover:underline">View all stories</a>
     {% else %}
-    <p class="text-gray-400">No stories recorded yet. Say "record my story" to get started!</p>
+    <p class="text-gray-400 text-sm">No stories recorded yet. Say "record my story" to get started!</p>
     {% endif %}
 </div>
 
-<!-- Medication Compliance -->
-<div class="bg-white rounded-lg shadow p-6">
-    <h2 class="text-lg font-semibold mb-4">Medication Schedule</h2>
+<!-- Medication Schedule -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Medication Schedule</h2>
     {% if medications %}
     <ul class="space-y-2">
         {% for med in medications %}
-        <li class="flex justify-between items-center">
-            <span class="font-medium">{{ med.name }}</span>
-            <span class="text-sm text-gray-500">{{ med.dosage }} &mdash; {{ med.times }}</span>
+        <li class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b pb-2">
+            <span class="font-medium text-sm sm:text-base">{{ med.name }}</span>
+            <span class="text-xs sm:text-sm text-gray-500">{{ med.dosage }} &mdash; {{ med.times }}</span>
         </li>
         {% endfor %}
     </ul>
     {% else %}
-    <p class="text-gray-400">No medications set up. Add them in the Medications tab.</p>
+    <p class="text-gray-400 text-sm">No medications set up. Add them in the Medications tab.</p>
     {% endif %}
 </div>
 {% endblock %}

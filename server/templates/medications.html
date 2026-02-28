@@ -2,35 +2,47 @@
 {% block title %}Medications - Polly Connect{% endblock %}
 
 {% block content %}
-<h1 class="text-2xl font-bold mb-6">Medication Reminders</h1>
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Medication Reminders</h1>
 
 <!-- Add Medication Form -->
-<div class="bg-white rounded-lg shadow p-6 mb-6">
-    <h2 class="text-lg font-semibold mb-4">Add Medication</h2>
-    <form method="POST" action="/web/medications/add" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">Name</label>
-            <input type="text" name="name" required class="w-full border rounded px-3 py-2" placeholder="Aspirin">
-        </div>
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">Dosage</label>
-            <input type="text" name="dosage" class="w-full border rounded px-3 py-2" placeholder="100mg">
-        </div>
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">Times (comma-separated)</label>
-            <input type="text" name="times" required class="w-full border rounded px-3 py-2" placeholder="08:00, 20:00">
-        </div>
-        <div class="flex items-end">
-            <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700 w-full">Add</button>
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Add Medication</h2>
+    <form method="POST" action="/web/medications/add">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Name</label>
+                <input type="text" name="name" required class="w-full border rounded px-3 py-2 text-sm" placeholder="Aspirin">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Dosage</label>
+                <input type="text" name="dosage" class="w-full border rounded px-3 py-2 text-sm" placeholder="100mg">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Times (comma-separated)</label>
+                <input type="text" name="times" required class="w-full border rounded px-3 py-2 text-sm" placeholder="08:00, 20:00">
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700 w-full text-sm">Add</button>
+            </div>
         </div>
     </form>
 </div>
 
 <!-- Medication List -->
-<div class="bg-white rounded-lg shadow p-6">
-    <h2 class="text-lg font-semibold mb-4">Current Medications</h2>
+<div class="bg-white rounded-lg shadow p-4 sm:p-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Current Medications</h2>
     {% if medications %}
-    <table class="w-full">
+    <!-- Mobile: card layout / Desktop: table -->
+    <div class="sm:hidden space-y-3">
+        {% for med in medications %}
+        <div class="border rounded-lg p-3">
+            <p class="font-medium text-sm">{{ med.name }}</p>
+            <p class="text-xs text-gray-500">{{ med.dosage or 'No dosage' }} &mdash; {{ med.times }}</p>
+            <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded mt-1 inline-block">Active</span>
+        </div>
+        {% endfor %}
+    </div>
+    <table class="hidden sm:table w-full">
         <thead>
             <tr class="text-left text-sm text-gray-500 border-b">
                 <th class="pb-2">Name</th>
@@ -42,9 +54,9 @@
         <tbody>
             {% for med in medications %}
             <tr class="border-b">
-                <td class="py-2 font-medium">{{ med.name }}</td>
-                <td class="py-2 text-gray-600">{{ med.dosage or '-' }}</td>
-                <td class="py-2 text-gray-600">{{ med.times }}</td>
+                <td class="py-2 font-medium text-sm">{{ med.name }}</td>
+                <td class="py-2 text-gray-600 text-sm">{{ med.dosage or '-' }}</td>
+                <td class="py-2 text-gray-600 text-sm">{{ med.times }}</td>
                 <td class="py-2">
                     <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Active</span>
                 </td>
@@ -53,7 +65,7 @@
         </tbody>
     </table>
     {% else %}
-    <p class="text-gray-400">No medications scheduled. Add one above or say "remind me to take aspirin at 8am".</p>
+    <p class="text-gray-400 text-sm">No medications scheduled. Add one above or say "remind me to take aspirin at 8am".</p>
     {% endif %}
 </div>
 {% endblock %}

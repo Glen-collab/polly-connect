@@ -8,6 +8,7 @@ import logging
 from typing import Optional, Tuple
 
 from core.conversation_state import ConversationMode, ConversationState
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +236,13 @@ class CommandProcessor:
             visit_count = member.get("visit_count", 1)
             state = self._get_state(device_id)
             state.speaker_name = name
+
+            # If no relationship and first visit, ask how they know the owner
+            if not relationship and visit_count <= 1:
+                owner_name = self.db.get_owner_name() or settings.OWNER_NAME
+                state.mode = ConversationMode.AWAITING_RELATIONSHIP
+                return f"Nice to meet you, {name}! How do you know {owner_name}?"
+
             return self.family_identity.build_greeting(name, relationship, visit_count)
 
         return f"Nice to meet you, {name}!"
@@ -412,6 +420,10 @@ class CommandProcessor:
                 response = await self._handle_family_question(device_id)
                 return (f"No problem, let's try another one. {response}", state.mode)
 
+        # In AWAITING_RELATIONSHIP mode — save the relationship answer
+        if state.mode == ConversationMode.AWAITING_RELATIONSHIP:
+            return await self._process_relationship_answer(raw_text, device_id)
+
         # In conversational mode — treat raw_text as an answer
         if state.mode in (ConversationMode.STORY_PROMPT, ConversationMode.FOLLOWUP_WAIT):
             return await self._process_story_answer(raw_text, device_id)
@@ -422,6 +434,24 @@ class CommandProcessor:
         # Fallback
         response = await self.process(intent_result, raw_text, device_id)
         return (response, state.mode)
+
+    async def _process_relationship_answer(self, raw_text: str,
+                                            device_id: str) -> Tuple[str, ConversationMode]:
+        """Process the user's answer about how they know the owner."""
+        state = self._get_state(device_id)
+        name = state.speaker_name
+
+        if not raw_text or not raw_text.strip():
+            return ("I didn't catch that. How do you know the family?", ConversationMode.AWAITING_RELATIONSHIP)
+
+        # Save the relationship
+        relationship = raw_text.strip()
+        if self.family_identity:
+            self.family_identity.update_relationship(name, relationship)
+
+        state.mode = ConversationMode.COMMAND
+        return (f"Wonderful! I'll remember you're {relationship}. It's great to meet you, {name}!",
+                ConversationMode.COMMAND)
 
     async def _process_story_answer(self, answer_text: str,
                                     device_id: str) -> Tuple[str, ConversationMode]:

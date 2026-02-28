@@ -20,6 +20,11 @@ build/
 # Environment
 .env
 .env.local
+.env.production
+
+# Photo uploads (local storage, not in git)
+server/static/uploads/*
+!server/static/uploads/.gitkeep
 
 # IDE
 .idea/

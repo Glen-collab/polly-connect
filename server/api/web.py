@@ -6,7 +6,9 @@ FastAPI + Jinja2 templates + Tailwind CSS.
 import json
 import logging
 import os
-from fastapi import APIRouter, Request, Form
+import shutil
+import uuid
+from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -121,9 +123,12 @@ async def medication_add(request: Request, name: str = Form(...),
 async def memory_page(request: Request):
     db = request.app.state.db
     items = db.list_all()
+    # Build unique location list for autocomplete suggestions
+    locations = sorted(set(item["location"] for item in items if item.get("location")))
     return templates.TemplateResponse("memory.html", {
         "request": request,
         "items": items,
+        "locations": locations,
     })
 
 
@@ -139,6 +144,43 @@ async def memory_delete(request: Request, item_id: int):
     db = request.app.state.db
     db.delete_by_id(item_id)
     return RedirectResponse("/web/memory", status_code=303)
+
+
+@router.post("/memory/scan")
+async def memory_scan(request: Request,
+                      photo: UploadFile = File(...),
+                      default_location: str = Form("")):
+    """Send a photo to OpenAI Vision and return detected items."""
+    from fastapi.responses import JSONResponse
+
+    vision = getattr(request.app.state, "vision", None)
+    if not vision or not vision.available:
+        return JSONResponse({"items": [], "error": "Vision service not available. Set OPENAI_API_KEY."})
+
+    content = await photo.read()
+    if len(content) > 10 * 1024 * 1024:
+        return JSONResponse({"items": [], "error": "Photo too large (max 10MB)."})
+
+    items = vision.identify_items(content, default_location)
+    return JSONResponse({"items": items})
+
+
+@router.post("/memory/save-batch")
+async def memory_save_batch(request: Request):
+    """Save multiple items at once from the photo scan."""
+    from fastapi.responses import JSONResponse
+
+    db = request.app.state.db
+    body = await request.json()
+    items = body.get("items", [])
+    count = 0
+    for entry in items:
+        item_name = entry.get("item", "").strip()
+        location = entry.get("location", "").strip()
+        if item_name and location:
+            db.store_item(item_name, location)
+            count += 1
+    return JSONResponse({"count": count})
 
 
 @router.get("/settings", response_class=HTMLResponse)
@@ -175,3 +217,173 @@ async def settings_save(request: Request, name: str = Form(...),
             conn.close()
 
     return RedirectResponse("/web/settings", status_code=303)
+
+
+# ── Setup ──
+
+@router.get("/setup", response_class=HTMLResponse)
+async def setup_page(request: Request):
+    db = request.app.state.db
+    user = db.get_or_create_user()
+    return templates.TemplateResponse("setup.html", {
+        "request": request,
+        "user": user,
+    })
+
+
+@router.post("/setup")
+async def setup_save(request: Request, owner_name: str = Form(...),
+                     owner_email: str = Form(""),
+                     caretaker_name: str = Form(""),
+                     caretaker_email: str = Form("")):
+    db = request.app.state.db
+    user = db.get_or_create_user()
+    db.update_user_setup(user["id"], owner_name, owner_email,
+                         caretaker_name, caretaker_email)
+    return RedirectResponse("/web/setup", status_code=303)
+
+
+# ── Transcription Review ──
+
+@router.get("/transcriptions", response_class=HTMLResponse)
+async def transcriptions_page(request: Request):
+    db = request.app.state.db
+    filter_val = request.query_params.get("filter", "all")
+
+    conn = db._get_connection()
+    try:
+        conn.row_factory = __import__("sqlite3").Row
+        if filter_val == "verified":
+            stories = [dict(r) for r in conn.execute(
+                "SELECT * FROM stories WHERE verified = 1 ORDER BY created_at DESC LIMIT 100"
+            ).fetchall()]
+        elif filter_val == "unverified":
+            stories = [dict(r) for r in conn.execute(
+                "SELECT * FROM stories WHERE verified = 0 OR verified IS NULL ORDER BY created_at DESC LIMIT 100"
+            ).fetchall()]
+        else:
+            stories = [dict(r) for r in conn.execute(
+                "SELECT * FROM stories ORDER BY created_at DESC LIMIT 100"
+            ).fetchall()]
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return templates.TemplateResponse("transcriptions.html", {
+        "request": request,
+        "stories": stories,
+        "filter": filter_val,
+    })
+
+
+@router.post("/transcriptions/{story_id}/verify")
+async def transcription_verify(request: Request, story_id: int,
+                                speaker_name: str = Form(""),
+                                corrected_transcript: str = Form(""),
+                                verified_by: str = Form(...)):
+    db = request.app.state.db
+
+    # Update speaker name if changed
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "UPDATE stories SET speaker_name = ? WHERE id = ?",
+            (speaker_name or None, story_id)
+        )
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    # Mark verified
+    db.verify_story(story_id, verified_by, corrected_transcript or None)
+    return RedirectResponse("/web/transcriptions", status_code=303)
+
+
+# ── Photos ──
+
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+MAX_PHOTO_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+@router.get("/photos", response_class=HTMLResponse)
+async def photos_page(request: Request):
+    db = request.app.state.db
+    photos = db.get_photos(limit=100)
+    stories = db.get_stories(limit=200)
+
+    # Parse tags JSON for template display
+    for photo in photos:
+        try:
+            photo["tag_list"] = json.loads(photo.get("tags") or "[]")
+        except (json.JSONDecodeError, TypeError):
+            photo["tag_list"] = []
+
+    return templates.TemplateResponse("photos.html", {
+        "request": request,
+        "photos": photos,
+        "stories": stories,
+    })
+
+
+@router.post("/photos/upload")
+async def photo_upload(request: Request,
+                       photo: UploadFile = File(...),
+                       caption: str = Form(""),
+                       date_taken: str = Form(""),
+                       tags: str = Form(""),
+                       story_id: str = Form(""),
+                       uploaded_by: str = Form("")):
+    db = request.app.state.db
+
+    # Validate file extension
+    ext = os.path.splitext(photo.filename or "")[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        return RedirectResponse("/web/photos", status_code=303)
+
+    # Read file content (with size limit)
+    content = await photo.read()
+    if len(content) > MAX_PHOTO_SIZE:
+        return RedirectResponse("/web/photos", status_code=303)
+
+    # Generate unique filename
+    unique_name = f"{uuid.uuid4().hex}{ext}"
+    uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
+    filepath = os.path.join(uploads_dir, unique_name)
+
+    # Save file
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    # Parse tags to JSON
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+
+    # Save to DB
+    user = db.get_or_create_user()
+    db.save_photo(
+        filename=unique_name,
+        original_name=photo.filename,
+        caption=caption or None,
+        date_taken=date_taken or None,
+        tags=json.dumps(tag_list),
+        story_id=int(story_id) if story_id else None,
+        uploaded_by=uploaded_by or None,
+        user_id=user["id"],
+    )
+
+    return RedirectResponse("/web/photos", status_code=303)
+
+
+@router.post("/photos/{photo_id}/delete")
+async def photo_delete(request: Request, photo_id: int):
+    db = request.app.state.db
+    photo = db.get_photo_by_id(photo_id)
+    if photo:
+        # Delete file from disk
+        uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads")
+        filepath = os.path.join(uploads_dir, photo["filename"])
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        db.delete_photo(photo_id)
+    return RedirectResponse("/web/photos", status_code=303)
