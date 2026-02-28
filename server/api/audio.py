@@ -89,6 +89,15 @@ async def continuous_stream(websocket: WebSocket):
     last_voice_time = 0.0
     command_start_time = 0.0
 
+    # Pre-roll: keep last ~1.5 seconds of audio so we capture the wake phrase
+    # 16kHz * 2 bytes * 1.5s = 48000 bytes
+    PRE_ROLL_SIZE = 48000
+    pre_roll = bytearray()
+
+    # Use the VAD threshold for silence detection during recording too
+    from core.vad_wakeword import VADWakeWordDetector
+    vad_threshold = detector.rms_threshold if isinstance(detector, VADWakeWordDetector) else settings.SILENCE_THRESHOLD_RMS
+
     logger.info("Continuous stream connected")
 
     try:
@@ -127,16 +136,21 @@ async def continuous_stream(websocket: WebSocket):
                 chunk_int16 = np.frombuffer(chunk_bytes, dtype=np.int16)
 
                 if state == "listening":
+                    # Maintain pre-roll buffer
+                    pre_roll.extend(chunk_bytes)
+                    if len(pre_roll) > PRE_ROLL_SIZE:
+                        pre_roll = pre_roll[-PRE_ROLL_SIZE:]
+
                     # Get live conversation state for dynamic timeouts
                     conv_state = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
 
                     # In conversational mode, skip wake word — go straight to recording
                     if conv_state and conv_state.is_conversational:
                         rms = int(np.sqrt(np.mean(chunk_int16.astype(np.float32) ** 2)))
-                        if rms > settings.SILENCE_THRESHOLD_RMS:
+                        if rms > vad_threshold:
                             logger.info(f"Voice detected in conversational mode (device: {device_id})")
                             state = "recording"
-                            command_audio = bytearray(chunk_bytes)
+                            command_audio = bytearray(pre_roll)  # include pre-roll
                             last_voice_time = time.monotonic()
                             command_start_time = time.monotonic()
                             await websocket.send_json({"event": "conversation_listening"})
@@ -145,7 +159,8 @@ async def continuous_stream(websocket: WebSocket):
                         detector.reset()
 
                         state = "recording"
-                        command_audio = bytearray()
+                        # Include pre-roll so we capture "Hey Polly" before trigger
+                        command_audio = bytearray(pre_roll)
                         last_voice_time = time.monotonic()
                         command_start_time = time.monotonic()
 
@@ -155,7 +170,7 @@ async def continuous_stream(websocket: WebSocket):
                     command_audio.extend(chunk_bytes)
 
                     rms = int(np.sqrt(np.mean(chunk_int16.astype(np.float32) ** 2)))
-                    if rms > settings.SILENCE_THRESHOLD_RMS:
+                    if rms > vad_threshold:
                         last_voice_time = time.monotonic()
 
                     now = time.monotonic()
@@ -177,6 +192,7 @@ async def continuous_stream(websocket: WebSocket):
                         )
 
                         # After processing, check if we should stay in listening-for-voice mode
+                        pre_roll = bytearray()  # clear pre-roll after processing
                         if conv_state and conv_state.is_conversational:
                             state = "listening"
                             command_audio = bytearray()
