@@ -16,6 +16,25 @@ from core.auth import generate_api_key
 from core.medications import format_time_12hr, _get_local_now
 from config import settings
 
+import re
+
+def parse_time_input(raw: str) -> str:
+    """Convert user-friendly time ('8am', '2:30 PM', '2 PM', '14:00') to 24hr 'HH:MM'."""
+    raw = raw.strip().lower()
+    m = re.match(r'^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$', raw)
+    if not m:
+        return raw  # return as-is if unparseable
+    h = int(m.group(1))
+    mins = int(m.group(2)) if m.group(2) else 0
+    period = m.group(3)
+    if period == 'pm' and h < 12:
+        h += 12
+    elif period == 'am' and h == 12:
+        h = 0
+    elif period is None and h <= 12:
+        pass  # assume 24hr if no am/pm
+    return f"{h:02d}:{mins:02d}"
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -290,10 +309,90 @@ async def medication_add(request: Request, name: str = Form(...),
     db = request.app.state.db
     tid = session["tenant_id"]
     user = db.get_or_create_user(tenant_id=tid)
-    # Parse comma-separated times into JSON
-    time_list = [t.strip() for t in times.split(",") if t.strip()]
+    # Parse comma-separated times (supports "8am", "2:30 PM", "14:00")
+    time_list = [parse_time_input(t) for t in times.split(",") if t.strip()]
     db.add_medication(user["id"], name, dosage, json.dumps(time_list), tenant_id=tid)
     return RedirectResponse("/web/medications", status_code=303)
+
+
+@router.get("/medications/calendar")
+async def medications_calendar(request: Request):
+    """Generate .ics calendar file with medication reminders."""
+    from fastapi.responses import Response
+
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    medications = db.get_medications(tenant_id=tid)
+
+    now = _get_local_now()
+    tz_name = settings.TIMEZONE
+
+    day_map = {"mon": "MO", "tue": "TU", "wed": "WE", "thu": "TH",
+               "fri": "FR", "sat": "SA", "sun": "SU"}
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Polly Connect//Medication Reminders//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-TIMEZONE:{tz_name}",
+    ]
+
+    for med in medications:
+        times = json.loads(med["times"]) if isinstance(med["times"], str) else med["times"]
+        active_days = json.loads(med["active_days"]) if isinstance(med["active_days"], str) else med["active_days"]
+
+        byday = ",".join(day_map.get(d, "") for d in active_days if d in day_map)
+        if not byday:
+            byday = "MO,TU,WE,TH,FR,SA,SU"
+
+        dosage_str = f" ({med.get('dosage', '')})" if med.get("dosage") else ""
+
+        for med_time in times:
+            try:
+                h, m = med_time.split(":")
+                h, m = int(h), int(m)
+            except (ValueError, AttributeError):
+                continue
+
+            time_display = format_time_12hr(med_time)
+            uid = f"polly-med-{med['id']}-{med_time.replace(':', '')}@polly-connect.com"
+            dtstart = now.strftime(f"%Y%m%dT{h:02d}{m:02d}00")
+            end_m = m + 15
+            end_h = h + (end_m // 60)
+            end_m = end_m % 60
+            dtend = now.strftime(f"%Y%m%dT{end_h:02d}{end_m:02d}00")
+
+            lines.extend([
+                "BEGIN:VEVENT",
+                f"UID:{uid}",
+                f"DTSTART;TZID={tz_name}:{dtstart}",
+                f"DTEND;TZID={tz_name}:{dtend}",
+                f"RRULE:FREQ=WEEKLY;BYDAY={byday}",
+                f"SUMMARY:Take {med['name']}{dosage_str}",
+                f"DESCRIPTION:Polly reminder: Take {med['name']}{dosage_str} at {time_display}",
+                "BEGIN:VALARM",
+                "TRIGGER:-PT5M",
+                "ACTION:DISPLAY",
+                f"DESCRIPTION:Time to take {med['name']}{dosage_str}",
+                "END:VALARM",
+                "END:VEVENT",
+            ])
+
+    lines.append("END:VCALENDAR")
+    ics_content = "\r\n".join(lines) + "\r\n"
+
+    return Response(
+        content=ics_content,
+        media_type="text/calendar",
+        headers={"Content-Disposition": "attachment; filename=polly-medications.ics"},
+    )
 
 
 @router.get("/medications/{med_id}/edit", response_class=HTMLResponse)
@@ -313,11 +412,14 @@ async def medication_edit(request: Request, med_id: int):
     times = json.loads(med["times"]) if isinstance(med["times"], str) else med["times"]
     active_days = json.loads(med["active_days"]) if isinstance(med["active_days"], str) else med["active_days"]
 
+    # Show times in 12hr format for the edit form
+    times_display = [format_time_12hr(t) for t in times]
+
     return templates.TemplateResponse("medication_edit.html", {
         "request": request,
         "session": session,
         "med": med,
-        "times_str": ", ".join(times),
+        "times_str": ", ".join(times_display),
         "active_days": active_days,
     })
 
@@ -334,8 +436,8 @@ async def medication_edit_save(request: Request, med_id: int,
     db = request.app.state.db
     tid = session["tenant_id"]
 
-    # Parse form data
-    time_list = [t.strip() for t in times.split(",") if t.strip()]
+    # Parse form data (supports "8am", "2:30 PM", "14:00")
+    time_list = [parse_time_input(t) for t in times.split(",") if t.strip()]
 
     # active_days comes from checkboxes
     form_data = await request.form()
@@ -420,88 +522,6 @@ async def medications_upcoming(request: Request):
     result.sort(key=lambda x: (badge_order.get(x["badge"], 9), x["time_24"]))
 
     return JSONResponse({"medications": result, "current_time": now.strftime("%I:%M %p")})
-
-
-@router.get("/medications/calendar")
-async def medications_calendar(request: Request):
-    """Generate .ics calendar file with medication reminders."""
-    from fastapi.responses import Response
-
-    session = await get_web_session(request)
-    redirect = require_login(session)
-    if redirect:
-        return redirect
-
-    db = request.app.state.db
-    tid = session["tenant_id"]
-    medications = db.get_medications(tenant_id=tid)
-
-    now = _get_local_now()
-    tz_name = settings.TIMEZONE
-
-    # Map day abbreviations to ICS RRULE BYDAY values
-    day_map = {"mon": "MO", "tue": "TU", "wed": "WE", "thu": "TH",
-               "fri": "FR", "sat": "SA", "sun": "SU"}
-
-    lines = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//Polly Connect//Medication Reminders//EN",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-        f"X-WR-TIMEZONE:{tz_name}",
-    ]
-
-    for med in medications:
-        times = json.loads(med["times"]) if isinstance(med["times"], str) else med["times"]
-        active_days = json.loads(med["active_days"]) if isinstance(med["active_days"], str) else med["active_days"]
-
-        byday = ",".join(day_map.get(d, "") for d in active_days if d in day_map)
-        if not byday:
-            byday = "MO,TU,WE,TH,FR,SA,SU"
-
-        dosage_str = f" ({med.get('dosage', '')})" if med.get("dosage") else ""
-
-        for med_time in times:
-            try:
-                h, m = med_time.split(":")
-                h, m = int(h), int(m)
-            except (ValueError, AttributeError):
-                continue
-
-            time_display = format_time_12hr(med_time)
-            uid = f"polly-med-{med['id']}-{med_time.replace(':', '')}@polly-connect.com"
-            dtstart = now.strftime(f"%Y%m%dT{h:02d}{m:02d}00")
-            # 15-minute event duration
-            end_m = m + 15
-            end_h = h + (end_m // 60)
-            end_m = end_m % 60
-            dtend = now.strftime(f"%Y%m%dT{end_h:02d}{end_m:02d}00")
-
-            lines.extend([
-                "BEGIN:VEVENT",
-                f"UID:{uid}",
-                f"DTSTART;TZID={tz_name}:{dtstart}",
-                f"DTEND;TZID={tz_name}:{dtend}",
-                f"RRULE:FREQ=WEEKLY;BYDAY={byday}",
-                f"SUMMARY:Take {med['name']}{dosage_str}",
-                f"DESCRIPTION:Polly reminder: Take {med['name']}{dosage_str} at {time_display}",
-                "BEGIN:VALARM",
-                "TRIGGER:-PT5M",
-                "ACTION:DISPLAY",
-                f"DESCRIPTION:Time to take {med['name']}{dosage_str}",
-                "END:VALARM",
-                "END:VEVENT",
-            ])
-
-    lines.append("END:VCALENDAR")
-    ics_content = "\r\n".join(lines) + "\r\n"
-
-    return Response(
-        content=ics_content,
-        media_type="text/calendar",
-        headers={"Content-Disposition": "attachment; filename=polly-medications.ics"},
-    )
 
 
 @router.get("/memory", response_class=HTMLResponse)
