@@ -172,7 +172,8 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/")
 async def root():
-    return {"name": "Polly Connect", "status": "online"}
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/web/dashboard")
 
 
 @app.get("/health")
