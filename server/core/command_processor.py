@@ -328,6 +328,16 @@ class CommandProcessor:
             response = await self.process(intent_result, raw_text, device_id)
             return (response, ConversationMode.COMMAND)
 
+        # Handle repeat — re-ask the current question
+        if intent == "repeat" and state.current_question:
+            return (f"Sure, no problem. {state.current_question}", state.mode)
+
+        # Handle skip — move to a new question
+        if intent == "skip":
+            if state.mode in (ConversationMode.STORY_PROMPT, ConversationMode.FOLLOWUP_WAIT):
+                response = await self._handle_family_question(device_id)
+                return (f"No problem, let's try another one. {response}", state.mode)
+
         # In conversational mode — treat raw_text as an answer
         if state.mode in (ConversationMode.STORY_PROMPT, ConversationMode.FOLLOWUP_WAIT):
             return await self._process_story_answer(raw_text, device_id)

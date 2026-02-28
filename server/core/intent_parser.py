@@ -52,6 +52,9 @@ class IntentParser:
             "repeat", "say that again", "what did you say", "what was that",
             "pardon", "come again", "one more time",
             "can you repeat that", "i didn't hear you", "i didn't catch that",
+            "ask me again", "ask me that again", "ask that again",
+            "what was the question", "what did you ask", "say it again",
+            "can you ask me again", "ask that question again",
         ]
         self._slower_phrases = [
             "slower", "slow down", "talk slower", "speak slower",
