@@ -90,6 +90,8 @@ async def continuous_stream(websocket: WebSocket):
     command_start_time = 0.0
     last_response_time = 0.0  # cooldown after response to avoid speaker feedback
     RESPONSE_COOLDOWN = 3.0   # ignore triggers for 3s after a response
+    still_there_prompted = False  # tracks if we've asked "still there?"
+    accumulated_parts = []        # partial audio from before the prompt
 
     # Pre-roll: keep last ~1.5 seconds of audio so we capture the wake phrase
     # 16kHz * 2 bytes * 1.5s = 48000 bytes
@@ -191,7 +193,38 @@ async def continuous_stream(websocket: WebSocket):
 
                     if silence_duration > silence_limit or total_duration > max_duration:
                         reason = "silence" if silence_duration > silence_limit else "max_duration"
+
+                        # In conversational mode, prompt "still there?" before giving up
+                        if (conv_state and conv_state.is_conversational
+                                and reason == "silence"
+                                and not still_there_prompted):
+                            still_there_prompted = True
+                            logger.info(f"Silence in conversational mode — prompting user")
+                            prompt = "Are you still there? Take your time, and say 'I'm done' when you're finished."
+                            await websocket.send_json({
+                                "event": "response",
+                                "text": prompt,
+                                "intent": "still_there_prompt",
+                            })
+                            await _send_tts(websocket, tts, prompt)
+                            # Save partial audio, go back to listening
+                            accumulated_parts.append(bytes(command_audio))
+                            state = "listening"
+                            command_audio = bytearray()
+                            pre_roll = bytearray()
+                            continue
+
                         logger.info(f"Command recording ended ({reason}), {len(command_audio)} bytes")
+
+                        # Combine any accumulated audio with current
+                        if accumulated_parts:
+                            full_audio = bytearray()
+                            for part in accumulated_parts:
+                                full_audio.extend(part)
+                            full_audio.extend(command_audio)
+                            command_audio = full_audio
+                            accumulated_parts = []
+                            logger.info(f"Combined with earlier audio: {len(command_audio)} total bytes")
 
                         await _process_command(
                             websocket, command_audio, transcriber, tts, cmd, device_id,
@@ -200,6 +233,7 @@ async def continuous_stream(websocket: WebSocket):
                         )
 
                         # After processing, reset state
+                        still_there_prompted = False
                         last_response_time = time.monotonic()
                         pre_roll = bytearray()  # clear pre-roll after processing
                         if conv_state and conv_state.is_conversational:

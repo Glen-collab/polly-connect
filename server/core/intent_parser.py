@@ -60,6 +60,15 @@ class IntentParser:
             "slower", "slow down", "talk slower", "speak slower",
             "too fast", "not so fast", "can you slow down",
         ]
+        self._thinking_phrases = [
+            "i'm still thinking", "still thinking", "hang on",
+            "let me think", "hold on", "hold your horses",
+            "wait a minute", "give me a second", "give me a moment",
+            "this is deep", "that's a good question", "good question",
+            "let me see", "hmm", "um", "one second", "one moment",
+            "i'm thinking", "thinking", "wait", "just a moment",
+            "i need a minute", "hold that thought",
+        ]
         self._skip_phrases = [
             "skip", "next question", "skip this one", "i don't know",
             "pass", "next one", "move on",
@@ -136,6 +145,9 @@ class IntentParser:
 
         if self._matches(text_lower, self._slower_phrases):
             return {"intent": "slower", "confidence": 0.95}
+
+        if self._matches(text_lower, self._thinking_phrases):
+            return {"intent": "thinking", "confidence": 0.95}
 
         if self._matches(text_lower, self._skip_phrases):
             return {"intent": "skip", "confidence": 0.95}

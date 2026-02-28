@@ -328,6 +328,10 @@ class CommandProcessor:
             response = await self.process(intent_result, raw_text, device_id)
             return (response, ConversationMode.COMMAND)
 
+        # Handle thinking — user needs more time
+        if intent == "thinking":
+            return ("Take your time. Continue when you're ready, and say 'I'm done' when you're finished.", state.mode)
+
         # Handle repeat — re-ask the current question
         if intent == "repeat" and state.current_question:
             return (f"Sure, no problem. {state.current_question}", state.mode)
