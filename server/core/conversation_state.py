@@ -18,9 +18,9 @@ class ConversationMode(Enum):
 # Generous silence timeouts so elderly users can pause and think
 SILENCE_TIMEOUTS = {
     ConversationMode.COMMAND: 2.0,
-    ConversationMode.STORY_PROMPT: 15.0,
-    ConversationMode.STORY_LISTEN: 12.0,
-    ConversationMode.FOLLOWUP_WAIT: 15.0,
+    ConversationMode.STORY_PROMPT: 8.0,
+    ConversationMode.STORY_LISTEN: 8.0,
+    ConversationMode.FOLLOWUP_WAIT: 8.0,
 }
 
 MAX_RECORDING_TIMES = {

@@ -101,6 +101,8 @@ async def continuous_stream(websocket: WebSocket):
     # Use the VAD threshold for silence detection during recording too
     from core.vad_wakeword import VADWakeWordDetector
     vad_threshold = detector.rms_threshold if isinstance(detector, VADWakeWordDetector) else settings.SILENCE_THRESHOLD_RMS
+    # Lower threshold for recording silence — catches softer speech during conversation
+    recording_silence_threshold = max(vad_threshold // 2, 50)
 
     logger.info("Continuous stream connected")
 
@@ -179,7 +181,7 @@ async def continuous_stream(websocket: WebSocket):
                     command_audio.extend(chunk_bytes)
 
                     rms = int(np.sqrt(np.mean(chunk_int16.astype(np.float32) ** 2)))
-                    if rms > vad_threshold:
+                    if rms > recording_silence_threshold:
                         last_voice_time = time.monotonic()
 
                     now = time.monotonic()
@@ -194,28 +196,6 @@ async def continuous_stream(websocket: WebSocket):
                     if silence_duration > silence_limit or total_duration > max_duration:
                         reason = "silence" if silence_duration > silence_limit else "max_duration"
 
-                        # In conversational mode, prompt "still there?" before giving up
-                        if (conv_state and conv_state.is_conversational
-                                and reason == "silence"
-                                and not still_there_prompted):
-                            still_there_prompted = True
-                            logger.info(f"Silence in conversational mode — prompting user")
-                            prompt = "Are you still there? Take your time, and say 'I'm done' when you're finished."
-                            await websocket.send_json({
-                                "event": "response",
-                                "text": prompt,
-                                "intent": "still_there_prompt",
-                            })
-                            await _send_tts(websocket, tts, prompt)
-                            # Save partial audio, go back to listening
-                            accumulated_parts.append(bytes(command_audio))
-                            state = "listening"
-                            command_audio = bytearray()
-                            pre_roll = bytearray()
-                            continue
-
-                        logger.info(f"Command recording ended ({reason}), {len(command_audio)} bytes")
-
                         # Combine any accumulated audio with current
                         if accumulated_parts:
                             full_audio = bytearray()
@@ -224,22 +204,62 @@ async def continuous_stream(websocket: WebSocket):
                             full_audio.extend(command_audio)
                             command_audio = full_audio
                             accumulated_parts = []
-                            logger.info(f"Combined with earlier audio: {len(command_audio)} total bytes")
+
+                        logger.info(f"Command recording ended ({reason}), {len(command_audio)} bytes")
+
+                        pre_transcription = None
+
+                        # In conversational mode on silence, transcribe first to decide
+                        if (conv_state and conv_state.is_conversational
+                                and reason == "silence"
+                                and not still_there_prompted):
+                            # Quick transcribe to check if user actually spoke
+                            check_wav = io.BytesIO()
+                            with wave.open(check_wav, 'wb') as wf:
+                                wf.setnchannels(settings.CHANNELS)
+                                wf.setsampwidth(2)
+                                wf.setframerate(settings.SAMPLE_RATE)
+                                wf.writeframes(command_audio)
+                            check_text = await asyncio.to_thread(
+                                transcriber.transcribe, check_wav.getvalue()
+                            )
+
+                            if not check_text or not check_text.strip():
+                                # No speech detected — prompt "still there?"
+                                still_there_prompted = True
+                                logger.info("No speech in conversational mode — prompting user")
+                                prompt = "Are you still there? Take your time, and say 'I'm done' when you're finished."
+                                await websocket.send_json({
+                                    "event": "response",
+                                    "text": prompt,
+                                    "intent": "still_there_prompt",
+                                })
+                                await _send_tts(websocket, tts, prompt)
+                                accumulated_parts.append(bytes(command_audio))
+                                state = "listening"
+                                command_audio = bytearray()
+                                pre_roll = bytearray()
+                                last_response_time = time.monotonic()
+                                continue
+
+                            # User said something — process it (skip re-transcription)
+                            pre_transcription = check_text
+                            logger.info(f"Conversational speech detected: {check_text[:100]}")
 
                         await _process_command(
                             websocket, command_audio, transcriber, tts, cmd, device_id,
                             detector=detector,
                             skip_wake_check=skip_wake_check,
+                            pre_transcription=pre_transcription,
                         )
 
                         # After processing, reset state
                         still_there_prompted = False
                         last_response_time = time.monotonic()
-                        pre_roll = bytearray()  # clear pre-roll after processing
+                        pre_roll = bytearray()
                         if conv_state and conv_state.is_conversational:
                             state = "listening"
                             command_audio = bytearray()
-                            # Don't reset detector — no wake word needed
                         else:
                             state = "listening"
                             command_audio = bytearray()
@@ -262,23 +282,28 @@ async def _process_command(
     device_id: str = "unknown",
     detector=None,
     skip_wake_check: bool = False,
+    pre_transcription: str = None,
 ):
     """Run STT → intent parse → CommandProcessor → TTS on buffered command audio."""
-    if len(command_audio) == 0:
+    if len(command_audio) == 0 and not pre_transcription:
         await websocket.send_json({"event": "response", "text": "I didn't hear anything.", "audio": None})
         return
 
-    # Wrap raw PCM in WAV header for STT
-    wav_buffer = io.BytesIO()
-    with wave.open(wav_buffer, 'wb') as wf:
-        wf.setnchannels(settings.CHANNELS)
-        wf.setsampwidth(2)
-        wf.setframerate(settings.SAMPLE_RATE)
-        wf.writeframes(command_audio)
-    wav_bytes = wav_buffer.getvalue()
+    if pre_transcription:
+        transcription = pre_transcription
+    else:
+        # Wrap raw PCM in WAV header for STT
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, 'wb') as wf:
+            wf.setnchannels(settings.CHANNELS)
+            wf.setsampwidth(2)
+            wf.setframerate(settings.SAMPLE_RATE)
+            wf.writeframes(command_audio)
+        wav_bytes = wav_buffer.getvalue()
 
-    # Transcribe
-    transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+        # Transcribe
+        transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+
     logger.info(f"Transcription: {transcription}")
 
     if not transcription:
