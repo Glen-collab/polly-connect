@@ -11,7 +11,7 @@ from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from core.web_auth import get_web_session, require_login, hash_password, verify_password
+from core.web_auth import get_web_session, require_login, require_owner, hash_password, verify_password
 from core.auth import generate_api_key
 from core.medications import format_time_12hr, _get_local_now
 from config import settings
@@ -172,6 +172,52 @@ async def register_submit(request: Request, name: str = Form(...),
     return response
 
 
+# ── Family access routes ──
+
+@router.get("/family", response_class=HTMLResponse)
+async def family_login_page(request: Request):
+    session = await get_web_session(request)
+    if session:
+        return RedirectResponse("/web/dashboard", status_code=302)
+    return templates.TemplateResponse("family_login.html", {
+        "request": request, "error": None, "name": "", "code": "", "session": None,
+    })
+
+
+@router.post("/family")
+async def family_login_submit(request: Request, name: str = Form(...),
+                               code: str = Form(...)):
+    db = request.app.state.db
+    code = code.strip()
+    name = name.strip()
+
+    if not name:
+        return templates.TemplateResponse("family_login.html", {
+            "request": request, "error": "Please enter your name.",
+            "name": name, "code": code, "session": None,
+        })
+
+    tenant = db.validate_family_code(code)
+    if not tenant:
+        return templates.TemplateResponse("family_login.html", {
+            "request": request, "error": "Invalid access code.",
+            "name": name, "code": code, "session": None,
+        })
+
+    session_id = db.create_family_session(
+        tenant["id"], name,
+        duration_hours=settings.SESSION_DURATION_HOURS,
+    )
+
+    response = RedirectResponse("/web/dashboard", status_code=302)
+    response.set_cookie(
+        "polly_session", session_id,
+        max_age=settings.SESSION_DURATION_HOURS * 3600,
+        httponly=True, samesite="lax",
+    )
+    return response
+
+
 # ── Protected routes (session required) ──
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -232,7 +278,7 @@ async def stories_list(request: Request):
 @router.get("/stories/{story_id}/edit", response_class=HTMLResponse)
 async def story_edit(request: Request, story_id: int):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -263,7 +309,7 @@ async def story_edit(request: Request, story_id: int):
 async def story_edit_save(request: Request, story_id: int,
                           transcript: str = Form(""), speaker_name: str = Form("")):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -302,7 +348,7 @@ async def medications_page(request: Request):
 async def medication_add(request: Request, name: str = Form(...),
                          dosage: str = Form(""), times: str = Form(...)):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -398,7 +444,7 @@ async def medications_calendar(request: Request):
 @router.get("/medications/{med_id}/edit", response_class=HTMLResponse)
 async def medication_edit(request: Request, med_id: int):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -429,7 +475,7 @@ async def medication_edit_save(request: Request, med_id: int,
                                 name: str = Form(...), dosage: str = Form(""),
                                 times: str = Form(...), active_days: list = Form(None)):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -456,7 +502,7 @@ async def medication_edit_save(request: Request, med_id: int,
 @router.post("/medications/{med_id}/delete")
 async def medication_delete(request: Request, med_id: int):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -547,7 +593,7 @@ async def memory_page(request: Request):
 @router.post("/memory/add")
 async def memory_add(request: Request, item: str = Form(...), location: str = Form(...)):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -559,7 +605,7 @@ async def memory_add(request: Request, item: str = Form(...), location: str = Fo
 @router.post("/memory/delete/{item_id}")
 async def memory_delete(request: Request, item_id: int):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -578,6 +624,8 @@ async def memory_scan(request: Request,
     session = await get_web_session(request)
     if not session:
         return JSONResponse({"items": [], "error": "Not authenticated"}, status_code=401)
+    if session.get("role") == "family":
+        return JSONResponse({"items": [], "error": "Not authorized"}, status_code=403)
 
     vision = getattr(request.app.state, "vision", None)
     if not vision or not vision.available:
@@ -599,6 +647,8 @@ async def memory_save_batch(request: Request):
     session = await get_web_session(request)
     if not session:
         return JSONResponse({"error": "Not authenticated"}, status_code=401)
+    if session.get("role") == "family":
+        return JSONResponse({"error": "Not authorized"}, status_code=403)
 
     db = request.app.state.db
     tid = session["tenant_id"]
@@ -617,16 +667,18 @@ async def memory_save_batch(request: Request):
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
     db = request.app.state.db
     user = db.get_or_create_user(tenant_id=session["tenant_id"])
+    tenant = db.get_tenant(session["tenant_id"])
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "session": session,
         "user": user,
+        "tenant": tenant,
     })
 
 
@@ -637,7 +689,7 @@ async def settings_save(request: Request, name: str = Form(...),
                         music_genre_preference: str = Form(""),
                         memory_care_mode: str = Form("")):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -666,7 +718,7 @@ async def settings_save(request: Request, name: str = Form(...),
 @router.get("/setup", response_class=HTMLResponse)
 async def setup_page(request: Request):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -685,7 +737,7 @@ async def setup_save(request: Request, owner_name: str = Form(...),
                      caretaker_name: str = Form(""),
                      caretaker_email: str = Form("")):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -861,7 +913,7 @@ async def photo_upload(request: Request,
 @router.post("/photos/{photo_id}/delete")
 async def photo_delete(request: Request, photo_id: int):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -877,12 +929,38 @@ async def photo_delete(request: Request, photo_id: int):
     return RedirectResponse("/web/photos", status_code=303)
 
 
+# ── Family Code Management ──
+
+@router.post("/settings/family-code/generate")
+async def family_code_generate(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    db.generate_family_code(session["tenant_id"])
+    return RedirectResponse("/web/settings", status_code=303)
+
+
+@router.post("/settings/family-code/revoke")
+async def family_code_revoke(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    db.revoke_family_code(session["tenant_id"])
+    return RedirectResponse("/web/settings", status_code=303)
+
+
 # ── Device Management ──
 
 @router.get("/devices", response_class=HTMLResponse)
 async def devices_page(request: Request):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -906,7 +984,7 @@ async def devices_page(request: Request):
 @router.post("/devices/add")
 async def device_add(request: Request, device_name: str = Form(...)):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -929,7 +1007,7 @@ async def device_add(request: Request, device_name: str = Form(...)):
 @router.post("/devices/{device_id}/delete")
 async def device_delete(request: Request, device_id: str):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 

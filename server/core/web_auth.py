@@ -48,13 +48,24 @@ async def get_web_session(request: Request) -> Optional[Dict]:
     # Touch session to keep it active
     db.touch_web_session(session_id)
 
+    # Family sessions have account_id=NULL, role stored on the session row
+    if session["account_id"] is None:
+        return {
+            "session_id": session["id"],
+            "account_id": None,
+            "tenant_id": session["tenant_id"],
+            "name": session.get("family_name") or "Family",
+            "email": None,
+            "role": "family",
+        }
+
     return {
         "session_id": session["id"],
         "account_id": session["account_id"],
         "tenant_id": session["tenant_id"],
         "name": session["account_name"],
         "email": session["account_email"],
-        "role": session["role"],
+        "role": session.get("account_role") or session.get("role") or "owner",
     }
 
 
@@ -62,4 +73,13 @@ def require_login(session: Optional[Dict]) -> Optional[RedirectResponse]:
     """If session is None, return a redirect to login page. Otherwise return None."""
     if session is None:
         return RedirectResponse("/web/login", status_code=302)
+    return None
+
+
+def require_owner(session: Optional[Dict]) -> Optional[RedirectResponse]:
+    """Require an owner/caretaker session. Family members get redirected to dashboard."""
+    if session is None:
+        return RedirectResponse("/web/login", status_code=302)
+    if session.get("role") == "family":
+        return RedirectResponse("/web/dashboard", status_code=302)
     return None

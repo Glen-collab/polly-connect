@@ -370,6 +370,21 @@ class PollyDB:
             for table in tenant_tables:
                 conn.execute(f"UPDATE {table} SET tenant_id = 1 WHERE tenant_id IS NULL")
 
+            # ── Family access code migrations ──
+            # Add family_code columns to tenants
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(tenants)").fetchall()}
+            if "family_code" not in cols:
+                conn.execute("ALTER TABLE tenants ADD COLUMN family_code TEXT")
+            if "family_code_created_at" not in cols:
+                conn.execute("ALTER TABLE tenants ADD COLUMN family_code_created_at TIMESTAMP")
+
+            # Add family_name and role columns to web_sessions
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(web_sessions)").fetchall()}
+            if "family_name" not in cols:
+                conn.execute("ALTER TABLE web_sessions ADD COLUMN family_name TEXT")
+            if "role" not in cols:
+                conn.execute("ALTER TABLE web_sessions ADD COLUMN role TEXT")
+
             conn.commit()
         finally:
             if not self._conn:
@@ -494,9 +509,10 @@ class PollyDB:
         try:
             conn.row_factory = sqlite3.Row
             result = conn.execute("""
-                SELECT ws.*, a.name as account_name, a.email as account_email, a.role
+                SELECT ws.*, a.name as account_name, a.email as account_email,
+                       a.role as account_role, ws.role as session_role, ws.family_name
                 FROM web_sessions ws
-                JOIN accounts a ON ws.account_id = a.id
+                LEFT JOIN accounts a ON ws.account_id = a.id
                 WHERE ws.id = ? AND ws.expires_at > datetime('now')
             """, (session_id,)).fetchone()
             return dict(result) if result else None
@@ -530,6 +546,68 @@ class PollyDB:
         try:
             conn.execute("DELETE FROM web_sessions WHERE expires_at <= datetime('now')")
             conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Family access code ──
+
+    def generate_family_code(self, tenant_id: int) -> str:
+        import random
+        code = f"{random.randint(0, 999999):06d}"
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE tenants SET family_code = ?, family_code_created_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (code, tenant_id)
+            )
+            conn.commit()
+            return code
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def revoke_family_code(self, tenant_id: int):
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE tenants SET family_code = NULL, family_code_created_at = NULL WHERE id = ?",
+                (tenant_id,)
+            )
+            # Kill all active family sessions for this tenant
+            conn.execute(
+                "DELETE FROM web_sessions WHERE tenant_id = ? AND role = 'family'",
+                (tenant_id,)
+            )
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def validate_family_code(self, code: str) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM tenants WHERE family_code = ?", (code,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def create_family_session(self, tenant_id: int, family_name: str,
+                              duration_hours: int = 72) -> str:
+        session_id = secrets.token_urlsafe(32)
+        expires_at = (datetime.utcnow() + timedelta(hours=duration_hours)).isoformat()
+        conn = self._get_connection()
+        try:
+            conn.execute("""
+                INSERT INTO web_sessions (id, account_id, tenant_id, expires_at, family_name, role)
+                VALUES (?, NULL, ?, ?, ?, 'family')
+            """, (session_id, tenant_id, expires_at, family_name))
+            conn.commit()
+            return session_id
         finally:
             if not self._conn:
                 conn.close()

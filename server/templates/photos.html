@@ -84,10 +84,12 @@
                 {% else %}
                 <span></span>
                 {% endif %}
+                {% if session.role != 'family' %}
                 <form method="POST" action="/web/photos/{{ photo.id }}/delete" class="inline"
                       onsubmit="return confirm('Delete this photo?')">
                     <button type="submit" class="text-xs text-red-400 hover:text-red-600 py-1">Delete</button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>

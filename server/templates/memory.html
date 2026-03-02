@@ -4,6 +4,7 @@
 {% block content %}
 <h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Memory Storage</h1>
 
+{% if session.role != 'family' %}
 <!-- Photo Scan Section -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <h2 class="text-base sm:text-lg font-semibold mb-3">Scan a Photo</h2>
@@ -63,7 +64,9 @@
     <!-- Save result -->
     <div id="save-result" class="hidden mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-emerald-700 text-sm"></div>
 </div>
+{% endif %}
 
+{% if session.role != 'family' %}
 <!-- Manual Add Item Form -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <h2 class="text-base sm:text-lg font-semibold mb-3">Store an Item Manually</h2>
@@ -84,6 +87,7 @@
         </div>
     </form>
 </div>
+{% endif %}
 
 <!-- Location suggestions datalist -->
 <datalist id="location-suggestions">
@@ -105,9 +109,11 @@
                 <p class="text-xs text-gray-500">{{ item.location }}</p>
                 <p class="text-xs text-gray-400">{{ item.updated_at }}</p>
             </div>
+            {% if session.role != 'family' %}
             <form method="POST" action="/web/memory/delete/{{ item.id }}">
                 <button type="submit" class="text-red-400 hover:text-red-600 text-xs p-1">Delete</button>
             </form>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -127,11 +133,13 @@
                 <td class="py-2 font-medium text-sm">{{ item.item }}</td>
                 <td class="py-2 text-gray-600 text-sm">{{ item.location }}</td>
                 <td class="py-2 text-gray-400 text-xs">{{ item.updated_at }}</td>
+                {% if session.role != 'family' %}
                 <td class="py-2">
                     <form method="POST" action="/web/memory/delete/{{ item.id }}" class="inline">
                         <button type="submit" class="text-red-500 hover:text-red-700 text-xs">Delete</button>
                     </form>
                 </td>
+                {% endif %}
             </tr>
             {% endfor %}
         </tbody>

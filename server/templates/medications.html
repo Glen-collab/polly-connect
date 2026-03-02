@@ -12,6 +12,7 @@
     {% endif %}
 </div>
 
+{% if session.role != 'family' %}
 <!-- Add Medication Form -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Add Medication</h2>
@@ -35,6 +36,7 @@
         </div>
     </form>
 </div>
+{% endif %}
 
 <!-- Medication List -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6">
@@ -50,6 +52,7 @@
                     <p class="text-xs text-gray-500">{{ med.dosage or 'No dosage' }}</p>
                     <p class="text-xs text-gray-500 mt-1" id="med-times-m-{{ med.id }}">{{ med.times }}</p>
                 </div>
+                {% if session.role != 'family' %}
                 <div class="flex gap-2">
                     <a href="/web/medications/{{ med.id }}/edit"
                        class="text-blue-600 hover:text-blue-800 text-xs">Edit</a>
@@ -58,6 +61,7 @@
                         <button type="submit" class="text-red-600 hover:text-red-800 text-xs">Delete</button>
                     </form>
                 </div>
+                {% endif %}
             </div>
             <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded mt-2 inline-block">Active</span>
         </div>
@@ -71,7 +75,7 @@
                 <th class="pb-2">Dosage</th>
                 <th class="pb-2">Times</th>
                 <th class="pb-2">Status</th>
-                <th class="pb-2 text-right">Actions</th>
+                {% if session.role != 'family' %}<th class="pb-2 text-right">Actions</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -83,6 +87,7 @@
                 <td class="py-2">
                     <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Active</span>
                 </td>
+                {% if session.role != 'family' %}
                 <td class="py-2 text-right">
                     <a href="/web/medications/{{ med.id }}/edit"
                        class="text-blue-600 hover:text-blue-800 text-xs mr-2">Edit</a>
@@ -91,6 +96,7 @@
                         <button type="submit" class="text-red-600 hover:text-red-800 text-xs">Delete</button>
                     </form>
                 </td>
+                {% endif %}
             </tr>
             {% endfor %}
         </tbody>

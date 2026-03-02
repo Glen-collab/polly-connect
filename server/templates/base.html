@@ -29,11 +29,13 @@
                     <a href="/web/photos" class="hover:underline">Photos</a>
                     <a href="/web/medications" class="hover:underline">Medications</a>
                     <a href="/web/memory" class="hover:underline">Memory</a>
+                    {% if session.role != 'family' %}
                     <a href="/web/devices" class="hover:underline">Devices</a>
                     <a href="/web/setup" class="hover:underline">Setup</a>
                     <a href="/web/settings" class="hover:underline">Settings</a>
+                    {% endif %}
                     <span class="text-emerald-200 text-xs">|</span>
-                    <span class="text-emerald-200 text-xs">{{ session.name }}</span>
+                    <span class="text-emerald-200 text-xs">{{ session.name }}{% if session.role == 'family' %} <span class="bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded ml-1">Family</span>{% endif %}</span>
                     <a href="/web/logout" class="hover:underline text-emerald-200">Logout</a>
                 </div>
                 {% endif %}
@@ -57,11 +59,13 @@
                     <a href="/web/photos" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Photos</a>
                     <a href="/web/medications" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Medications</a>
                     <a href="/web/memory" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Memory</a>
+                    {% if session.role != 'family' %}
                     <a href="/web/devices" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Devices</a>
                     <a href="/web/setup" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Setup</a>
                     <a href="/web/settings" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Settings</a>
+                    {% endif %}
                     <div class="border-t border-emerald-500 mt-2 pt-2">
-                        <span class="block py-1 px-3 text-emerald-200 text-xs">Signed in as {{ session.name }}</span>
+                        <span class="block py-1 px-3 text-emerald-200 text-xs">Signed in as {{ session.name }}{% if session.role == 'family' %} (Family){% endif %}</span>
                         <a href="/web/logout" class="block py-2 px-3 rounded hover:bg-emerald-700 text-sm">Logout</a>
                     </div>
                 </div>
