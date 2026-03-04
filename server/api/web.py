@@ -278,7 +278,7 @@ async def stories_list(request: Request):
 @router.get("/stories/{story_id}/edit", response_class=HTMLResponse)
 async def story_edit(request: Request, story_id: int):
     session = await get_web_session(request)
-    redirect = require_owner(session)
+    redirect = require_login(session)
     if redirect:
         return redirect
 
@@ -309,7 +309,7 @@ async def story_edit(request: Request, story_id: int):
 async def story_edit_save(request: Request, story_id: int,
                           transcript: str = Form(""), speaker_name: str = Form("")):
     session = await get_web_session(request)
-    redirect = require_owner(session)
+    redirect = require_login(session)
     if redirect:
         return redirect
 
@@ -593,7 +593,7 @@ async def memory_page(request: Request):
 @router.post("/memory/add")
 async def memory_add(request: Request, item: str = Form(...), location: str = Form(...)):
     session = await get_web_session(request)
-    redirect = require_owner(session)
+    redirect = require_login(session)
     if redirect:
         return redirect
 

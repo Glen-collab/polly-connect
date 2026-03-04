@@ -16,7 +16,7 @@
         <p class="text-xs sm:text-sm text-gray-500 mb-1">Shared by {{ story.speaker_name }}</p>
         {% endif %}
         <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap">{{ story.transcript or "Transcription pending..." }}</p>
-        {% if story.id and session.role != 'family' %}
+        {% if story.id %}
         <a href="/web/stories/{{ story.id }}/edit" class="text-sm text-emerald-600 hover:underline mt-2 inline-block">Edit</a>
         {% endif %}
     </div>
