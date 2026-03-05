@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Legacy Book - Polly Connect{% endblock %}
+
+{% block content %}
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Legacy Book</h1>
+
+<!-- Progress Overview -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <h3 class="text-gray-500 text-xs">Memories</h3>
+        <p class="text-2xl font-bold text-emerald-600">{{ progress.total_memories }}</p>
+        <p class="text-xs text-gray-400">{{ progress.verified_memories }} verified</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <h3 class="text-gray-500 text-xs">Chapters</h3>
+        <p class="text-2xl font-bold text-blue-600">{{ progress.chapters_ready }}</p>
+        <p class="text-xs text-gray-400">of {{ progress.total_chapters_outlined }} outlined</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <h3 class="text-gray-500 text-xs">Est. Pages</h3>
+        <p class="text-2xl font-bold text-purple-600">{{ progress.estimated_pages }}</p>
+        <p class="text-xs text-gray-400">target: {{ progress.target_pages }}</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <h3 class="text-gray-500 text-xs">Complete</h3>
+        <p class="text-2xl font-bold text-amber-600">{{ progress.percent_complete }}%</p>
+        <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+            <div class="bg-amber-500 h-2 rounded-full" style="width: {{ progress.percent_complete }}%"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Narrative Arc Coverage -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-4">Story Arc Coverage</h2>
+    <p class="text-xs text-gray-500 mb-4">Each section of the Hero's Journey needs memories to build a complete book. Polly automatically guides conversations toward gaps.</p>
+    <div class="space-y-3">
+        {% for bucket_key, bucket_data in arc_coverage.items() %}
+        <div>
+            <div class="flex justify-between items-center mb-1">
+                <span class="text-sm font-medium text-gray-700">{{ bucket_data.label }}</span>
+                <span class="text-xs text-gray-500">{{ bucket_data.count }} memories</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+                {% set pct = ((bucket_data.count / bucket_data.target) * 100) if bucket_data.target > 0 else 0 %}
+                {% set pct_clamped = pct if pct <= 100 else 100 %}
+                {% set bar_color = "bg-emerald-500" if pct >= 100 else ("bg-yellow-400" if pct >= 50 else "bg-red-400") %}
+                <div class="{{ bar_color }} h-3 rounded-full transition-all" style="width: {{ pct_clamped }}%"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Life Phase Coverage -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-4">Life Phases</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {% for phase_key, phase_data in phase_coverage.items() %}
+        <div class="border rounded-lg p-3 text-center {% if phase_data.count > 0 %}border-emerald-200 bg-emerald-50{% else %}border-gray-200{% endif %}">
+            <p class="text-sm font-medium text-gray-700">{{ phase_data.label }}</p>
+            <p class="text-lg font-bold {% if phase_data.count > 0 %}text-emerald-600{% else %}text-gray-400{% endif %}">{{ phase_data.count }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Chapter Outline -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base sm:text-lg font-semibold">Chapters</h2>
+        <a href="/web/book/chapters" class="text-emerald-600 text-sm hover:underline">View All</a>
+    </div>
+
+    {% if chapters %}
+    <div class="space-y-3">
+        {% for ch in chapters %}
+        <a href="/web/book/chapters/{{ ch.chapter_number }}" class="block border rounded-lg p-3 hover:bg-gray-50 transition">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-xs text-gray-400">Chapter {{ ch.chapter_number }}</span>
+                    <h3 class="font-medium text-sm sm:text-base text-gray-800">{{ ch.title }}</h3>
+                    <p class="text-xs text-gray-500">{{ ch.memory_count }} memories &middot; {{ ch.bucket_label }}</p>
+                </div>
+                <div>
+                    {% if ch.status == 'ready' %}
+                    <span class="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700">Ready</span>
+                    {% elif ch.status == 'has_draft' %}
+                    <span class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">Draft</span>
+                    {% else %}
+                    <span class="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700">Needs More</span>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-400 text-sm">No chapters yet. Keep talking to Polly and memories will start filling in the story arc above.</p>
+    {% endif %}
+</div>
+
+<!-- Encouragement / Next Steps -->
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 sm:p-6">
+    <h2 class="text-base font-semibold text-emerald-800 mb-2">What's Next?</h2>
+    <p class="text-sm text-emerald-700">{{ gap_report }}</p>
+    {% if progress.percent_complete >= 100 %}
+    <p class="text-sm text-emerald-700 mt-2 font-medium">You have enough memories for a full book! Head to the chapters page to review and generate drafts.</p>
+    {% endif %}
+</div>
+{% endblock %}

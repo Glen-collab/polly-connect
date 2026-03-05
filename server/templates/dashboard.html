@@ -20,6 +20,28 @@
     </div>
 </div>
 
+<!-- Legacy Book Progress -->
+{% if book_progress %}
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-base sm:text-lg font-semibold">Legacy Book</h2>
+        <a href="/web/book" class="text-emerald-600 text-sm hover:underline">View Details</a>
+    </div>
+    <div class="flex items-center gap-4">
+        <div class="flex-1">
+            <div class="flex justify-between text-xs text-gray-500 mb-1">
+                <span>{{ book_progress.total_memories }} memories captured</span>
+                <span>{{ book_progress.percent_complete }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+                <div class="bg-emerald-500 h-3 rounded-full transition-all" style="width: {{ book_progress.percent_complete }}%"></div>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">{{ book_progress.chapters_ready }} chapters ready &middot; ~{{ book_progress.estimated_pages }} pages</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Recent Stories -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Recent Stories</h2>

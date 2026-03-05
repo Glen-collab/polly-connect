@@ -248,6 +248,10 @@ async def dashboard(request: Request):
         if not db._conn:
             conn.close()
 
+    # Book progress
+    book_builder = getattr(request.app.state, "book_builder", None)
+    book_progress = book_builder.get_book_progress() if book_builder else None
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "session": session,
@@ -256,6 +260,7 @@ async def dashboard(request: Request):
         "story_count": len(stories),
         "question_count": q_count,
         "item_count": stats.get("total_items", 0),
+        "book_progress": book_progress,
     })
 
 
@@ -1014,3 +1019,266 @@ async def device_delete(request: Request, device_id: str):
     db = request.app.state.db
     db.delete_device(device_id, session["tenant_id"])
     return RedirectResponse("/web/devices", status_code=303)
+
+
+# ── Legacy Book ──
+
+BUCKET_LABELS = {
+    "ordinary_world": "Everyday Life",
+    "call_to_adventure": "Turning Points",
+    "crossing_threshold": "Big Decisions",
+    "trials_allies_enemies": "Challenges & Helpers",
+    "transformation": "How You Changed",
+    "return_with_knowledge": "Wisdom & Lessons",
+}
+
+PHASE_LABELS = {
+    "childhood": "Childhood",
+    "adolescence": "Adolescence",
+    "young_adult": "Young Adult",
+    "adult": "Adult",
+    "midlife": "Midlife",
+    "elder": "Elder",
+    "reflection": "Reflection",
+}
+
+BUCKET_TARGETS = {
+    "ordinary_world": 15,
+    "call_to_adventure": 10,
+    "crossing_threshold": 10,
+    "trials_allies_enemies": 15,
+    "transformation": 10,
+    "return_with_knowledge": 10,
+}
+
+
+@router.get("/book", response_class=HTMLResponse)
+async def book_overview(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    book_builder = request.app.state.book_builder
+    narrative_arc = request.app.state.narrative_arc
+    engagement = request.app.state.engagement
+
+    progress = book_builder.get_book_progress()
+    chapters = book_builder.generate_chapter_outline()
+
+    # Check which chapters already have drafts
+    existing_drafts = {d["chapter_number"]: d for d in db.get_chapter_drafts(tenant_id=tid)}
+    for ch in chapters:
+        ch["bucket_label"] = BUCKET_LABELS.get(ch["bucket"], ch["bucket"])
+        ch["phase_label"] = PHASE_LABELS.get(ch["life_phase"], ch["life_phase"])
+        if ch["chapter_number"] in existing_drafts:
+            ch["status"] = "has_draft"
+
+    # Arc coverage
+    bucket_coverage = narrative_arc.get_bucket_coverage()
+    arc_coverage = {}
+    for bucket_key, count in bucket_coverage.items():
+        arc_coverage[bucket_key] = {
+            "label": BUCKET_LABELS.get(bucket_key, bucket_key),
+            "count": count,
+            "target": BUCKET_TARGETS.get(bucket_key, 10),
+        }
+
+    # Life phase coverage
+    phase_cov = narrative_arc.get_life_phase_coverage()
+    phase_coverage = {}
+    for phase_key, count in phase_cov.items():
+        phase_coverage[phase_key] = {
+            "label": PHASE_LABELS.get(phase_key, phase_key),
+            "count": count,
+        }
+
+    gap_report = engagement.get_gap_report()
+
+    return templates.TemplateResponse("book.html", {
+        "request": request,
+        "session": session,
+        "progress": progress,
+        "chapters": chapters,
+        "arc_coverage": arc_coverage,
+        "phase_coverage": phase_coverage,
+        "gap_report": gap_report,
+    })
+
+
+@router.get("/book/chapters", response_class=HTMLResponse)
+async def book_chapters_list(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    book_builder = request.app.state.book_builder
+
+    chapters = book_builder.generate_chapter_outline()
+    existing_drafts = {d["chapter_number"]: d for d in db.get_chapter_drafts(tenant_id=tid)}
+
+    for ch in chapters:
+        ch["bucket_label"] = BUCKET_LABELS.get(ch["bucket"], ch["bucket"])
+        ch["phase_label"] = PHASE_LABELS.get(ch["life_phase"], ch["life_phase"])
+        if ch["chapter_number"] in existing_drafts:
+            ch["status"] = "has_draft"
+        # Fetch memory previews
+        ch["memories"] = []
+        for mid in ch.get("memory_ids", []):
+            mem = db.get_memory_by_id(mid)
+            if mem:
+                ch["memories"].append(mem)
+
+    return templates.TemplateResponse("book_chapters.html", {
+        "request": request,
+        "session": session,
+        "chapters": chapters,
+    })
+
+
+@router.get("/book/chapters/{chapter_num}", response_class=HTMLResponse)
+async def book_chapter_detail(request: Request, chapter_num: int):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    book_builder = request.app.state.book_builder
+
+    chapters = book_builder.generate_chapter_outline()
+    chapter = None
+    for ch in chapters:
+        if ch["chapter_number"] == chapter_num:
+            chapter = ch
+            break
+
+    if not chapter:
+        return RedirectResponse("/web/book/chapters", status_code=302)
+
+    chapter["bucket_label"] = BUCKET_LABELS.get(chapter["bucket"], chapter["bucket"])
+    chapter["phase_label"] = PHASE_LABELS.get(chapter["life_phase"], chapter["life_phase"])
+
+    # Fetch full memories
+    memories = []
+    for mid in chapter.get("memory_ids", []):
+        mem = db.get_memory_by_id(mid)
+        if mem:
+            memories.append(mem)
+
+    # Check for existing draft
+    existing_drafts = db.get_chapter_drafts(tenant_id=tid)
+    draft = None
+    for d in existing_drafts:
+        if d["chapter_number"] == chapter_num:
+            draft = d
+            break
+
+    if draft:
+        chapter["status"] = "has_draft"
+
+    ai_available = getattr(request.app.state, "followup_gen", None)
+    ai_available = ai_available and ai_available.available if ai_available else False
+
+    message = request.query_params.get("msg")
+
+    return templates.TemplateResponse("book_chapter_detail.html", {
+        "request": request,
+        "session": session,
+        "chapter": chapter,
+        "memories": memories,
+        "draft": draft,
+        "ai_available": ai_available,
+        "message": message,
+    })
+
+
+@router.post("/book/chapters/{chapter_num}/generate")
+async def book_chapter_generate(request: Request, chapter_num: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    book_builder = request.app.state.book_builder
+
+    chapters = book_builder.generate_chapter_outline()
+    chapter = None
+    for ch in chapters:
+        if ch["chapter_number"] == chapter_num:
+            chapter = ch
+            break
+
+    if not chapter:
+        return RedirectResponse("/web/book/chapters", status_code=302)
+
+    # Generate AI draft
+    content = await book_builder.generate_chapter_draft(chapter)
+
+    if content:
+        book_builder.save_chapter_draft(
+            chapter_number=chapter_num,
+            title=chapter["title"],
+            bucket=chapter["bucket"],
+            life_phase=chapter["life_phase"],
+            memory_ids=chapter.get("memory_ids", []),
+            content=content,
+        )
+        msg = "Draft generated successfully!"
+    else:
+        msg = "Could not generate draft. Make sure OPENAI_API_KEY is set."
+
+    return RedirectResponse(
+        f"/web/book/chapters/{chapter_num}?msg={msg}",
+        status_code=303,
+    )
+
+
+@router.post("/book/chapters/{chapter_num}/save")
+async def book_chapter_save(request: Request, chapter_num: int,
+                             content: str = Form("")):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Update existing draft content
+    conn = db._get_connection()
+    try:
+        import sqlite3
+        conn.row_factory = sqlite3.Row
+        existing = conn.execute(
+            "SELECT * FROM chapter_drafts WHERE chapter_number = ? AND tenant_id = ?",
+            (chapter_num, tid)
+        ).fetchone()
+
+        if existing:
+            conn.execute(
+                "UPDATE chapter_drafts SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (content, existing["id"])
+            )
+        else:
+            conn.execute("""
+                INSERT INTO chapter_drafts (chapter_number, title, bucket, life_phase, memory_ids, content, tenant_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (chapter_num, f"Chapter {chapter_num}", "", "", "[]", content, tid))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return RedirectResponse(
+        f"/web/book/chapters/{chapter_num}?msg=Changes saved.",
+        status_code=303,
+    )
