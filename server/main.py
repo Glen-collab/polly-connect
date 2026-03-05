@@ -163,10 +163,12 @@ app.include_router(devices_router, prefix="/api/devices", tags=["devices"])
 app.include_router(ha_router, prefix="/api/commands", tags=["homeassistant"])
 app.include_router(web_router, prefix="/web", tags=["web"])
 
-# Static files for photo uploads
+# Static files for photo uploads and story recordings
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 uploads_dir = os.path.join(static_dir, "uploads")
+recordings_dir = os.path.join(static_dir, "recordings")
 os.makedirs(uploads_dir, exist_ok=True)
+os.makedirs(recordings_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 

@@ -20,6 +20,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from core.intent_parser import IntentParser
 from core.conversation_state import ConversationMode
 from core.vad_wakeword import VADWakeWordDetector
+from core.story_recorder import StoryRecordingSession
 from core.auth import verify_device_api_key, verify_websocket_key
 from config import settings
 
@@ -94,6 +95,9 @@ async def continuous_stream(websocket: WebSocket):
     still_there_prompted = False  # tracks if we've asked "still there?"
     accumulated_parts = []        # partial audio from before the prompt
 
+    # Story recording session (button-triggered WAV capture)
+    story_session = None  # type: StoryRecordingSession
+
     # Pre-roll: keep last ~1.5 seconds of audio so we capture the wake phrase
     # 16kHz * 2 bytes * 1.5s = 48000 bytes
     PRE_ROLL_SIZE = 48000
@@ -155,12 +159,149 @@ async def continuous_stream(websocket: WebSocket):
                     await websocket.send_json({"event": "pong"})
                     continue
 
+                if event == "story_button":
+                    action = msg_data.get("action", "start")
+                    conv_state = cmd._get_state(device_id)
+
+                    if action == "start" and story_session is None:
+                        # Start story recording
+                        tenant_id = conv_state.tenant_id or 1
+                        story_session = StoryRecordingSession(device_id, tenant_id)
+                        conv_state.mode = ConversationMode.STORY_RECORD
+                        logger.info(f"Story recording started for device {device_id}")
+
+                        # Announce via TTS
+                        announce = "Recording started. Tell your story, and press the button again when you're done."
+                        await websocket.send_json({"event": "story_record_started"})
+                        await websocket.send_json({"event": "response", "text": announce, "mode": "story_record"})
+                        await _send_tts(websocket, tts, announce)
+                        last_response_time = time.monotonic()
+
+                    elif action == "stop" and story_session is not None:
+                        # Stop story recording — finalize and save
+                        logger.info(f"Story recording stopped for device {device_id}")
+
+                        # Transcribe any remaining segment
+                        remaining_wav = story_session.get_segment_wav()
+                        if remaining_wav:
+                            seg_text = await asyncio.to_thread(transcriber.transcribe, remaining_wav)
+                            if seg_text:
+                                story_session.add_transcript_segment(seg_text)
+
+                        result = story_session.finish()
+                        story_session = None
+                        conv_state.mode = ConversationMode.COMMAND
+
+                        # Save story to database
+                        transcript = result.get("transcript", "")
+                        wav_filename = result.get("wav_filename")
+                        duration = result.get("duration_seconds", 0)
+
+                        if transcript or wav_filename:
+                            db = app.state.db
+                            story_id = db.save_story(
+                                transcript=transcript or "(no speech detected)",
+                                audio_s3_key=wav_filename,
+                                speaker_name=conv_state.speaker_name,
+                                source="wav_button",
+                                duration_seconds=duration,
+                                tenant_id=conv_state.tenant_id,
+                            )
+
+                            # Extract memory metadata if we have transcript
+                            if transcript and len(transcript) > 20:
+                                extractor = getattr(app.state, "memory_extractor", None)
+                                if extractor:
+                                    metadata = extractor.extract(
+                                        transcript,
+                                        speaker=conv_state.speaker_name,
+                                    )
+                                    db.save_memory(
+                                        story_id=story_id,
+                                        speaker=metadata.get("speaker"),
+                                        bucket=metadata.get("bucket", "ordinary_world"),
+                                        life_phase=metadata.get("life_phase", "unknown"),
+                                        text_summary=metadata.get("text_summary", ""),
+                                        text=transcript,
+                                        people=",".join(metadata.get("people", [])),
+                                        locations=",".join(metadata.get("locations", [])),
+                                        emotions=",".join(metadata.get("emotions", [])),
+                                        fingerprint=extractor.compute_fingerprint(metadata),
+                                        tenant_id=conv_state.tenant_id,
+                                    )
+
+                            logger.info(f"Story saved: id={story_id}, wav={wav_filename}, "
+                                        f"transcript={len(transcript)} chars, duration={duration:.1f}s")
+
+                        mins = int(duration // 60)
+                        secs = int(duration % 60)
+                        announce = f"Got it! Recording saved. That was {mins} minutes and {secs} seconds."
+                        await websocket.send_json({"event": "story_record_stopped"})
+                        await websocket.send_json({"event": "response", "text": announce, "mode": "command"})
+                        await _send_tts(websocket, tts, announce)
+                        last_response_time = time.monotonic()
+
+                    continue
+
                 continue
 
             if "bytes" not in message:
                 continue
 
             pcm_data = message["bytes"]
+
+            # Fork audio to story recorder if active
+            if story_session is not None:
+                rms_val = int(np.sqrt(np.mean(
+                    np.frombuffer(pcm_data[:len(pcm_data) - len(pcm_data) % 2], dtype=np.int16
+                    ).astype(np.float32) ** 2))) if len(pcm_data) >= 2 else 0
+                story_session.add_audio(pcm_data, rms=rms_val)
+
+                # Transcribe segments on silence gaps (background)
+                if story_session.should_transcribe_segment():
+                    seg_wav = story_session.get_segment_wav()
+                    if seg_wav:
+                        seg_text = await asyncio.to_thread(transcriber.transcribe, seg_wav)
+                        if seg_text:
+                            story_session.add_transcript_segment(seg_text)
+                            logger.info(f"Story segment transcribed: {seg_text[:80]}...")
+
+                # Auto-stop at 30 minute limit
+                if story_session.is_over_limit:
+                    logger.info("Story recording hit 30-minute limit, auto-stopping")
+                    # Trigger stop by simulating button press
+                    remaining_wav = story_session.get_segment_wav()
+                    if remaining_wav:
+                        seg_text = await asyncio.to_thread(transcriber.transcribe, remaining_wav)
+                        if seg_text:
+                            story_session.add_transcript_segment(seg_text)
+
+                    result = story_session.finish()
+                    conv_state = cmd._get_state(device_id)
+                    story_session = None
+                    conv_state.mode = ConversationMode.COMMAND
+
+                    transcript = result.get("transcript", "")
+                    wav_filename = result.get("wav_filename")
+                    duration = result.get("duration_seconds", 0)
+
+                    if transcript or wav_filename:
+                        db_ref = app.state.db
+                        db_ref.save_story(
+                            transcript=transcript or "(no speech detected)",
+                            audio_s3_key=wav_filename,
+                            speaker_name=conv_state.speaker_name,
+                            source="wav_button",
+                            duration_seconds=duration,
+                            tenant_id=conv_state.tenant_id,
+                        )
+
+                    announce = "We hit the thirty minute mark, so I saved your recording. You can start another one anytime."
+                    await websocket.send_json({"event": "story_record_stopped"})
+                    await websocket.send_json({"event": "response", "text": announce, "mode": "command"})
+                    await _send_tts(websocket, tts, announce)
+                    last_response_time = time.monotonic()
+
             pcm_buffer.extend(pcm_data)
 
             while len(pcm_buffer) >= OWW_CHUNK_BYTES:

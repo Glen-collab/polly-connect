@@ -1165,11 +1165,17 @@ async def book_chapter_detail(request: Request, chapter_num: int):
     chapter["bucket_label"] = BUCKET_LABELS.get(chapter["bucket"], chapter["bucket"])
     chapter["phase_label"] = PHASE_LABELS.get(chapter["life_phase"], chapter["life_phase"])
 
-    # Fetch full memories
+    # Fetch full memories with audio keys from linked stories
     memories = []
     for mid in chapter.get("memory_ids", []):
         mem = db.get_memory_by_id(mid)
         if mem:
+            # Look up audio from linked story
+            if mem.get("story_id"):
+                story = db.get_story_by_id(mem["story_id"])
+                mem["audio_key"] = story.get("audio_s3_key") if story else None
+            else:
+                mem["audio_key"] = None
             memories.append(mem)
 
     # Check for existing draft

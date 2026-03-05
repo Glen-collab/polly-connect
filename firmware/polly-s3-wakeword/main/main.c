@@ -88,6 +88,10 @@ static const char *TAG = "POLLY";
 // Status LED (built-in on most S3 devkits)
 #define LED_PIN         GPIO_NUM_48
 
+// Story mode button (GPIO0 = BOOT button, free during runtime)
+#define STORY_BUTTON    GPIO_NUM_0
+#define DEBOUNCE_MS     300
+
 // WebSocket
 #define WS_BUFFER_SIZE  4096        // 4KB buffer (smaller = less memory pressure)
 #define WS_RECONNECT_MS 5000
@@ -110,6 +114,11 @@ static volatile bool ws_connected = false;
 // Flags set by WebSocket event handler, consumed by streaming task
 static volatile bool wake_detected = false;
 static volatile bool streaming_paused = false;
+
+// Story recording state
+static volatile bool story_recording = false;
+static volatile bool story_button_pressed = false;
+static uint32_t last_button_time = 0;
 
 // Response audio accumulation (PSRAM)
 static uint8_t *response_audio = NULL;
@@ -135,6 +144,33 @@ static void led_init(void)
 static void led_set(int on)
 {
     gpio_set_level(LED_PIN, on ? 1 : 0);
+}
+
+
+/* --- Story Button (GPIO0 / BOOT) --- */
+
+static void IRAM_ATTR story_button_isr(void *arg)
+{
+    uint32_t now = xTaskGetTickCountFromISR();
+    if ((now - last_button_time) > pdMS_TO_TICKS(DEBOUNCE_MS)) {
+        last_button_time = now;
+        story_button_pressed = true;
+    }
+}
+
+static void story_button_init(void)
+{
+    gpio_config_t btn_cfg = {
+        .pin_bit_mask = (1ULL << STORY_BUTTON),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_NEGEDGE,  // button press = falling edge (active low)
+    };
+    gpio_config(&btn_cfg);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(STORY_BUTTON, story_button_isr, NULL);
+    ESP_LOGI(TAG, "Story button initialized on GPIO%d", STORY_BUTTON);
 }
 
 
@@ -389,6 +425,16 @@ static void ws_handle_message(const char *json_str, int len)
             response_complete = true;
         }
 
+    } else if (strcmp(evt, "story_record_started") == 0) {
+        ESP_LOGI(TAG, "*** STORY RECORDING STARTED ***");
+        story_recording = true;
+        led_set(1);  // solid LED = recording
+
+    } else if (strcmp(evt, "story_record_stopped") == 0) {
+        ESP_LOGI(TAG, "*** STORY RECORDING STOPPED ***");
+        story_recording = false;
+        led_set(0);
+
     } else if (strcmp(evt, "no_wake_word") == 0) {
         // VAD triggered but no wake phrase in transcription — resume streaming
         ESP_LOGI(TAG, "No wake phrase detected, resuming...");
@@ -559,6 +605,18 @@ static void mic_stream_task(void *arg)
     uint32_t ping_timer = 0;
 
     while (1) {
+        // Handle story button press
+        if (story_button_pressed) {
+            story_button_pressed = false;
+            if (ws_connected) {
+                const char *msg = story_recording
+                    ? "{\"event\":\"story_button\",\"action\":\"stop\"}"
+                    : "{\"event\":\"story_button\",\"action\":\"start\"}";
+                esp_websocket_client_send_text(ws_client, msg, strlen(msg), pdMS_TO_TICKS(1000));
+                ESP_LOGI(TAG, "Story button: %s", story_recording ? "stop" : "start");
+            }
+        }
+
         // Handle wake word detection — just LED, keep streaming
         if (wake_detected) {
             wake_detected = false;
@@ -642,6 +700,9 @@ void app_main(void)
     // Init LED
     led_init();
     led_set(1);
+
+    // Init story button
+    story_button_init();
 
     // Init microphone
     ESP_ERROR_CHECK(mic_init());

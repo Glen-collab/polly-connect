@@ -77,6 +77,11 @@
                 {% endfor %}
             </div>
             <p class="text-sm text-gray-600">{{ mem.text or mem.text_summary }}</p>
+            {% if mem.audio_key %}
+            <audio controls preload="none" class="h-8 mt-2">
+                <source src="/static/recordings/{{ mem.audio_key }}" type="audio/wav">
+            </audio>
+            {% endif %}
             {% if mem.people %}
             <p class="text-xs text-gray-400 mt-1">People: {{ mem.people }}</p>
             {% endif %}

@@ -16,9 +16,19 @@
         <p class="text-xs sm:text-sm text-gray-500 mb-1">Shared by {{ story.speaker_name }}</p>
         {% endif %}
         <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap">{{ story.transcript or "Transcription pending..." }}</p>
-        {% if story.id %}
-        <a href="/web/stories/{{ story.id }}/edit" class="text-sm text-emerald-600 hover:underline mt-2 inline-block">Edit</a>
-        {% endif %}
+        <div class="flex items-center gap-3 mt-2">
+            {% if story.audio_s3_key %}
+            <audio controls preload="none" class="h-8">
+                <source src="/static/recordings/{{ story.audio_s3_key }}" type="audio/wav">
+            </audio>
+            {% if story.duration_seconds %}
+            <span class="text-xs text-gray-400">{{ (story.duration_seconds / 60)|int }}:{{ '%02d' % (story.duration_seconds % 60)|int }}</span>
+            {% endif %}
+            {% endif %}
+            {% if story.id %}
+            <a href="/web/stories/{{ story.id }}/edit" class="text-sm text-emerald-600 hover:underline">Edit</a>
+            {% endif %}
+        </div>
     </div>
     {% endfor %}
 </div>
