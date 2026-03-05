@@ -2,7 +2,13 @@
 {% block title %}Legacy Book - Polly Connect{% endblock %}
 
 {% block content %}
-<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Legacy Book</h1>
+<div class="flex items-center justify-between mb-4 sm:mb-6">
+    <h1 class="text-xl sm:text-2xl font-bold">Legacy Book</h1>
+    <a href="/web/book/export"
+       class="text-sm bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700">
+        Export PDF (6x9)
+    </a>
+</div>
 
 <!-- Progress Overview -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
@@ -108,4 +114,41 @@
     <p class="text-sm text-emerald-700 mt-2 font-medium">You have enough memories for a full book! Head to the chapters page to review and generate drafts.</p>
     {% endif %}
 </div>
+
+<!-- Export Options -->
+{% if chapters %}
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mt-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-4">Export Book (6x9 PDF)</h2>
+    <p class="text-xs text-gray-500 mb-4">Generate a print-ready PDF for Book Bolt, KDP, Lulu, or any print-on-demand service. Works for both softcover and hardcover.</p>
+    <form action="/web/book/export" method="GET" class="space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Book Title</label>
+                <input type="text" name="title" placeholder="The Story of..."
+                       class="w-full border rounded px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Subtitle</label>
+                <input type="text" name="subtitle" placeholder="Stories, Memories, and Wisdom"
+                       class="w-full border rounded px-3 py-2 text-sm">
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Dedication (optional)</label>
+            <input type="text" name="dedication" placeholder="For the grandkids, with love..."
+                   class="w-full border rounded px-3 py-2 text-sm">
+        </div>
+        <div class="flex items-center gap-4">
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" name="qr" value="1" checked class="rounded">
+                Include QR codes for voice recordings
+            </label>
+        </div>
+        <button type="submit"
+                class="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-emerald-700 text-sm sm:text-base">
+            Download PDF
+        </button>
+    </form>
+</div>
+{% endif %}
 {% endblock %}

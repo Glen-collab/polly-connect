@@ -1288,3 +1288,55 @@ async def book_chapter_save(request: Request, chapter_num: int,
         f"/web/book/chapters/{chapter_num}?msg=Changes saved.",
         status_code=303,
     )
+
+
+@router.get("/book/export")
+async def book_export_pdf(request: Request):
+    """Generate and download the legacy book as a print-ready 6x9 PDF."""
+    from fastapi.responses import Response
+
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    book_builder = request.app.state.book_builder
+
+    # Get speaker name from user profile
+    user = db.get_or_create_user(tenant_id=tid)
+    speaker_name = user.get("name", "")
+
+    # Get optional params from query string
+    title = request.query_params.get("title") or None
+    subtitle = request.query_params.get("subtitle") or None
+    dedication = request.query_params.get("dedication") or None
+    include_qr = request.query_params.get("qr", "0") == "1"
+
+    from core.book_pdf import LegacyBookPDF
+    pdf_gen = LegacyBookPDF(db, book_builder, tenant_id=tid)
+
+    try:
+        pdf_bytes = pdf_gen.generate(
+            speaker_name=speaker_name,
+            book_title=title,
+            subtitle=subtitle,
+            dedication=dedication,
+            include_qr_codes=include_qr,
+        )
+    except Exception as e:
+        logger.error(f"PDF export failed: {e}")
+        return RedirectResponse(
+            f"/web/book?msg=PDF generation failed: {e}",
+            status_code=303,
+        )
+
+    safe_name = speaker_name.replace(" ", "_").lower() if speaker_name else "legacy"
+    filename = f"polly_book_{safe_name}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
