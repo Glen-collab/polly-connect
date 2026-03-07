@@ -96,8 +96,8 @@ static const char *TAG = "POLLY";
 #define WS_BUFFER_SIZE  4096        // 4KB buffer (smaller = less memory pressure)
 #define WS_RECONNECT_MS 5000
 
-// Response audio buffer (10 seconds max, in PSRAM)
-#define RESPONSE_AUDIO_MAX (SAMPLE_RATE * 2 * 10)  // 320000 bytes
+// Response audio buffer (30 seconds max, in PSRAM)
+#define RESPONSE_AUDIO_MAX (SAMPLE_RATE * 2 * 30)  // 960000 bytes
 
 /* --- Globals --- */
 
