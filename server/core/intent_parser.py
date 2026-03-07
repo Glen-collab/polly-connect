@@ -96,8 +96,8 @@ class IntentParser:
             "med reminder",
         ]
         self._weather_phrases = [
-            "what's the weather", "weather this week", "weather today",
-            "farmer's almanac", "forecast",
+            "what's the weather", "what is the weather", "weather this week",
+            "weather today", "farmer's almanac", "forecast",
         ]
 
     def parse(self, text: str) -> Dict:
