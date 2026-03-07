@@ -1194,6 +1194,8 @@ RELATIONSHIP_CHOICES = [
     ("mother-in-law", "Mother-in-law"),
     # -- Same generation --
     ("owner", "This is me (the owner)"),
+    ("husband", "Husband"),
+    ("wife", "Wife"),
     ("spouse", "Spouse / Partner"),
     ("brother", "Brother"),
     ("sister", "Sister"),
@@ -1233,7 +1235,7 @@ RELATION_GENERATION = {
     "father-in-law": -1, "mother-in-law": -1,
     "uncle": -1, "aunt": -1,
     "great-uncle": -2, "great-aunt": -2,
-    "owner": 0, "spouse": 0,
+    "owner": 0, "husband": 0, "wife": 0, "spouse": 0,
     "brother": 0, "sister": 0, "brother-in-law": 0, "sister-in-law": 0,
     "cousin": 0,
     "son": 1, "daughter": 1, "son-in-law": 1, "daughter-in-law": 1,
