@@ -419,7 +419,12 @@ class CommandProcessor:
                 return (response, ConversationMode.COMMAND)
 
         # Handle thinking — user needs more time
-        if intent == "thinking":
+        # But if the answer is long (>80 chars), it's a real story answer that
+        # happens to contain a trigger word like "wait" or "i don't know"
+        is_story_mode = state.mode in (ConversationMode.STORY_PROMPT, ConversationMode.FOLLOWUP_WAIT)
+        is_long_answer = len(raw_text.strip()) > 80
+
+        if intent == "thinking" and not (is_story_mode and is_long_answer):
             return ("Take your time. Continue when you're ready, and say 'I'm done' when you're finished.", state.mode)
 
         # Handle repeat — re-ask the current question
@@ -427,7 +432,7 @@ class CommandProcessor:
             return (f"Sure, no problem. {state.current_question}", state.mode)
 
         # Handle skip — move to a new question
-        if intent == "skip":
+        if intent == "skip" and not (is_story_mode and is_long_answer):
             if state.mode in (ConversationMode.STORY_PROMPT, ConversationMode.FOLLOWUP_WAIT):
                 response = await self._handle_family_question(device_id)
                 return (f"No problem, let's try another one. {response}", state.mode)
