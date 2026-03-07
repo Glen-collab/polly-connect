@@ -99,12 +99,15 @@
                 {% else %}
                 <span></span>
                 {% endif %}
-                {% if session.role != 'family' %}
-                <form method="POST" action="/web/photos/{{ photo.id }}/delete" class="inline"
-                      onsubmit="return confirm('Delete this photo?')">
-                    <button type="submit" class="text-xs text-red-400 hover:text-red-600 py-1">Delete</button>
-                </form>
-                {% endif %}
+                <div class="flex gap-2">
+                    <a href="/web/photos/{{ photo.id }}/edit" class="text-xs text-blue-500 hover:text-blue-700 py-1">Edit</a>
+                    {% if session.role != 'family' %}
+                    <form method="POST" action="/web/photos/{{ photo.id }}/delete" class="inline"
+                          onsubmit="return confirm('Delete this photo?')">
+                        <button type="submit" class="text-xs text-red-400 hover:text-red-600 py-1">Delete</button>
+                    </form>
+                    {% endif %}
+                </div>
             </div>
         </div>
 

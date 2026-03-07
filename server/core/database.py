@@ -380,6 +380,17 @@ class PollyDB:
             if "family_code_created_at" not in cols:
                 conn.execute("ALTER TABLE tenants ADD COLUMN family_code_created_at TIMESTAMP")
 
+            # ── Family tree migrations ──
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(family_members)").fetchall()}
+            fm_migrations = {
+                "parent_member_id": "ALTER TABLE family_members ADD COLUMN parent_member_id INTEGER REFERENCES family_members(id)",
+                "relation_to_owner": "ALTER TABLE family_members ADD COLUMN relation_to_owner TEXT",
+                "generation": "ALTER TABLE family_members ADD COLUMN generation INTEGER DEFAULT 0",
+            }
+            for col, sql in fm_migrations.items():
+                if col not in cols:
+                    conn.execute(sql)
+
             # Add family_name and role columns to web_sessions
             cols = {row[1] for row in conn.execute("PRAGMA table_info(web_sessions)").fetchall()}
             if "family_name" not in cols:
@@ -1123,6 +1134,62 @@ class PollyDB:
                     "SELECT * FROM family_members ORDER BY last_seen DESC"
                 ).fetchall()
             return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_family_member(self, member_id: int, name: str = None,
+                             relationship: str = None, relation_to_owner: str = None,
+                             parent_member_id: int = None, generation: int = None) -> bool:
+        conn = self._get_connection()
+        try:
+            updates = []
+            params = []
+            if name is not None:
+                updates.append("name = ?")
+                params.append(name)
+                updates.append("name_normalized = ?")
+                params.append(self._normalize(name))
+            if relationship is not None:
+                updates.append("relationship = ?")
+                params.append(relationship)
+            if relation_to_owner is not None:
+                updates.append("relation_to_owner = ?")
+                params.append(relation_to_owner)
+            if parent_member_id is not None:
+                updates.append("parent_member_id = ?")
+                params.append(parent_member_id if parent_member_id > 0 else None)
+            if generation is not None:
+                updates.append("generation = ?")
+                params.append(generation)
+            if not updates:
+                return False
+            params.append(member_id)
+            conn.execute(f"UPDATE family_members SET {', '.join(updates)} WHERE id = ?", params)
+            conn.commit()
+            return True
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_family_member_by_id(self, member_id: int) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute("SELECT * FROM family_members WHERE id = ?", (member_id,)).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_family_member(self, member_id: int) -> bool:
+        conn = self._get_connection()
+        try:
+            # Clear parent references pointing to this member
+            conn.execute("UPDATE family_members SET parent_member_id = NULL WHERE parent_member_id = ?", (member_id,))
+            conn.execute("DELETE FROM family_members WHERE id = ?", (member_id,))
+            conn.commit()
+            return True
         finally:
             if not self._conn:
                 conn.close()

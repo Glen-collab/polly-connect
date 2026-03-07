@@ -1115,6 +1115,233 @@ async def family_code_revoke(request: Request):
     return RedirectResponse("/web/settings", status_code=303)
 
 
+# ── Photo Edit ──
+
+@router.get("/photos/{photo_id}/edit", response_class=HTMLResponse)
+async def photo_edit_page(request: Request, photo_id: int):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    photo = db.get_photo_by_id(photo_id)
+    if not photo or photo.get("tenant_id") != tid:
+        return RedirectResponse("/web/photos", status_code=303)
+
+    # Parse tags for display
+    try:
+        tag_list = json.loads(photo.get("tags") or "[]")
+    except (json.JSONDecodeError, TypeError):
+        tag_list = []
+
+    stories = db.get_stories(limit=200, tenant_id=tid)
+    family_members = db.get_family_members(tenant_id=tid)
+
+    return templates.TemplateResponse("photo_edit.html", {
+        "request": request,
+        "session": session,
+        "photo": photo,
+        "tag_list": tag_list,
+        "stories": stories,
+        "family_members": family_members,
+    })
+
+
+@router.post("/photos/{photo_id}/edit")
+async def photo_edit_save(request: Request, photo_id: int,
+                           caption: str = Form(""),
+                           date_taken: str = Form(""),
+                           tags: str = Form(""),
+                           story_id: str = Form(""),
+                           uploaded_by: str = Form("")):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    photo = db.get_photo_by_id(photo_id)
+    if not photo or photo.get("tenant_id") != tid:
+        return RedirectResponse("/web/photos", status_code=303)
+
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+    db.update_photo(
+        photo_id,
+        caption=caption or None,
+        date_taken=date_taken or None,
+        tags=json.dumps(tag_list),
+        story_id=int(story_id) if story_id else None,
+    )
+    return RedirectResponse("/web/photos", status_code=303)
+
+
+# ── Family Tree ──
+
+RELATIONSHIP_CHOICES = [
+    ("owner", "This is me (the owner)"),
+    ("spouse", "Spouse / Partner"),
+    ("son", "Son"),
+    ("daughter", "Daughter"),
+    ("son-in-law", "Son-in-law"),
+    ("daughter-in-law", "Daughter-in-law"),
+    ("grandson", "Grandson"),
+    ("granddaughter", "Granddaughter"),
+    ("great-grandson", "Great-grandson"),
+    ("great-granddaughter", "Great-granddaughter"),
+    ("brother", "Brother"),
+    ("sister", "Sister"),
+    ("brother-in-law", "Brother-in-law"),
+    ("sister-in-law", "Sister-in-law"),
+    ("nephew", "Nephew"),
+    ("niece", "Niece"),
+    ("cousin", "Cousin"),
+    ("uncle", "Uncle"),
+    ("aunt", "Aunt"),
+    ("friend", "Friend"),
+    ("neighbor", "Neighbor"),
+    ("caretaker", "Caretaker"),
+    ("other", "Other"),
+]
+
+# Generation levels relative to owner (0)
+RELATION_GENERATION = {
+    "owner": 0, "spouse": 0,
+    "son": 1, "daughter": 1, "son-in-law": 1, "daughter-in-law": 1,
+    "brother": 0, "sister": 0, "brother-in-law": 0, "sister-in-law": 0,
+    "grandson": 2, "granddaughter": 2,
+    "great-grandson": 3, "great-granddaughter": 3,
+    "nephew": 1, "niece": 1, "cousin": 0,
+    "uncle": -1, "aunt": -1,
+    "friend": 0, "neighbor": 0, "caretaker": 0, "other": 0,
+}
+
+
+@router.get("/family-tree", response_class=HTMLResponse)
+async def family_tree_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    members = db.get_family_members(tenant_id=tid)
+
+    # Get owner name from setup
+    conn = db._get_connection()
+    try:
+        conn.row_factory = __import__("sqlite3").Row
+        profile = conn.execute(
+            "SELECT * FROM user_profiles WHERE tenant_id = ? LIMIT 1", (tid,)
+        ).fetchone()
+        owner_name = profile["name"] if profile and profile["name"] else "The Owner"
+    finally:
+        if not db._conn:
+            conn.close()
+
+    # Build tree structure: group by generation
+    tree = {}
+    for m in members:
+        gen = m.get("generation") or RELATION_GENERATION.get(m.get("relation_to_owner", ""), 0)
+        if gen not in tree:
+            tree[gen] = []
+        tree[gen].append(m)
+
+    return templates.TemplateResponse("family_tree.html", {
+        "request": request,
+        "session": session,
+        "members": members,
+        "tree": tree,
+        "owner_name": owner_name,
+        "relationship_choices": RELATIONSHIP_CHOICES,
+    })
+
+
+@router.post("/family-tree/add")
+async def family_tree_add(request: Request,
+                           name: str = Form(...),
+                           relation_to_owner: str = Form(...),
+                           parent_member_id: str = Form("")):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    generation = RELATION_GENERATION.get(relation_to_owner, 0)
+    parent_id = int(parent_member_id) if parent_member_id else None
+
+    # Use add_family_member to create or update
+    member_id = db.add_family_member(
+        name=name.strip(),
+        relationship=relation_to_owner,
+        tenant_id=tid,
+    )
+    # Set tree-specific fields
+    db.update_family_member(
+        member_id,
+        relation_to_owner=relation_to_owner,
+        parent_member_id=parent_id,
+        generation=generation,
+    )
+
+    return RedirectResponse("/web/family-tree", status_code=303)
+
+
+@router.post("/family-tree/{member_id}/edit")
+async def family_tree_edit(request: Request, member_id: int,
+                            name: str = Form(...),
+                            relation_to_owner: str = Form(...),
+                            parent_member_id: str = Form("")):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    member = db.get_family_member_by_id(member_id)
+    if not member or member.get("tenant_id") != tid:
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    generation = RELATION_GENERATION.get(relation_to_owner, 0)
+    parent_id = int(parent_member_id) if parent_member_id else None
+
+    db.update_family_member(
+        member_id,
+        name=name.strip(),
+        relationship=relation_to_owner,
+        relation_to_owner=relation_to_owner,
+        parent_member_id=parent_id,
+        generation=generation,
+    )
+
+    return RedirectResponse("/web/family-tree", status_code=303)
+
+
+@router.post("/family-tree/{member_id}/delete")
+async def family_tree_delete(request: Request, member_id: int):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    member = db.get_family_member_by_id(member_id)
+    if not member or member.get("tenant_id") != tid:
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    db.delete_family_member(member_id)
+    return RedirectResponse("/web/family-tree", status_code=303)
+
+
 # ── Device Management ──
 
 @router.get("/devices", response_class=HTMLResponse)

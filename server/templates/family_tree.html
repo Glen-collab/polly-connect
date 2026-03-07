@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Family Tree - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+    <h1 class="text-xl sm:text-2xl font-bold">Family Tree</h1>
+    <button onclick="document.getElementById('add-form').classList.toggle('hidden')"
+            class="bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700">
+        + Add Family Member
+    </button>
+</div>
+
+<!-- Add member form (hidden by default) -->
+<div id="add-form" class="hidden bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h2 class="text-base font-semibold mb-3">Add a Family Member</h2>
+    <form method="POST" action="/web/family-tree/add">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Name</label>
+                <input type="text" name="name" required
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Glen Rogers">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Relationship to {{ owner_name }}</label>
+                <select name="relation_to_owner" required class="w-full border rounded px-3 py-2 text-sm">
+                    <option value="">-- Select --</option>
+                    {% for val, label in relationship_choices %}
+                    <option value="{{ val }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Connected through (optional)</label>
+                <select name="parent_member_id" class="w-full border rounded px-3 py-2 text-sm">
+                    <option value="">-- Direct to {{ owner_name }} --</option>
+                    {% for m in members %}
+                    <option value="{{ m.id }}">{{ m.name }}{% if m.relation_to_owner %} ({{ m.relation_to_owner }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded text-sm hover:bg-emerald-700">
+            Add to Tree
+        </button>
+    </form>
+</div>
+
+<!-- Family Tree Visualization -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <!-- Owner at center -->
+    <div class="text-center mb-6">
+        <div class="inline-block bg-emerald-600 text-white rounded-full px-6 py-3 text-lg font-bold shadow-lg">
+            {{ owner_name }}
+        </div>
+        <p class="text-xs text-gray-400 mt-1">Polly's Owner</p>
+    </div>
+
+    {% if members %}
+    <!-- Generation -1: Parents/Uncles/Aunts -->
+    {% if tree.get(-1) %}
+    <div class="mb-6">
+        <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center">Parents &amp; Elders</h3>
+        <div class="flex flex-wrap justify-center gap-3">
+            {% for m in tree[-1] %}
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 text-center min-w-[120px] relative group">
+                <p class="font-medium text-sm text-gray-800">{{ m.name }}</p>
+                <p class="text-xs text-purple-600">{{ m.relation_to_owner or m.relationship or '' }}</p>
+                {% if m.parent_member_id %}
+                {% for p in members %}{% if p.id == m.parent_member_id %}
+                <p class="text-xs text-gray-400">via {{ p.name }}</p>
+                {% endif %}{% endfor %}
+                {% endif %}
+                <div class="hidden group-hover:flex absolute top-1 right-1 gap-1">
+                    <button onclick="editMember({{ m.id }})" class="text-xs text-blue-500 hover:text-blue-700 bg-white rounded px-1">edit</button>
+                    <form method="POST" action="/web/family-tree/{{ m.id }}/delete" class="inline"
+                          onsubmit="return confirm('Remove {{ m.name }}?')">
+                        <button type="submit" class="text-xs text-red-400 hover:text-red-600 bg-white rounded px-1">x</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Generation 0: Siblings, Spouse, Same-gen -->
+    {% if tree.get(0) %}
+    <div class="mb-6">
+        <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center">Same Generation</h3>
+        <div class="flex flex-wrap justify-center gap-3">
+            {% for m in tree[0] %}
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center min-w-[120px] relative group">
+                <p class="font-medium text-sm text-gray-800">{{ m.name }}</p>
+                <p class="text-xs text-blue-600">{{ m.relation_to_owner or m.relationship or '' }}</p>
+                {% if m.parent_member_id %}
+                {% for p in members %}{% if p.id == m.parent_member_id %}
+                <p class="text-xs text-gray-400">via {{ p.name }}</p>
+                {% endif %}{% endfor %}
+                {% endif %}
+                <div class="hidden group-hover:flex absolute top-1 right-1 gap-1">
+                    <button onclick="editMember({{ m.id }})" class="text-xs text-blue-500 hover:text-blue-700 bg-white rounded px-1">edit</button>
+                    <form method="POST" action="/web/family-tree/{{ m.id }}/delete" class="inline"
+                          onsubmit="return confirm('Remove {{ m.name }}?')">
+                        <button type="submit" class="text-xs text-red-400 hover:text-red-600 bg-white rounded px-1">x</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Generation 1: Children, in-laws, nephews/nieces -->
+    {% if tree.get(1) %}
+    <div class="mb-6">
+        <div class="flex justify-center mb-2">
+            <div class="w-px h-6 bg-gray-300"></div>
+        </div>
+        <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center">Children &amp; Their Generation</h3>
+        <div class="flex flex-wrap justify-center gap-3">
+            {% for m in tree[1] %}
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center min-w-[120px] relative group">
+                <p class="font-medium text-sm text-gray-800">{{ m.name }}</p>
+                <p class="text-xs text-emerald-600">{{ m.relation_to_owner or m.relationship or '' }}</p>
+                {% if m.parent_member_id %}
+                {% for p in members %}{% if p.id == m.parent_member_id %}
+                <p class="text-xs text-gray-400">via {{ p.name }}</p>
+                {% endif %}{% endfor %}
+                {% endif %}
+                <div class="hidden group-hover:flex absolute top-1 right-1 gap-1">
+                    <button onclick="editMember({{ m.id }})" class="text-xs text-blue-500 hover:text-blue-700 bg-white rounded px-1">edit</button>
+                    <form method="POST" action="/web/family-tree/{{ m.id }}/delete" class="inline"
+                          onsubmit="return confirm('Remove {{ m.name }}?')">
+                        <button type="submit" class="text-xs text-red-400 hover:text-red-600 bg-white rounded px-1">x</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Generation 2: Grandchildren -->
+    {% if tree.get(2) %}
+    <div class="mb-6">
+        <div class="flex justify-center mb-2">
+            <div class="w-px h-6 bg-gray-300"></div>
+        </div>
+        <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center">Grandchildren</h3>
+        <div class="flex flex-wrap justify-center gap-3">
+            {% for m in tree[2] %}
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center min-w-[120px] relative group">
+                <p class="font-medium text-sm text-gray-800">{{ m.name }}</p>
+                <p class="text-xs text-amber-600">{{ m.relation_to_owner or m.relationship or '' }}</p>
+                {% if m.parent_member_id %}
+                {% for p in members %}{% if p.id == m.parent_member_id %}
+                <p class="text-xs text-gray-400">via {{ p.name }}</p>
+                {% endif %}{% endfor %}
+                {% endif %}
+                <div class="hidden group-hover:flex absolute top-1 right-1 gap-1">
+                    <button onclick="editMember({{ m.id }})" class="text-xs text-blue-500 hover:text-blue-700 bg-white rounded px-1">edit</button>
+                    <form method="POST" action="/web/family-tree/{{ m.id }}/delete" class="inline"
+                          onsubmit="return confirm('Remove {{ m.name }}?')">
+                        <button type="submit" class="text-xs text-red-400 hover:text-red-600 bg-white rounded px-1">x</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Generation 3: Great-grandchildren -->
+    {% if tree.get(3) %}
+    <div class="mb-6">
+        <div class="flex justify-center mb-2">
+            <div class="w-px h-6 bg-gray-300"></div>
+        </div>
+        <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center">Great-Grandchildren</h3>
+        <div class="flex flex-wrap justify-center gap-3">
+            {% for m in tree[3] %}
+            <div class="bg-pink-50 border border-pink-200 rounded-lg p-3 text-center min-w-[120px] relative group">
+                <p class="font-medium text-sm text-gray-800">{{ m.name }}</p>
+                <p class="text-xs text-pink-600">{{ m.relation_to_owner or m.relationship or '' }}</p>
+                {% if m.parent_member_id %}
+                {% for p in members %}{% if p.id == m.parent_member_id %}
+                <p class="text-xs text-gray-400">via {{ p.name }}</p>
+                {% endif %}{% endfor %}
+                {% endif %}
+                <div class="hidden group-hover:flex absolute top-1 right-1 gap-1">
+                    <button onclick="editMember({{ m.id }})" class="text-xs text-blue-500 hover:text-blue-700 bg-white rounded px-1">edit</button>
+                    <form method="POST" action="/web/family-tree/{{ m.id }}/delete" class="inline"
+                          onsubmit="return confirm('Remove {{ m.name }}?')">
+                        <button type="submit" class="text-xs text-red-400 hover:text-red-600 bg-white rounded px-1">x</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <p class="text-xs text-gray-400 text-center mt-4">{{ members|length }} family member{{ 's' if members|length != 1 else '' }} &middot; Hover or tap a card to edit or remove</p>
+
+    {% else %}
+    <div class="text-center py-8">
+        <p class="text-gray-400 text-base">No family members added yet.</p>
+        <p class="text-gray-400 text-sm mt-1">Click "+ Add Family Member" above to start building the tree.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Edit modal -->
+<div id="edit-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <h2 class="text-lg font-semibold mb-4">Edit Family Member</h2>
+        <form id="edit-form" method="POST">
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Name</label>
+                    <input type="text" name="name" id="edit-name" required
+                           class="w-full border rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Relationship to {{ owner_name }}</label>
+                    <select name="relation_to_owner" id="edit-relation" required class="w-full border rounded px-3 py-2 text-sm">
+                        {% for val, label in relationship_choices %}
+                        <option value="{{ val }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Connected through</label>
+                    <select name="parent_member_id" id="edit-parent" class="w-full border rounded px-3 py-2 text-sm">
+                        <option value="">-- Direct to {{ owner_name }} --</option>
+                        {% for m in members %}
+                        <option value="{{ m.id }}">{{ m.name }}{% if m.relation_to_owner %} ({{ m.relation_to_owner }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700">Save</button>
+                <button type="button" onclick="closeEdit()" class="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var memberData = {
+{% for m in members %}
+{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}" },
+{% endfor %}
+};
+
+function editMember(id) {
+    var m = memberData[id];
+    if (!m) return;
+    document.getElementById('edit-name').value = m.name;
+    document.getElementById('edit-relation').value = m.relation;
+    document.getElementById('edit-parent').value = m.parent;
+    document.getElementById('edit-form').action = '/web/family-tree/' + id + '/edit';
+    document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+function closeEdit() {
+    document.getElementById('edit-modal').classList.add('hidden');
+}
+</script>
+{% endblock %}

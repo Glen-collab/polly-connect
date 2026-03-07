@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Edit Photo - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="flex items-center gap-3 mb-4 sm:mb-6">
+    <a href="/web/photos" class="text-emerald-600 hover:underline text-sm">&larr; Back to Photos</a>
+    <h1 class="text-xl sm:text-2xl font-bold">Edit Photo</h1>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+    <!-- Photo preview -->
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <img src="/static/uploads/{{ photo.filename }}" alt="{{ photo.caption or '' }}"
+             class="w-full max-h-96 object-contain bg-gray-100">
+    </div>
+
+    <!-- Edit form -->
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6">
+        <form method="POST" action="/web/photos/{{ photo.id }}/edit">
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Caption</label>
+                    <input type="text" name="caption" value="{{ photo.caption or '' }}"
+                           class="w-full border rounded px-3 py-2 text-sm"
+                           placeholder="Grandma at the lake house, 1978">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Date Taken</label>
+                    <input type="text" name="date_taken" value="{{ photo.date_taken or '' }}"
+                           class="w-full border rounded px-3 py-2 text-sm"
+                           placeholder="Summer 1978 or 1978-06-15">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Tags (comma-separated)</label>
+                    <input type="text" name="tags" value="{{ tag_list | join(', ') }}"
+                           class="w-full border rounded px-3 py-2 text-sm"
+                           placeholder="grandma, lake house, family reunion">
+                    {% if tag_list %}
+                    <div class="flex flex-wrap gap-1 mt-1">
+                        {% for tag in tag_list %}
+                        <span class="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Link to Story</label>
+                    <select name="story_id" class="w-full border rounded px-3 py-2 text-sm">
+                        <option value="">-- None --</option>
+                        {% for story in stories %}
+                        <option value="{{ story.id }}" {% if photo.story_id == story.id %}selected{% endif %}>
+                            #{{ story.id }} - {{ (story.corrected_transcript or story.transcript or "Untitled")[:50] }}{% if story.speaker_name %} ({{ story.speaker_name }}){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Uploaded By</label>
+                    <input type="text" name="uploaded_by" value="{{ photo.uploaded_by or '' }}"
+                           class="w-full border rounded px-3 py-2 text-sm">
+                </div>
+
+                <!-- People in this photo -->
+                {% if family_members %}
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">People in this photo</label>
+                    <p class="text-xs text-gray-400 mb-1">Add their names to the tags above, or add them to the <a href="/web/family-tree" class="text-emerald-600 hover:underline">Family Tree</a> first.</p>
+                    <div class="flex flex-wrap gap-1">
+                        {% for m in family_members %}
+                        <button type="button" onclick="addPersonTag('{{ m.name }}')"
+                                class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 border border-blue-200">
+                            + {{ m.name }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 bg-emerald-600 text-white px-4 py-2.5 rounded text-sm hover:bg-emerald-700">
+                    Save Changes
+                </button>
+                <a href="/web/photos" class="flex-1 bg-gray-200 text-gray-700 px-4 py-2.5 rounded text-sm hover:bg-gray-300 text-center">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function addPersonTag(name) {
+    var input = document.querySelector('input[name="tags"]');
+    var current = input.value.trim();
+    if (current && !current.endsWith(',')) {
+        current += ', ';
+    } else if (current) {
+        current += ' ';
+    }
+    // Don't add if already present
+    var existing = current.toLowerCase().split(',').map(function(t) { return t.trim(); });
+    if (existing.indexOf(name.toLowerCase()) === -1) {
+        input.value = current + name;
+    }
+}
+</script>
+{% endblock %}
