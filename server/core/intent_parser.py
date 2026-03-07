@@ -146,6 +146,35 @@ class IntentParser:
         if self._matches(text_lower, self._slower_phrases):
             return {"intent": "slower", "confidence": 0.95}
 
+        # Memory/item intents first — specific structured queries take priority
+        if self._is_help(text_lower):
+            return {"intent": "help", "confidence": 1.0}
+
+        if self._is_list(text_lower):
+            return {"intent": "list_all", "confidence": 1.0}
+
+        delete_match = self._is_delete(text_lower)
+        if delete_match:
+            return {"intent": "delete", "item": delete_match, "confidence": 0.9}
+
+        location_query = self._is_location_query(text_lower)
+        if location_query:
+            return {"intent": "retrieve_location", "location": location_query, "confidence": 0.9}
+
+        item_query = self._is_item_query(text_lower)
+        if item_query:
+            return {"intent": "retrieve_item", "item": item_query, "confidence": 0.9}
+
+        store_result = self._is_store(text_lower)
+        if store_result:
+            return {
+                "intent": "store",
+                "item": store_result["item"],
+                "location": store_result["location"],
+                "context": store_result.get("context"),
+                "confidence": 0.85
+            }
+
         if self._matches(text_lower, self._thinking_phrases):
             return {"intent": "thinking", "confidence": 0.95}
 
@@ -175,42 +204,18 @@ class IntentParser:
         if self._matches(text_lower, self._greeting_phrases):
             return {"intent": "greeting", "confidence": 0.9}
 
-        # Memory intents (existing)
-        if self._is_help(text_lower):
-            return {"intent": "help", "confidence": 1.0}
-
-        if self._is_list(text_lower):
-            return {"intent": "list_all", "confidence": 1.0}
-
-        delete_match = self._is_delete(text_lower)
-        if delete_match:
-            return {"intent": "delete", "item": delete_match, "confidence": 0.9}
-
-        location_query = self._is_location_query(text_lower)
-        if location_query:
-            return {"intent": "retrieve_location", "location": location_query, "confidence": 0.9}
-
-        item_query = self._is_item_query(text_lower)
-        if item_query:
-            return {"intent": "retrieve_item", "item": item_query, "confidence": 0.9}
-
-        store_result = self._is_store(text_lower)
-        if store_result:
-            return {
-                "intent": "store",
-                "item": store_result["item"],
-                "location": store_result["location"],
-                "context": store_result.get("context"),
-                "confidence": 0.85
-            }
-
         return {"intent": "unknown", "confidence": 0.0}
 
     def _matches(self, text: str, phrases: list) -> bool:
-        """Check if text contains any of the trigger phrases."""
+        """Check if text contains any of the trigger phrases (word-boundary safe)."""
         for phrase in phrases:
-            if phrase in text:
-                return True
+            if len(phrase) <= 3:
+                # Short words like "um", "hmm" need word boundaries to avoid matching inside words
+                if re.search(r'\b' + re.escape(phrase) + r'\b', text):
+                    return True
+            else:
+                if phrase in text:
+                    return True
         return False
 
     def _is_help(self, text: str) -> bool:
