@@ -478,7 +478,9 @@ async def _process_command(
     logger.info(f"Transcription: {transcription}")
 
     if not transcription:
-        await websocket.send_json({"event": "response", "text": "I didn't catch that.", "audio": None})
+        fallback = "I didn't catch that."
+        await websocket.send_json({"event": "response", "text": fallback, "audio": None})
+        await _send_tts(websocket, tts, fallback)
         return
 
     # If using VAD detector, check transcription for wake phrase (skip in conversational mode)
