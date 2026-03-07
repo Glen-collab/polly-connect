@@ -829,6 +829,27 @@ async def transcription_verify(request: Request, story_id: int,
     return RedirectResponse("/web/transcriptions", status_code=303)
 
 
+@router.post("/transcriptions/{story_id}/delete")
+async def transcription_delete(request: Request, story_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    conn = db._get_connection()
+    try:
+        conn.execute("DELETE FROM stories WHERE id = ? AND tenant_id = ?", (story_id, tid))
+        conn.execute("DELETE FROM memories WHERE story_id = ? AND tenant_id = ?", (story_id, tid))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return RedirectResponse("/web/transcriptions", status_code=303)
+
+
 # ── Photos ──
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
