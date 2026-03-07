@@ -1542,6 +1542,27 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def get_photos_by_tag(self, tag: str, tenant_id: int = None) -> List[Dict]:
+        """Find photos whose JSON tags array contains the given tag (case-insensitive)."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            tag_lower = tag.lower()
+            if tenant_id:
+                results = conn.execute(
+                    "SELECT * FROM photos WHERE LOWER(tags) LIKE ? AND tenant_id = ? ORDER BY created_at DESC",
+                    (f'%"{tag_lower}"%', tenant_id)
+                ).fetchall()
+            else:
+                results = conn.execute(
+                    "SELECT * FROM photos WHERE LOWER(tags) LIKE ? ORDER BY created_at DESC",
+                    (f'%"{tag_lower}"%',)
+                ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
     def link_photo_story(self, photo_id: int, story_id: int) -> bool:
         conn = self._get_connection()
         try:

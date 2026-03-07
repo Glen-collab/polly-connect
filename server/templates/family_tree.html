@@ -66,7 +66,8 @@
         <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center">{{ label|safe }}</h3>
         <div class="flex flex-wrap justify-center gap-3">
             {% for m in tree[gen_num] %}
-            <div class="{{ card_class }} rounded-lg p-3 text-center min-w-[120px] relative group">
+            <div class="{{ card_class }} rounded-lg p-3 text-center min-w-[120px] relative group cursor-pointer hover:shadow-md transition"
+                 onclick="showPhotos({{ m.id }})">
                 <p class="font-medium text-sm text-gray-800">{{ m.name }}</p>
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
                 {% if m.parent_member_id %}
@@ -74,7 +75,7 @@
                 <p class="text-xs text-gray-400">via {{ p.name }}</p>
                 {% endif %}{% endfor %}
                 {% endif %}
-                <div class="hidden group-hover:flex absolute top-1 right-1 gap-1">
+                <div class="hidden group-hover:flex absolute top-1 right-1 gap-1" onclick="event.stopPropagation()">
                     <button onclick="editMember({{ m.id }})" class="text-xs text-blue-500 hover:text-blue-700 bg-white rounded px-1">edit</button>
                     <form method="POST" action="/web/family-tree/{{ m.id }}/delete" class="inline"
                           onsubmit="return confirm('Remove {{ m.name }}?')">
@@ -105,6 +106,22 @@
         <p class="text-gray-400 text-sm mt-1">Click "+ Add Family Member" above to start building the tree.</p>
     </div>
     {% endif %}
+</div>
+
+<!-- Photo modal -->
+<div id="photo-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full sm:max-w-2xl sm:rounded-lg rounded-t-2xl max-h-[85vh] overflow-auto">
+        <div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-10">
+            <div>
+                <h2 id="photo-modal-name" class="text-lg font-semibold"></h2>
+                <p id="photo-modal-relation" class="text-sm text-gray-500"></p>
+            </div>
+            <button onclick="closePhotos()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div id="photo-modal-content" class="p-4">
+            <!-- Filled by JS -->
+        </div>
+    </div>
 </div>
 
 <!-- Edit modal -->
@@ -165,6 +182,55 @@ function editMember(id) {
 
 function closeEdit() {
     document.getElementById('edit-modal').classList.add('hidden');
+}
+
+function showPhotos(memberId) {
+    var content = document.getElementById('photo-modal-content');
+    content.innerHTML = '<div class="text-center py-8"><div class="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div><p class="text-sm text-gray-400 mt-2">Loading photos...</p></div>';
+    document.getElementById('photo-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    fetch('/web/api/family-tree/' + memberId + '/photos')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        document.getElementById('photo-modal-name').textContent = data.member_name;
+        document.getElementById('photo-modal-relation').textContent = data.relation;
+
+        if (!data.photos || data.photos.length === 0) {
+            content.innerHTML = '<div class="text-center py-8">' +
+                '<p class="text-gray-400 text-base">No photos tagged with ' + data.member_name + ' yet.</p>' +
+                '<p class="text-gray-400 text-sm mt-1">Tag them in photos on the <a href="/web/photos" class="text-emerald-600 hover:underline">Photos page</a> or use the <a href="/web/photos" class="text-emerald-600 hover:underline">Edit</a> button on any photo.</p>' +
+                '</div>';
+            return;
+        }
+
+        var html = '<p class="text-sm text-gray-500 mb-3">' + data.photos.length + ' photo' + (data.photos.length !== 1 ? 's' : '') + '</p>';
+        html += '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">';
+        data.photos.forEach(function(p) {
+            html += '<div class="rounded-lg overflow-hidden shadow-sm border">';
+            html += '<a href="/static/uploads/' + p.filename + '" target="_blank">';
+            html += '<img src="/static/uploads/' + p.filename + '" class="w-full h-32 sm:h-40 object-cover hover:opacity-90 transition" loading="lazy">';
+            html += '</a>';
+            html += '<div class="p-2">';
+            if (p.caption) html += '<p class="text-xs text-gray-700 font-medium line-clamp-2">' + p.caption + '</p>';
+            if (p.date_taken) html += '<p class="text-xs text-gray-400">' + p.date_taken + '</p>';
+            var links = '';
+            if (p.story_id) links += '<a href="/web/stories/' + p.story_id + '/edit" class="text-xs text-emerald-600 hover:underline">Story</a>';
+            links += '<a href="/web/photos/' + p.id + '/edit" class="text-xs text-blue-500 hover:underline">Edit</a>';
+            html += '<div class="flex gap-2 mt-1">' + links + '</div>';
+            html += '</div></div>';
+        });
+        html += '</div>';
+        content.innerHTML = html;
+    })
+    .catch(function() {
+        content.innerHTML = '<p class="text-red-500 text-sm text-center py-8">Failed to load photos.</p>';
+    });
+}
+
+function closePhotos() {
+    document.getElementById('photo-modal').classList.add('hidden');
+    document.body.style.overflow = '';
 }
 </script>
 {% endblock %}

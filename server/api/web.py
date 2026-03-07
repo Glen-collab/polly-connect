@@ -1370,6 +1370,35 @@ async def family_tree_delete(request: Request, member_id: int):
     return RedirectResponse("/web/family-tree", status_code=303)
 
 
+@router.get("/api/family-tree/{member_id}/photos")
+async def family_member_photos(request: Request, member_id: int):
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    member = db.get_family_member_by_id(member_id)
+    if not member or member.get("tenant_id") != tid:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    photos = db.get_photos_by_tag(member["name"], tenant_id=tid)
+    return JSONResponse({
+        "member_name": member["name"],
+        "relation": member.get("relation_to_owner") or member.get("relationship") or "",
+        "photos": [
+            {
+                "id": p["id"],
+                "filename": p["filename"],
+                "caption": p.get("caption") or "",
+                "date_taken": p.get("date_taken") or "",
+                "story_id": p.get("story_id"),
+            }
+            for p in photos
+        ],
+    })
+
+
 # ── Device Management ──
 
 @router.get("/devices", response_class=HTMLResponse)
