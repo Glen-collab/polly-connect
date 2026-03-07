@@ -154,7 +154,7 @@ class CommandProcessor:
                 self.db.save_message(
                     from_name=person, message=status_text, tenant_id=tid
                 )
-                resp = f"Got it. I'll remember {person} is {status_text}."
+                resp = f"Got it. I'll let everyone know {person} is {status_text}."
                 self._last_response[device_id] = resp
                 return resp
             else:
@@ -170,7 +170,7 @@ class CommandProcessor:
                 # Don't know who's speaking — ask
                 state.pending_status = status_text
                 state.mode = ConversationMode.AWAITING_NAME
-                return "Sure, I can post that. Who is this?"
+                return "Sure, I can post that to the message board. Who is this?"
 
         elif intent == "check_messages":
             messages = self.db.get_messages_for(tenant_id=tid)
@@ -541,9 +541,16 @@ class CommandProcessor:
     async def _process_name_answer(self, raw_text: str,
                                      device_id: str) -> Tuple[str, ConversationMode]:
         """Process name answer for pending status update."""
+        import re
         state = self._get_state(device_id)
         tid = state.tenant_id
-        name = raw_text.strip().split()[0].title() if raw_text.strip() else None
+
+        # Clean up: strip wake phrases, filler words
+        cleaned = re.sub(r'\b(hey|hi|hello|polly|um|uh|this is|my name is|i\'?m)\b',
+                         '', raw_text.lower()).strip()
+        # Take the first remaining word as the name
+        words = cleaned.split()
+        name = words[0].title() if words else None
 
         if not name:
             return ("I didn't catch your name. Who is this?", ConversationMode.AWAITING_NAME)

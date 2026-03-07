@@ -352,25 +352,38 @@ class IntentParser:
 
     def _is_status_update(self, text: str) -> Optional[Dict]:
         """Detect 'I'm going to the store' or 'dad went to work'."""
-        patterns = [
-            # "I'm going to the store" / "I'm at work"
-            r"i'?m (?:going to|headed to|heading to|at|leaving for|off to) (.+)",
-            # "dad is going to work" / "dad went to the store"
-            r"(\w+) (?:is going to|went to|is at|is heading to|left for|is off to) (.+)",
+        # Speaker updating their own status
+        self_patterns = [
+            r"i'?m (going to|headed to|heading to|leaving for|off to|at|running to) (.+)",
+            r"i (?:will be |am )?(going to|headed to|heading to|leaving for|off to) (.+)",
         ]
-        # First pattern: speaker is updating their own status
-        match = re.search(patterns[0], text)
-        if match:
-            destination = match.group(1).strip()
-            return {"person": None, "status": destination}
+        for pattern in self_patterns:
+            match = re.search(pattern, text)
+            if match:
+                action = match.group(1).strip()
+                destination = match.group(2).strip()
+                return {"person": None, "status": f"{action} {destination}"}
 
-        # Second pattern: reporting someone else's status
-        match = re.search(patterns[1], text)
-        if match:
-            person = match.group(1).strip()
-            destination = match.group(2).strip()
-            if person.lower() not in ("it", "this", "that", "there", "what", "who"):
-                return {"person": person, "status": destination}
+        # Reporting someone else's status
+        other_patterns = [
+            r"(\w+) (?:is |)(going to|headed to|heading to|leaving for|off to|went to|left for) (.+)",
+            r"(\w+) is at (.+)",
+        ]
+        for pattern in other_patterns:
+            match = re.search(pattern, text)
+            if match:
+                groups = match.groups()
+                person = groups[0].strip()
+                if person.lower() in ("it", "this", "that", "there", "what", "who"):
+                    continue
+                if len(groups) == 3:
+                    action = groups[1].strip()
+                    destination = groups[2].strip()
+                    status = f"{action} {destination}"
+                else:
+                    destination = groups[1].strip()
+                    status = f"at {destination}"
+                return {"person": person, "status": status}
         return None
 
     def _is_person_query(self, text: str, family_names: set = None) -> Optional[str]:
