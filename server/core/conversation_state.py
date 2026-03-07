@@ -13,6 +13,7 @@ class ConversationMode(Enum):
     STORY_LISTEN = "story_listen"              # User is telling a story
     FOLLOWUP_WAIT = "followup_wait"            # Asked follow-up, waiting for answer
     AWAITING_RELATIONSHIP = "awaiting_relationship"  # Asked how they know the owner
+    AWAITING_NAME = "awaiting_name"            # Asked "who is this?" for message board
     STORY_RECORD = "story_record"              # Button-triggered WAV recording mode
 
 
@@ -24,6 +25,7 @@ SILENCE_TIMEOUTS = {
     ConversationMode.STORY_LISTEN: 8.0,
     ConversationMode.FOLLOWUP_WAIT: 8.0,
     ConversationMode.AWAITING_RELATIONSHIP: 8.0,
+    ConversationMode.AWAITING_NAME: 8.0,
     ConversationMode.STORY_RECORD: 15.0,       # Extra generous — button stops it, not silence
 }
 
@@ -33,6 +35,7 @@ MAX_RECORDING_TIMES = {
     ConversationMode.STORY_LISTEN: 300.0,
     ConversationMode.FOLLOWUP_WAIT: 300.0,
     ConversationMode.AWAITING_RELATIONSHIP: 30.0,
+    ConversationMode.AWAITING_NAME: 30.0,
     ConversationMode.STORY_RECORD: 1800.0,     # 30 minutes max
 }
 
@@ -51,6 +54,8 @@ class ConversationState:
         self.current_bucket: Optional[str] = None      # Jungian bucket
         self.current_life_phase: Optional[str] = None   # Life phase
         self.critical_thinking_step: int = 1             # 1-6
+        # Message board pending status
+        self.pending_status: Optional[str] = None
         # Multi-tenant context (device-level, persists across reset)
         self.tenant_id: Optional[int] = None
         self.user_id: Optional[int] = None
@@ -64,6 +69,7 @@ class ConversationState:
         self.current_bucket = None
         self.current_life_phase = None
         self.critical_thinking_step = 1
+        self.pending_status = None
         # tenant_id and user_id intentionally NOT reset (device-level)
 
     @property
@@ -85,5 +91,6 @@ class ConversationState:
             ConversationMode.STORY_LISTEN,
             ConversationMode.FOLLOWUP_WAIT,
             ConversationMode.AWAITING_RELATIONSHIP,
+            ConversationMode.AWAITING_NAME,
             ConversationMode.STORY_RECORD,
         )

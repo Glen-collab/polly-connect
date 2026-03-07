@@ -152,6 +152,20 @@ async def continuous_stream(websocket: WebSocket):
                     if med_scheduler:
                         med_scheduler.register_websocket(device_id, websocket, tenant_id)
 
+                    # Load family names into intent parser for person detection
+                    try:
+                        family_members = db.get_family_members(tenant_id=tenant_id)
+                        family_names = set()
+                        for m in family_members:
+                            family_names.add(m["name"].lower().split()[0])  # first name
+                            family_names.add(m["name"].lower())  # full name
+                            if m.get("relation_to_owner"):
+                                family_names.add(m["relation_to_owner"].lower())
+                        intent_parser._family_names = family_names
+                        logger.info(f"Loaded {len(family_names)} family names for message board")
+                    except Exception as e:
+                        logger.warning(f"Could not load family names: {e}")
+
                     await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
                     continue
 

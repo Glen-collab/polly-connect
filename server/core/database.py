@@ -278,6 +278,21 @@ class PollyDB:
                 )
             """)
 
+            # ── Family message board ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS family_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    from_name TEXT NOT NULL,
+                    to_name TEXT,
+                    message TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    read INTEGER DEFAULT 0
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_family_messages_tenant ON family_messages(tenant_id)")
+
             # ── Multi-tenant tables ──
 
             conn.execute("""
@@ -355,7 +370,7 @@ class PollyDB:
                 "items", "stories", "question_sessions", "medications",
                 "medication_logs", "joke_history", "family_members", "memories",
                 "memory_verifications", "chapter_drafts", "sessions", "photos",
-                "story_tags", "user_profiles", "devices",
+                "story_tags", "user_profiles", "devices", "family_messages",
             ]
             for table in tenant_tables:
                 cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -1579,6 +1594,88 @@ class PollyDB:
             cursor = conn.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
             conn.commit()
             return cursor.rowcount > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Family Message Board ──
+
+    def save_message(self, from_name: str, message: str, to_name: str = None,
+                     tenant_id: int = None, expire_hours: int = 24) -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                """INSERT INTO family_messages (tenant_id, from_name, to_name, message, expires_at)
+                   VALUES (?, ?, ?, ?, datetime('now', ?))""",
+                (tenant_id, from_name, to_name, message, f"+{expire_hours} hours")
+            )
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_messages_for(self, name: str = None, tenant_id: int = None) -> list:
+        """Get unread/active messages, optionally filtered by recipient."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            t_clause = " AND tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+            if name:
+                name_lower = name.lower()
+                results = conn.execute(
+                    f"""SELECT * FROM family_messages
+                        WHERE (to_name IS NULL OR LOWER(to_name) = ?)
+                        AND expires_at > datetime('now')
+                        {t_clause}
+                        ORDER BY created_at DESC""",
+                    (name_lower,) + t_params
+                ).fetchall()
+            else:
+                results = conn.execute(
+                    f"""SELECT * FROM family_messages
+                        WHERE expires_at > datetime('now')
+                        {t_clause}
+                        ORDER BY created_at DESC""",
+                    t_params
+                ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_person_status(self, name: str, tenant_id: int = None) -> dict:
+        """Get the most recent message FROM a person (their status)."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            t_clause = " AND tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+            result = conn.execute(
+                f"""SELECT * FROM family_messages
+                    WHERE LOWER(from_name) = ?
+                    AND expires_at > datetime('now')
+                    {t_clause}
+                    ORDER BY created_at DESC LIMIT 1""",
+                (name.lower(),) + t_params
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def clear_person_messages(self, from_name: str, tenant_id: int = None):
+        """Clear all messages from a person (they're back home)."""
+        conn = self._get_connection()
+        try:
+            t_clause = " AND tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+            conn.execute(
+                f"DELETE FROM family_messages WHERE LOWER(from_name) = ?{t_clause}",
+                (from_name.lower(),) + t_params
+            )
+            conn.commit()
         finally:
             if not self._conn:
                 conn.close()

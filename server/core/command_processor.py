@@ -108,6 +108,84 @@ class CommandProcessor:
             self._last_response[device_id] = resp
             return resp
 
+        # ── Message board ──
+
+        elif intent == "leave_message":
+            person = intent_result.get("person", "")
+            message = intent_result.get("message", "")
+            if person and message:
+                self.db.save_message(
+                    from_name="someone", to_name=person,
+                    message=message, tenant_id=tid
+                )
+                resp = f"Got it. I'll let {person} know: {message}."
+                self._last_response[device_id] = resp
+                return resp
+            return "I didn't catch the message. Try saying: tell dad I'm going to the store."
+
+        elif intent == "where_is_person":
+            person = intent_result.get("person", "")
+            if person:
+                status = self.db.get_person_status(person, tenant_id=tid)
+                if status:
+                    from datetime import datetime
+                    created = datetime.strptime(status["created_at"], "%Y-%m-%d %H:%M:%S")
+                    now = datetime.utcnow()
+                    diff = now - created
+                    minutes = int(diff.total_seconds() / 60)
+                    if minutes < 2:
+                        ago = "just a moment ago"
+                    elif minutes < 60:
+                        ago = f"about {minutes} minutes ago"
+                    else:
+                        hours = minutes // 60
+                        ago = f"about {hours} hour{'s' if hours > 1 else ''} ago"
+                    resp = f"{status['from_name']} said they're {status['message']}, {ago}."
+                    self._last_response[device_id] = resp
+                    return resp
+                return f"I don't have any updates on {person} right now."
+            return "Who are you looking for?"
+
+        elif intent == "status_update":
+            person = intent_result.get("person")
+            status_text = intent_result.get("status", "")
+            if person:
+                # Someone is reporting another person's status
+                self.db.save_message(
+                    from_name=person, message=status_text, tenant_id=tid
+                )
+                resp = f"Got it. I'll remember {person} is {status_text}."
+                self._last_response[device_id] = resp
+                return resp
+            else:
+                # Speaker is updating their own status — need their name
+                speaker = state.speaker_name
+                if speaker:
+                    self.db.save_message(
+                        from_name=speaker, message=status_text, tenant_id=tid
+                    )
+                    resp = f"Got it, {speaker}. I'll let everyone know you're {status_text}."
+                    self._last_response[device_id] = resp
+                    return resp
+                # Don't know who's speaking — ask
+                state.pending_status = status_text
+                state.mode = ConversationMode.AWAITING_NAME
+                return "Sure, I can post that. Who is this?"
+
+        elif intent == "check_messages":
+            messages = self.db.get_messages_for(tenant_id=tid)
+            if messages:
+                parts = []
+                for m in messages[:5]:
+                    if m["to_name"]:
+                        parts.append(f"{m['from_name']} to {m['to_name']}: {m['message']}")
+                    else:
+                        parts.append(f"{m['from_name']}: {m['message']}")
+                resp = f"You have {len(messages)} message{'s' if len(messages) > 1 else ''} on the board. " + ". ".join(parts) + "."
+                self._last_response[device_id] = resp
+                return resp
+            return "The message board is clear. No messages right now."
+
         # ── Jokes & questions ──
 
         elif intent == "tell_joke":
@@ -441,6 +519,10 @@ class CommandProcessor:
                 response = await self._handle_family_question(device_id)
                 return (f"No problem, let's try another one. {response}", state.mode)
 
+        # In AWAITING_NAME mode — save name for pending status message
+        if state.mode == ConversationMode.AWAITING_NAME:
+            return await self._process_name_answer(raw_text, device_id)
+
         # In AWAITING_RELATIONSHIP mode — save the relationship answer
         if state.mode == ConversationMode.AWAITING_RELATIONSHIP:
             return await self._process_relationship_answer(raw_text, device_id)
@@ -455,6 +537,28 @@ class CommandProcessor:
         # Fallback
         response = await self.process(intent_result, raw_text, device_id)
         return (response, state.mode)
+
+    async def _process_name_answer(self, raw_text: str,
+                                     device_id: str) -> Tuple[str, ConversationMode]:
+        """Process name answer for pending status update."""
+        state = self._get_state(device_id)
+        tid = state.tenant_id
+        name = raw_text.strip().split()[0].title() if raw_text.strip() else None
+
+        if not name:
+            return ("I didn't catch your name. Who is this?", ConversationMode.AWAITING_NAME)
+
+        status_text = state.pending_status
+        state.speaker_name = name
+        state.pending_status = None
+        state.mode = ConversationMode.COMMAND
+
+        if status_text:
+            self.db.save_message(from_name=name, message=status_text, tenant_id=tid)
+            return (f"Got it, {name}. I'll let everyone know you're {status_text}.",
+                    ConversationMode.COMMAND)
+
+        return (f"Hi {name}! What can I do for you?", ConversationMode.COMMAND)
 
     async def _process_relationship_answer(self, raw_text: str,
                                             device_id: str) -> Tuple[str, ConversationMode]:

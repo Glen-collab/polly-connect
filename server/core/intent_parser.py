@@ -9,6 +9,7 @@ from typing import Dict, Optional
 class IntentParser:
     def __init__(self, use_spacy: bool = False):
         self.use_spacy = False  # Disabled for simplicity
+        self._family_names = set()  # populated from family tree
 
         # Family storytelling intents
         self._introduce_self_phrases = [
@@ -95,6 +96,17 @@ class IntentParser:
             "what medications", "did i take my pills", "medicine",
             "med reminder",
         ]
+        # Message board intents
+        self._check_messages_phrases = [
+            "any messages", "check messages", "do i have messages",
+            "are there any messages", "messages for me", "check the board",
+            "what's on the board", "message board",
+        ]
+        self._person_status_words = {
+            "dad", "mom", "daddy", "mommy", "papa", "mama",
+            "grandma", "grandpa", "brother", "sister",
+        }
+
         self._weather_phrases = [
             "what's the weather", "what is the weather", "weather this week",
             "weather today", "farmer's almanac", "forecast",
@@ -146,7 +158,26 @@ class IntentParser:
         if self._matches(text_lower, self._slower_phrases):
             return {"intent": "slower", "confidence": 0.95}
 
-        # Memory/item intents first — specific structured queries take priority
+        # ── Message board intents (before item queries) ──
+
+        if self._matches(text_lower, self._check_messages_phrases):
+            return {"intent": "check_messages", "confidence": 0.95}
+
+        leave_msg = self._is_leave_message(text_lower)
+        if leave_msg:
+            return {"intent": "leave_message", "person": leave_msg["person"],
+                    "message": leave_msg["message"], "confidence": 0.9}
+
+        person_query = self._is_person_query(text_lower, self._family_names)
+        if person_query:
+            return {"intent": "where_is_person", "person": person_query, "confidence": 0.9}
+
+        status_update = self._is_status_update(text_lower)
+        if status_update:
+            return {"intent": "status_update", "person": status_update["person"],
+                    "status": status_update["status"], "confidence": 0.85}
+
+        # ── Memory/item intents ──
         if self._is_help(text_lower):
             return {"intent": "help", "confidence": 1.0}
 
@@ -299,6 +330,62 @@ class IntentParser:
         if re.search(r'(left|right|top|bottom|front|back)\s+\w+', text_lower):
             return True
         return False
+
+    def _is_leave_message(self, text: str) -> Optional[Dict]:
+        """Detect 'tell dad I'm going to the store' or 'leave a message for mom'."""
+        patterns = [
+            r"(?:tell|let) (\w+) (?:that |know )?(.+)",
+            r"leave (?:a )?message for (\w+)[,:]?\s*(.+)",
+            r"message for (\w+)[,:]?\s*(.+)",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                person = match.group(1).strip()
+                message = match.group(2).strip()
+                # Filter out non-person phrases like "tell me a joke"
+                if person.lower() in ("me", "us", "everyone", "a"):
+                    continue
+                if message:
+                    return {"person": person, "message": message}
+        return None
+
+    def _is_status_update(self, text: str) -> Optional[Dict]:
+        """Detect 'I'm going to the store' or 'dad went to work'."""
+        patterns = [
+            # "I'm going to the store" / "I'm at work"
+            r"i'?m (?:going to|headed to|heading to|at|leaving for|off to) (.+)",
+            # "dad is going to work" / "dad went to the store"
+            r"(\w+) (?:is going to|went to|is at|is heading to|left for|is off to) (.+)",
+        ]
+        # First pattern: speaker is updating their own status
+        match = re.search(patterns[0], text)
+        if match:
+            destination = match.group(1).strip()
+            return {"person": None, "status": destination}
+
+        # Second pattern: reporting someone else's status
+        match = re.search(patterns[1], text)
+        if match:
+            person = match.group(1).strip()
+            destination = match.group(2).strip()
+            if person.lower() not in ("it", "this", "that", "there", "what", "who"):
+                return {"person": person, "status": destination}
+        return None
+
+    def _is_person_query(self, text: str, family_names: set = None) -> Optional[str]:
+        """Detect 'where is dad' when it's about a person, not an item."""
+        match = re.search(r"where(?:'s| is| did) (\w+)", text)
+        if match:
+            person = match.group(1).strip()
+            p_lower = person.lower()
+            # Check against known role words
+            if p_lower in self._person_status_words:
+                return person
+            # Check against family tree names
+            if family_names and p_lower in family_names:
+                return person
+        return None
 
     def _parse_introduction(self, text: str) -> Optional[tuple]:
         """
