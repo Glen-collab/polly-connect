@@ -102,6 +102,10 @@ class IntentParser:
             "are there any messages", "messages for me", "check the board",
             "what's on the board", "message board",
         ]
+        self._clear_messages_phrases = [
+            "clear the board", "clear messages", "clear the message board",
+            "delete messages", "erase the board", "wipe the board",
+        ]
         self._person_status_words = {
             "dad", "mom", "daddy", "mommy", "papa", "mama",
             "grandma", "grandpa", "brother", "sister",
@@ -162,6 +166,16 @@ class IntentParser:
 
         if self._matches(text_lower, self._check_messages_phrases):
             return {"intent": "check_messages", "confidence": 0.95}
+
+        if self._matches(text_lower, self._clear_messages_phrases):
+            return {"intent": "clear_messages", "confidence": 0.95}
+
+        # "[person] is home/back" — clear their status
+        home_match = re.search(r"(\w+) is (?:home|back|here)\b", text_lower)
+        if home_match:
+            person = home_match.group(1).strip()
+            if person.lower() not in ("it", "this", "that", "there", "what", "who", "everyone"):
+                return {"intent": "person_home", "person": person, "confidence": 0.9}
 
         leave_msg = self._is_leave_message(text_lower)
         if leave_msg:

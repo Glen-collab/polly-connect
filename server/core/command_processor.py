@@ -140,7 +140,9 @@ class CommandProcessor:
                     else:
                         hours = minutes // 60
                         ago = f"about {hours} hour{'s' if hours > 1 else ''} ago"
-                    resp = f"{status['from_name']} said they're {status['message']}, {ago}."
+                    name = status['from_name'].title()
+                    msg = self._natural_status(status['message'])
+                    resp = f"Last I heard, {name} is {msg}. That was {ago}."
                     self._last_response[device_id] = resp
                     return resp
                 return f"I don't have any updates on {person} right now."
@@ -154,7 +156,9 @@ class CommandProcessor:
                 self.db.save_message(
                     from_name=person, message=status_text, tenant_id=tid
                 )
-                resp = f"Got it. I'll let everyone know {person} is {status_text}."
+                name = person.title()
+                msg = self._natural_status(status_text)
+                resp = f"Got it. {name} is {msg}. I'll post that to the board."
                 self._last_response[device_id] = resp
                 return resp
             else:
@@ -164,7 +168,8 @@ class CommandProcessor:
                     self.db.save_message(
                         from_name=speaker, message=status_text, tenant_id=tid
                     )
-                    resp = f"Got it, {speaker}. I'll let everyone know you're {status_text}."
+                    msg = self._natural_status(status_text)
+                    resp = f"Got it, {speaker}. I'll post to the board that you're {msg}."
                     self._last_response[device_id] = resp
                     return resp
                 # Don't know who's speaking — ask
@@ -177,14 +182,42 @@ class CommandProcessor:
             if messages:
                 parts = []
                 for m in messages[:5]:
+                    name = m['from_name'].title()
+                    msg = self._natural_status(m['message'])
                     if m["to_name"]:
-                        parts.append(f"{m['from_name']} to {m['to_name']}: {m['message']}")
+                        parts.append(f"{name} to {m['to_name'].title()}: {msg}")
                     else:
-                        parts.append(f"{m['from_name']}: {m['message']}")
+                        parts.append(f"{name} is {msg}")
                 resp = f"You have {len(messages)} message{'s' if len(messages) > 1 else ''} on the board. " + ". ".join(parts) + "."
                 self._last_response[device_id] = resp
                 return resp
             return "The message board is clear. No messages right now."
+
+        elif intent == "clear_messages":
+            messages = self.db.get_messages_for(tenant_id=tid)
+            if messages:
+                conn = self.db._get_connection()
+                try:
+                    if tid:
+                        conn.execute("DELETE FROM family_messages WHERE tenant_id = ?", (tid,))
+                    else:
+                        conn.execute("DELETE FROM family_messages")
+                    conn.commit()
+                finally:
+                    if not self.db._conn:
+                        conn.close()
+                return f"Done. I cleared {len(messages)} message{'s' if len(messages) > 1 else ''} from the board."
+            return "The board is already clear."
+
+        elif intent == "person_home":
+            person = intent_result.get("person", "")
+            if person:
+                self.db.clear_person_messages(person, tenant_id=tid)
+                name = person.title()
+                resp = f"Welcome back, {name}! I've cleared their messages from the board."
+                self._last_response[device_id] = resp
+                return resp
+            return "Who's home?"
 
         # ── Jokes & questions ──
 
@@ -402,6 +435,27 @@ class CommandProcessor:
             return "We haven't started collecting stories yet. Ready when you are."
         return f"You've shared {count} memories so far."
 
+    @staticmethod
+    def _natural_status(status: str) -> str:
+        """Make a status phrase sound natural with proper prepositions.
+        'going to the store' → 'going to the store' (already has verb)
+        'the store' → 'at the store' (bare location needs preposition)
+        'at the store' → 'at the store' (already has preposition)
+        """
+        s = status.strip()
+        if not s:
+            return "out"
+        # Already starts with an action verb — sounds natural as-is
+        action_starts = (
+            "going", "headed", "heading", "leaving", "running",
+            "off to", "on the way", "driving", "walking", "picking up",
+            "at ", "in ", "on ", "out ",
+        )
+        if any(s.lower().startswith(a) for a in action_starts):
+            return s
+        # Bare location — add "at"
+        return f"at {s}"
+
     def _ends_with_termination(self, text: str) -> bool:
         """Check if text ENDS with a termination phrase (not in the middle)."""
         import re
@@ -562,7 +616,8 @@ class CommandProcessor:
 
         if status_text:
             self.db.save_message(from_name=name, message=status_text, tenant_id=tid)
-            return (f"Got it, {name}. I'll let everyone know you're {status_text}.",
+            msg = self._natural_status(status_text)
+            return (f"Got it, {name}. I'll post to the board that you're {msg}.",
                     ConversationMode.COMMAND)
 
         return (f"Hi {name}! What can I do for you?", ConversationMode.COMMAND)
