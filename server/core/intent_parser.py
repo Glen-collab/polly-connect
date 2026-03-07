@@ -378,7 +378,7 @@ class IntentParser:
                 destination = match.group(2).strip()
                 return {"person": None, "status": f"{action} {destination}"}
 
-        # Reporting someone else's status
+        # Reporting someone else's status — specific verb patterns
         other_patterns = [
             r"(\w+) (?:is |)(going to|headed to|heading to|leaving for|off to|went to|left for) (.+)",
             r"(\w+) is at (.+)",
@@ -398,6 +398,19 @@ class IntentParser:
                     destination = groups[1].strip()
                     status = f"at {destination}"
                 return {"person": person, "status": status}
+
+        # Broader match: "[known person] is [doing something] in/at [place]"
+        broad_match = re.search(
+            r"(\w+) is (.+?) (?:in|at|on) (?:the |my )?(.+)", text)
+        if broad_match:
+            person = broad_match.group(1).strip()
+            p_lower = person.lower()
+            # Only match if it's a known person (family name or role word)
+            if p_lower in self._family_names or p_lower in self._person_status_words:
+                action = broad_match.group(2).strip()
+                place = broad_match.group(3).strip()
+                return {"person": person, "status": f"{action} in the {place}"}
+
         return None
 
     def _is_person_query(self, text: str, family_names: set = None) -> Optional[str]:
