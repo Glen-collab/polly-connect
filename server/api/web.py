@@ -3,12 +3,15 @@ Web app routes for Polly Connect caretaker portal.
 FastAPI + Jinja2 templates + Tailwind CSS.
 """
 
+import asyncio
+import io
 import json
 import logging
 import os
+import struct
 import uuid
 from fastapi import APIRouter, Request, Form, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from core.web_auth import get_web_session, require_login, require_owner, hash_password, verify_password
@@ -932,6 +935,109 @@ async def photo_delete(request: Request, photo_id: int):
             os.remove(filepath)
         db.delete_photo(photo_id)
     return RedirectResponse("/web/photos", status_code=303)
+
+
+# ── Photo Story Recording (browser mic) ──
+
+MAX_AUDIO_SIZE = 30 * 1024 * 1024  # 30MB (~5 min at 16kHz mono)
+
+def _build_wav(pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1, sample_width: int = 2) -> bytes:
+    """Wrap raw PCM int16 bytes in a WAV header."""
+    buf = io.BytesIO()
+    data_size = len(pcm_bytes)
+    buf.write(b'RIFF')
+    buf.write(struct.pack('<I', 36 + data_size))
+    buf.write(b'WAVE')
+    buf.write(b'fmt ')
+    buf.write(struct.pack('<I', 16))  # chunk size
+    buf.write(struct.pack('<H', 1))   # PCM format
+    buf.write(struct.pack('<H', channels))
+    buf.write(struct.pack('<I', sample_rate))
+    buf.write(struct.pack('<I', sample_rate * channels * sample_width))
+    buf.write(struct.pack('<H', channels * sample_width))
+    buf.write(struct.pack('<H', sample_width * 8))
+    buf.write(b'data')
+    buf.write(struct.pack('<I', data_size))
+    buf.write(pcm_bytes)
+    return buf.getvalue()
+
+
+@router.post("/photos/{photo_id}/record-story")
+async def photo_record_story(request: Request, photo_id: int,
+                              audio: UploadFile = File(...),
+                              speaker_name: str = Form("")):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Verify photo belongs to this tenant
+    photo = db.get_photo_by_id(photo_id)
+    if not photo or photo.get("tenant_id") != tid:
+        return JSONResponse({"error": "Photo not found"}, status_code=404)
+
+    # Read audio data
+    audio_data = await audio.read()
+    if len(audio_data) > MAX_AUDIO_SIZE:
+        return JSONResponse({"error": "Audio too large (max 5 minutes)"}, status_code=413)
+    if len(audio_data) < 1000:
+        return JSONResponse({"error": "Audio too short"}, status_code=400)
+
+    content_type = audio.content_type or ""
+    # Browser sends raw PCM int16 at 16kHz from our JS recorder
+    if "octet-stream" in content_type or "raw" in content_type:
+        wav_bytes = _build_wav(audio_data, sample_rate=16000)
+    elif "wav" in content_type:
+        wav_bytes = audio_data
+    else:
+        # Try treating as WAV anyway (browser might label it oddly)
+        wav_bytes = audio_data if audio_data[:4] == b'RIFF' else _build_wav(audio_data)
+
+    # Save WAV file for playback
+    recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+    os.makedirs(recordings_dir, exist_ok=True)
+    wav_filename = f"photo_{photo_id}_{uuid.uuid4().hex[:8]}.wav"
+    wav_path = os.path.join(recordings_dir, wav_filename)
+    with open(wav_path, "wb") as f:
+        f.write(wav_bytes)
+
+    # Transcribe
+    transcriber = request.app.state.transcriber
+    transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+
+    if not transcription or len(transcription.strip()) < 5:
+        os.remove(wav_path)
+        return JSONResponse({"error": "Could not understand the audio. Try speaking louder or closer to the mic."}, status_code=422)
+
+    # Build question context from photo caption
+    caption = photo.get("caption") or "this photo"
+    question_text = f"Tell me about {caption}"
+
+    # Save as story linked to the photo
+    user = db.get_or_create_user(tenant_id=tid)
+    story_id = db.save_story(
+        transcript=transcription,
+        audio_s3_key=wav_filename,
+        speaker_name=speaker_name or None,
+        source="photo_story",
+        user_id=user["id"],
+        tenant_id=tid,
+        question_text=question_text,
+        photo_id=photo_id,
+    )
+
+    # Link story to photo (bidirectional)
+    db.link_photo_story(photo_id, story_id)
+
+    return JSONResponse({
+        "success": True,
+        "story_id": story_id,
+        "transcript": transcription,
+        "photo_id": photo_id,
+    })
 
 
 # ── Family Code Management ──

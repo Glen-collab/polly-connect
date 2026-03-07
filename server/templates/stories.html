@@ -9,7 +9,7 @@
     {% for story in stories %}
     <div class="bg-white rounded-lg shadow p-4 sm:p-6">
         <div class="flex justify-between items-start mb-2">
-            <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">{{ story.source }}</span>
+            <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">{{ story.source }}{% if story.source == 'photo_story' %} (photo){% endif %}</span>
             <span class="text-xs text-gray-400">{{ story.created_at }}</span>
         </div>
         {% if story.speaker_name %}
