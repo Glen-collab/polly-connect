@@ -84,10 +84,14 @@ class CommandProcessor:
                 results = self.db.find_by_location(location, tenant_id=tid)
                 if results:
                     items = [r["item"] for r in results]
-                    resp = f"In the {location}, you have: {', '.join(items)}."
+                    if len(items) == 1:
+                        resp = f"On the {location}, you have your {items[0]}."
+                    else:
+                        listed = ", ".join(items[:-1]) + f", and {items[-1]}"
+                        resp = f"On the {location}, you have {len(items)} things: {listed}."
                     self._last_response[device_id] = resp
                     return resp
-                return f"Nothing stored in {location}."
+                return f"I don't have anything stored for {location}."
             return "Which location?"
 
         elif intent == "delete":

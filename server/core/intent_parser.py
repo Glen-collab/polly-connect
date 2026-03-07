@@ -242,14 +242,16 @@ class IntentParser:
 
     def _is_location_query(self, text: str) -> Optional[str]:
         patterns = [
-            r"what(?:'s| is| do i have) in (?:the |my )?(.+?)(?:\?|$)",
+            r"what(?:'s| is| do i have) (?:in|on|at|under|behind) (?:the |my )?(.+?)(?:\?|$)",
+            r"what(?:'s| is) (?:stored |kept )?(?:in|on|at|under|behind) (?:the |my )?(.+?)(?:\?|$)",
             r"show me (?:the |my )?(.+?)(?:\?|$)",
+            r"list (?:everything |what's |what is )?(?:in|on|at) (?:the |my )?(.+?)(?:\?|$)",
         ]
         for pattern in patterns:
             match = re.search(pattern, text)
             if match:
                 location = match.group(1).strip()
-                if self._looks_like_location(location):
+                if location:
                     return location
         return None
 
