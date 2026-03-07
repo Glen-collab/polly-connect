@@ -104,18 +104,20 @@
 <!-- Photo modal -->
 <div id="photo-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white w-full sm:max-w-2xl sm:rounded-lg rounded-t-2xl max-h-[85vh] overflow-auto">
-        <div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center z-10">
-            <div>
-                <h2 id="photo-modal-name" class="text-lg font-semibold"></h2>
-                <p id="photo-modal-relation" class="text-sm text-gray-500"></p>
-            </div>
-            <div class="flex items-center gap-3">
-                <button id="photo-modal-edit-btn" onclick="closePhotos(); editMember(currentMemberId)" class="text-sm text-blue-500 hover:text-blue-700">Edit</button>
-                <form id="photo-modal-delete-form" method="POST" class="inline"
-                      onsubmit="return confirm('Remove this family member?')">
-                    <button type="submit" class="text-sm text-red-400 hover:text-red-600">Delete</button>
-                </form>
+        <div class="sticky top-0 bg-white border-b p-4 z-10">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h2 id="photo-modal-name" class="text-lg font-semibold"></h2>
+                    <p id="photo-modal-relation" class="text-sm text-gray-500"></p>
+                </div>
                 <button onclick="closePhotos()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="flex gap-3 mt-2">
+                <button onclick="closePhotos(); editMember(currentMemberId)" class="text-sm text-blue-500 hover:text-blue-700">Edit Member</button>
+                <form id="photo-modal-delete-form" method="POST" class="inline"
+                      onsubmit="return confirm('Are you sure you want to delete this family member?')">
+                    <button type="submit" class="text-sm text-red-400 hover:text-red-600">Delete Member</button>
+                </form>
             </div>
         </div>
         <div id="photo-modal-content" class="p-4">
