@@ -1383,6 +1383,14 @@ async def family_member_photos(request: Request, member_id: int):
         return JSONResponse({"error": "Not found"}, status_code=404)
 
     photos = db.get_photos_by_tag(member["name"], tenant_id=tid)
+    # Also search by first name if full name has multiple words
+    first_name = member["name"].split()[0] if " " in member["name"] else None
+    if first_name:
+        first_photos = db.get_photos_by_tag(first_name, tenant_id=tid)
+        seen_ids = {p["id"] for p in photos}
+        for p in first_photos:
+            if p["id"] not in seen_ids:
+                photos.append(p)
     return JSONResponse({
         "member_name": member["name"],
         "relation": member.get("relation_to_owner") or member.get("relationship") or "",
