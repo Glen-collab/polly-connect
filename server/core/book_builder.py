@@ -167,6 +167,20 @@ class BookBuilder:
             entry = f"Memory {i} ({speaker_name}): {text}"
             if emotions:
                 entry += f" [emotions: {emotions}]"
+            # Check if this memory came from a photo
+            story_id = mem.get("story_id")
+            if story_id:
+                story = self.db.get_story_by_id(story_id)
+                if story and story.get("photo_id"):
+                    photo = self.db.get_photo_by_id(story["photo_id"])
+                    if photo:
+                        photo_note = f" [prompted by a photo"
+                        if photo.get("caption"):
+                            photo_note += f": {photo['caption']}"
+                        if photo.get("date_taken"):
+                            photo_note += f", {photo['date_taken']}"
+                        photo_note += "]"
+                        entry += photo_note
             memory_texts.append(entry)
 
         prompt = f"""You are writing a chapter of a family legacy book.
@@ -186,6 +200,7 @@ Write a warm, narrative chapter (7-10 paragraphs) that:
 - Closes with a reflective paragraph
 - Uses second person sparingly, mostly third person narrative
 - Keeps a blue-collar, honest, heartfelt tone
+- If a memory was prompted by a photo, reference it naturally (e.g. "In the photo, you can still see...")
 
 Write the chapter now:"""
 

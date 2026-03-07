@@ -359,6 +359,33 @@ class MemoryExtractor:
 
         return "ordinary_world"
 
+    def infer_life_phase_from_date(self, date_str: str, birth_year: int = None) -> Optional[str]:
+        """Infer life phase from a photo date string and optional birth year.
+        Supports formats like '1964', 'Summer 1964', '1964-06-15', 'June 1964'."""
+        if not date_str:
+            return None
+        # Extract 4-digit year
+        match = re.search(r'(19\d{2}|20\d{2})', date_str)
+        if not match:
+            return None
+        year = int(match.group(1))
+        if not birth_year:
+            return None
+        age = year - birth_year
+        if age < 0:
+            return None
+        if age <= 12:
+            return "childhood"
+        if age <= 18:
+            return "adolescence"
+        if age <= 30:
+            return "young_adult"
+        if age <= 50:
+            return "adult"
+        if age <= 70:
+            return "midlife"
+        return "elder"
+
     def _summarize(self, text: str) -> str:
         """Create a brief summary (first sentence, max 120 chars)."""
         sentences = re.split(r'[.!?]+', text)

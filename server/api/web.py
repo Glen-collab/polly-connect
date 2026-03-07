@@ -1012,7 +1012,7 @@ async def photo_record_story(request: Request, photo_id: int,
         os.remove(wav_path)
         return JSONResponse({"error": "Could not understand the audio. Try speaking louder or closer to the mic."}, status_code=422)
 
-    # Build question context from photo caption
+    # Build question context from photo caption + tags
     caption = photo.get("caption") or "this photo"
     question_text = f"Tell me about {caption}"
 
@@ -1031,6 +1031,55 @@ async def photo_record_story(request: Request, photo_id: int,
 
     # Link story to photo (bidirectional)
     db.link_photo_story(photo_id, story_id)
+
+    # Extract structured memory for the legacy book
+    memory_extractor = getattr(request.app.state, "memory_extractor", None)
+    if memory_extractor:
+        date_taken = photo.get("date_taken") or ""
+
+        # Build enriched context: photo caption + tags as question hint
+        tags_str = ""
+        try:
+            tag_list = json.loads(photo.get("tags") or "[]")
+            if tag_list:
+                tags_str = ", ".join(tag_list)
+        except (json.JSONDecodeError, TypeError):
+            pass
+        enriched_question = question_text
+        if tags_str:
+            enriched_question += f" (tags: {tags_str})"
+        if date_taken:
+            enriched_question += f" (from {date_taken})"
+
+        mem_data = memory_extractor.extract(
+            text=transcription,
+            question=enriched_question,
+            speaker=speaker_name or None,
+        )
+
+
+        fingerprint = memory_extractor.compute_fingerprint(mem_data)
+        db.save_memory(
+            story_id=story_id,
+            speaker=speaker_name or None,
+            bucket=mem_data["bucket"],
+            life_phase=mem_data["life_phase"],
+            text_summary=mem_data["text_summary"],
+            text=transcription,
+            people=mem_data["people"],
+            locations=mem_data["locations"],
+            emotions=mem_data["emotions"],
+            fingerprint=fingerprint,
+            tenant_id=tid,
+        )
+
+    # Add photo tags as story tags
+    try:
+        tag_list = json.loads(photo.get("tags") or "[]")
+        for tag in tag_list:
+            db.add_story_tag(story_id, "photo_tag", tag, tenant_id=tid)
+    except (json.JSONDecodeError, TypeError):
+        pass
 
     return JSONResponse({
         "success": True,
