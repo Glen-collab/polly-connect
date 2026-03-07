@@ -35,6 +35,9 @@
 
         <!-- Display mode -->
         <div id="display-{{ story.id }}">
+            {% if story.question_text %}
+            <p class="text-xs text-blue-600 italic mb-2">Q: {{ story.question_text }}</p>
+            {% endif %}
             <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap mb-3">{{ story.corrected_transcript or story.transcript or "No transcript" }}</p>
             {% if story.corrected_transcript and story.transcript != story.corrected_transcript %}
             <details class="mb-3">

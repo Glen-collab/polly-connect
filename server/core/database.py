@@ -343,6 +343,7 @@ class PollyDB:
                 "verified_by": "ALTER TABLE stories ADD COLUMN verified_by TEXT",
                 "verified_at": "ALTER TABLE stories ADD COLUMN verified_at TIMESTAMP",
                 "corrected_transcript": "ALTER TABLE stories ADD COLUMN corrected_transcript TEXT",
+                "question_text": "ALTER TABLE stories ADD COLUMN question_text TEXT",
             }
             for col, sql in migrations.items():
                 if col not in cols:
@@ -963,15 +964,15 @@ class PollyDB:
     def save_story(self, transcript: str, audio_s3_key: str = None,
                    speaker_name: str = None, source: str = "voice",
                    duration_seconds: float = None, user_id: int = None,
-                   tenant_id: int = None) -> int:
+                   tenant_id: int = None, question_text: str = None) -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
                 INSERT INTO stories (user_id, transcript, audio_s3_key, speaker_name,
-                                    source, duration_seconds, tenant_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                    source, duration_seconds, tenant_id, question_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (user_id, transcript, audio_s3_key, speaker_name, source,
-                  duration_seconds, tenant_id))
+                  duration_seconds, tenant_id, question_text))
             conn.commit()
             return cursor.lastrowid
         finally:

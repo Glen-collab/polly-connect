@@ -49,7 +49,11 @@
     <ul class="space-y-3">
         {% for story in stories %}
         <li class="border-b pb-2">
-            <p class="text-sm sm:text-base text-gray-700">{{ story.transcript[:200] }}{% if story.transcript|length > 200 %}...{% endif %}</p>
+            {% if story.question_text %}
+            <p class="text-xs text-blue-600 italic mb-1">Q: {{ story.question_text }}</p>
+            {% endif %}
+            {% set display_text = story.corrected_transcript or story.transcript %}
+            <p class="text-sm sm:text-base text-gray-700">{{ display_text[:200] }}{% if display_text|length > 200 %}...{% endif %}</p>
             <span class="text-xs text-gray-400">{{ story.created_at }}</span>
         </li>
         {% endfor %}

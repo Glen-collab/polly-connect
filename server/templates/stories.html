@@ -15,7 +15,10 @@
         {% if story.speaker_name %}
         <p class="text-xs sm:text-sm text-gray-500 mb-1">Shared by {{ story.speaker_name }}</p>
         {% endif %}
-        <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap">{{ story.transcript or "Transcription pending..." }}</p>
+        {% if story.question_text %}
+        <p class="text-xs text-blue-600 italic mb-1">Q: {{ story.question_text }}</p>
+        {% endif %}
+        <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap">{{ story.corrected_transcript or story.transcript or "Transcription pending..." }}</p>
         <div class="flex items-center gap-3 mt-2">
             {% if story.audio_s3_key %}
             <audio controls preload="none" class="h-8">

@@ -383,6 +383,7 @@ class CommandProcessor:
                             speaker_name=state.speaker_name,
                             source="family_story",
                             tenant_id=tid,
+                            question_text=state.current_question,
                         )
                         if self.memory_extractor:
                             mem_data = self.memory_extractor.extract(
@@ -482,6 +483,7 @@ class CommandProcessor:
             speaker_name=state.speaker_name,
             source="family_story",
             tenant_id=tid,
+            question_text=state.current_question,
         )
 
         # Extract structured memory and save
