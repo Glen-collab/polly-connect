@@ -66,7 +66,7 @@
         <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center">{{ label|safe }}</h3>
         <div class="flex flex-wrap justify-center gap-3">
             {% for m in tree[gen_num] %}
-            <div class="{{ card_class }} rounded-lg p-3 text-center min-w-[120px] relative cursor-pointer hover:shadow-md transition"
+            <div class="{{ card_class }} rounded-lg p-3 text-center min-w-[120px] cursor-pointer hover:shadow-md transition"
                  onclick="showPhotos({{ m.id }})">
                 <p class="font-medium text-sm text-gray-800">{{ m.name }}</p>
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
@@ -75,14 +75,6 @@
                 <p class="text-xs text-gray-400">via {{ p.name }}</p>
                 {% endif %}{% endfor %}
                 {% endif %}
-                <div class="flex justify-center gap-2 mt-1" onclick="event.stopPropagation()">
-                    <button onclick="editMember({{ m.id }})" class="text-xs text-blue-500 hover:text-blue-700">edit</button>
-                    <span class="text-gray-300">|</span>
-                    <form method="POST" action="/web/family-tree/{{ m.id }}/delete" class="inline"
-                          onsubmit="return confirm('Remove {{ m.name }}?')">
-                        <button type="submit" class="text-xs text-red-400 hover:text-red-600">x</button>
-                    </form>
-                </div>
             </div>
             {% endfor %}
         </div>
@@ -117,7 +109,14 @@
                 <h2 id="photo-modal-name" class="text-lg font-semibold"></h2>
                 <p id="photo-modal-relation" class="text-sm text-gray-500"></p>
             </div>
-            <button onclick="closePhotos()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            <div class="flex items-center gap-3">
+                <button id="photo-modal-edit-btn" onclick="closePhotos(); editMember(currentMemberId)" class="text-sm text-blue-500 hover:text-blue-700">Edit</button>
+                <form id="photo-modal-delete-form" method="POST" class="inline"
+                      onsubmit="return confirm('Remove this family member?')">
+                    <button type="submit" class="text-sm text-red-400 hover:text-red-600">Delete</button>
+                </form>
+                <button onclick="closePhotos()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
         </div>
         <div id="photo-modal-content" class="p-4">
             <!-- Filled by JS -->
@@ -165,6 +164,7 @@
 
 {% block scripts %}
 <script>
+var currentMemberId = null;
 var memberData = {
 {% for m in members %}
 {{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}" },
@@ -186,6 +186,8 @@ function closeEdit() {
 }
 
 function showPhotos(memberId) {
+    currentMemberId = memberId;
+    document.getElementById('photo-modal-delete-form').action = '/web/family-tree/' + memberId + '/delete';
     var content = document.getElementById('photo-modal-content');
     content.innerHTML = '<div class="text-center py-8"><div class="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div><p class="text-sm text-gray-400 mt-2">Loading photos...</p></div>';
     document.getElementById('photo-modal').classList.remove('hidden');
