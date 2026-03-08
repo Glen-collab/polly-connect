@@ -90,7 +90,13 @@ static const char *TAG = "POLLY-WS";
 // TCA9555 port bits (from xiaozhi-esp32 working implementation)
 // Port 0: bit 0 = LCD reset, bit 1 = touchpad reset, bit 5 = camera reset, bit 6 = camera power
 // Port 1: bit 0 (pin 8) = speaker amplifier enable
+// Port 1: bit 1 (pin 9) = K1/+ button (story record toggle)
+// Port 1: bit 2 (pin 10) = K2/SET button
+// Port 1: bit 3 (pin 11) = K3 button
 #define TCA_PA_PIN      0x01    // Port 1 bit 0: speaker amplifier enable
+#define TCA_KEY1_BIT    0x02    // Port 1 bit 1: K1/+ button
+#define TCA_KEY2_BIT    0x04    // Port 1 bit 2: K2/SET button
+#define TCA_KEY3_BIT    0x08    // Port 1 bit 3: K3 button
 
 // Status LED (WS2812 RGB on GPIO48, driven as simple GPIO)
 #define LED_PIN         GPIO_NUM_48
@@ -126,6 +132,7 @@ static volatile bool streaming_paused = false;
 
 // Story recording state
 static volatile bool story_recording = false;
+static volatile bool story_button_pressed = false;  // set by button poll task
 
 // Response audio accumulation (PSRAM)
 static uint8_t *response_audio = NULL;
@@ -187,7 +194,44 @@ static void tca9555_init(void)
 static void tca9555_amp_enable(bool on)
 {
     // Speaker amp is on port 1, bit 0 (TCA9555 pin 8)
+    // Preserve other output bits while toggling amp
     i2c_write_reg(TCA9555_ADDR, 0x03, on ? TCA_PA_PIN : 0x00);
+}
+
+static bool tca9555_read_key1(void)
+{
+    // Read port 1 input register (0x01), check bit 1 (K1/+ button)
+    // Active low: button pressed = bit is 0
+    uint8_t port1 = i2c_read_reg(TCA9555_ADDR, 0x01);
+    return !(port1 & TCA_KEY1_BIT);
+}
+
+/* --- Story Button Polling Task --- */
+
+static void story_button_task(void *arg)
+{
+    bool last_state = false;
+    TickType_t last_press_tick = 0;
+    const TickType_t debounce_ticks = pdMS_TO_TICKS(300);
+
+    ESP_LOGI(TAG, "Story button task started (K1/+ via TCA9555)");
+
+    while (1) {
+        bool pressed = tca9555_read_key1();
+
+        // Detect rising edge (not pressed -> pressed) with debounce
+        if (pressed && !last_state) {
+            TickType_t now = xTaskGetTickCount();
+            if ((now - last_press_tick) > debounce_ticks) {
+                last_press_tick = now;
+                story_button_pressed = true;
+                ESP_LOGI(TAG, "K1/+ button pressed (story toggle)");
+            }
+        }
+        last_state = pressed;
+
+        vTaskDelay(pdMS_TO_TICKS(50));  // poll every 50ms
+    }
 }
 
 
@@ -1242,6 +1286,18 @@ static void mic_stream_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(10));
         }
 
+        // Story button (K1/+) toggle — send start/stop to server
+        if (story_button_pressed) {
+            story_button_pressed = false;
+            if (ws_connected) {
+                const char *msg = story_recording
+                    ? "{\"event\":\"story_button\",\"action\":\"stop\"}"
+                    : "{\"event\":\"story_button\",\"action\":\"start\"}";
+                esp_websocket_client_send_text(ws_client, msg, strlen(msg), pdMS_TO_TICKS(1000));
+                ESP_LOGI(TAG, "Story button → %s", story_recording ? "stop" : "start");
+            }
+        }
+
         // Periodic ping (every ~30 seconds)
         ping_timer++;
         if (ping_timer >= 1000) {
@@ -1329,6 +1385,9 @@ void app_main(void)
 
     led_set(0);
     ESP_LOGI(TAG, "Setup complete. Streaming audio to server...");
+
+    // Start story button polling task (K1/+ via TCA9555 I/O expander)
+    xTaskCreate(story_button_task, "story_btn", 2048, NULL, 3, NULL);
 
     // Start mic streaming task on core 1 (core 0 handles WiFi/WebSocket)
     xTaskCreatePinnedToCore(mic_stream_task, "mic_stream", 8192, NULL, 5, NULL, 1);
