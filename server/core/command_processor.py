@@ -57,9 +57,11 @@ class CommandProcessor:
             item = intent_result.get("item")
             location = intent_result.get("location")
             context = intent_result.get("context")
+            prep = intent_result.get("prep", "on")
             if item and location:
-                self.db.store_item(item, location, context, raw_text, tenant_id=tid)
-                resp = f"Got it. {item} is in the {location}."
+                self.db.store_item(item, location, context, raw_text, tenant_id=tid, prep=prep)
+                verb = "are" if item.endswith("s") and not item.endswith("ss") else "is"
+                resp = f"Got it. The {item} {verb} {prep} the {location}."
                 self._last_response[device_id] = resp
                 return resp
             return "I didn't understand what to store."
@@ -70,10 +72,12 @@ class CommandProcessor:
                 results = self.db.find_item(item, tenant_id=tid)
                 if results:
                     r = results[0]
+                    prep = r.get("prep") or "on"
+                    verb = "are" if r['item'].endswith("s") and not r['item'].endswith("ss") else "is"
                     if r.get("context"):
-                        resp = f"The {r['item']} is in the {r['location']}, {r['context']}."
+                        resp = f"The {r['item']} {verb} {prep} the {r['location']}, {r['context']}."
                     else:
-                        resp = f"The {r['item']} is in the {r['location']}."
+                        resp = f"The {r['item']} {verb} {prep} the {r['location']}."
                     self._last_response[device_id] = resp
                     return resp
                 return f"I don't know where the {item} is."
@@ -129,7 +133,6 @@ class CommandProcessor:
             if person:
                 status = self.db.get_person_status(person, tenant_id=tid)
                 if status:
-                    from datetime import datetime
                     created = datetime.strptime(status["created_at"], "%Y-%m-%d %H:%M:%S")
                     now = datetime.utcnow()
                     diff = now - created

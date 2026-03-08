@@ -395,6 +395,11 @@ class PollyDB:
             if "family_code_created_at" not in cols:
                 conn.execute("ALTER TABLE tenants ADD COLUMN family_code_created_at TIMESTAMP")
 
+            # ── Items prep column ──
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(items)").fetchall()}
+            if "prep" not in cols:
+                conn.execute("ALTER TABLE items ADD COLUMN prep TEXT DEFAULT 'on'")
+
             # ── Family tree migrations ──
             cols = {row[1] for row in conn.execute("PRAGMA table_info(family_members)").fetchall()}
             fm_migrations = {
@@ -724,7 +729,8 @@ class PollyDB:
     # ── Items (memory storage) ──
 
     def store_item(self, item: str, location: str, context: Optional[str] = None,
-                   raw_input: Optional[str] = None, tenant_id: int = None) -> int:
+                   raw_input: Optional[str] = None, tenant_id: int = None,
+                   prep: str = "on") -> int:
         item_norm = self._normalize(item)
         location_norm = self._normalize(location)
 
@@ -743,17 +749,17 @@ class PollyDB:
             if existing:
                 conn.execute("""
                     UPDATE items SET location = ?, location_normalized = ?,
-                    context = ?, raw_input = ?, updated_at = CURRENT_TIMESTAMP
+                    context = ?, raw_input = ?, prep = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
-                """, (location, location_norm, context, raw_input, existing[0]))
+                """, (location, location_norm, context, raw_input, prep, existing[0]))
                 conn.commit()
                 return existing[0]
             else:
                 cursor = conn.execute("""
                     INSERT INTO items (item, item_normalized, location,
-                                      location_normalized, context, raw_input, tenant_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (item, item_norm, location, location_norm, context, raw_input, tenant_id))
+                                      location_normalized, context, raw_input, prep, tenant_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (item, item_norm, location, location_norm, context, raw_input, prep, tenant_id))
                 conn.commit()
                 return cursor.lastrowid
         finally:
@@ -769,13 +775,13 @@ class PollyDB:
             t_params = (tenant_id,) if tenant_id else ()
 
             results = conn.execute(
-                f"SELECT id, item, location, context, created_at, updated_at FROM items WHERE item_normalized = ?{t_clause}",
+                f"SELECT id, item, location, context, prep, created_at, updated_at FROM items WHERE item_normalized = ?{t_clause}",
                 (item_norm,) + t_params
             ).fetchall()
 
             if not results:
                 results = conn.execute(
-                    f"SELECT id, item, location, context, created_at, updated_at FROM items WHERE item_normalized LIKE ?{t_clause}",
+                    f"SELECT id, item, location, context, prep, created_at, updated_at FROM items WHERE item_normalized LIKE ?{t_clause}",
                     (f"%{item_norm}%",) + t_params
                 ).fetchall()
 

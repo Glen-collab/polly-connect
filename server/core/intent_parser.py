@@ -28,7 +28,7 @@ class IntentParser:
             "tell me about", "what did", "play back",
             "what stories", "any stories about", "what has",
             "read me a story", "play a story", "do you have any stories",
-            "what have you heard about",
+            "what have you heard about", "play my stories", "read my stories",
         ]
         self._family_question_phrases = [
             "ask me about my family", "family question", "ask me a family question",
@@ -116,6 +116,7 @@ class IntentParser:
             "skip that", "i'll skip that one", "give me a different one",
             "try another one", "different question", "ask me something else",
             "i don't want to answer that", "i'd rather not",
+            "never mind", "nevermind", "forget it",
         ]
         self._stop_phrases = [
             "stop", "that's enough", "i'm tired", "let's stop",
@@ -131,6 +132,7 @@ class IntentParser:
             "goodnight polly", "nighty night", "see you tomorrow",
             "see ya", "bye", "later polly", "talk to you later",
             "i'm going to bed", "going to sleep",
+            "i'm heading out", "heading out", "i'm leaving",
         ]
         self._greeting_phrases = [
             "hello polly", "hi polly", "hey polly", "good morning",
@@ -150,6 +152,7 @@ class IntentParser:
             "read from the bible", "do you have a verse",
             "can you read me a verse", "what's today's verse",
             "inspirational verse", "devotional",
+            "verse of the day", "daily bible verse",
         ]
         self._medication_phrases = [
             "remind me to take", "medication", "my pills",
@@ -194,6 +197,7 @@ class IntentParser:
             "what's the weather like", "weather report",
             "do i need an umbrella", "is it cold outside",
             "what's it going to be like this week",
+            "what's the temperature", "temperature outside",
         ]
 
         self._time_phrases = [
@@ -229,6 +233,18 @@ class IntentParser:
             return {"intent": "unknown", "confidence": 0.0}
 
         text_lower = text.lower()
+
+        # Normalize contractions: "whats" → "what's", "im" → "i'm", "dont" → "don't"
+        # so phrases match regardless of whether STT includes apostrophes
+        contraction_map = {
+            "whats ": "what's ", "thats ": "that's ", "hows ": "how's ",
+            "todays ": "today's ", "lets ": "let's ", "dont ": "don't ",
+            "didnt ": "didn't ", "doesnt ": "doesn't ", "cant ": "can't ",
+            "wont ": "won't ", "isnt ": "isn't ", "im ": "i'm ",
+            "ive ": "i've ", "youre ": "you're ",
+        }
+        for abbrev, full in contraction_map.items():
+            text_lower = text_lower.replace(abbrev, full)
 
         # ── Family storytelling intents (check first, order matters) ──
 
@@ -361,6 +377,7 @@ class IntentParser:
                 "intent": "store",
                 "item": store_result["item"],
                 "location": store_result["location"],
+                "prep": store_result.get("prep", "in"),
                 "context": store_result.get("context"),
                 "confidence": 0.85
             }
@@ -454,17 +471,19 @@ class IntentParser:
 
     def _is_store(self, text_lower: str) -> Optional[Dict]:
         patterns = [
-            r"(?:the |my )?(.+?) (?:is|are|goes?) (?:in|on|under|behind|inside|next to|near|by|at) (?:the |my )?(.+)",
-            r"(?:i )?(?:put|placed|stored|keep|left) (?:the |my )?(.+?) (?:in|on|under|behind|inside|next to|near|by|at) (?:the |my )?(.+)",
-            r"(?:the |my )?(.+?) (?:in|on|under|behind|at) (?:the |my )?(.+)",
+            r"(?:the |my )?(.+?) (?:is|are|goes?) (in|on|under|behind|inside|next to|near|by|at) (?:the |my )?(.+)",
+            r"(?:i )?(?:put|placed|stored|keep|left) (?:the |my )?(.+?) (in|on|under|behind|inside|next to|near|by|at) (?:the |my )?(.+)",
+            r"(?:the |my )?(.+?) (in|on|under|behind|at) (?:the |my )?(.+)",
         ]
 
         for pattern in patterns:
             match = re.search(pattern, text_lower)
             if match:
-                item, location = match.group(1).strip(), match.group(2).strip()
+                item = match.group(1).strip()
+                prep = match.group(2).strip()
+                location = match.group(3).strip()
                 if item and location and not self._looks_like_question(item):
-                    return {"item": item, "location": location, "context": None}
+                    return {"item": item, "location": location, "prep": prep, "context": None}
         return None
 
     def _looks_like_question(self, text: str) -> bool:
@@ -485,9 +504,9 @@ class IntentParser:
     def _is_leave_message(self, text: str) -> Optional[Dict]:
         """Detect 'tell dad I'm going to the store' or 'leave a message for mom'."""
         patterns = [
-            r"(?:tell|let) (\w+) (?:that |know )?(.+)",
-            r"leave (?:a )?message for (\w+)[,:]?\s*(.+)",
-            r"message for (\w+)[,:]?\s*(.+)",
+            r"\b(?:tell|let) (\w+) (?:that |know )?(.+)",
+            r"\bleave (?:a )?message for (\w+)[,:]?\s*(.+)",
+            r"\bmessage for (\w+)[,:]?\s*(.+)",
         ]
         for pattern in patterns:
             match = re.search(pattern, text)

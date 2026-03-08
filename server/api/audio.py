@@ -135,6 +135,9 @@ async def continuous_stream(websocket: WebSocket):
                     device_info = verify_device_api_key(msg_data.get("api_key", ""), db)
                     if device_info:
                         conv_state = cmd._get_state(device_id)
+                        # Reset conversation mode on reconnect so stale
+                        # FOLLOWUP_WAIT / STORY_PROMPT state doesn't persist
+                        conv_state.reset()
                         conv_state.tenant_id = device_info["tenant_id"]
                         conv_state.user_id = device_info["user_id"]
                         tenant_id = device_info["tenant_id"]
@@ -147,6 +150,7 @@ async def continuous_stream(websocket: WebSocket):
                     else:
                         # Global key fallback → tenant 1
                         conv_state = cmd._get_state(device_id)
+                        conv_state.reset()
                         conv_state.tenant_id = 1
                         logger.info(f"Continuous stream device: {device_id} (global key, tenant=1)")
 

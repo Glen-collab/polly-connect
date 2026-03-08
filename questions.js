@@ -510,7 +510,7 @@
             { "id": "q_w43_01", "type": "where", "question": "Where did you go on your best vacation?" },
             { "id": "q_w43_02", "type": "who", "question": "Who went on vacation with you?" },
             { "id": "q_w43_03", "type": "what", "question": "What did you do on that vacation?" },
-            { "id": "q_w43_04", "type": "when", "question": "When did you take this memorable trip?" },
+            { "id": "q_w43_04", "type": "when", "question": "When did you take your most memorable trip?" },
             { "id": "q_w43_05", "type": "why", "question": "Why was this vacation so special?" },
             { "id": "q_w43_06", "type": "how", "question": "How did you plan your vacations back then?" }
         ]
