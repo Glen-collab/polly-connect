@@ -21,6 +21,7 @@ from core.vad_wakeword import VADWakeWordDetector
 from core.data_loader import DataLoader
 from core.command_processor import CommandProcessor
 from core.bible import BibleVerseService
+from core.prayer import PrayerService
 from core.weather import AlmanacWeather
 from core.medications import MedicationScheduler
 from core.family_identity import FamilyIdentityService
@@ -95,6 +96,7 @@ async def lifespan(app: FastAPI):
 
     # Initialize feature services
     app.state.bible = BibleVerseService(app.state.db, settings.DATA_DIR)
+    app.state.prayer = PrayerService(settings.DATA_DIR)
     app.state.weather = AlmanacWeather(settings.DATA_DIR)
     app.state.med_scheduler = MedicationScheduler(app.state.db, tts=app.state.tts)
 
@@ -123,6 +125,7 @@ async def lifespan(app: FastAPI):
         db=app.state.db,
         data=app.state.data,
         bible_service=app.state.bible,
+        prayer_service=app.state.prayer,
         weather_service=app.state.weather,
         med_scheduler=app.state.med_scheduler,
         family_identity=app.state.family_identity,

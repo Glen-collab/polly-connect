@@ -156,6 +156,18 @@ class IntentParser:
             "inspirational verse", "devotional",
             "verse of the day", "daily bible verse",
         ]
+        self._prayer_phrases = [
+            "say a prayer", "pray for me", "pray with me",
+            "let's pray", "let us pray", "can you pray",
+            "i need a prayer", "prayer", "pray",
+            "say a prayer for me", "will you pray",
+            "bedtime prayer", "goodnight prayer",
+            "nighttime prayer", "evening prayer",
+            "pray for my family", "family prayer",
+            "i want to pray", "help me pray",
+            "lead me in prayer", "lead a prayer",
+            "can we pray", "would you pray",
+        ]
         self._medication_phrases = [
             "remind me to take", "medication", "my pills",
             "what medications", "did i take my pills", "medicine",
@@ -331,6 +343,22 @@ class IntentParser:
             elif "proverb" in text_lower:
                 topic = "Proverb"
             return {"intent": "bible_verse", "topic": topic, "confidence": 0.9}
+
+        if self._matches(text_lower, self._prayer_phrases):
+            theme = None
+            if any(w in text_lower for w in ["bedtime", "goodnight", "nighttime", "evening"]):
+                theme = "bedtime"
+            elif "family" in text_lower:
+                theme = "family"
+            elif any(w in text_lower for w in ["strength", "strong", "courage"]):
+                theme = "resilience"
+            elif any(w in text_lower for w in ["hope", "hopeful"]):
+                theme = "hope"
+            elif any(w in text_lower for w in ["faith", "believe", "trust"]):
+                theme = "faith"
+            elif any(w in text_lower for w in ["thank", "grateful", "blessing"]):
+                theme = "gratitude"
+            return {"intent": "prayer", "theme": theme, "confidence": 0.9}
 
         if self._matches(text_lower, self._medication_phrases):
             return {"intent": "medication", "confidence": 0.9, "raw": text}

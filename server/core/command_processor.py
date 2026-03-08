@@ -21,13 +21,15 @@ class CommandProcessor:
     Initialized with all service instances, called from audio.py.
     """
 
-    def __init__(self, db, data, bible_service=None, weather_service=None,
+    def __init__(self, db, data, bible_service=None, prayer_service=None,
+                 weather_service=None,
                  med_scheduler=None, family_identity=None, echo_engine=None,
                  memory_extractor=None, narrative_arc=None,
                  engagement=None):
         self.db = db
         self.data = data
         self.bible = bible_service
+        self.prayer = prayer_service
         self.weather = weather_service
         self.meds = med_scheduler
         self.family_identity = family_identity
@@ -329,6 +331,16 @@ class CommandProcessor:
                 self._last_response[device_id] = resp
                 return resp
             return "Bible verses are coming soon. Stay tuned!"
+
+        # ── Prayer ──
+
+        elif intent == "prayer":
+            if self.prayer:
+                theme = intent_result.get("theme")
+                resp = self.prayer.get_prayer(theme)
+                self._last_response[device_id] = resp
+                return resp
+            return "Let us bow our heads. Dear Lord, be with us today. Give us strength, give us peace, and remind us that we are loved. Amen."
 
         # ── Medications ──
 
