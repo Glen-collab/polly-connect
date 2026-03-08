@@ -5,6 +5,7 @@ Tracks last_response per device for "repeat" functionality.
 """
 
 import logging
+from datetime import datetime
 from typing import Optional, Tuple
 
 from core.conversation_state import ConversationMode, ConversationState
@@ -269,6 +270,42 @@ class CommandProcessor:
         elif intent == "stop":
             return self.data.get_response("goodbye") or "Okay, take care."
 
+        elif intent == "tell_time":
+            now = datetime.now()
+            hour = now.strftime("%I").lstrip("0")
+            minute = now.strftime("%M")
+            ampm = now.strftime("%p").replace("AM", "A M").replace("PM", "P M")
+            if minute == "00":
+                resp = f"It's {hour} o'clock {ampm}."
+            else:
+                resp = f"It's {hour}:{minute} {ampm}."
+            self._last_response[device_id] = resp
+            return resp
+
+        elif intent == "tell_date":
+            now = datetime.now()
+            resp = f"Today is {now.strftime('%A, %B')} {now.day}, {now.year}."
+            self._last_response[device_id] = resp
+            return resp
+
+        elif intent == "thank_you":
+            import random
+            responses = [
+                "You're welcome!",
+                "Happy to help!",
+                "Anytime!",
+                "Of course! That's what I'm here for.",
+                "You're very welcome!",
+                "My pleasure!",
+            ]
+            resp = random.choice(responses)
+            self._last_response[device_id] = resp
+            return resp
+
+        elif intent == "who_is":
+            name = intent_result.get("name", "")
+            return await self._handle_who_is(name, device_id)
+
         elif intent == "greeting":
             resp = self.data.get_response("greeting") or "Hello! How are you today?"
             self._last_response[device_id] = resp
@@ -442,6 +479,45 @@ class CommandProcessor:
         if count == 0:
             return "We haven't started collecting stories yet. Ready when you are."
         return f"You've shared {count} memories so far."
+
+    async def _handle_who_is(self, name: str, device_id: str) -> str:
+        """Look up a person in the family tree by name."""
+        state = self._get_state(device_id)
+        tid = state.tenant_id
+
+        # Search family_members table for matching name
+        conn = self.db._get_connection()
+        try:
+            rows = conn.execute(
+                "SELECT name, relation_to_owner FROM family_members WHERE LOWER(name) LIKE ? AND (tenant_id = ? OR tenant_id IS NULL)",
+                (f"%{name.lower()}%", tid)
+            ).fetchall()
+        finally:
+            if not self.db._conn:
+                conn.close()
+
+        if rows:
+            member = rows[0]
+            member_name = member["name"]
+            relation = member["relation_to_owner"] or "a family member"
+            resp = f"{member_name} is {relation}."
+            self._last_response[device_id] = resp
+            return resp
+
+        # Check family identity service for visitors
+        if self.family_identity:
+            member_info = self.family_identity.recognize_member(name, tenant_id=tid)
+            if member_info:
+                member_name = member_info.get("name", name)
+                relationship = member_info.get("relationship", "")
+                if relationship:
+                    resp = f"{member_name} is {relationship}."
+                else:
+                    resp = f"I know {member_name}, but I don't have details about them."
+                self._last_response[device_id] = resp
+                return resp
+
+        return f"I don't know who {name} is. You can add them to the family tree on the web portal."
 
     @staticmethod
     def _natural_status(status: str) -> str:

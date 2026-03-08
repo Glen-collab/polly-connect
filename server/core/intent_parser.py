@@ -126,6 +126,24 @@ class IntentParser:
             "weather today", "farmer's almanac", "forecast",
         ]
 
+        self._time_phrases = [
+            "what time is it", "what's the time", "what is the time",
+            "do you have the time", "tell me the time", "current time",
+        ]
+        self._date_phrases = [
+            "what day is it", "what's today's date", "what is today's date",
+            "what's the date", "what is the date", "what day is today",
+            "what is today", "what's today", "today's date",
+        ]
+        self._thank_you_phrases = [
+            "thank you", "thanks polly", "thanks", "thank you polly",
+            "appreciate it", "that was helpful", "you're the best",
+            "thanks so much", "thank you so much",
+        ]
+        self._who_is_phrases = [
+            "who is", "who's",
+        ]
+
     def parse(self, text: str) -> Dict:
         text = text.strip()
         if not text:
@@ -258,6 +276,22 @@ class IntentParser:
 
         if self._matches(text_lower, self._weather_phrases):
             return {"intent": "weather", "confidence": 0.9}
+
+        if self._matches(text_lower, self._time_phrases):
+            return {"intent": "tell_time", "confidence": 0.95}
+
+        if self._matches(text_lower, self._date_phrases):
+            return {"intent": "tell_date", "confidence": 0.95}
+
+        if self._matches(text_lower, self._thank_you_phrases):
+            return {"intent": "thank_you", "confidence": 0.9}
+
+        # "Who is [name]?" — extract the name
+        who_match = re.search(r"(?:who(?:'s| is) )(.+?)(?:\?|$)", text_lower)
+        if who_match:
+            name = who_match.group(1).strip()
+            if name and name not in ("this", "that", "it", "there", "here"):
+                return {"intent": "who_is", "name": name, "confidence": 0.9}
 
         if self._matches(text_lower, self._greeting_phrases):
             return {"intent": "greeting", "confidence": 0.9}
