@@ -346,6 +346,9 @@ class PollyDB:
                 "caretaker_name": "ALTER TABLE user_profiles ADD COLUMN caretaker_name TEXT",
                 "caretaker_email": "ALTER TABLE user_profiles ADD COLUMN caretaker_email TEXT",
                 "setup_complete": "ALTER TABLE user_profiles ADD COLUMN setup_complete INTEGER DEFAULT 0",
+                "squawk_interval": "ALTER TABLE user_profiles ADD COLUMN squawk_interval INTEGER DEFAULT 45",
+                "chatter_interval": "ALTER TABLE user_profiles ADD COLUMN chatter_interval INTEGER DEFAULT 45",
+                "squawk_snoozed_until": "ALTER TABLE user_profiles ADD COLUMN squawk_snoozed_until TIMESTAMP",
             }
             for col, sql in migrations.items():
                 if col not in cols:

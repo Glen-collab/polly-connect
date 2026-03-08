@@ -188,9 +188,21 @@ async def continuous_stream(websocket: WebSocket):
 
                     await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
 
+                    # Load squawk intervals from user profile
+                    squawk_int = 10  # default minutes between short squawks
+                    chatter_int = 45  # default minutes between long chatter
+                    try:
+                        profile = db.get_or_create_user(tenant_id=tenant_id)
+                        squawk_int = profile.get("squawk_interval") or 10
+                        chatter_int = profile.get("chatter_interval") or 45
+                    except Exception:
+                        pass
+
                     # Register for ambient squawk sounds + startup squawk
                     if squawk_mgr:
-                        squawk_mgr.register_device(device_id, websocket)
+                        squawk_mgr.register_device(device_id, websocket,
+                                                   squawk_interval=squawk_int,
+                                                   chatter_interval=chatter_int)
                         await squawk_mgr.send_squawk(device_id)
 
                     continue

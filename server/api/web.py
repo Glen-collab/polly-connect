@@ -739,11 +739,22 @@ async def settings_page(request: Request):
     db = request.app.state.db
     user = db.get_or_create_user(tenant_id=session["tenant_id"])
     tenant = db.get_tenant(session["tenant_id"])
+
+    # Check if any device is currently snoozed
+    squawk_mgr = getattr(request.app.state, "squawk", None)
+    is_snoozed = False
+    if squawk_mgr:
+        for dev_id in squawk_mgr._active_devices:
+            if squawk_mgr.is_snoozed(dev_id):
+                is_snoozed = True
+                break
+
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "session": session,
         "user": user,
         "tenant": tenant,
+        "is_snoozed": is_snoozed,
     })
 
 
@@ -752,7 +763,9 @@ async def settings_save(request: Request, name: str = Form(...),
                         familiar_name: str = Form(""),
                         bible_topic_preference: str = Form(""),
                         music_genre_preference: str = Form(""),
-                        memory_care_mode: str = Form("")):
+                        memory_care_mode: str = Form(""),
+                        squawk_interval: int = Form(10),
+                        chatter_interval: int = Form(45)):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -761,19 +774,62 @@ async def settings_save(request: Request, name: str = Form(...),
     db = request.app.state.db
     user = db.get_or_create_user(tenant_id=session["tenant_id"])
 
+    # Clamp intervals to reasonable bounds
+    squawk_interval = max(1, min(60, squawk_interval))
+    chatter_interval = max(5, min(240, chatter_interval))
+
     conn = db._get_connection()
     try:
         conn.execute("""
             UPDATE user_profiles SET name = ?, familiar_name = ?,
             bible_topic_preference = ?, music_genre_preference = ?,
-            memory_care_mode = ?, updated_at = CURRENT_TIMESTAMP
+            memory_care_mode = ?, squawk_interval = ?, chatter_interval = ?,
+            updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (name, familiar_name or None, bible_topic_preference or None,
-              music_genre_preference or None, 1 if memory_care_mode else 0, user["id"]))
+              music_genre_preference or None, 1 if memory_care_mode else 0,
+              squawk_interval, chatter_interval, user["id"]))
         conn.commit()
     finally:
         if not db._conn:
             conn.close()
+
+    # Update live squawk manager if devices are connected
+    squawk_mgr = getattr(request.app.state, "squawk", None)
+    if squawk_mgr:
+        for dev_id in list(squawk_mgr._active_devices.keys()):
+            squawk_mgr.update_intervals(dev_id, squawk_interval, chatter_interval)
+
+    return RedirectResponse("/web/settings", status_code=303)
+
+
+@router.post("/settings/squawk-snooze")
+async def squawk_snooze(request: Request, duration: int = Form(30)):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    duration = max(5, min(480, duration))  # 5 min to 8 hours
+    squawk_mgr = getattr(request.app.state, "squawk", None)
+    if squawk_mgr:
+        for dev_id in list(squawk_mgr._active_devices.keys()):
+            squawk_mgr.snooze(dev_id, duration)
+
+    return RedirectResponse("/web/settings", status_code=303)
+
+
+@router.post("/settings/squawk-unsnooze")
+async def squawk_unsnooze(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    squawk_mgr = getattr(request.app.state, "squawk", None)
+    if squawk_mgr:
+        for dev_id in list(squawk_mgr._active_devices.keys()):
+            squawk_mgr.unsnooze(dev_id)
 
     return RedirectResponse("/web/settings", status_code=303)
 
