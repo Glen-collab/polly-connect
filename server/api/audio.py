@@ -11,6 +11,7 @@ import base64
 import json
 import logging
 import io
+import random
 import time
 import wave
 from typing import Optional
@@ -113,6 +114,7 @@ async def continuous_stream(websocket: WebSocket):
 
     # Medication scheduler for WebSocket registration
     med_scheduler = getattr(app.state, "med_scheduler", None)
+    squawk_mgr = getattr(app.state, "squawk", None)
 
     try:
         while True:
@@ -167,6 +169,11 @@ async def continuous_stream(websocket: WebSocket):
                         logger.warning(f"Could not load family names: {e}")
 
                     await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
+
+                    # Register for ambient squawk sounds
+                    if squawk_mgr:
+                        squawk_mgr.register_device(device_id, websocket)
+
                     continue
 
                 if event == "ping":
@@ -336,6 +343,11 @@ async def continuous_stream(websocket: WebSocket):
                     if conv_state and conv_state.is_conversational:
                         rms = int(np.sqrt(np.mean(chunk_int16.astype(np.float32) ** 2)))
                         if rms > vad_threshold:
+                            # Interrupt squawk if playing
+                            if squawk_mgr and squawk_mgr.is_playing(device_id):
+                                squawk_mgr.stop_playback(device_id)
+                            if squawk_mgr:
+                                squawk_mgr.reset_idle_timer(device_id)
                             logger.info(f"Voice detected in conversational mode (device: {device_id})")
                             state = "recording"
                             skip_wake_check = True  # don't require wake phrase
@@ -347,8 +359,18 @@ async def continuous_stream(websocket: WebSocket):
                         # Ignore triggers during cooldown after response (speaker feedback)
                         if time.monotonic() - last_response_time < RESPONSE_COOLDOWN:
                             continue
+
+                        # Interrupt any playing squawk/chatter
+                        if squawk_mgr and squawk_mgr.is_playing(device_id):
+                            squawk_mgr.stop_playback(device_id)
+                            logger.info(f"Squawk interrupted by wake word → {device_id}")
+
                         logger.info(f"*** WAKE WORD DETECTED (device: {device_id}) ***")
                         detector.reset()
+
+                        # Reset idle squawk timer on activity
+                        if squawk_mgr:
+                            squawk_mgr.reset_idle_timer(device_id)
 
                         state = "recording"
                         skip_wake_check = False  # require wake phrase
@@ -358,6 +380,10 @@ async def continuous_stream(websocket: WebSocket):
                         command_start_time = time.monotonic()
 
                         await websocket.send_json({"event": "wake_word_detected"})
+
+                        # Short wake squawk (parrot perking up)
+                        if squawk_mgr:
+                            asyncio.ensure_future(squawk_mgr.send_wake_squawk(device_id))
 
                 elif state == "recording":
                     command_audio.extend(chunk_bytes)
@@ -433,6 +459,7 @@ async def continuous_stream(websocket: WebSocket):
                             detector=detector,
                             skip_wake_check=skip_wake_check,
                             pre_transcription=pre_transcription,
+                            squawk_mgr=squawk_mgr,
                         )
 
                         # After processing, reset state
@@ -456,6 +483,8 @@ async def continuous_stream(websocket: WebSocket):
     finally:
         if med_scheduler:
             med_scheduler.unregister_websocket(device_id)
+        if squawk_mgr:
+            squawk_mgr.unregister_device(device_id)
 
 
 async def _process_command(
@@ -468,6 +497,7 @@ async def _process_command(
     detector=None,
     skip_wake_check: bool = False,
     pre_transcription: str = None,
+    squawk_mgr=None,
 ):
     """Run STT → intent parse → CommandProcessor → TTS on buffered command audio."""
     if len(command_audio) == 0 and not pre_transcription:
@@ -508,6 +538,38 @@ async def _process_command(
         logger.info(f"VAD: wake phrase found, command: {cleaned}")
         transcription = cleaned
 
+    # Check if user is telling the parrot to be quiet
+    text_lower = transcription.lower().strip()
+    quiet_phrases = ["be quiet", "shut up", "stop squawking", "quiet", "hush",
+                     "stop talking", "be quiet polly", "shush"]
+    if squawk_mgr and any(p in text_lower for p in quiet_phrases):
+        if squawk_mgr.is_playing(device_id):
+            squawk_mgr.stop_playback(device_id)
+            response_text = random.choice([
+                "<speak>Okay okay!<break time=\"500ms\"/>Squawk.</speak>",
+                "<speak>Fine, I'll be quiet.<break time=\"500ms\"/>For now.</speak>",
+                "<speak>Alright, alright! Sheesh.</speak>",
+            ])
+            await websocket.send_json({
+                "event": "response", "text": response_text,
+                "intent": "be_quiet", "transcription": transcription,
+                "mode": ConversationMode.COMMAND.value,
+            })
+            await _send_tts(websocket, tts, response_text)
+            return
+        # Even if not currently playing, acknowledge it
+        response_text = random.choice([
+            "I wasn't even squawking!", "Who, me? I'm innocent!",
+            "I'll try to keep it down.",
+        ])
+        await websocket.send_json({
+            "event": "response", "text": response_text,
+            "intent": "be_quiet", "transcription": transcription,
+            "mode": ConversationMode.COMMAND.value,
+        })
+        await _send_tts(websocket, tts, response_text)
+        return
+
     # Intent parse
     intent_result = intent_parser.parse(transcription)
     logger.info(f"Intent: {intent_result}")
@@ -532,6 +594,10 @@ async def _process_command(
 
     # Generate and send TTS audio
     await _send_tts(websocket, tts, response_text)
+
+    # Maybe squawk after responding (parrot personality)
+    if squawk_mgr:
+        asyncio.ensure_future(squawk_mgr.maybe_post_response_squawk(device_id))
 
 
 async def _send_tts(websocket: WebSocket, tts, text: str):

@@ -33,6 +33,7 @@ from core.verification import VerificationService
 from core.book_builder import BookBuilder
 from core.vision import VisionService
 from core.auth import APIKeyMiddleware
+from core.squawk import SquawkManager
 from config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -130,6 +131,10 @@ async def lifespan(app: FastAPI):
         narrative_arc=app.state.narrative_arc,
         engagement=app.state.engagement,
     )
+
+    # Squawk / ambient parrot sounds
+    sounds_dir = os.path.join(os.path.dirname(__file__), "static", "sounds")
+    app.state.squawk = SquawkManager(sounds_dir)
 
     # Start medication reminder background task
     await app.state.med_scheduler.start()
