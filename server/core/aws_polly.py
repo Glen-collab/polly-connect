@@ -50,13 +50,20 @@ class AWSPollyTTS(TTSBackend):
             return None
 
         try:
-            response = self._polly.synthesize_speech(
-                Text=text,
+            # Use SSML if text contains SSML tags, otherwise plain text
+            synth_params = dict(
                 OutputFormat="pcm",
                 VoiceId=self.voice_id,
                 Engine="neural",
                 SampleRate="16000",
             )
+            if "<speak>" in text:
+                synth_params["Text"] = text
+                synth_params["TextType"] = "ssml"
+            else:
+                synth_params["Text"] = text
+
+            response = self._polly.synthesize_speech(**synth_params)
 
             # Read PCM stream
             pcm_data = response["AudioStream"].read()

@@ -224,10 +224,18 @@ class CommandProcessor:
         elif intent == "tell_joke":
             joke = self.data.get_joke()
             if joke:
-                resp = f"{joke['setup']} ... {joke['punchline']}"
-                self._last_response[device_id] = resp
+                resp = f"<speak>{joke['setup']}<break time=\"2s\"/>{joke['punchline']}</speak>"
+                self._last_response[device_id] = f"{joke['setup']} ... {joke['punchline']}"
                 return resp
             return "I'm fresh out of jokes right now!"
+
+        elif intent == "tell_kid_joke":
+            joke = self.data.get_kid_joke()
+            if joke:
+                resp = f"<speak>{joke['setup']}<break time=\"2s\"/>{joke['punchline']}</speak>"
+                self._last_response[device_id] = f"{joke['setup']} ... {joke['punchline']}"
+                return resp
+            return "I don't have any kid jokes right now!"
 
         elif intent == "ask_question":
             question = self.data.get_question()

@@ -42,6 +42,16 @@ class IntentParser:
         }
 
         # Trigger phrases for non-memory intents (from polly-config)
+        self._tell_kid_joke_phrases = [
+            "tell me a kid joke", "tell me a kids joke", "kid joke",
+            "tell me a potty joke", "potty joke", "tell me a poop joke",
+            "poop joke", "fart joke", "tell me a fart joke",
+            "tell me a silly joke", "silly joke",
+            "tell me a funny kid joke", "tell me a gross joke",
+            "tell me a unicorn joke", "unicorn joke",
+            "tell me a dinosaur joke", "dinosaur joke",
+            "tell the kids a joke", "joke for kids",
+        ]
         self._tell_joke_phrases = [
             "tell me a joke", "make me laugh", "say something funny",
             "i need a laugh", "cheer me up", "tell a joke",
@@ -150,6 +160,9 @@ class IntentParser:
                     "relationship": intro[1], "confidence": 0.9}
 
         # Check non-memory intents (they're simpler/faster)
+        if self._matches(text_lower, self._tell_kid_joke_phrases):
+            return {"intent": "tell_kid_joke", "confidence": 0.95}
+
         if self._matches(text_lower, self._tell_joke_phrases):
             return {"intent": "tell_joke", "confidence": 0.95}
 

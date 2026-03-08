@@ -15,16 +15,19 @@ class DataLoader:
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
         self.jokes: List[Dict] = []
+        self.kid_jokes: List[Dict] = []
         self.questions: List[Dict] = []
         self.family_questions: List[Dict] = []
         self.config: Dict = {}
 
         # Flat lists for random access
         self._all_jokes: List[Dict] = []
+        self._all_kid_jokes: List[Dict] = []
         self._all_questions: List[Dict] = []
         self._all_family_questions: List[Dict] = []
 
         self._load_jokes()
+        self._load_kid_jokes()
         self._load_questions()
         self._load_family_questions()
         self._load_config()
@@ -41,6 +44,15 @@ class DataLoader:
             for joke in week_block.get("jokes", []):
                 self._all_jokes.append(joke)
         logger.info(f"Loaded {len(self._all_jokes)} jokes")
+
+    def _load_kid_jokes(self):
+        path = os.path.join(self.data_dir, "kid_jokes.json")
+        if not os.path.exists(path):
+            logger.warning(f"Kid jokes file not found: {path}")
+            return
+        with open(path, "r", encoding="utf-8") as f:
+            self._all_kid_jokes = json.load(f)
+        logger.info(f"Loaded {len(self._all_kid_jokes)} kid jokes")
 
     def _load_questions(self):
         path = os.path.join(self.data_dir, "questions.json")
@@ -86,6 +98,12 @@ class DataLoader:
         if not self._all_jokes:
             return None
         return random.choice(self._all_jokes)
+
+    def get_kid_joke(self) -> Optional[Dict]:
+        """Return a random kid joke dict with 'setup' and 'punchline'."""
+        if not self._all_kid_jokes:
+            return None
+        return random.choice(self._all_kid_jokes)
 
     def get_question(self) -> Optional[Dict]:
         """Return a random question dict with 'question', 'theme', 'type'."""
