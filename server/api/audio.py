@@ -118,7 +118,12 @@ async def continuous_stream(websocket: WebSocket):
 
     try:
         while True:
-            message = await websocket.receive()
+            try:
+                message = await websocket.receive()
+            except RuntimeError as e:
+                # "Cannot call receive once a disconnect message has been received"
+                logger.info(f"WebSocket already disconnected: {e}")
+                break
 
             if "text" in message:
                 try:

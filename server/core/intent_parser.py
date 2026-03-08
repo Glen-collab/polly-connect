@@ -524,8 +524,8 @@ class IntentParser:
         """Detect 'I'm going to the store' or 'dad went to work'."""
         # Speaker updating their own status
         self_patterns = [
-            r"i'?m (going to|headed to|heading to|leaving for|off to|at|running to) (.+)",
-            r"i (?:will be |am )?(going to|headed to|heading to|leaving for|off to) (.+)",
+            r"i'?m (going to|going for|headed to|heading to|leaving for|off to|at|running to|out for) (.+)",
+            r"i (?:will be |am )?(going to|going for|headed to|heading to|leaving for|off to|out for) (.+)",
         ]
         for pattern in self_patterns:
             match = re.search(pattern, text)
@@ -536,7 +536,7 @@ class IntentParser:
 
         # Reporting someone else's status — specific verb patterns
         other_patterns = [
-            r"(\w+) (?:is |)(going to|headed to|heading to|leaving for|off to|went to|left for) (.+)",
+            r"(\w+) (?:is |)(going to|going for|headed to|heading to|leaving for|off to|went to|went for|left for|out for) (.+)",
             r"(\w+) is at (.+)",
         ]
         for pattern in other_patterns:
