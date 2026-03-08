@@ -29,9 +29,12 @@ CHATTER_INTERVAL = 2 * 60 * 60  # 2 hours
 # Chance of squawk after a TTS response
 POST_RESPONSE_SQUAWK_CHANCE = 0.20  # 20%
 
+# Volume reduction (0.0 = silent, 1.0 = full)
+SQUAWK_VOLUME = 0.30  # 30% volume so mic doesn't pick it up
 
-def _convert_to_16k_mono(wav_bytes: bytes) -> bytes:
-    """Convert any WAV to 16kHz mono 16-bit WAV."""
+
+def _convert_to_16k_mono(wav_bytes: bytes, volume: float = SQUAWK_VOLUME) -> bytes:
+    """Convert any WAV to 16kHz mono 16-bit WAV with volume adjustment."""
     with wave.open(io.BytesIO(wav_bytes), 'rb') as w:
         channels = w.getnchannels()
         sampwidth = w.getsampwidth()
@@ -58,6 +61,9 @@ def _convert_to_16k_mono(wav_bytes: bytes) -> bytes:
         num_out = int(len(samples) * 16000 / framerate)
         indices = np.linspace(0, len(samples) - 1, num_out)
         samples = np.interp(indices, np.arange(len(samples)), samples)
+
+    # Apply volume reduction
+    samples = samples * volume
 
     # Back to int16
     samples = np.clip(samples, -32768, 32767).astype(np.int16)
@@ -217,8 +223,8 @@ class SquawkManager:
         if not self.squawks:
             return
         if random.random() < POST_RESPONSE_SQUAWK_CHANCE:
-            # Small delay so it feels natural — like a parrot reacting
-            await asyncio.sleep(random.uniform(0.3, 1.0))
+            # Wait past the 3s response cooldown so mic feedback doesn't retrigger
+            await asyncio.sleep(random.uniform(3.5, 5.0))
             await self.send_squawk(device_id)
 
     async def send_wake_squawk(self, device_id: str):

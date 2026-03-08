@@ -381,10 +381,6 @@ async def continuous_stream(websocket: WebSocket):
 
                         await websocket.send_json({"event": "wake_word_detected"})
 
-                        # Short wake squawk (parrot perking up)
-                        if squawk_mgr:
-                            asyncio.ensure_future(squawk_mgr.send_wake_squawk(device_id))
-
                 elif state == "recording":
                     command_audio.extend(chunk_bytes)
 
