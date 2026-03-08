@@ -86,6 +86,7 @@ class SquawkManager:
         self._idle_tasks: Dict[str, asyncio.Task] = {}
         self._chatter_tasks: Dict[str, asyncio.Task] = {}
         self._playing: Dict[str, bool] = {}  # True if currently sending squawk/chatter
+        self._send_locks: Dict[str, asyncio.Lock] = {}  # prevent concurrent WS writes
 
         self._load_sounds(sounds_dir)
 
@@ -119,6 +120,7 @@ class SquawkManager:
         """Start idle squawk timer for a connected device."""
         self._active_devices[device_id] = websocket
         self._playing[device_id] = False
+        self._send_locks[device_id] = asyncio.Lock()
         self._start_idle_timer(device_id)
         if self.chatter:
             self._start_chatter_timer(device_id)
@@ -127,12 +129,17 @@ class SquawkManager:
         """Stop timers when device disconnects."""
         self._active_devices.pop(device_id, None)
         self._playing.pop(device_id, None)
+        self._send_locks.pop(device_id, None)
         task = self._idle_tasks.pop(device_id, None)
         if task:
             task.cancel()
         task = self._chatter_tasks.pop(device_id, None)
         if task:
             task.cancel()
+
+    def get_send_lock(self, device_id: str) -> Optional[asyncio.Lock]:
+        """Get the websocket send lock for a device (used by _send_tts too)."""
+        return self._send_locks.get(device_id)
 
     def stop_playback(self, device_id: str):
         """Interrupt any currently playing squawk/chatter."""
@@ -241,28 +248,33 @@ class SquawkManager:
 
     async def _send_wav(self, ws, device_id: str, wav_data: bytes, interruptible: bool = False):
         """Send WAV data as chunked base64 audio_chunk events."""
-        self._playing[device_id] = True
-        try:
-            # Notify ESP32 that ambient sound is starting
-            await ws.send_json({"event": "squawk_start"})
+        lock = self._send_locks.get(device_id)
+        if not lock:
+            return
 
-            chunk_size = 8000
-            for i in range(0, len(wav_data), chunk_size):
-                if not self._playing.get(device_id, False):
-                    logger.info(f"Squawk/chatter interrupted → {device_id}")
-                    break
-                chunk = wav_data[i:i + chunk_size]
-                chunk_b64 = base64.b64encode(chunk).decode()
-                await ws.send_json({
-                    "event": "audio_chunk",
-                    "audio": chunk_b64,
-                    "final": (i + chunk_size >= len(wav_data)),
-                    "squawk": True,
-                })
-                await asyncio.sleep(0.05)
+        async with lock:
+            self._playing[device_id] = True
+            try:
+                # Notify ESP32 that ambient sound is starting
+                await ws.send_json({"event": "squawk_start"})
 
-            await ws.send_json({"event": "squawk_end"})
-        except Exception as e:
-            logger.error(f"Squawk send error: {e}")
-        finally:
-            self._playing[device_id] = False
+                chunk_size = 8000
+                for i in range(0, len(wav_data), chunk_size):
+                    if not self._playing.get(device_id, False):
+                        logger.info(f"Squawk/chatter interrupted → {device_id}")
+                        break
+                    chunk = wav_data[i:i + chunk_size]
+                    chunk_b64 = base64.b64encode(chunk).decode()
+                    await ws.send_json({
+                        "event": "audio_chunk",
+                        "audio": chunk_b64,
+                        "final": (i + chunk_size >= len(wav_data)),
+                        "squawk": True,
+                    })
+                    await asyncio.sleep(0.05)
+
+                await ws.send_json({"event": "squawk_end"})
+            except Exception as e:
+                logger.error(f"Squawk send error: {e}")
+            finally:
+                self._playing[device_id] = False

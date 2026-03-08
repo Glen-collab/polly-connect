@@ -195,7 +195,7 @@ async def continuous_stream(websocket: WebSocket):
                         announce = "Recording started. Tell your story, and press the button again when you're done."
                         await websocket.send_json({"event": "story_record_started"})
                         await websocket.send_json({"event": "response", "text": announce, "mode": "story_record"})
-                        await _send_tts(websocket, tts, announce)
+                        await _send_tts(websocket, tts, announce, squawk_mgr=squawk_mgr, device_id=device_id)
                         last_response_time = time.monotonic()
 
                     elif action == "stop" and story_session is not None:
@@ -259,7 +259,7 @@ async def continuous_stream(websocket: WebSocket):
                         announce = f"Got it! Recording saved. That was {mins} minutes and {secs} seconds."
                         await websocket.send_json({"event": "story_record_stopped"})
                         await websocket.send_json({"event": "response", "text": announce, "mode": "command"})
-                        await _send_tts(websocket, tts, announce)
+                        await _send_tts(websocket, tts, announce, squawk_mgr=squawk_mgr, device_id=device_id)
                         last_response_time = time.monotonic()
 
                     continue
@@ -320,7 +320,7 @@ async def continuous_stream(websocket: WebSocket):
                     announce = "We hit the thirty minute mark, so I saved your recording. You can start another one anytime."
                     await websocket.send_json({"event": "story_record_stopped"})
                     await websocket.send_json({"event": "response", "text": announce, "mode": "command"})
-                    await _send_tts(websocket, tts, announce)
+                    await _send_tts(websocket, tts, announce, squawk_mgr=squawk_mgr, device_id=device_id)
                     last_response_time = time.monotonic()
 
             pcm_buffer.extend(pcm_data)
@@ -438,7 +438,7 @@ async def continuous_stream(websocket: WebSocket):
                                     "text": prompt,
                                     "intent": "still_there_prompt",
                                 })
-                                await _send_tts(websocket, tts, prompt)
+                                await _send_tts(websocket, tts, prompt, squawk_mgr=squawk_mgr, device_id=device_id)
                                 accumulated_parts.append(bytes(command_audio))
                                 state = "listening"
                                 command_audio = bytearray()
@@ -520,7 +520,7 @@ async def _process_command(
     if not transcription:
         fallback = "I didn't catch that."
         await websocket.send_json({"event": "response", "text": fallback, "audio": None})
-        await _send_tts(websocket, tts, fallback)
+        await _send_tts(websocket, tts, fallback, squawk_mgr=squawk_mgr, device_id=device_id)
         return
 
     # If using VAD detector, check transcription for wake phrase (skip in conversational mode)
@@ -551,7 +551,7 @@ async def _process_command(
                 "intent": "be_quiet", "transcription": transcription,
                 "mode": ConversationMode.COMMAND.value,
             })
-            await _send_tts(websocket, tts, response_text)
+            await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
             return
         # Even if not currently playing, acknowledge it
         response_text = random.choice([
@@ -563,7 +563,7 @@ async def _process_command(
             "intent": "be_quiet", "transcription": transcription,
             "mode": ConversationMode.COMMAND.value,
         })
-        await _send_tts(websocket, tts, response_text)
+        await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
         return
 
     # Intent parse
@@ -589,18 +589,24 @@ async def _process_command(
     })
 
     # Generate and send TTS audio
-    await _send_tts(websocket, tts, response_text)
+    await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
 
     # Maybe squawk after responding (parrot personality)
     if squawk_mgr:
         asyncio.ensure_future(squawk_mgr.maybe_post_response_squawk(device_id))
 
 
-async def _send_tts(websocket: WebSocket, tts, text: str):
+async def _send_tts(websocket: WebSocket, tts, text: str, squawk_mgr=None, device_id: str = None):
     """Generate TTS audio and send as chunked base64."""
     try:
         tts_audio = tts.synthesize(text)
-        if tts_audio:
+        if not tts_audio:
+            return
+
+        # Acquire send lock if available (prevents concurrent writes with squawk)
+        lock = squawk_mgr.get_send_lock(device_id) if squawk_mgr and device_id else None
+
+        async def _do_send():
             chunk_size = 8000
             for i in range(0, len(tts_audio), chunk_size):
                 chunk = tts_audio[i:i + chunk_size]
@@ -611,6 +617,12 @@ async def _send_tts(websocket: WebSocket, tts, text: str):
                     "final": (i + chunk_size >= len(tts_audio)),
                 })
                 await asyncio.sleep(0.05)
+
+        if lock:
+            async with lock:
+                await _do_send()
+        else:
+            await _do_send()
     except Exception as e:
         import traceback
         logger.error(f"TTS error: {e}")
