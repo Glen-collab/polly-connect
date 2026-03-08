@@ -170,9 +170,10 @@ async def continuous_stream(websocket: WebSocket):
 
                     await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
 
-                    # Register for ambient squawk sounds
+                    # Register for ambient squawk sounds + startup squawk
                     if squawk_mgr:
                         squawk_mgr.register_device(device_id, websocket)
+                        await squawk_mgr.send_squawk(device_id)
 
                     continue
 
