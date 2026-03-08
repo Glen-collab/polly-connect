@@ -18,7 +18,7 @@
             <div>
                 <label class="block text-sm text-gray-600 mb-1">To <span class="text-gray-400">(optional)</span></label>
                 <select name="to_name" class="w-full border rounded px-3 py-2 text-sm bg-white">
-                    <option value="">Everyone</option>
+                    <option value="Everyone">Everyone</option>
                     {% for member in family_members %}
                     <option value="{{ member.name }}">{{ member.name }}</option>
                     {% endfor %}
