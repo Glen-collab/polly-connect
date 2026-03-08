@@ -146,8 +146,8 @@ class IntentParser:
         self._bible_phrases = [
             "read me a verse", "bible verse", "today's verse",
             "give me a verse", "read me today's verse",
-            "verse about", "scripture", "read me a psalm",
-            "psalm", "read me a proverb", "proverb",
+            "verse about", "scripture", "read me a psalm", "read me a salm",
+            "psalm", "salm", "read me a proverb", "proverb",
             "read me from the bible", "daily verse",
             "read me some scripture", "what does the bible say",
             "i need a bible verse", "give me some scripture",
@@ -326,7 +326,7 @@ class IntentParser:
             topic_match = re.search(r"verse about (.+)", text_lower)
             if topic_match:
                 topic = topic_match.group(1).strip()
-            elif "psalm" in text_lower:
+            elif "psalm" in text_lower or "salm" in text_lower:
                 topic = "Psalm"
             elif "proverb" in text_lower:
                 topic = "Proverb"
