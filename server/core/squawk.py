@@ -27,7 +27,7 @@ IDLE_SQUAWK_MAX = 15 * 60   # 15 minutes
 CHATTER_INTERVAL = 2 * 60 * 60  # 2 hours
 
 # Chance of squawk after a TTS response
-POST_RESPONSE_SQUAWK_CHANCE = 0.20  # 20%
+POST_RESPONSE_SQUAWK_CHANCE = 0.50  # 50%
 
 # Volume reduction (0.0 = silent, 1.0 = full)
 SQUAWK_VOLUME = 0.30  # 30% volume so mic doesn't pick it up
