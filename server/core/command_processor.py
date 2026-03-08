@@ -184,10 +184,12 @@ class CommandProcessor:
                 parts = []
                 for m in messages[:5]:
                     name = m['from_name'].title()
-                    msg = self._natural_status(m['message'])
                     if m["to_name"]:
-                        parts.append(f"{name} to {m['to_name'].title()}: {msg}")
+                        # Direct message — read as-is
+                        parts.append(f"{name} says to {m['to_name'].title()}: {m['message']}")
                     else:
+                        # Status update — add natural preposition
+                        msg = self._natural_status(m['message'])
                         parts.append(f"{name} is {msg}")
                 resp = f"You have {len(messages)} message{'s' if len(messages) > 1 else ''} on the board. " + ". ".join(parts) + "."
                 self._last_response[device_id] = resp
