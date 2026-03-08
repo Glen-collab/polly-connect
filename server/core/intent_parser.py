@@ -34,7 +34,7 @@ class IntentParser:
             "ask me about my family", "family question", "ask me a family question",
             "family story", "ask me something about my life",
             "ask me about my life", "tell me about my family",
-            "ask me something", "ask me a question about my life",
+            "ask me a question about my life",
             "i want to answer questions", "interview me",
             "let's do a family question", "give me a question",
             "ask me about my past", "ask me about growing up",
@@ -79,7 +79,7 @@ class IntentParser:
             "let's hear a joke", "how about a joke",
         ]
         self._ask_question_phrases = [
-            "ask me a question", "ask me something", "let's talk",
+            "ask me a question", "let's talk",
             "got any questions for me", "what do you want to know",
             "i'm ready for a question", "go ahead and ask me",
             "let's do a question", "question time",
@@ -301,6 +301,41 @@ class IntentParser:
             return {"intent": "status_update", "person": status_update["person"],
                     "status": status_update["status"], "confidence": 0.85}
 
+        # ── Content intents (before memory/item to avoid false matches) ──
+
+        if self._matches(text_lower, self._bible_phrases):
+            topic = None
+            topic_match = re.search(r"verse about (.+)", text_lower)
+            if topic_match:
+                topic = topic_match.group(1).strip()
+            elif "psalm" in text_lower:
+                topic = "Psalm"
+            elif "proverb" in text_lower:
+                topic = "Proverb"
+            return {"intent": "bible_verse", "topic": topic, "confidence": 0.9}
+
+        if self._matches(text_lower, self._medication_phrases):
+            return {"intent": "medication", "confidence": 0.9, "raw": text}
+
+        if self._matches(text_lower, self._weather_phrases):
+            return {"intent": "weather", "confidence": 0.9}
+
+        if self._matches(text_lower, self._time_phrases):
+            return {"intent": "tell_time", "confidence": 0.95}
+
+        if self._matches(text_lower, self._date_phrases):
+            return {"intent": "tell_date", "confidence": 0.95}
+
+        if self._matches(text_lower, self._thank_you_phrases):
+            return {"intent": "thank_you", "confidence": 0.9}
+
+        # "Who is [name]?" — extract the name
+        who_match = re.search(r"(?:who(?:'s| is) )(.+?)(?:\?|$)", text_lower)
+        if who_match:
+            name = who_match.group(1).strip()
+            if name and name not in ("this", "that", "it", "there", "here"):
+                return {"intent": "who_is", "name": name, "confidence": 0.9}
+
         # ── Memory/item intents ──
         if self._is_help(text_lower):
             return {"intent": "help", "confidence": 1.0}
@@ -341,40 +376,6 @@ class IntentParser:
 
         if self._matches(text_lower, self._stop_phrases):
             return {"intent": "stop", "confidence": 0.95}
-
-        if self._matches(text_lower, self._bible_phrases):
-            # Extract topic if present: "verse about strength", "read me a psalm"
-            topic = None
-            topic_match = re.search(r"verse about (.+)", text_lower)
-            if topic_match:
-                topic = topic_match.group(1).strip()
-            elif "psalm" in text_lower:
-                topic = "Psalm"
-            elif "proverb" in text_lower:
-                topic = "Proverb"
-            return {"intent": "bible_verse", "topic": topic, "confidence": 0.9}
-
-        if self._matches(text_lower, self._medication_phrases):
-            return {"intent": "medication", "confidence": 0.9, "raw": text}
-
-        if self._matches(text_lower, self._weather_phrases):
-            return {"intent": "weather", "confidence": 0.9}
-
-        if self._matches(text_lower, self._time_phrases):
-            return {"intent": "tell_time", "confidence": 0.95}
-
-        if self._matches(text_lower, self._date_phrases):
-            return {"intent": "tell_date", "confidence": 0.95}
-
-        if self._matches(text_lower, self._thank_you_phrases):
-            return {"intent": "thank_you", "confidence": 0.9}
-
-        # "Who is [name]?" — extract the name
-        who_match = re.search(r"(?:who(?:'s| is) )(.+?)(?:\?|$)", text_lower)
-        if who_match:
-            name = who_match.group(1).strip()
-            if name and name not in ("this", "that", "it", "there", "here"):
-                return {"intent": "who_is", "name": name, "confidence": 0.9}
 
         if self._matches(text_lower, self._greeting_phrases):
             return {"intent": "greeting", "confidence": 0.9}
