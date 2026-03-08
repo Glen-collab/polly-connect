@@ -185,11 +185,11 @@ class AlmanacWeather:
         return None
 
     def _format_real_weather(self, weather: Dict) -> str:
-        """Format real weather data into conversational speech."""
+        """Format real weather data into brief conversational speech."""
         parts = []
         location = weather.get("location_name") or weather.get("location", "your area")
 
-        # Current conditions
+        # Current conditions — keep it short
         temp = weather.get("current_temp_f")
         desc = weather.get("current_desc", "")
         if temp is not None:
@@ -200,38 +200,31 @@ class AlmanacWeather:
         elif desc:
             parts.append(f"Right now in {location}, it's {desc.lower()}.")
 
-        # Humidity and wind
-        extras = []
-        humidity = weather.get("humidity")
-        if humidity is not None:
-            extras.append(f"humidity is {humidity} percent")
-        wind = weather.get("wind_mph")
-        if wind is not None and wind > 0:
-            extras.append(f"winds around {wind} miles per hour")
-        if extras:
-            parts.append(f"The {', and '.join(extras)}.")
-
-        # Today's/tonight's forecast
+        # Today's short forecast only (not the detailed paragraph)
         current_period = weather.get("current_period")
         if current_period:
             name = current_period.get("name", "Today")
-            detailed = current_period.get("detailedForecast", "")
-            if detailed:
-                parts.append(f"{name}: {detailed}")
+            short = current_period.get("shortForecast", "")
+            high_low = current_period.get("temperature")
+            trend = current_period.get("temperatureTrend", "")
+            if short and high_low:
+                temp_word = "a high" if "day" in name.lower() or name == "Today" else "a low"
+                parts.append(f"{name}, {short.lower()} with {temp_word} of {high_low}.")
+            elif short:
+                parts.append(f"{name}: {short.lower()}.")
 
-        # Upcoming periods (just names and short forecasts)
+        # Tomorrow in one line
         periods = weather.get("periods", [])
-        upcoming = []
-        for p in periods[1:4]:  # Next 2-3 periods
-            short = p.get("shortForecast", "")
-            temp_val = p.get("temperature")
+        for p in periods[1:3]:
             name = p.get("name", "")
-            if short and temp_val:
-                upcoming.append(f"{name}, {short}, {temp_val} degrees")
-        if upcoming:
-            parts.append("Coming up: " + ". ".join(upcoming) + ".")
+            if "night" not in name.lower():
+                short = p.get("shortForecast", "")
+                temp_val = p.get("temperature")
+                if short and temp_val:
+                    parts.append(f"{name}, {short.lower()}, {temp_val} degrees.")
+                break
 
-        # Add almanac fun fact
+        # Almanac fun fact
         parts.append(random.choice(ALMANAC_NOTES))
 
         return " ".join(parts)

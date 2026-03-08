@@ -465,16 +465,19 @@ async def continuous_stream(websocket: WebSocket):
                             pre_transcription = check_text
                             logger.info(f"Conversational speech detected: {check_text[:100]}")
 
-                        await _process_command(
+                        tts_duration = await _process_command(
                             websocket, command_audio, transcriber, tts, cmd, device_id,
                             detector=detector,
                             skip_wake_check=skip_wake_check,
                             pre_transcription=pre_transcription,
                             squawk_mgr=squawk_mgr,
-                        )
+                        ) or 0.0
 
                         # After processing, reset state
+                        # Dynamic cooldown: base 3s + audio playback time
+                        # ESP32 buffers audio, so it's still playing after we finish sending
                         still_there_prompted = False
+                        RESPONSE_COOLDOWN = max(3.0, tts_duration + 1.0)
                         last_response_time = time.monotonic()
                         pre_roll = bytearray()
                         if conv_state and conv_state.is_conversational:
@@ -509,11 +512,12 @@ async def _process_command(
     skip_wake_check: bool = False,
     pre_transcription: str = None,
     squawk_mgr=None,
-):
-    """Run STT → intent parse → CommandProcessor → TTS on buffered command audio."""
+) -> float:
+    """Run STT → intent parse → CommandProcessor → TTS on buffered command audio.
+    Returns estimated TTS playback duration in seconds for cooldown calculation."""
     if len(command_audio) == 0 and not pre_transcription:
         await websocket.send_json({"event": "response", "text": "I didn't hear anything.", "audio": None})
-        return
+        return 0.0
 
     if pre_transcription:
         transcription = pre_transcription
@@ -535,8 +539,8 @@ async def _process_command(
     if not transcription:
         fallback = "I didn't catch that."
         await websocket.send_json({"event": "response", "text": fallback, "audio": None})
-        await _send_tts(websocket, tts, fallback, squawk_mgr=squawk_mgr, device_id=device_id)
-        return
+        dur = await _send_tts(websocket, tts, fallback, squawk_mgr=squawk_mgr, device_id=device_id)
+        return dur
 
     # If using VAD detector, check transcription for wake phrase (skip in conversational mode)
     if detector and isinstance(detector, VADWakeWordDetector) and not skip_wake_check:
@@ -545,7 +549,7 @@ async def _process_command(
             logger.info(f"VAD: no wake phrase in transcription, ignoring: {transcription}")
             # Tell ESP32 to resume streaming (no command to process)
             await websocket.send_json({"event": "no_wake_word", "text": transcription})
-            return
+            return 0.0
         logger.info(f"VAD: wake phrase found, command: {cleaned}")
         transcription = cleaned
 
@@ -566,8 +570,8 @@ async def _process_command(
                 "intent": "be_quiet", "transcription": transcription,
                 "mode": ConversationMode.COMMAND.value,
             })
-            await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
-            return
+            dur = await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
+            return dur
         # Even if not currently playing, acknowledge it
         response_text = random.choice([
             "I wasn't even squawking!", "Who, me? I'm innocent!",
@@ -578,8 +582,8 @@ async def _process_command(
             "intent": "be_quiet", "transcription": transcription,
             "mode": ConversationMode.COMMAND.value,
         })
-        await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
-        return
+        dur = await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
+        return dur
 
     # Intent parse
     intent_result = intent_parser.parse(transcription)
@@ -604,19 +608,24 @@ async def _process_command(
     })
 
     # Generate and send TTS audio
-    await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
+    duration = await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
 
     # Maybe squawk after responding (parrot personality)
     if squawk_mgr:
         asyncio.ensure_future(squawk_mgr.maybe_post_response_squawk(device_id))
 
+    return duration
 
-async def _send_tts(websocket: WebSocket, tts, text: str, squawk_mgr=None, device_id: str = None):
-    """Generate TTS audio and send as chunked base64."""
+
+async def _send_tts(websocket: WebSocket, tts, text: str, squawk_mgr=None, device_id: str = None) -> float:
+    """Generate TTS audio and send as chunked base64. Returns estimated playback duration in seconds."""
     try:
         tts_audio = tts.synthesize(text)
         if not tts_audio:
-            return
+            return 0.0
+
+        # Estimate playback duration: 16kHz, 16-bit mono = 32000 bytes/sec
+        audio_duration = len(tts_audio) / 32000.0
 
         # Acquire send lock if available (prevents concurrent writes with squawk)
         lock = squawk_mgr.get_send_lock(device_id) if squawk_mgr and device_id else None
@@ -638,10 +647,13 @@ async def _send_tts(websocket: WebSocket, tts, text: str, squawk_mgr=None, devic
                 await _do_send()
         else:
             await _do_send()
+
+        return audio_duration
     except Exception as e:
         import traceback
         logger.error(f"TTS error: {e}")
         traceback.print_exc()
+        return 0.0
 
 
 # ─── Original Event-Based Stream Handler ─────────────────────────────────────
