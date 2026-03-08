@@ -1084,6 +1084,10 @@ static void ws_event_handler(void *arg, esp_event_base_t event_base,
         case WEBSOCKET_EVENT_CONNECTED:
             ESP_LOGI(TAG, "WebSocket connected to server");
             ws_connected = true;
+            streaming_paused = false;       // Reset in case disconnect happened mid-response
+            response_complete = false;
+            response_audio_len = 0;
+            story_recording = false;
 
             // Send connect event with device identity and API key
             {
@@ -1120,6 +1124,8 @@ static void ws_event_handler(void *arg, esp_event_base_t event_base,
         case WEBSOCKET_EVENT_DISCONNECTED:
             ESP_LOGW(TAG, "WebSocket disconnected");
             ws_connected = false;
+            streaming_paused = false;  // Unstick mic loop
+            led_set(0);               // LED off to indicate disconnected
             break;
 
         case WEBSOCKET_EVENT_ERROR:
@@ -1228,6 +1234,8 @@ static void mic_stream_task(void *arg)
 
     uint32_t ping_timer = 0;
     uint32_t rms_debug_counter = 0;
+    uint32_t disconnect_counter = 0;       // Watchdog: counts ticks while disconnected
+    const uint32_t WATCHDOG_REBOOT_MS = 60000;  // Reboot after 60s disconnected
 
     while (1) {
         // Handle wake word detection — just LED, keep streaming
@@ -1285,6 +1293,21 @@ static void mic_stream_task(void *arg)
             // While paused or disconnected, still read mic to keep I2S flowing
             mic_read(audio_chunk, CHUNK_SAMPLES);
             vTaskDelay(pdMS_TO_TICKS(10));
+
+            // Watchdog: if disconnected too long, reboot
+            if (!ws_connected) {
+                disconnect_counter += 10;
+                if (disconnect_counter >= WATCHDOG_REBOOT_MS) {
+                    ESP_LOGE(TAG, "WebSocket disconnected for %lus — rebooting!", WATCHDOG_REBOOT_MS / 1000);
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    esp_restart();
+                }
+            }
+        }
+
+        // Reset watchdog when connected
+        if (ws_connected) {
+            disconnect_counter = 0;
         }
 
         // Story button (K1/+) toggle — send start/stop to server
