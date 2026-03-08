@@ -277,7 +277,7 @@ class CommandProcessor:
             return self.data.get_response("goodbye") or "Okay, take care."
 
         elif intent == "tell_time":
-            now = datetime.now(ZoneInfo("America/New_York"))
+            now = datetime.now(ZoneInfo("America/Chicago"))
             hour = now.strftime("%I").lstrip("0")
             minute = now.strftime("%M")
             ampm = now.strftime("%p").replace("AM", "A M").replace("PM", "P M")
@@ -289,7 +289,7 @@ class CommandProcessor:
             return resp
 
         elif intent == "tell_date":
-            now = datetime.now(ZoneInfo("America/New_York"))
+            now = datetime.now(ZoneInfo("America/Chicago"))
             resp = f"Today is {now.strftime('%A, %B')} {now.day}, {now.year}."
             self._last_response[device_id] = resp
             return resp
