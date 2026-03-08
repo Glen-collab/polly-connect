@@ -306,16 +306,44 @@ async def story_edit(request: Request, story_id: int):
     if not story:
         return RedirectResponse("/web/stories")
 
+    audio_url = f"https://polly-connect.com/static/recordings/{story['audio_s3_key']}" if story.get('audio_s3_key') else None
     return templates.TemplateResponse("story_edit.html", {
         "request": request,
         "session": session,
         "story": story,
+        "audio_url": audio_url,
     })
 
 
 @router.post("/stories/{story_id}/edit")
-async def story_edit_save(request: Request, story_id: int,
-                          transcript: str = Form(""), speaker_name: str = Form("")):
+async def story_edit_save(request: Request, story_id: int):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    form = await request.form()
+    transcript = form.get("transcript", "")
+    speaker_name = form.get("speaker_name", "")
+    qr_in_book = 1 if form.get("qr_in_book") else 0
+
+    db = request.app.state.db
+    conn = db._get_connection()
+    try:
+        conn.execute("""
+            UPDATE stories SET transcript = ?, speaker_name = ?, qr_in_book = ?
+            WHERE id = ? AND tenant_id = ?
+        """, (transcript, speaker_name or None, qr_in_book, story_id, session["tenant_id"]))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return RedirectResponse(f"/web/stories/{story_id}/edit", status_code=303)
+
+
+@router.get("/stories/{story_id}/qr.png")
+async def story_qr_code(request: Request, story_id: int):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -324,16 +352,63 @@ async def story_edit_save(request: Request, story_id: int,
     db = request.app.state.db
     conn = db._get_connection()
     try:
-        conn.execute("""
-            UPDATE stories SET transcript = ?, speaker_name = ?
-            WHERE id = ? AND tenant_id = ?
-        """, (transcript, speaker_name or None, story_id, session["tenant_id"]))
+        conn.row_factory = __import__("sqlite3").Row
+        story = conn.execute(
+            "SELECT audio_s3_key FROM stories WHERE id = ? AND tenant_id = ?",
+            (story_id, session["tenant_id"])
+        ).fetchone()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    if not story or not story["audio_s3_key"]:
+        from fastapi.responses import Response
+        return Response(status_code=404)
+
+    url = f"https://polly-connect.com/static/recordings/{story['audio_s3_key']}"
+    from core.book_pdf import _generate_qr_image
+    qr_buf = _generate_qr_image(url, size_px=200)
+    if not qr_buf:
+        from fastapi.responses import Response
+        return Response(status_code=500)
+
+    from fastapi.responses import Response
+    return Response(content=qr_buf.read(), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
+@router.post("/stories/{story_id}/delete")
+async def story_delete(request: Request, story_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    conn = db._get_connection()
+    try:
+        conn.row_factory = __import__("sqlite3").Row
+        story = conn.execute(
+            "SELECT audio_s3_key FROM stories WHERE id = ? AND tenant_id = ?",
+            (story_id, session["tenant_id"])
+        ).fetchone()
+
+        conn.execute("DELETE FROM memories WHERE story_id = ? AND tenant_id = ?",
+                     (story_id, session["tenant_id"]))
+        conn.execute("DELETE FROM stories WHERE id = ? AND tenant_id = ?",
+                     (story_id, session["tenant_id"]))
         conn.commit()
     finally:
         if not db._conn:
             conn.close()
 
-    return RedirectResponse(f"/web/stories/{story_id}/edit", status_code=303)
+    if story and story["audio_s3_key"]:
+        import os
+        audio_path = os.path.join("server", "static", "recordings", story["audio_s3_key"])
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
+
+    return RedirectResponse("/web/stories", status_code=303)
 
 
 @router.get("/medications", response_class=HTMLResponse)

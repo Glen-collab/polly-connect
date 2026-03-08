@@ -403,22 +403,21 @@ class LegacyBookPDF:
                         self.styles['BodyFirst'],
                     ))
 
-            # QR code for audio companion
+            # QR codes for audio companions (per-memory, filtered by qr_in_book)
             if include_qr_codes:
-                audio_keys = self._get_chapter_audio_keys(ch)
-                if audio_keys:
+                audio_entries = self._get_chapter_audio_entries(ch)
+                if audio_entries:
                     story.append(Spacer(1, 18))
-                    # Use first audio recording for the QR
-                    audio_url = f"{AUDIO_BASE_URL}/{audio_keys[0]}"
-                    qr_buf = _generate_qr_image(audio_url)
-                    if qr_buf:
-                        story.append(Spacer(1, 6))
-                        img = Image(qr_buf, width=QR_SIZE, height=QR_SIZE)
-                        story.append(img)
-                        story.append(Paragraph(
-                            "Scan to hear the original voice recording",
-                            self.styles['QRCaption'],
-                        ))
+                    for entry in audio_entries:
+                        audio_url = f"{AUDIO_BASE_URL}/{entry['audio_key']}"
+                        qr_buf = _generate_qr_image(audio_url)
+                        if qr_buf:
+                            story.append(Spacer(1, 6))
+                            img = Image(qr_buf, width=QR_SIZE, height=QR_SIZE)
+                            story.append(img)
+                            caption = f"Hear {entry['speaker']}'s voice" if entry.get('speaker') else "Scan to hear the original voice recording"
+                            story.append(Paragraph(caption, self.styles['QRCaption']))
+                            story.append(Spacer(1, 8))
 
             story.append(PageBreak())
 
@@ -477,13 +476,20 @@ class LegacyBookPDF:
         )
         canvas.restoreState()
 
-    def _get_chapter_audio_keys(self, chapter: dict) -> List[str]:
-        """Get audio file keys for memories in a chapter."""
-        keys = []
+    def _get_chapter_audio_entries(self, chapter: dict) -> List[dict]:
+        """Get audio entries for memories in a chapter, filtered by qr_in_book."""
+        entries = []
+        seen_keys = set()
         for mid in chapter.get("memory_ids", []):
             mem = self.db.get_memory_by_id(mid)
             if mem and mem.get("story_id"):
                 story = self.db.get_story_by_id(mem["story_id"])
-                if story and story.get("audio_s3_key"):
-                    keys.append(story["audio_s3_key"])
-        return keys
+                if (story and story.get("audio_s3_key")
+                        and story.get("qr_in_book", 1)
+                        and story["audio_s3_key"] not in seen_keys):
+                    seen_keys.add(story["audio_s3_key"])
+                    entries.append({
+                        "audio_key": story["audio_s3_key"],
+                        "speaker": story.get("speaker_name", ""),
+                    })
+        return entries
