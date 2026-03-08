@@ -19,20 +19,32 @@ class IntentParser:
             "let me tell you about", "i remember when", "i want to tell you",
             "let me share", "i have a story", "tell me a story",
             "i want to share", "record my story", "take my story",
+            "story time", "i want to record", "i have something to share",
+            "i want to tell a story", "let me tell you something",
+            "can i tell you something", "i got a story",
+            "i have a memory to share", "can i share a story",
         ]
         self._hear_stories_phrases = [
             "tell me about", "what did", "play back",
             "what stories", "any stories about", "what has",
+            "read me a story", "play a story", "do you have any stories",
+            "what have you heard about",
         ]
         self._family_question_phrases = [
             "ask me about my family", "family question", "ask me a family question",
             "family story", "ask me something about my life",
             "ask me about my life", "tell me about my family",
+            "ask me something", "ask me a question about my life",
+            "i want to answer questions", "interview me",
+            "let's do a family question", "give me a question",
+            "ask me about my past", "ask me about growing up",
         ]
         self._story_progress_phrases = [
             "how many stories", "my progress", "how are we doing",
             "story progress", "how many memories", "show my progress",
             "what have we captured", "book progress",
+            "how's the book coming", "how's my book",
+            "how far along are we", "how many have we done",
         ]
 
         self.container_words = {
@@ -51,13 +63,26 @@ class IntentParser:
             "tell me a unicorn joke", "unicorn joke",
             "tell me a dinosaur joke", "dinosaur joke",
             "tell the kids a joke", "joke for kids",
+            "joke for the kids", "got a kid joke",
+            "do you know any kid jokes", "say a funny joke for kids",
+            "kids joke", "tell us a kid joke",
+            "tell a kid joke", "got any kid jokes",
         ]
         self._tell_joke_phrases = [
             "tell me a joke", "make me laugh", "say something funny",
             "i need a laugh", "cheer me up", "tell a joke",
+            "got any jokes", "do you know any jokes", "know any jokes",
+            "give me a joke", "hit me with a joke", "another joke",
+            "tell me another joke", "tell me another one",
+            "one more joke", "got another joke", "joke please",
+            "can you tell me a joke", "do you have any jokes",
+            "let's hear a joke", "how about a joke",
         ]
         self._ask_question_phrases = [
             "ask me a question", "ask me something", "let's talk",
+            "got any questions for me", "what do you want to know",
+            "i'm ready for a question", "go ahead and ask me",
+            "let's do a question", "question time",
         ]
         self._repeat_phrases = [
             "repeat", "say that again", "what did you say", "what was that",
@@ -66,10 +91,15 @@ class IntentParser:
             "ask me again", "ask me that again", "ask that again",
             "what was the question", "what did you ask", "say it again",
             "can you ask me again", "ask that question again",
+            "huh", "excuse me", "i missed that", "sorry what",
+            "can you say that again", "repeat that please",
+            "tell me again", "run that by me again",
         ]
         self._slower_phrases = [
             "slower", "slow down", "talk slower", "speak slower",
             "too fast", "not so fast", "can you slow down",
+            "you're talking too fast", "that was too fast",
+            "speak more slowly", "take it slow",
         ]
         self._thinking_phrases = [
             "i'm still thinking", "still thinking", "hang on",
@@ -83,18 +113,31 @@ class IntentParser:
         self._skip_phrases = [
             "skip", "next question", "skip this one", "i don't know",
             "pass", "next one", "move on",
+            "skip that", "i'll skip that one", "give me a different one",
+            "try another one", "different question", "ask me something else",
+            "i don't want to answer that", "i'd rather not",
         ]
         self._stop_phrases = [
             "stop", "that's enough", "i'm tired", "let's stop",
             "no more", "i'm done", "enough for today",
+            "i'm finished", "we're done", "that's all",
+            "that's it", "let's be done", "all done",
+            "i'm all done", "no more questions",
+            "that's all for now", "we can stop",
         ]
         self._goodbye_phrases = [
             "goodbye polly", "bye polly", "goodbye", "bye bye",
-            "see you later", "good night",
+            "see you later", "good night", "goodnight",
+            "goodnight polly", "nighty night", "see you tomorrow",
+            "see ya", "bye", "later polly", "talk to you later",
+            "i'm going to bed", "going to sleep",
         ]
         self._greeting_phrases = [
             "hello polly", "hi polly", "hey polly", "good morning",
             "good afternoon", "good evening", "hello", "hi there",
+            "good morning polly", "morning polly", "morning",
+            "hey there", "howdy", "what's up polly",
+            "how are you polly", "how are you doing",
         ]
         self._bible_phrases = [
             "read me a verse", "bible verse", "today's verse",
@@ -102,11 +145,22 @@ class IntentParser:
             "verse about", "scripture", "read me a psalm",
             "psalm", "read me a proverb", "proverb",
             "read me from the bible", "daily verse",
+            "read me some scripture", "what does the bible say",
+            "i need a bible verse", "give me some scripture",
+            "read from the bible", "do you have a verse",
+            "can you read me a verse", "what's today's verse",
+            "inspirational verse", "devotional",
         ]
         self._medication_phrases = [
             "remind me to take", "medication", "my pills",
             "what medications", "did i take my pills", "medicine",
-            "med reminder",
+            "med reminder", "what pills do i take", "my meds",
+            "what are my meds", "when do i take my pills",
+            "when is my next pill", "pill schedule",
+            "did i take my meds", "have i taken my medicine",
+            "i took my pills", "i took my meds", "meds taken",
+            "i already took my medicine", "took my medication",
+            "what medicine do i take",
         ]
         # Message board intents
         self._check_messages_phrases = [
@@ -120,30 +174,50 @@ class IntentParser:
         self._clear_messages_phrases = [
             "clear the board", "clear messages", "clear the message board",
             "delete messages", "erase the board", "wipe the board",
+            "delete all messages", "clear all messages", "remove all messages",
+            "get rid of the messages", "erase messages", "wipe messages",
+            "clean the board", "empty the board",
         ]
         self._person_status_words = {
             "dad", "mom", "daddy", "mommy", "papa", "mama",
             "grandma", "grandpa", "brother", "sister",
+            "nana", "nanny", "pops", "poppy", "granny",
+            "auntie", "aunt", "uncle", "cousin",
+            "hubby", "husband", "wife", "wifey",
         }
 
         self._weather_phrases = [
             "what's the weather", "what is the weather", "weather this week",
             "weather today", "farmer's almanac", "forecast",
+            "how's the weather", "what's it like outside",
+            "is it going to rain", "what's the forecast",
+            "what's the weather like", "weather report",
+            "do i need an umbrella", "is it cold outside",
+            "what's it going to be like this week",
         ]
 
         self._time_phrases = [
             "what time is it", "what's the time", "what is the time",
             "do you have the time", "tell me the time", "current time",
+            "what time do you have", "can you tell me the time",
+            "you got the time", "what time you got",
         ]
         self._date_phrases = [
             "what day is it", "what's today's date", "what is today's date",
             "what's the date", "what is the date", "what day is today",
             "what is today", "what's today", "today's date",
+            "what day of the week is it", "what month is it",
+            "what year is it", "what's the date today",
+            "can you tell me the date", "do you know what day it is",
         ]
         self._thank_you_phrases = [
             "thank you", "thanks polly", "thanks", "thank you polly",
             "appreciate it", "that was helpful", "you're the best",
             "thanks so much", "thank you so much",
+            "that's very kind", "you're sweet", "you're so helpful",
+            "i appreciate that", "thanks a lot", "thanks a bunch",
+            "that was great", "perfect thank you", "awesome thanks",
+            "great job polly", "good job polly", "nice one polly",
         ]
         self._who_is_phrases = [
             "who is", "who's",
@@ -320,7 +394,13 @@ class IntentParser:
         return False
 
     def _is_help(self, text: str) -> bool:
-        patterns = [r"\bhelp\b", r"\bwhat can you do\b", r"\bhow do (i|you)\b"]
+        patterns = [
+            r"\bhelp\b", r"\bwhat can you do\b", r"\bhow do (i|you)\b",
+            r"\bwhat do you do\b", r"\bwhat are you\b",
+            r"\bwhat can i (ask|say|do)\b", r"\bwhat are your commands\b",
+            r"\bwhat else can you do\b", r"\bwhat are you capable of\b",
+            r"\bi need help\b", r"\bcan you help me\b",
+        ]
         return any(re.search(p, text) for p in patterns)
 
     def _is_list(self, text: str) -> bool:
