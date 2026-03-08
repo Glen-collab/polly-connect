@@ -31,9 +31,11 @@ A parrot companion device for elderly users. Revolves around **one primary user*
 
 ## Feature 2: WAV Button (Story Capture)
 
-- Physical illuminated button on the ESP32 device
+- Physical button on the ESP32 device (K1/+ on Waveshare, BOOT on breadboard)
 - Caretaker or family member presses it to capture special family moments
 - User can press it themselves to just talk and save for the book
+- Press once to start recording, press again to stop (or auto-stops at 30 minutes)
+- LED turns solid during recording; Polly announces "Recording started" / "Recording stopped"
 - Saved WAV is transcribed and feeds into Legacy Book alongside Story Mode and Questions
 - Think of it as a "save this moment" button
 
@@ -90,13 +92,14 @@ A parrot companion device for elderly users. Revolves around **one primary user*
 
 ---
 
-## Feature 6: Farmer's Almanac Weather
+## Feature 6: Weather (Real + Almanac)
 
-- Trigger: "What's the weather this week?"
-- Responds with Farmer's Almanac style prediction (not a live weather API)
-- Pre-loaded forecasts by week for a full year ahead
-- Fits the old-school, comforting, conversational vibe
-- Can be updated annually with new almanac data
+- Trigger: "What's the weather?" / "Do I need an umbrella?"
+- **Real weather** from Weather.gov API (free, no key needed)
+- Auto-detects location from device IP via geolocation
+- Current conditions + today's forecast + tomorrow + Farmer's Almanac fun fact
+- Falls back to pre-loaded almanac forecasts if API fails
+- 2-hour cache per IP to minimize API calls
 
 ---
 
@@ -114,22 +117,57 @@ A parrot companion device for elderly users. Revolves around **one primary user*
 
 ## Feature 8: Jokes & Personality
 
-- 460+ jokes, organized by season/week
+- 1,040+ jokes + 100 kid jokes (fart, poop, dinosaur, unicorn)
 - Casual conversation triggers: "Tell me a joke", "Make me laugh", "Cheer me up"
+- Kid jokes: "Tell me a kid joke", "Tell me a fart joke", "Tell me a dinosaur joke"
+- SSML punchline timing with 2-second dramatic pause
 - Seasonal rotation keeps it fresh
 - This is what makes Polly feel alive — not just a tool, but a companion
+
+---
+
+## Feature 8b: Parrot Sounds & Ambient Personality
+
+- 5 short squawks (0.6-1.8s) + 3 parakeet chatter clips (~50s each)
+- **Startup squawk**: plays when device connects (confirms Polly is ready)
+- **Post-response squawk**: 50% chance after any TTS response
+- **Idle squawk**: random every 5-60 minutes (configurable)
+- **Chatter**: random every 15 min-4 hours (configurable)
+- **Quiet Hours**: Polly goes to sleep at bedtime, wakes up in the morning (configurable)
+- **Snooze**: temporarily quiet all sounds from web portal (30 min, 1 hr, 2 hr, 8 hr)
+- **Interruptible**: "Be quiet", "Shut up", "Hush", "Shush" with sassy responses
+- All sounds server-side — no firmware changes needed
 
 ---
 
 ## Feature 9: Help & Navigation
 
 - Voice-driven commands:
-  - "What can you do?" → capabilities overview
-  - "Repeat that" → replays last response
-  - "Skip" / "Next question" → moves on
-  - "Stop" / "Be quiet" → ends current interaction
-  - "Help" → guidance on what to say
+  - "What can you do?" / "Help" → capabilities overview
+  - "Repeat that" / "Say that again" → replays last response
+  - "Skip" / "Next question" / "I don't know" → moves on
+  - "Stop" / "I'm done" / "That's enough" → ends current interaction
+  - "Be quiet" / "Hush" → silences Polly's squawking
+  - "What time is it?" → current time
+  - "What day is it?" → current date
+  - "Thank you" → polite response
+  - "Who is [name]?" → family tree lookup
+  - "Goodbye" / "Good night" → farewell
 - Discoverable and forgiving — designed for elderly users
+
+---
+
+## Feature 9b: Family Message Board
+
+- **Status updates**: "Dad is going to work" / "I'm going for a walk"
+- **Direct messages**: "Tell Dad I'm going to the store"
+- **Check messages**: "Any messages?" / "Read my messages"
+- **Person queries**: "Where is Dad?"
+- **Clear by person**: "Dad is home" (clears dad's messages)
+- **Clear all**: "Clear the board"
+- Messages auto-expire after 24 hours
+- Web message board at /web/messages (send/delete/clear)
+- Family tree names loaded for person recognition
 
 ---
 
@@ -183,24 +221,18 @@ A parrot companion device for elderly users. Revolves around **one primary user*
 
 ## Tech Stack (Current → Target)
 
-### Current (Local)
-- ESP32-S3 (mic, speaker, LED, button)
-- Python FastAPI server on local machine
-- Whisper for speech-to-text
-- pyttsx3 for TTS
-- SQLite database
-- Wake word: custom ONNX model ("Hey Polly")
-
-### Target (Cloud — AWS Free Tier Start)
-- ESP32-S3 → connects to cloud endpoint
-- EC2 (t2.micro free tier) → FastAPI brain server
-- Amazon Transcribe → speech-to-text
-- Amazon Polly → TTS (neural voice)
-- S3 → WAV files, transcripts, book chapters, songs
-- DynamoDB → structured data (Q&A, memory, meds, profiles)
-- OpenAI API → summaries, themes, book writing, follow-up questions
-- Suno API → personalized music generation
-- ChatGPT Vision → camera item recognition
+### Deployed Stack (Live at polly-connect.com)
+- **Hardware:** ESP32-S3 (breadboard + Waveshare ESP32-S3-AUDIO)
+- **Server:** AWS EC2 + Python 3.11 + FastAPI + Uvicorn
+- **STT:** Google Cloud STT (free tier)
+- **TTS:** AWS Polly (female voice, SSML support)
+- **Database:** SQLite (22 tables, WAL mode)
+- **AI:** OpenAI GPT-4o (Vision photo scan, chapter drafts), GPT-3.5-turbo (follow-ups)
+- **Weather:** Weather.gov API (free) + IP geolocation
+- **SSL:** Let's Encrypt via certbot + Nginx reverse proxy
+- **Domain:** polly-connect.com (GoDaddy)
+- **Wake word:** Server-side VAD (RMS threshold detection)
+- **WiFi Provisioning:** AP captive portal ("Polly-Setup") with DNS redirect
 
 ---
 

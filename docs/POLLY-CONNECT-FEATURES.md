@@ -19,7 +19,7 @@ The system has three audiences:
 
 ## Hardware
 
-### Polly Device (ESP32-S3)
+### Breadboard Prototype (ESP32-S3)
 - **Board:** ESP32-S3-WROOM-1 with 8MB PSRAM and 16MB flash
 - **Microphone:** INMP441 I2S MEMS mic (GPIO 4/5/6)
 - **Speaker:** MAX98357A I2S amplifier (GPIO 10/11/12)
@@ -27,6 +27,14 @@ The system has three audiences:
 - **Story Button:** GPIO 0 (BOOT button, doubles as story record toggle during runtime)
 - **Power:** USB-C, 5V via AMS1117-3.3 regulator
 - **Connectivity:** WiFi (2.4GHz), streams audio to cloud server via WebSocket
+
+### Waveshare ESP32-S3 AI Smart Speaker
+- **Board:** Waveshare ESP32-S3-AUDIO with ES7210 (4-ch ADC), ES8311 (DAC), TCA9555 (I/O expander)
+- **I2C bus:** SDA=GPIO11, SCL=GPIO10 (shared for ES7210, ES8311, TCA9555)
+- **I2S bus:** MCLK=GPIO12, BCLK=GPIO13, WS=GPIO14, DOUT=GPIO16, DIN=GPIO15
+- **Buttons:** K1/+ (story record), K2/SET, K3, BOOT, Reset — via TCA9555 I/O expander
+- **Story Button:** K1/+ (TCA9555 Port 1 bit 1) — press to start/stop story recording
+- **WiFi Provisioning:** AP captive portal ("Polly-Setup"), DNS redirect, force-provision via BOOT hold
 
 ### Custom PCB (In Progress)
 - KiCad 9.0.7 schematic verified and complete
@@ -67,13 +75,26 @@ The system has three audiences:
 
 ### Voice Commands
 - "Tell me a joke" — random joke from 1,040-joke database
-- "Read me a bible verse" / "Give me scripture" — daily verse from 336-verse collection
-- "What's the weather" — local forecast from 52-week almanac
-- "Ask me a question" / "Ask me something" — guided family question
-- "Record my story" / "Let me tell you about..." — free-form story mode
-- "What do you remember?" — plays back stored memories
-- "What medications do I take?" — reads medication schedule
+- "Tell me a kid joke" / "Tell me a fart joke" — 100 silly kid jokes
+- "Read me a bible verse" / "Verse about hope" — daily verse from 336-verse collection
+- "What's the weather" / "Do I need an umbrella?" — real local weather + almanac fun fact
+- "Ask me a family question" — guided family question (story mode)
+- "Tell me a story" / "Record my story" — free-form story mode
+- "How many stories do I have?" — story progress
+- "My keys are on the counter" / "Where are my keys?" — item memory
+- "What are my medications?" / "I took my medicine" — medication info + logging
+- "Tell Dad I'm going to the store" — leave a message
+- "Dad is going to work" / "I'm going for a walk" — status update
+- "Any messages?" — check message board
+- "Where is Dad?" — person location query
+- "Dad is home" — clear person's messages
+- "Clear the board" — clear all messages
+- "Who is Mia?" — family tree lookup
+- "What time is it?" / "What day is it?" — time and date
+- "Be quiet" / "Hush" / "Shut up" — silence squawking
 - "My name is [name]" — speaker introduction and identity tracking
+- "Help" / "What can you do?" — capabilities overview
+- K1/+ button press — start/stop WAV story recording (up to 30 minutes)
 
 ---
 
@@ -235,7 +256,8 @@ Print-ready 6x9 inch PDF generated on demand:
 | Med Edit | /web/medications/{id}/edit | Owner only | Edit medication details |
 | Med Calendar | /web/medications/calendar | All logged in | Download .ics calendar |
 | Setup | /web/setup | Owner only | Owner/caretaker names and emails |
-| Settings | /web/settings | Owner only | Preferences + family code management |
+| Settings | /web/settings | Owner only | Preferences, squawk intervals, quiet hours, snooze, family codes |
+| Messages | /web/messages | All logged in | Family message board (send/delete/clear) |
 | Devices | /web/devices | Owner only | Manage Polly devices + API keys |
 
 ### AI Photo Scan
@@ -290,7 +312,35 @@ sudo systemctl restart polly-connect
 
 ---
 
-## Database Schema (21 Tables)
+## Parrot Sounds & Ambient Personality
+
+- 5 short squawks (0.6-1.8s) + 3 parakeet chatter clips (~50s each)
+- Startup squawk on device connect (confirms Polly is ready)
+- Post-response squawk: 50% chance after any TTS response
+- Idle squawk interval: configurable (5-60 minutes, default 10)
+- Chatter interval: configurable (15 min-4 hours, default 45 min)
+- **Quiet Hours**: automatic bedtime/wake schedule (default 9 PM-7 AM)
+- **Snooze**: temporarily quiet all sounds from web portal (30 min / 1 hr / 2 hr / 8 hr)
+- **Interruptible**: "Be quiet", "Shut up", "Hush", "Shush" with sassy responses
+- All sounds auto-converted to 16kHz mono, volume reduced to 30%
+- All server-side — no firmware changes needed
+
+---
+
+## Family Message Board
+
+- Voice status updates: "Dad is going to work" / "I'm going for a walk"
+- Voice messages: "Tell Dad I'm going to the store"
+- Voice queries: "Any messages?" / "Where is Dad?"
+- "Dad is home" clears dad's messages from board
+- Messages auto-expire after 24 hours
+- Web message board at /web/messages (send/delete/clear)
+- Family tree names loaded for person recognition
+- Status vs. direct message readback formatting
+
+---
+
+## Database Schema (22 Tables)
 
 | Table | Purpose |
 |-------|---------|
@@ -314,6 +364,7 @@ sudo systemctl restart polly-connect
 | joke_history | Which jokes have been told |
 | bible_verses | 336 verses (shared, not per-tenant) |
 | almanac_weather | 52-week weather forecasts (shared) |
+| family_messages | Message board (from, to, message, expiry) |
 
 ---
 
@@ -351,14 +402,21 @@ sudo systemctl restart polly-connect
 | server/core/family_identity.py | Speaker intro + relationship tracking |
 | server/core/web_auth.py | Session handling, login, family access |
 | server/core/medications.py | Medication scheduler + voice push |
-| firmware/polly-s3-wakeword/main/main.c | ESP32 firmware (mic, speaker, WiFi, WebSocket, button) |
+| server/core/squawk.py | Parrot sounds, intervals, quiet hours, snooze |
+| server/core/intent_parser.py | Voice command recognition (35+ intents) |
+| firmware/polly-s3-wakeword/main/main.c | ESP32 firmware — breadboard (INMP441 + MAX98357A) |
+| firmware/polly-waveshare-s3/main/main.c | ESP32 firmware — Waveshare (ES7210 + ES8311 + TCA9555 + K1 button) |
 
 ---
 
 ## What's Next
 
+### Immediate (Pre-Trial)
+- Flash second Waveshare device for family deployment
+- Full end-to-end voice pipeline test (test_A automated suite)
+- Family trial: real story capture with Grandma
+
 ### Short Term
-- Full family story flow test with a real user
 - Install OpenAI package on EC2 for AI chapter generation
 - Test print via Book Bolt / KDP
 - Audio companion web page behind QR codes
@@ -368,6 +426,7 @@ sudo systemctl restart polly-connect
 - Lulu API integration for automated print-on-demand
 - Cover template generator with family photos
 - Mobile app wrapper (PWA or native)
+- Suno AI personalized music generation
 
 ### Long Term
 - Multi-device household support

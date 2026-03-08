@@ -25,10 +25,12 @@ class IntentParser:
             "i have a memory to share", "can i share a story",
         ]
         self._hear_stories_phrases = [
-            "tell me about", "what did", "play back",
-            "what stories", "any stories about", "what has",
+            "tell me about", "play back",
+            "what stories", "any stories about",
             "read me a story", "play a story", "do you have any stories",
             "what have you heard about", "play my stories", "read my stories",
+            "what did grandma say", "what did she say", "what did he say",
+            "what has grandma said", "what has she said",
         ]
         self._family_question_phrases = [
             "ask me about my family", "family question", "ask me a family question",
@@ -493,7 +495,7 @@ class IntentParser:
     def _looks_like_location(self, text: str) -> bool:
         text_lower = text.lower()
         for word in self.container_words:
-            if word in text_lower:
+            if re.search(r'\b' + re.escape(word) + r'\b', text_lower):
                 return True
         if re.search(r'(red|blue|green|black|white|yellow)\s+\w+', text_lower):
             return True
@@ -532,6 +534,9 @@ class IntentParser:
             if match:
                 action = match.group(1).strip()
                 destination = match.group(2).strip()
+                # "going to bed/sleep" is a goodbye, not a status update
+                if destination in ("bed", "sleep"):
+                    return None
                 return {"person": None, "status": f"{action} {destination}"}
 
         # Reporting someone else's status — specific verb patterns
