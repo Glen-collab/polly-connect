@@ -112,7 +112,10 @@ class IntentParser:
         self._check_messages_phrases = [
             "any messages", "check messages", "do i have messages",
             "are there any messages", "messages for me", "check the board",
-            "what's on the board", "message board",
+            "what's on the board", "message board", "what are my messages",
+            "read my messages", "read me my messages", "do i have any messages",
+            "what messages do i have", "any new messages", "read the messages",
+            "what did i miss", "anything on the board",
         ]
         self._clear_messages_phrases = [
             "clear the board", "clear messages", "clear the message board",
