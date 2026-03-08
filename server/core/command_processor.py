@@ -6,6 +6,7 @@ Tracks last_response per device for "repeat" functionality.
 
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Optional, Tuple
 
 from core.conversation_state import ConversationMode, ConversationState
@@ -276,7 +277,7 @@ class CommandProcessor:
             return self.data.get_response("goodbye") or "Okay, take care."
 
         elif intent == "tell_time":
-            now = datetime.now()
+            now = datetime.now(ZoneInfo("America/New_York"))
             hour = now.strftime("%I").lstrip("0")
             minute = now.strftime("%M")
             ampm = now.strftime("%p").replace("AM", "A M").replace("PM", "P M")
@@ -288,7 +289,7 @@ class CommandProcessor:
             return resp
 
         elif intent == "tell_date":
-            now = datetime.now()
+            now = datetime.now(ZoneInfo("America/New_York"))
             resp = f"Today is {now.strftime('%A, %B')} {now.day}, {now.year}."
             self._last_response[device_id] = resp
             return resp
