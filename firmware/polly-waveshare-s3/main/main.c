@@ -47,6 +47,9 @@
 #include "esp_websocket_client.h"
 #include "cJSON.h"
 #include "mbedtls/base64.h"
+#include "esp_http_server.h"
+#include "esp_netif.h"
+#include "lwip/sockets.h"
 
 static const char *TAG = "POLLY-WS";
 
@@ -421,6 +424,56 @@ static size_t mic_read(int16_t *buffer, size_t samples)
 
 /* --- WiFi --- */
 
+// Provisioning state
+static SemaphoreHandle_t provision_done_sem = NULL;
+static esp_netif_t *sta_netif = NULL;
+static esp_netif_t *ap_netif = NULL;
+static httpd_handle_t portal_server = NULL;
+static TaskHandle_t dns_task_handle = NULL;
+static char prov_ssid[33] = {0};
+static char prov_pass[65] = {0};
+
+// --- NVS helpers ---
+
+static bool wifi_nvs_load(char *ssid, size_t ssid_len, char *pass, size_t pass_len)
+{
+    nvs_handle_t h;
+    if (nvs_open("wifi_cfg", NVS_READONLY, &h) != ESP_OK) return false;
+    uint8_t configured = 0;
+    nvs_get_u8(h, "configured", &configured);
+    if (!configured) { nvs_close(h); return false; }
+    esp_err_t r1 = nvs_get_str(h, "ssid", ssid, &ssid_len);
+    esp_err_t r2 = nvs_get_str(h, "password", pass, &pass_len);
+    nvs_close(h);
+    return (r1 == ESP_OK && r2 == ESP_OK && strlen(ssid) > 0);
+}
+
+static esp_err_t wifi_nvs_save(const char *ssid, const char *pass)
+{
+    nvs_handle_t h;
+    ESP_ERROR_CHECK(nvs_open("wifi_cfg", NVS_READWRITE, &h));
+    nvs_set_str(h, "ssid", ssid);
+    nvs_set_str(h, "password", pass);
+    nvs_set_u8(h, "configured", 1);
+    nvs_commit(h);
+    nvs_close(h);
+    ESP_LOGI(TAG, "WiFi credentials saved to NVS");
+    return ESP_OK;
+}
+
+static esp_err_t wifi_nvs_clear(void)
+{
+    nvs_handle_t h;
+    ESP_ERROR_CHECK(nvs_open("wifi_cfg", NVS_READWRITE, &h));
+    nvs_erase_all(h);
+    nvs_commit(h);
+    nvs_close(h);
+    ESP_LOGI(TAG, "WiFi credentials cleared from NVS");
+    return ESP_OK;
+}
+
+// --- STA connection ---
+
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                 int32_t event_id, void *event_data)
 {
@@ -442,13 +495,15 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-static void wifi_init(void)
+static bool wifi_try_sta(const char *ssid, const char *pass)
 {
-    wifi_event_group = xEventGroupCreate();
+    ESP_LOGI(TAG, "Trying WiFi: '%s'", ssid);
+    wifi_retry_count = 0;
 
+    wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
+    sta_netif = esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -459,23 +514,414 @@ static void wifi_init(void)
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
                                                          &wifi_event_handler, NULL, &got_ip));
 
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = WIFI_SSID,
-            .password = WIFI_PASSWORD,
-        },
-    };
+    wifi_config_t wifi_config = {0};
+    strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
+    strncpy((char *)wifi_config.sta.password, pass, sizeof(wifi_config.sta.password) - 1);
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "Connecting to WiFi '%s'...", WIFI_SSID);
-
     EventBits_t bits = xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT,
                                             pdFALSE, pdFALSE, pdMS_TO_TICKS(15000));
-    if (!(bits & WIFI_CONNECTED_BIT)) {
-        ESP_LOGW(TAG, "WiFi connection timed out - will keep retrying in background");
+    if (bits & WIFI_CONNECTED_BIT) {
+        return true;
     }
+
+    // Failed — tear down for clean AP start
+    ESP_LOGW(TAG, "WiFi '%s' failed, cleaning up", ssid);
+    esp_wifi_stop();
+    esp_wifi_deinit();
+    esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, any_id);
+    esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, got_ip);
+    esp_event_loop_delete_default();
+    esp_netif_destroy_default_wifi(sta_netif);
+    sta_netif = NULL;
+    vEventGroupDelete(wifi_event_group);
+    wifi_event_group = NULL;
+
+    return false;
+}
+
+// --- URL decode helper ---
+
+static void url_decode(char *dst, const char *src, size_t dst_size)
+{
+    size_t di = 0;
+    for (size_t si = 0; src[si] && di < dst_size - 1; si++) {
+        if (src[si] == '%' && src[si+1] && src[si+2]) {
+            char hex[3] = { src[si+1], src[si+2], 0 };
+            dst[di++] = (char)strtol(hex, NULL, 16);
+            si += 2;
+        } else if (src[si] == '+') {
+            dst[di++] = ' ';
+        } else {
+            dst[di++] = src[si];
+        }
+    }
+    dst[di] = '\0';
+}
+
+// --- Captive portal HTML ---
+
+static const char CAPTIVE_PORTAL_HTML[] =
+"<!DOCTYPE html><html><head>"
+"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+"<title>Polly WiFi Setup</title>"
+"<style>"
+"body{font-family:sans-serif;background:#1a1a2e;color:#e0e0e0;margin:0;padding:20px;}"
+"h1{color:#4fc3f7;text-align:center;font-size:24px;}"
+"h2{color:#81d4fa;font-size:18px;margin-top:20px;}"
+".net{background:#16213e;padding:12px;margin:6px 0;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}"
+".net:active{background:#0f3460;}"
+".bars{color:#4fc3f7;font-size:16px;}"
+"input{width:100%;padding:12px;margin:8px 0;border:1px solid #333;border-radius:8px;background:#16213e;color:#e0e0e0;font-size:16px;box-sizing:border-box;}"
+"button{width:100%;padding:14px;margin:8px 0;border:none;border-radius:8px;font-size:18px;cursor:pointer;}"
+".scan-btn{background:#0f3460;color:#4fc3f7;}"
+".connect-btn{background:#4fc3f7;color:#1a1a2e;font-weight:bold;}"
+".status{text-align:center;padding:10px;color:#81d4fa;}"
+".parrot{text-align:center;font-size:48px;margin:10px 0;}"
+"</style></head><body>"
+"<div class='parrot'>&#x1F99C;</div>"
+"<h1>Polly WiFi Setup</h1>"
+"<button class='scan-btn' onclick='scan()'>Scan for Networks</button>"
+"<div id='nets'></div>"
+"<h2>WiFi Network</h2>"
+"<input id='ssid' placeholder='Network name (SSID)'>"
+"<input id='pass' type='password' placeholder='Password'>"
+"<button class='connect-btn' onclick='save()'>Connect</button>"
+"<div id='status' class='status'></div>"
+"<script>"
+"function scan(){"
+"document.getElementById('status').innerText='Scanning...';"
+"fetch('/scan').then(r=>r.json()).then(d=>{"
+"let h='';"
+"d.forEach(n=>{"
+"let b=n.rssi>-50?'\\u2589\\u2589\\u2589\\u2589':n.rssi>-65?'\\u2589\\u2589\\u2589':n.rssi>-75?'\\u2589\\u2589':'\\u2589';"
+"h+='<div class=\"net\" onclick=\"document.getElementById(\\'ssid\\').value=\\''+n.ssid.replace(/'/g,'\\\\\\'')+'\\'\">';"
+"h+='<span>'+n.ssid+'</span><span class=\"bars\">'+b+'</span></div>';"
+"});"
+"document.getElementById('nets').innerHTML=h;"
+"document.getElementById('status').innerText=d.length+' networks found';"
+"}).catch(e=>{document.getElementById('status').innerText='Scan failed';});"
+"}"
+"function save(){"
+"let s=document.getElementById('ssid').value,p=document.getElementById('pass').value;"
+"if(!s){document.getElementById('status').innerText='Enter a network name';return;}"
+"document.getElementById('status').innerText='Saving... Polly will reboot!';"
+"fetch('/connect',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},"
+"body:'ssid='+encodeURIComponent(s)+'&password='+encodeURIComponent(p)"
+"}).then(r=>r.text()).then(t=>{"
+"document.getElementById('status').innerText='Saved! Polly is rebooting...';"
+"}).catch(e=>{document.getElementById('status').innerText='Error: '+e;});"
+"}"
+"scan();"
+"</script></body></html>";
+
+// --- DNS redirect (captive portal trigger) ---
+
+static void dns_redirect_task(void *arg)
+{
+    int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sock < 0) {
+        ESP_LOGE(TAG, "DNS socket failed");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(53),
+        .sin_addr.s_addr = htonl(INADDR_ANY),
+    };
+    bind(sock, (struct sockaddr *)&addr, sizeof(addr));
+
+    // Set receive timeout so we can check for task deletion
+    struct timeval tv = { .tv_sec = 2, .tv_usec = 0 };
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    uint8_t buf[512];
+    struct sockaddr_in client;
+    socklen_t client_len;
+
+    ESP_LOGI(TAG, "DNS redirect server started on port 53");
+
+    while (1) {
+        client_len = sizeof(client);
+        int len = recvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr *)&client, &client_len);
+        if (len < 12) continue;  // too short or timeout
+
+        // Build DNS response
+        uint8_t resp[512];
+        memcpy(resp, buf, len);  // copy query
+
+        // Set flags: QR=1, AA=1, no error
+        resp[2] = 0x84;
+        resp[3] = 0x00;
+        // ANCOUNT = 1
+        resp[6] = 0x00;
+        resp[7] = 0x01;
+
+        // Append answer after the query section
+        int pos = len;
+        // Name pointer to question
+        resp[pos++] = 0xC0;
+        resp[pos++] = 0x0C;
+        // Type A
+        resp[pos++] = 0x00; resp[pos++] = 0x01;
+        // Class IN
+        resp[pos++] = 0x00; resp[pos++] = 0x01;
+        // TTL = 60
+        resp[pos++] = 0x00; resp[pos++] = 0x00; resp[pos++] = 0x00; resp[pos++] = 0x3C;
+        // RDLENGTH = 4
+        resp[pos++] = 0x00; resp[pos++] = 0x04;
+        // IP = 192.168.4.1
+        resp[pos++] = 192; resp[pos++] = 168; resp[pos++] = 4; resp[pos++] = 1;
+
+        sendto(sock, resp, pos, 0, (struct sockaddr *)&client, client_len);
+    }
+
+    close(sock);
+    vTaskDelete(NULL);
+}
+
+// --- HTTP handlers ---
+
+static esp_err_t portal_get_handler(httpd_req_t *req)
+{
+    const char *uri = req->uri;
+
+    // /scan endpoint: return JSON list of WiFi networks
+    if (strstr(uri, "/scan")) {
+        // Need APSTA mode for scanning
+        esp_wifi_set_mode(WIFI_MODE_APSTA);
+        vTaskDelay(pdMS_TO_TICKS(100));
+
+        wifi_scan_config_t scan_cfg = { .show_hidden = false };
+        esp_wifi_scan_start(&scan_cfg, true);
+
+        uint16_t ap_count = 0;
+        esp_wifi_scan_get_ap_num(&ap_count);
+        if (ap_count > 20) ap_count = 20;
+
+        wifi_ap_record_t *ap_list = malloc(ap_count * sizeof(wifi_ap_record_t));
+        esp_wifi_scan_get_ap_records(&ap_count, ap_list);
+
+        // Back to AP only
+        esp_wifi_set_mode(WIFI_MODE_AP);
+
+        // Build JSON
+        char *json = malloc(2048);
+        int offset = 0;
+        offset += snprintf(json + offset, 2048 - offset, "[");
+
+        // Deduplicate by SSID
+        for (int i = 0; i < ap_count && offset < 1900; i++) {
+            if (strlen((char *)ap_list[i].ssid) == 0) continue;
+
+            // Check for duplicate SSID
+            bool dup = false;
+            for (int j = 0; j < i; j++) {
+                if (strcmp((char *)ap_list[i].ssid, (char *)ap_list[j].ssid) == 0) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (dup) continue;
+
+            if (offset > 1) offset += snprintf(json + offset, 2048 - offset, ",");
+            offset += snprintf(json + offset, 2048 - offset,
+                "{\"ssid\":\"%s\",\"rssi\":%d,\"auth\":%d}",
+                (char *)ap_list[i].ssid, ap_list[i].rssi, ap_list[i].authmode);
+        }
+        offset += snprintf(json + offset, 2048 - offset, "]");
+
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, json, offset);
+
+        free(ap_list);
+        free(json);
+        return ESP_OK;
+    }
+
+    // All other GETs: serve captive portal HTML
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_send(req, CAPTIVE_PORTAL_HTML, sizeof(CAPTIVE_PORTAL_HTML) - 1);
+    return ESP_OK;
+}
+
+static esp_err_t portal_post_handler(httpd_req_t *req)
+{
+    char body[256] = {0};
+    int len = httpd_req_recv(req, body, sizeof(body) - 1);
+    if (len <= 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data");
+        return ESP_FAIL;
+    }
+    body[len] = '\0';
+
+    // Parse ssid=...&password=...
+    char raw_ssid[65] = {0}, raw_pass[65] = {0};
+    char *ssid_start = strstr(body, "ssid=");
+    char *pass_start = strstr(body, "password=");
+
+    if (ssid_start) {
+        ssid_start += 5;
+        char *end = strchr(ssid_start, '&');
+        if (end) *end = '\0';
+        url_decode(raw_ssid, ssid_start, sizeof(raw_ssid));
+        if (end) *end = '&';
+    }
+    if (pass_start) {
+        pass_start += 9;
+        char *end = strchr(pass_start, '&');
+        if (end) *end = '\0';
+        url_decode(raw_pass, pass_start, sizeof(raw_pass));
+    }
+
+    if (strlen(raw_ssid) == 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SSID required");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Portal: saving WiFi '%s'", raw_ssid);
+    wifi_nvs_save(raw_ssid, raw_pass);
+
+    const char *resp = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<style>body{font-family:sans-serif;background:#1a1a2e;color:#e0e0e0;text-align:center;padding:40px;}"
+        "h1{color:#4fc3f7;}</style></head><body>"
+        "<h1>&#x1F99C; Saved!</h1><p>Polly is rebooting and will connect to your WiFi.</p>"
+        "<p>You can close this page.</p></body></html>";
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_send(req, resp, strlen(resp));
+
+    // Give the response time to send, then reboot
+    xSemaphoreGive(provision_done_sem);
+
+    return ESP_OK;
+}
+
+// --- Captive portal start ---
+
+static void captive_portal_start(void)
+{
+    ESP_LOGI(TAG, "Starting WiFi provisioning (AP mode)...");
+
+    provision_done_sem = xSemaphoreCreateBinary();
+
+    // Init WiFi in AP mode
+    wifi_event_group = xEventGroupCreate();
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    ap_netif = esp_netif_create_default_wifi_ap();
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    wifi_config_t ap_config = {
+        .ap = {
+            .ssid = "Polly-Setup",
+            .ssid_len = 11,
+            .password = "",
+            .max_connection = 2,
+            .authmode = WIFI_AUTH_OPEN,
+            .channel = 1,
+        },
+    };
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    ESP_LOGI(TAG, "AP 'Polly-Setup' started. Connect and go to 192.168.4.1");
+
+    // Start DNS redirect for captive portal auto-open
+    xTaskCreate(dns_redirect_task, "dns_redirect", 4096, NULL, 5, &dns_task_handle);
+
+    // Start HTTP server
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers = 8;
+    config.uri_match_fn = httpd_uri_match_wildcard;
+    config.lru_purge_enable = true;
+
+    ESP_ERROR_CHECK(httpd_start(&portal_server, &config));
+
+    httpd_uri_t post_uri = {
+        .uri = "/connect",
+        .method = HTTP_POST,
+        .handler = portal_post_handler,
+    };
+    httpd_register_uri_handler(portal_server, &post_uri);
+
+    // Wildcard GET must be registered AFTER specific routes
+    httpd_uri_t get_uri = {
+        .uri = "/*",
+        .method = HTTP_GET,
+        .handler = portal_get_handler,
+    };
+    httpd_register_uri_handler(portal_server, &get_uri);
+
+    // Blink LED: slow blink = provisioning mode
+    ESP_LOGI(TAG, "Waiting for WiFi credentials via captive portal...");
+
+    // Block until credentials submitted (blink LED while waiting)
+    while (xSemaphoreTake(provision_done_sem, pdMS_TO_TICKS(500)) != pdTRUE) {
+        static bool led_on = false;
+        led_on = !led_on;
+        led_set(led_on ? 1 : 0);
+    }
+
+    led_set(1);
+    ESP_LOGI(TAG, "Credentials received! Rebooting in 2 seconds...");
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    esp_restart();
+}
+
+// --- Main provisioning init (replaces wifi_init) ---
+
+static void wifi_provision_init(void)
+{
+    // Check if GPIO0 (BOOT button) is held at startup = force provisioning
+    gpio_config_t btn_check = {
+        .pin_bit_mask = (1ULL << GPIO_NUM_0),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+    };
+    gpio_config(&btn_check);
+
+    bool force_provision = false;
+    if (gpio_get_level(GPIO_NUM_0) == 0) {
+        ESP_LOGW(TAG, "BOOT button held — hold for 3 seconds to enter WiFi setup...");
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        if (gpio_get_level(GPIO_NUM_0) == 0) {
+            ESP_LOGW(TAG, "Entering WiFi provisioning mode!");
+            wifi_nvs_clear();
+            force_provision = true;
+        }
+    }
+
+    if (!force_provision) {
+        // Try NVS saved credentials first
+        char nvs_ssid[33] = {0}, nvs_pass[65] = {0};
+        if (wifi_nvs_load(nvs_ssid, sizeof(nvs_ssid), nvs_pass, sizeof(nvs_pass))) {
+            ESP_LOGI(TAG, "Found saved WiFi: '%s'", nvs_ssid);
+            if (wifi_try_sta(nvs_ssid, nvs_pass)) {
+                return;  // Connected!
+            }
+        }
+
+        // Try hardcoded fallback
+        ESP_LOGI(TAG, "Trying hardcoded WiFi: '%s'", WIFI_SSID);
+        if (wifi_try_sta(WIFI_SSID, WIFI_PASSWORD)) {
+            // Save hardcoded creds to NVS so we don't retry the flow next boot
+            wifi_nvs_save(WIFI_SSID, WIFI_PASSWORD);
+            return;  // Connected!
+        }
+    }
+
+    // All failed or force provision — start captive portal
+    captive_portal_start();
+    // captive_portal_start blocks until creds saved, then reboots
+    // We should never reach here
 }
 
 
@@ -856,8 +1302,8 @@ void app_main(void)
     // Small settle time after codec init
     vTaskDelay(pdMS_TO_TICKS(50));
 
-    // Init WiFi
-    wifi_init();
+    // Init WiFi (with provisioning — checks NVS, fallback to AP captive portal)
+    wifi_provision_init();
 
     // Allocate response audio buffer in PSRAM
     response_audio = heap_caps_malloc(RESPONSE_AUDIO_MAX, MALLOC_CAP_SPIRAM);
