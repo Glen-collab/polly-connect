@@ -1035,7 +1035,24 @@ class PollyDB:
             query += " ORDER BY created_at DESC LIMIT ?"
             params.append(limit)
             results = conn.execute(query, params).fetchall()
-            return [dict(r) for r in results]
+            rows = [dict(r) for r in results]
+            # Convert UTC timestamps to local timezone for display
+            try:
+                from zoneinfo import ZoneInfo
+                from datetime import datetime
+                tz = ZoneInfo("America/Chicago")
+                for row in rows:
+                    if row.get("created_at"):
+                        try:
+                            dt = datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S")
+                            dt_utc = dt.replace(tzinfo=ZoneInfo("UTC"))
+                            dt_local = dt_utc.astimezone(tz)
+                            row["created_at"] = dt_local.strftime("%Y-%m-%d %I:%M %p")
+                        except (ValueError, TypeError):
+                            pass
+            except ImportError:
+                pass
+            return rows
         finally:
             if not self._conn:
                 conn.close()
