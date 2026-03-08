@@ -1679,3 +1679,31 @@ class PollyDB:
         finally:
             if not self._conn:
                 conn.close()
+
+    def delete_message(self, message_id: int, tenant_id: int = None):
+        """Delete a single message by ID."""
+        conn = self._get_connection()
+        try:
+            t_clause = " AND tenant_id = ?" if tenant_id else ""
+            t_params = (tenant_id,) if tenant_id else ()
+            conn.execute(
+                f"DELETE FROM family_messages WHERE id = ?{t_clause}",
+                (message_id,) + t_params
+            )
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def clear_all_messages(self, tenant_id: int = None):
+        """Delete all messages for a tenant."""
+        conn = self._get_connection()
+        try:
+            if tenant_id:
+                conn.execute("DELETE FROM family_messages WHERE tenant_id = ?", (tenant_id,))
+            else:
+                conn.execute("DELETE FROM family_messages")
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()

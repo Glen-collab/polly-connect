@@ -672,6 +672,63 @@ async def memory_save_batch(request: Request):
     return JSONResponse({"count": count})
 
 
+# ── Message Board routes ──
+
+@router.get("/messages", response_class=HTMLResponse)
+async def messages_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    messages = db.get_messages_for(tenant_id=session["tenant_id"])
+    family_members = db.get_family_members(tenant_id=session["tenant_id"])
+    return templates.TemplateResponse("messages.html", {
+        "request": request,
+        "session": session,
+        "messages": messages,
+        "family_members": family_members,
+    })
+
+
+@router.post("/messages/send")
+async def messages_send(request: Request, from_name: str = Form(...), to_name: str = Form(""), message: str = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    db.save_message(
+        from_name=from_name,
+        message=message,
+        to_name=to_name if to_name else None,
+        tenant_id=session["tenant_id"],
+    )
+    return RedirectResponse("/web/messages", status_code=303)
+
+
+@router.post("/messages/{message_id}/delete")
+async def messages_delete(request: Request, message_id: int):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    db.delete_message(message_id, tenant_id=session["tenant_id"])
+    return RedirectResponse("/web/messages", status_code=303)
+
+
+@router.post("/messages/clear-all")
+async def messages_clear_all(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    db.clear_all_messages(tenant_id=session["tenant_id"])
+    return RedirectResponse("/web/messages", status_code=303)
+
+
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
     session = await get_web_session(request)

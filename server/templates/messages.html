@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Message Board - Polly Connect{% endblock %}
+
+{% block content %}
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Message Board 🦜</h1>
+
+<!-- Send Message Form -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-3">Leave a Message</h2>
+    <form method="POST" action="/web/messages/send">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">From</label>
+                <input type="text" name="from_name" required
+                       value="{{ session.name }}"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="Your name">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">To <span class="text-gray-400">(optional)</span></label>
+                <select name="to_name" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                    <option value="">Everyone</option>
+                    {% for member in family_members %}
+                    <option value="{{ member.name }}">{{ member.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="block text-sm text-gray-600 mb-1">Message</label>
+            <textarea name="message" required rows="3"
+                      class="w-full border rounded px-3 py-2 text-sm resize-y"
+                      placeholder="Write your message here..."></textarea>
+        </div>
+        <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700 text-sm w-full sm:w-auto">
+            Send Message
+        </button>
+    </form>
+</div>
+
+<!-- Active Messages -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6">
+    <h2 class="text-base sm:text-lg font-semibold mb-3">Active Messages ({{ messages|length }})</h2>
+    {% if messages %}
+    <div class="space-y-3">
+        {% for msg in messages %}
+        <div class="border rounded-lg p-3 sm:p-4">
+            <div class="flex justify-between items-start">
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                        <span class="font-semibold text-sm text-gray-800">{{ msg.from_name }}</span>
+                        <span class="text-gray-400 text-xs">→</span>
+                        {% if msg.to_name %}
+                        <span class="text-sm text-emerald-600 font-medium">{{ msg.to_name }}</span>
+                        {% else %}
+                        <span class="text-sm text-gray-500">Everyone</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-sm text-gray-700 whitespace-pre-wrap break-words mb-2">{{ msg.message }}</p>
+                    <p class="text-xs text-gray-400">
+                        {% set created = msg.created_at %}
+                        {% if created %}
+                        {{ created }}
+                        {% endif %}
+                    </p>
+                </div>
+                <form method="POST" action="/web/messages/{{ msg.id }}/delete" class="ml-2 flex-shrink-0">
+                    <button type="submit" onclick="return confirm('Delete this message?')"
+                            class="text-red-400 hover:text-red-600 text-lg leading-none p-1" title="Delete message">
+                        &times;
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-400 text-sm">No messages on the board. Leave one for the family!</p>
+    {% endif %}
+</div>
+
+{% if session.role != 'family' and messages|length > 0 %}
+<!-- Clear All (owner only) -->
+<div class="mt-4 text-center">
+    <form method="POST" action="/web/messages/clear-all">
+        <button type="submit" onclick="return confirm('Delete ALL messages? This cannot be undone.')"
+                class="text-red-500 hover:text-red-700 text-sm underline">
+            Clear All Messages
+        </button>
+    </form>
+</div>
+{% endif %}
+
+{% endblock %}
