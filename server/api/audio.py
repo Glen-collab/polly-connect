@@ -189,12 +189,16 @@ async def continuous_stream(websocket: WebSocket):
                     await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
 
                     # Load squawk intervals from user profile
-                    squawk_int = 10  # default minutes between short squawks
-                    chatter_int = 45  # default minutes between long chatter
+                    squawk_int = 10
+                    chatter_int = 45
+                    quiet_start = 21
+                    quiet_end = 7
                     try:
                         profile = db.get_or_create_user(tenant_id=tenant_id)
                         squawk_int = profile.get("squawk_interval") or 10
                         chatter_int = profile.get("chatter_interval") or 45
+                        quiet_start = profile.get("quiet_hours_start") if profile.get("quiet_hours_start") is not None else 21
+                        quiet_end = profile.get("quiet_hours_end") if profile.get("quiet_hours_end") is not None else 7
                     except Exception:
                         pass
 
@@ -202,8 +206,11 @@ async def continuous_stream(websocket: WebSocket):
                     if squawk_mgr:
                         squawk_mgr.register_device(device_id, websocket,
                                                    squawk_interval=squawk_int,
-                                                   chatter_interval=chatter_int)
-                        await squawk_mgr.send_squawk(device_id)
+                                                   chatter_interval=chatter_int,
+                                                   quiet_hours_start=quiet_start,
+                                                   quiet_hours_end=quiet_end)
+                        if not squawk_mgr.is_snoozed(device_id):
+                            await squawk_mgr.send_squawk(device_id)
 
                     continue
 

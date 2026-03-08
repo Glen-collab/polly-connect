@@ -765,7 +765,9 @@ async def settings_save(request: Request, name: str = Form(...),
                         music_genre_preference: str = Form(""),
                         memory_care_mode: str = Form(""),
                         squawk_interval: int = Form(10),
-                        chatter_interval: int = Form(45)):
+                        chatter_interval: int = Form(45),
+                        quiet_hours_start: int = Form(21),
+                        quiet_hours_end: int = Form(7)):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -777,6 +779,8 @@ async def settings_save(request: Request, name: str = Form(...),
     # Clamp intervals to reasonable bounds
     squawk_interval = max(1, min(60, squawk_interval))
     chatter_interval = max(5, min(240, chatter_interval))
+    quiet_hours_start = max(0, min(23, quiet_hours_start))
+    quiet_hours_end = max(0, min(23, quiet_hours_end))
 
     conn = db._get_connection()
     try:
@@ -784,11 +788,13 @@ async def settings_save(request: Request, name: str = Form(...),
             UPDATE user_profiles SET name = ?, familiar_name = ?,
             bible_topic_preference = ?, music_genre_preference = ?,
             memory_care_mode = ?, squawk_interval = ?, chatter_interval = ?,
+            quiet_hours_start = ?, quiet_hours_end = ?,
             updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (name, familiar_name or None, bible_topic_preference or None,
               music_genre_preference or None, 1 if memory_care_mode else 0,
-              squawk_interval, chatter_interval, user["id"]))
+              squawk_interval, chatter_interval,
+              quiet_hours_start, quiet_hours_end, user["id"]))
         conn.commit()
     finally:
         if not db._conn:
@@ -798,7 +804,8 @@ async def settings_save(request: Request, name: str = Form(...),
     squawk_mgr = getattr(request.app.state, "squawk", None)
     if squawk_mgr:
         for dev_id in list(squawk_mgr._active_devices.keys()):
-            squawk_mgr.update_intervals(dev_id, squawk_interval, chatter_interval)
+            squawk_mgr.update_intervals(dev_id, squawk_interval, chatter_interval,
+                                        quiet_hours_start, quiet_hours_end)
 
     return RedirectResponse("/web/settings", status_code=303)
 

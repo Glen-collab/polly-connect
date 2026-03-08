@@ -13,6 +13,7 @@ import os
 import random
 import struct
 import wave
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -90,6 +91,7 @@ class SquawkManager:
         self._squawk_interval: Dict[str, int] = {}   # per-device squawk interval (minutes)
         self._chatter_interval: Dict[str, int] = {}  # per-device chatter interval (minutes)
         self._snoozed_until: Dict[str, Optional[float]] = {}  # epoch time when snooze ends
+        self._quiet_hours: Dict[str, tuple] = {}  # per-device (start_hour, end_hour)
 
         self._load_sounds(sounds_dir)
 
@@ -120,13 +122,15 @@ class SquawkManager:
         logger.info(f"SquawkManager ready: {len(self.squawks)} squawks, {len(self.chatter)} chatter files")
 
     def register_device(self, device_id: str, websocket,
-                        squawk_interval: int = None, chatter_interval: int = None):
+                        squawk_interval: int = None, chatter_interval: int = None,
+                        quiet_hours_start: int = 21, quiet_hours_end: int = 7):
         """Start idle squawk timer for a connected device."""
         self._active_devices[device_id] = websocket
         self._playing[device_id] = False
         self._send_locks[device_id] = asyncio.Lock()
         self._squawk_interval[device_id] = squawk_interval or 10
         self._chatter_interval[device_id] = chatter_interval or DEFAULT_CHATTER_MINUTES
+        self._quiet_hours[device_id] = (quiet_hours_start, quiet_hours_end)
         self._start_idle_timer(device_id)
         if self.chatter:
             self._start_chatter_timer(device_id)
@@ -139,6 +143,7 @@ class SquawkManager:
         self._squawk_interval.pop(device_id, None)
         self._chatter_interval.pop(device_id, None)
         self._snoozed_until.pop(device_id, None)
+        self._quiet_hours.pop(device_id, None)
         task = self._idle_tasks.pop(device_id, None)
         if task:
             task.cancel()
@@ -175,6 +180,25 @@ class SquawkManager:
         until = self._snoozed_until.get(device_id)
         if until and time.time() < until:
             return True
+        return self._in_quiet_hours(device_id)
+
+    def _in_quiet_hours(self, device_id: str) -> bool:
+        """Check if current time is within quiet hours (no squawks at night)."""
+        from config import settings as app_settings
+        try:
+            import pytz
+            tz = pytz.timezone(app_settings.TIMEZONE)
+        except Exception:
+            from datetime import timezone
+            tz = timezone.utc
+        now_hour = datetime.now(tz).hour
+        start, end = self._quiet_hours.get(device_id, (21, 7))
+        if start > end:
+            # Wraps midnight: e.g. 21-7 means 9PM to 7AM
+            return now_hour >= start or now_hour < end
+        elif start < end:
+            # Same day: e.g. 14-16 means 2PM to 4PM
+            return start <= now_hour < end
         return False
 
     async def _resume_after_snooze(self, device_id: str, delay: float):
@@ -192,12 +216,15 @@ class SquawkManager:
             pass
 
     def update_intervals(self, device_id: str, squawk_interval: int = None,
-                         chatter_interval: int = None):
+                         chatter_interval: int = None,
+                         quiet_hours_start: int = None, quiet_hours_end: int = None):
         """Update intervals for a device (from web settings)."""
         if squawk_interval is not None:
             self._squawk_interval[device_id] = squawk_interval
         if chatter_interval is not None:
             self._chatter_interval[device_id] = chatter_interval
+        if quiet_hours_start is not None and quiet_hours_end is not None:
+            self._quiet_hours[device_id] = (quiet_hours_start, quiet_hours_end)
         # Restart timers with new intervals
         if device_id in self._active_devices:
             task = self._idle_tasks.pop(device_id, None)

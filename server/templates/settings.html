@@ -77,6 +77,30 @@
                 </select>
             </div>
         </div>
+        <div class="mt-4">
+            <label class="block text-sm text-gray-700 font-medium mb-2">Quiet Hours (no bird sounds)</label>
+            <p class="text-xs text-gray-500 mb-2">Polly goes to sleep and wakes up automatically each day. She'll still respond if you talk to her.</p>
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-sm text-gray-600">Bedtime:</span>
+                <select name="quiet_hours_start" class="border rounded px-2 py-1 text-sm">
+                    {% for h in range(24) %}
+                    {% set ampm = "AM" if h < 12 else "PM" %}
+                    {% set h12 = h if h == 0 or h == 12 %}
+                    <option value="{{ h }}" {% if (user.quiet_hours_start if user.quiet_hours_start is not none else 21) == h %}selected{% endif %}>
+                        {{ "12" if h == 0 or h == 12 else (h if h < 12 else h - 12) }}:00 {{ "AM" if h < 12 else "PM" }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <span class="text-sm text-gray-600">Wake up:</span>
+                <select name="quiet_hours_end" class="border rounded px-2 py-1 text-sm">
+                    {% for h in range(24) %}
+                    <option value="{{ h }}" {% if (user.quiet_hours_end if user.quiet_hours_end is not none else 7) == h %}selected{% endif %}>
+                        {{ "12" if h == 0 or h == 12 else (h if h < 12 else h - 12) }}:00 {{ "AM" if h < 12 else "PM" }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
     </div>
 
     <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-emerald-700 text-sm">
