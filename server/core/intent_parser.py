@@ -99,7 +99,9 @@ class IntentParser:
         self._bible_phrases = [
             "read me a verse", "bible verse", "today's verse",
             "give me a verse", "read me today's verse",
-            "verse about", "scripture",
+            "verse about", "scripture", "read me a psalm",
+            "psalm", "read me a proverb", "proverb",
+            "read me from the bible", "daily verse",
         ]
         self._medication_phrases = [
             "remind me to take", "medication", "my pills",
@@ -264,11 +266,15 @@ class IntentParser:
             return {"intent": "stop", "confidence": 0.95}
 
         if self._matches(text_lower, self._bible_phrases):
-            # Extract topic if present: "verse about strength"
+            # Extract topic if present: "verse about strength", "read me a psalm"
             topic = None
             topic_match = re.search(r"verse about (.+)", text_lower)
             if topic_match:
                 topic = topic_match.group(1).strip()
+            elif "psalm" in text_lower:
+                topic = "Psalm"
+            elif "proverb" in text_lower:
+                topic = "Proverb"
             return {"intent": "bible_verse", "topic": topic, "confidence": 0.9}
 
         if self._matches(text_lower, self._medication_phrases):

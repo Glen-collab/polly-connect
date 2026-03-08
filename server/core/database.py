@@ -1066,10 +1066,16 @@ class PollyDB:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
+            # Search by topic first, then fall back to reference (e.g., "Psalm", "Proverbs")
             result = conn.execute(
                 "SELECT * FROM bible_verses WHERE topic LIKE ? ORDER BY RANDOM() LIMIT 1",
                 (f"%{topic}%",)
             ).fetchone()
+            if not result:
+                result = conn.execute(
+                    "SELECT * FROM bible_verses WHERE reference LIKE ? ORDER BY RANDOM() LIMIT 1",
+                    (f"%{topic}%",)
+                ).fetchone()
             return dict(result) if result else None
         finally:
             if not self._conn:
