@@ -355,7 +355,8 @@ class CommandProcessor:
 
         elif intent == "weather":
             if self.weather:
-                resp = self.weather.get_weekly_forecast()
+                client_ip = state.client_ip
+                resp = self.weather.get_weather(client_ip=client_ip)
                 self._last_response[device_id] = resp
                 return resp
             return "Weather forecasts are coming soon."

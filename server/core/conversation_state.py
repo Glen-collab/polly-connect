@@ -59,6 +59,8 @@ class ConversationState:
         # Multi-tenant context (device-level, persists across reset)
         self.tenant_id: Optional[int] = None
         self.user_id: Optional[int] = None
+        # Client IP for location-based services (weather)
+        self.client_ip: Optional[str] = None
 
     def reset(self):
         self.mode = ConversationMode.COMMAND

@@ -168,6 +168,20 @@ async def continuous_stream(websocket: WebSocket):
                     except Exception as e:
                         logger.warning(f"Could not load family names: {e}")
 
+                    # Store client IP for location-based services (weather)
+                    # Use X-Forwarded-For if behind Nginx, otherwise direct client IP
+                    conv_state = cmd._get_state(device_id)
+                    forwarded_for = None
+                    for header_name in ("x-forwarded-for", "x-real-ip"):
+                        val = dict(websocket.headers).get(header_name)
+                        if val:
+                            forwarded_for = val.split(",")[0].strip()
+                            break
+                    client_host = forwarded_for or (websocket.client.host if websocket.client else None)
+                    if client_host:
+                        conv_state.client_ip = client_host
+                        logger.info(f"Client IP for {device_id}: {client_host}")
+
                     await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
 
                     # Register for ambient squawk sounds + startup squawk
