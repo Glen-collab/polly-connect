@@ -494,6 +494,7 @@ class CommandProcessor:
         # Search family_members table for matching name
         conn = self.db._get_connection()
         try:
+            conn.row_factory = __import__('sqlite3').Row
             rows = conn.execute(
                 "SELECT name, relation_to_owner FROM family_members WHERE LOWER(name) LIKE ? AND (tenant_id = ? OR tenant_id IS NULL)",
                 (f"%{name.lower()}%", tid)
