@@ -107,7 +107,7 @@ static const char *TAG = "POLLY-WS";
 #define CHUNK_BYTES     (CHUNK_SAMPLES * sizeof(int16_t))  // 960 bytes
 
 // WebSocket
-#define WS_BUFFER_SIZE  4096
+#define WS_BUFFER_SIZE  8192
 #define WS_RECONNECT_MS 5000
 
 // Response audio buffer (30 seconds max, in PSRAM)
@@ -1140,7 +1140,8 @@ static esp_err_t ws_init(void)
         .uri = WS_URI,
         .buffer_size = WS_BUFFER_SIZE,
         .reconnect_timeout_ms = WS_RECONNECT_MS,
-        .network_timeout_ms = 10000,
+        .network_timeout_ms = 30000,        // 30s TCP timeout (was 10s — caused idle disconnects)
+        .ping_interval_sec = 20,            // RFC 6455 WebSocket ping every 20s (keeps connection alive)
         .task_stack = 8192,
     };
 
