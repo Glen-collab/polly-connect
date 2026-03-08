@@ -1286,6 +1286,9 @@ static void mic_stream_task(void *arg)
                 if (ret < 0) {
                     ESP_LOGW(TAG, "WebSocket send failed (ret=%d), free heap=%u",
                              ret, (unsigned)esp_get_free_heap_size());
+                    ws_connected = false;  // Treat send failure as disconnect
+                    streaming_paused = false;
+                    led_set(0);
                     vTaskDelay(pdMS_TO_TICKS(100));
                 }
             }
