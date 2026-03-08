@@ -386,6 +386,11 @@ async def continuous_stream(websocket: WebSocket):
                     if conv_state and conv_state.is_conversational:
                         rms = int(np.sqrt(np.mean(chunk_int16.astype(np.float32) ** 2)))
                         if rms > vad_threshold:
+                            # Ignore speaker feedback after squawk/chatter
+                            if squawk_mgr and not squawk_mgr.is_playing(device_id):
+                                squawk_end = squawk_mgr.last_squawk_end.get(device_id, 0)
+                                if time.monotonic() - squawk_end < RESPONSE_COOLDOWN:
+                                    continue
                             # Interrupt squawk if playing
                             if squawk_mgr and squawk_mgr.is_playing(device_id):
                                 squawk_mgr.stop_playback(device_id)
@@ -402,6 +407,11 @@ async def continuous_stream(websocket: WebSocket):
                         # Ignore triggers during cooldown after response (speaker feedback)
                         if time.monotonic() - last_response_time < RESPONSE_COOLDOWN:
                             continue
+                        # Ignore triggers during cooldown after squawk/chatter
+                        if squawk_mgr and not squawk_mgr.is_playing(device_id):
+                            squawk_end = squawk_mgr.last_squawk_end.get(device_id, 0)
+                            if time.monotonic() - squawk_end < RESPONSE_COOLDOWN:
+                                continue
 
                         # Interrupt any playing squawk/chatter
                         if squawk_mgr and squawk_mgr.is_playing(device_id):

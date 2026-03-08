@@ -12,6 +12,7 @@ import logging
 import os
 import random
 import struct
+import time
 import wave
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -92,6 +93,7 @@ class SquawkManager:
         self._chatter_interval: Dict[str, int] = {}  # per-device chatter interval (minutes)
         self._snoozed_until: Dict[str, Optional[float]] = {}  # epoch time when snooze ends
         self._quiet_hours: Dict[str, tuple] = {}  # per-device (start_hour, end_hour)
+        self.last_squawk_end: Dict[str, float] = {}  # monotonic time when last squawk/chatter finished
 
         self._load_sounds(sounds_dir)
 
@@ -379,3 +381,4 @@ class SquawkManager:
                 logger.error(f"Squawk send error: {e}")
             finally:
                 self._playing[device_id] = False
+                self.last_squawk_end[device_id] = time.monotonic()
