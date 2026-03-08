@@ -366,15 +366,23 @@ async def story_qr_code(request: Request, story_id: int):
         return Response(status_code=404)
 
     url = f"https://polly-connect.com/static/recordings/{story['audio_s3_key']}"
-    from core.book_pdf import _generate_qr_image
-    qr_buf = _generate_qr_image(url, size_px=200)
-    if not qr_buf:
+    try:
+        import qrcode
+        import io
+        qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_M,
+                            box_size=6, border=1)
+        qr.add_data(url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+        from fastapi.responses import Response
+        return Response(content=buf.read(), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+    except Exception:
         from fastapi.responses import Response
         return Response(status_code=500)
-
-    from fastapi.responses import Response
-    return Response(content=qr_buf.read(), media_type="image/png",
-                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.post("/stories/{story_id}/delete")
