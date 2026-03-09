@@ -63,7 +63,7 @@
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Short Squawks (every N minutes)</label>
                 <select name="squawk_interval" class="w-full border rounded px-3 py-2 text-sm">
-                    {% for val, label in [(5, "Every 5 min (frequent)"), (10, "Every 10 min (default)"), (15, "Every 15 min"), (30, "Every 30 min"), (60, "Every 60 min (rare)")] %}
+                    {% for val, label in [(0, "Off"), (5, "Every 5 min (frequent)"), (10, "Every 10 min (default)"), (15, "Every 15 min"), (30, "Every 30 min"), (60, "Every 60 min (rare)")] %}
                     <option value="{{ val }}" {% if (user.squawk_interval or 10) == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
@@ -71,7 +71,7 @@
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Long Chatter (every N minutes)</label>
                 <select name="chatter_interval" class="w-full border rounded px-3 py-2 text-sm">
-                    {% for val, label in [(15, "Every 15 min"), (30, "Every 30 min"), (45, "Every 45 min (default)"), (60, "Every hour"), (120, "Every 2 hours"), (240, "Every 4 hours (rare)")] %}
+                    {% for val, label in [(0, "Off"), (15, "Every 15 min"), (30, "Every 30 min"), (45, "Every 45 min (default)"), (60, "Every hour"), (120, "Every 2 hours"), (240, "Every 4 hours (rare)")] %}
                     <option value="{{ val }}" {% if (user.chatter_interval or 45) == val %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>

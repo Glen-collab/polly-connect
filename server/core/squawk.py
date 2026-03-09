@@ -134,16 +134,24 @@ class SquawkManager:
         logger.info(f"SquawkManager ready: {len(self.squawks)} squawks, {len(self.chatter)} chatter files")
 
     def _schedule_next_squawk(self, device_id: str, min_delay: float = 0):
-        """Set the next squawk time based on interval + jitter."""
-        interval = self._squawk_interval.get(device_id, DEFAULT_SQUAWK_MINUTES) * 60
+        """Set the next squawk time based on interval + jitter. 0 = disabled."""
+        interval_min = self._squawk_interval.get(device_id, DEFAULT_SQUAWK_MINUTES)
+        if interval_min == 0:
+            self._next_squawk_time[device_id] = float('inf')  # never fires
+            return
+        interval = interval_min * 60
         jitter = random.uniform(-JITTER_SECONDS, JITTER_SECONDS)
         delay = max(min_delay, interval + jitter)
         self._next_squawk_time[device_id] = time.time() + delay
         logger.debug(f"Next squawk for {device_id} in {delay:.0f}s")
 
     def _schedule_next_chatter(self, device_id: str, min_delay: float = 0):
-        """Set the next chatter time based on interval + jitter."""
-        interval = self._chatter_interval.get(device_id, DEFAULT_CHATTER_MINUTES) * 60
+        """Set the next chatter time based on interval + jitter. 0 = disabled."""
+        interval_min = self._chatter_interval.get(device_id, DEFAULT_CHATTER_MINUTES)
+        if interval_min == 0:
+            self._next_chatter_time[device_id] = float('inf')  # never fires
+            return
+        interval = interval_min * 60
         jitter = random.uniform(-JITTER_SECONDS, JITTER_SECONDS)
         delay = max(min_delay, interval + jitter)
         self._next_chatter_time[device_id] = time.time() + delay
@@ -330,6 +338,8 @@ class SquawkManager:
         """50% chance of a short squawk after a TTS response."""
         if not self.squawks or self.is_snoozed(device_id):
             return
+        if self._squawk_interval.get(device_id, DEFAULT_SQUAWK_MINUTES) == 0:
+            return  # squawks disabled
         if random.random() < POST_RESPONSE_SQUAWK_CHANCE:
             # Wait past the 3s response cooldown so mic feedback doesn't retrigger
             await asyncio.sleep(random.uniform(3.5, 5.0))

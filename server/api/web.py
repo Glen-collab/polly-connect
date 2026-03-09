@@ -860,8 +860,8 @@ async def settings_save(request: Request, name: str = Form(...),
     user = db.get_or_create_user(tenant_id=session["tenant_id"])
 
     # Clamp intervals to reasonable bounds
-    squawk_interval = max(1, min(60, squawk_interval))
-    chatter_interval = max(5, min(240, chatter_interval))
+    squawk_interval = max(0, min(60, squawk_interval))       # 0 = off
+    chatter_interval = max(0, min(240, chatter_interval))    # 0 = off
     quiet_hours_start = max(0, min(23, quiet_hours_start))
     quiet_hours_end = max(0, min(23, quiet_hours_end))
 
