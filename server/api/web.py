@@ -14,7 +14,7 @@ from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from core.web_auth import get_web_session, require_login, require_owner, hash_password, verify_password
+from core.web_auth import get_web_session, require_login, require_owner, require_admin, hash_password, verify_password
 from core.auth import generate_api_key
 from core.medications import format_time_12hr, _get_local_now
 from config import settings
@@ -2054,7 +2054,7 @@ async def book_export_pdf(request: Request):
 @router.get("/firmware", response_class=HTMLResponse)
 async def firmware_page(request: Request):
     session = await get_web_session(request)
-    redirect = require_owner(session)
+    redirect = require_admin(session)
     if redirect:
         return redirect
 
@@ -2106,7 +2106,7 @@ async def firmware_upload(
     file: UploadFile = File(...),
 ):
     session = await get_web_session(request)
-    redirect = require_owner(session)
+    redirect = require_admin(session)
     if redirect:
         return redirect
 
@@ -2144,7 +2144,7 @@ async def firmware_upload(
 @router.post("/firmware/{fw_id}/activate")
 async def firmware_activate(request: Request, fw_id: int):
     session = await get_web_session(request)
-    redirect = require_owner(session)
+    redirect = require_admin(session)
     if redirect:
         return redirect
 
@@ -2160,7 +2160,7 @@ async def firmware_activate(request: Request, fw_id: int):
 @router.post("/firmware/{fw_id}/delete")
 async def firmware_delete(request: Request, fw_id: int):
     session = await get_web_session(request)
-    redirect = require_owner(session)
+    redirect = require_admin(session)
     if redirect:
         return redirect
 

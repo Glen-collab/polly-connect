@@ -401,6 +401,13 @@ class PollyDB:
                 if "tenant_id" not in cols:
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN tenant_id INTEGER")
 
+            # Add is_admin to accounts
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(accounts)").fetchall()}
+            if "is_admin" not in cols:
+                conn.execute("ALTER TABLE accounts ADD COLUMN is_admin INTEGER DEFAULT 0")
+                # First account is always admin (manufacturer)
+                conn.execute("UPDATE accounts SET is_admin = 1 WHERE id = 1")
+
             # Add api_key_hash and firmware info to devices
             cols = {row[1] for row in conn.execute("PRAGMA table_info(devices)").fetchall()}
             if "api_key_hash" not in cols:
@@ -571,7 +578,8 @@ class PollyDB:
             conn.row_factory = sqlite3.Row
             result = conn.execute("""
                 SELECT ws.*, a.name as account_name, a.email as account_email,
-                       a.role as account_role, ws.role as session_role, ws.family_name
+                       a.role as account_role, a.is_admin as account_is_admin,
+                       ws.role as session_role, ws.family_name
                 FROM web_sessions ws
                 LEFT JOIN accounts a ON ws.account_id = a.id
                 WHERE ws.id = ? AND ws.expires_at > datetime('now')

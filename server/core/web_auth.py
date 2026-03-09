@@ -66,6 +66,7 @@ async def get_web_session(request: Request) -> Optional[Dict]:
         "name": session["account_name"],
         "email": session["account_email"],
         "role": session.get("account_role") or session.get("role") or "owner",
+        "is_admin": bool(session.get("account_is_admin")),
     }
 
 
@@ -81,5 +82,14 @@ def require_owner(session: Optional[Dict]) -> Optional[RedirectResponse]:
     if session is None:
         return RedirectResponse("/web/login", status_code=302)
     if session.get("role") == "family":
+        return RedirectResponse("/web/dashboard", status_code=302)
+    return None
+
+
+def require_admin(session: Optional[Dict]) -> Optional[RedirectResponse]:
+    """Require admin (manufacturer) session. Non-admins get redirected to dashboard."""
+    if session is None:
+        return RedirectResponse("/web/login", status_code=302)
+    if not session.get("is_admin"):
         return RedirectResponse("/web/dashboard", status_code=302)
     return None
