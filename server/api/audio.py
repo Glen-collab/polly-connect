@@ -136,6 +136,12 @@ async def continuous_stream(websocket: WebSocket):
                 if event == "connect":
                     device_id = msg_data.get("device_id", "unknown")
                     tenant_id = 1  # default
+                    # Record firmware version if provided
+                    fw_version = msg_data.get("fw_version")
+                    fw_variant = msg_data.get("fw_variant")
+                    if fw_version:
+                        db.update_device_firmware_info(device_id, fw_version, fw_variant)
+                        logger.info(f"Device {device_id} firmware: v{fw_version} ({fw_variant})")
                     # Authenticate device
                     device_info = verify_device_api_key(msg_data.get("api_key", ""), db)
                     if device_info:
@@ -397,6 +403,8 @@ async def continuous_stream(websocket: WebSocket):
                             if squawk_mgr:
                                 squawk_mgr.reset_idle_timer(device_id)
                             logger.info(f"Voice detected in conversational mode (device: {device_id})")
+                            if squawk_mgr:
+                                squawk_mgr.set_busy(device_id, True)
                             state = "recording"
                             skip_wake_check = True  # don't require wake phrase
                             command_audio = bytearray(pre_roll)  # include pre-roll
@@ -419,6 +427,8 @@ async def continuous_stream(websocket: WebSocket):
                             logger.info(f"Squawk interrupted by wake word → {device_id}")
 
                         logger.info(f"*** WAKE WORD DETECTED (device: {device_id}) ***")
+                        if squawk_mgr:
+                            squawk_mgr.set_busy(device_id, True)
                         detector.reset()
 
                         # Reset idle squawk timer on activity
@@ -514,6 +524,8 @@ async def continuous_stream(websocket: WebSocket):
                         # After processing, reset state
                         # Dynamic cooldown: base 3s + audio playback time
                         # ESP32 buffers audio, so it's still playing after we finish sending
+                        if squawk_mgr:
+                            squawk_mgr.set_busy(device_id, False)
                         still_there_prompted = False
                         RESPONSE_COOLDOWN = max(3.0, tts_duration + 1.0)
                         last_response_time = time.monotonic()
@@ -533,6 +545,8 @@ async def continuous_stream(websocket: WebSocket):
         logger.error(f"Continuous stream error: {e}")
         traceback.print_exc()
     finally:
+        if squawk_mgr:
+            squawk_mgr.set_busy(device_id, False)
         if med_scheduler:
             med_scheduler.unregister_websocket(device_id)
         if squawk_mgr:
@@ -724,6 +738,12 @@ async def audio_stream(websocket: WebSocket):
                 device_id = message.get("device_id", "unknown")
                 session = AudioSession(device_id)
                 tenant_id_ev = 1  # default
+                # Record firmware version if provided
+                fw_version = message.get("fw_version")
+                fw_variant = message.get("fw_variant")
+                if fw_version:
+                    app.state.db.update_device_firmware_info(device_id, fw_version, fw_variant)
+                    logger.info(f"Device {device_id} firmware: v{fw_version} ({fw_variant})")
                 # Authenticate device
                 device_info = verify_device_api_key(message.get("api_key", ""), app.state.db)
                 if device_info:

@@ -330,6 +330,21 @@ class PollyDB:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_web_sessions_account ON web_sessions(account_id)")
 
+            # ── Firmware versions (OTA updates) ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS firmware_versions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    variant TEXT NOT NULL,
+                    version TEXT NOT NULL,
+                    filename TEXT NOT NULL,
+                    file_size INTEGER,
+                    file_hash TEXT,
+                    release_notes TEXT,
+                    is_active INTEGER DEFAULT 0,
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             conn.commit()
         finally:
             if not self._conn:
@@ -383,10 +398,14 @@ class PollyDB:
                 if "tenant_id" not in cols:
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN tenant_id INTEGER")
 
-            # Add api_key_hash to devices
+            # Add api_key_hash and firmware info to devices
             cols = {row[1] for row in conn.execute("PRAGMA table_info(devices)").fetchall()}
             if "api_key_hash" not in cols:
                 conn.execute("ALTER TABLE devices ADD COLUMN api_key_hash TEXT")
+            if "fw_version" not in cols:
+                conn.execute("ALTER TABLE devices ADD COLUMN fw_version TEXT")
+            if "fw_variant" not in cols:
+                conn.execute("ALTER TABLE devices ADD COLUMN fw_variant TEXT")
 
             # Create default tenant #1 and backfill
             conn.execute("INSERT OR IGNORE INTO tenants (id, name) VALUES (1, 'Default')")
@@ -1739,6 +1758,111 @@ class PollyDB:
             else:
                 conn.execute("DELETE FROM family_messages")
             conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Firmware OTA management ──
+
+    def update_device_firmware_info(self, device_id: str, fw_version: str, fw_variant: str):
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE devices SET fw_version = ?, fw_variant = ? WHERE device_id = ?",
+                (fw_version, fw_variant, device_id)
+            )
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def save_firmware_version(self, variant: str, version: str, filename: str,
+                              file_size: int, file_hash: str, release_notes: str = None) -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO firmware_versions (variant, version, filename, file_size, file_hash, release_notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (variant, version, filename, file_size, file_hash, release_notes))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_firmware_versions(self, variant: str = None) -> List[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            if variant:
+                rows = conn.execute(
+                    "SELECT * FROM firmware_versions WHERE variant = ? ORDER BY uploaded_at DESC",
+                    (variant,)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM firmware_versions ORDER BY uploaded_at DESC"
+                ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_active_firmware(self, variant: str) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM firmware_versions WHERE variant = ? AND is_active = 1",
+                (variant,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_firmware_by_id(self, firmware_id: int) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM firmware_versions WHERE id = ?", (firmware_id,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def set_active_firmware(self, firmware_id: int):
+        conn = self._get_connection()
+        try:
+            # Get variant of the target firmware
+            row = conn.execute("SELECT variant FROM firmware_versions WHERE id = ?", (firmware_id,)).fetchone()
+            if not row:
+                return
+            variant = row[0]
+            # Deactivate all for this variant, then activate the target
+            conn.execute("UPDATE firmware_versions SET is_active = 0 WHERE variant = ?", (variant,))
+            conn.execute("UPDATE firmware_versions SET is_active = 1 WHERE id = ?", (firmware_id,))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_firmware_version(self, firmware_id: int) -> Optional[str]:
+        """Delete a firmware version. Returns filename if deleted, None if active."""
+        conn = self._get_connection()
+        try:
+            row = conn.execute(
+                "SELECT filename, is_active FROM firmware_versions WHERE id = ?", (firmware_id,)
+            ).fetchone()
+            if not row:
+                return None
+            if row[1] == 1:
+                return None  # Can't delete active firmware
+            conn.execute("DELETE FROM firmware_versions WHERE id = ?", (firmware_id,))
+            conn.commit()
+            return row[0]
         finally:
             if not self._conn:
                 conn.close()

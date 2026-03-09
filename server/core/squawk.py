@@ -92,6 +92,7 @@ class SquawkManager:
         self.chatter: List[bytes] = []       # long chatter WAVs (16kHz mono)
         self._active_devices: Dict[str, asyncio.WebSocketServerProtocol] = {}
         self._playing: Dict[str, bool] = {}  # True if currently sending squawk/chatter
+        self._busy: Dict[str, bool] = {}     # True if device is recording/processing/playing TTS
         self._send_locks: Dict[str, asyncio.Lock] = {}  # prevent concurrent WS writes
         self._snoozed_until: Dict[str, Optional[float]] = {}  # epoch time when snooze ends
         self._quiet_hours: Dict[str, tuple] = {}  # per-device (start_hour, end_hour)
@@ -265,6 +266,13 @@ class SquawkManager:
     def is_playing(self, device_id: str) -> bool:
         return self._playing.get(device_id, False)
 
+    def set_busy(self, device_id: str, busy: bool):
+        """Mark device as busy (recording, processing, or playing TTS). Suppresses squawks."""
+        self._busy[device_id] = busy
+
+    def is_busy(self, device_id: str) -> bool:
+        return self._busy.get(device_id, False)
+
     def reset_idle_timer(self, device_id: str):
         """Push back the next squawk after user activity (so it doesn't squawk mid-conversation)."""
         grace = self._squawk_interval.get(device_id, DEFAULT_SQUAWK_MINUTES) * 60 * 0.5
@@ -289,6 +297,10 @@ class SquawkManager:
 
                 # Skip during quiet hours or snooze
                 if self.is_snoozed(device_id):
+                    continue
+
+                # Skip if device is busy (recording, processing, or playing TTS)
+                if self.is_busy(device_id):
                     continue
 
                 now = time.time()

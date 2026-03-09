@@ -2011,3 +2011,132 @@ async def book_export_pdf(request: Request):
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ── Firmware OTA Management ──
+
+@router.get("/firmware", response_class=HTMLResponse)
+async def firmware_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    firmware_versions = db.get_firmware_versions()
+    devices = db.get_devices_by_tenant(tid)
+
+    # Enrich devices with update status
+    active_versions = {}
+    for fw in firmware_versions:
+        if fw["is_active"]:
+            active_versions[fw["variant"]] = fw["version"]
+
+    for d in devices:
+        d = dict(d) if not isinstance(d, dict) else d
+        variant = d.get("fw_variant")
+        current = d.get("fw_version")
+        if variant and current and variant in active_versions:
+            active_v = active_versions[variant]
+            try:
+                cur = tuple(int(x) for x in current.split("."))
+                act = tuple(int(x) for x in active_v.split("."))
+                d["needs_update"] = act > cur
+            except (ValueError, AttributeError):
+                d["needs_update"] = False
+        else:
+            d["needs_update"] = False
+
+    message = request.query_params.get("msg")
+    error = request.query_params.get("err")
+
+    return templates.TemplateResponse("firmware.html", {
+        "request": request,
+        "session": session,
+        "firmware_versions": firmware_versions,
+        "devices": devices,
+        "message": message,
+        "error": error,
+    })
+
+
+@router.post("/firmware/upload")
+async def firmware_upload(
+    request: Request,
+    variant: str = Form(...),
+    version: str = Form(...),
+    release_notes: str = Form(""),
+    file: UploadFile = File(...),
+):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    import hashlib
+    db = request.app.state.db
+
+    # Read file
+    content = await file.read()
+    if len(content) < 1024:
+        return RedirectResponse("/web/firmware?err=File too small — is this a valid firmware binary?", status_code=303)
+
+    # Save to disk
+    firmware_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "firmware")
+    os.makedirs(firmware_dir, exist_ok=True)
+    filename = f"{variant}_{version}.bin"
+    filepath = os.path.join(firmware_dir, filename)
+
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    file_hash = hashlib.sha256(content).hexdigest()
+
+    db.save_firmware_version(
+        variant=variant,
+        version=version,
+        filename=filename,
+        file_size=len(content),
+        file_hash=file_hash,
+        release_notes=release_notes or None,
+    )
+
+    return RedirectResponse(f"/web/firmware?msg=Uploaded {variant} v{version} ({len(content) // 1024}KB)", status_code=303)
+
+
+@router.post("/firmware/{fw_id}/activate")
+async def firmware_activate(request: Request, fw_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    fw = db.get_firmware_by_id(fw_id)
+    if not fw:
+        return RedirectResponse("/web/firmware?err=Firmware not found", status_code=303)
+
+    db.set_active_firmware(fw_id)
+    return RedirectResponse(f"/web/firmware?msg=Activated {fw['variant']} v{fw['version']} — devices will update within 1 hour", status_code=303)
+
+
+@router.post("/firmware/{fw_id}/delete")
+async def firmware_delete(request: Request, fw_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    filename = db.delete_firmware_version(fw_id)
+    if filename is None:
+        return RedirectResponse("/web/firmware?err=Cannot delete active firmware", status_code=303)
+
+    # Delete file from disk
+    firmware_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "firmware")
+    filepath = os.path.join(firmware_dir, filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+    return RedirectResponse("/web/firmware?msg=Firmware deleted", status_code=303)

@@ -15,6 +15,7 @@ from api.commands import router as commands_router
 from api.devices import router as devices_router
 from api.homeassistant import router as ha_router
 from api.web import router as web_router
+from api.firmware import router as firmware_router
 from core.database import PollyDB
 from core.wakeword import WakeWordDetector
 from core.vad_wakeword import VADWakeWordDetector
@@ -170,13 +171,16 @@ app.include_router(commands_router, prefix="/api", tags=["commands"])
 app.include_router(devices_router, prefix="/api/devices", tags=["devices"])
 app.include_router(ha_router, prefix="/api/commands", tags=["homeassistant"])
 app.include_router(web_router, prefix="/web", tags=["web"])
+app.include_router(firmware_router, prefix="/api/firmware", tags=["firmware"])
 
 # Static files for photo uploads and story recordings
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 uploads_dir = os.path.join(static_dir, "uploads")
 recordings_dir = os.path.join(static_dir, "recordings")
+firmware_dir = os.path.join(static_dir, "firmware")
 os.makedirs(uploads_dir, exist_ok=True)
 os.makedirs(recordings_dir, exist_ok=True)
+os.makedirs(firmware_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 

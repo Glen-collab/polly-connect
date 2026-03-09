@@ -54,15 +54,23 @@
 #include "esp_http_server.h"
 #include "esp_netif.h"
 #include "lwip/sockets.h"
+#include "esp_ota_ops.h"
+#include "esp_http_client.h"
+#include "esp_app_format.h"
 
 static const char *TAG = "POLLY";
 
 /* --- Configuration --- */
 
+// Firmware version (for OTA updates)
+#define FW_VERSION      "1.0.0"
+#define FW_VARIANT      "breadboard"
+
 // WiFi
 #define WIFI_SSID       "SpectrumSetup-73"
 #define WIFI_PASSWORD   "orangegate448"
 #define WIFI_MAX_RETRY  10
+#define WIFI_MAX_SAVED  5   // Max remembered WiFi networks
 
 // Server
 #define SERVER_HOST     "3.14.130.158"
@@ -113,6 +121,7 @@ static int wifi_retry_count = 0;
 
 static esp_websocket_client_handle_t ws_client = NULL;
 static volatile bool ws_connected = false;
+static volatile bool ota_in_progress = false;
 
 // Flags set by WebSocket event handler, consumed by streaming task
 static volatile bool wake_detected = false;
@@ -296,34 +305,79 @@ static esp_netif_t *sta_netif = NULL;
 static esp_netif_t *ap_netif = NULL;
 static httpd_handle_t portal_server = NULL;
 static TaskHandle_t dns_task_handle = NULL;
-static char prov_ssid[33] = {0};
-static char prov_pass[65] = {0};
+// --- NVS helpers (multi-network) ---
 
-// --- NVS helpers ---
+typedef struct {
+    char ssid[33];
+    char pass[65];
+} wifi_cred_t;
 
-static bool wifi_nvs_load(char *ssid, size_t ssid_len, char *pass, size_t pass_len)
+static int wifi_nvs_load_all(wifi_cred_t *creds, int max_creds)
 {
     nvs_handle_t h;
-    if (nvs_open("wifi_cfg", NVS_READONLY, &h) != ESP_OK) return false;
-    uint8_t configured = 0;
-    nvs_get_u8(h, "configured", &configured);
-    if (!configured) { nvs_close(h); return false; }
-    esp_err_t r1 = nvs_get_str(h, "ssid", ssid, &ssid_len);
-    esp_err_t r2 = nvs_get_str(h, "password", pass, &pass_len);
+    if (nvs_open("wifi_cfg", NVS_READONLY, &h) != ESP_OK) return 0;
+    uint8_t count = 0;
+    nvs_get_u8(h, "count", &count);
+    if (count > max_creds) count = max_creds;
+    int loaded = 0;
+    for (int i = 0; i < count; i++) {
+        char key_s[16], key_p[16];
+        snprintf(key_s, sizeof(key_s), "ssid%d", i);
+        snprintf(key_p, sizeof(key_p), "pass%d", i);
+        size_t s_len = sizeof(creds[loaded].ssid);
+        size_t p_len = sizeof(creds[loaded].pass);
+        esp_err_t r1 = nvs_get_str(h, key_s, creds[loaded].ssid, &s_len);
+        esp_err_t r2 = nvs_get_str(h, key_p, creds[loaded].pass, &p_len);
+        if (r1 == ESP_OK && r2 == ESP_OK && strlen(creds[loaded].ssid) > 0) {
+            ESP_LOGI(TAG, "NVS slot %d: '%s'", i, creds[loaded].ssid);
+            loaded++;
+        }
+    }
     nvs_close(h);
-    return (r1 == ESP_OK && r2 == ESP_OK && strlen(ssid) > 0);
+    return loaded;
 }
 
 static esp_err_t wifi_nvs_save(const char *ssid, const char *pass)
 {
+    wifi_cred_t creds[WIFI_MAX_SAVED] = {0};
+    int count = wifi_nvs_load_all(creds, WIFI_MAX_SAVED);
+
+    for (int i = 0; i < count; i++) {
+        if (strcmp(creds[i].ssid, ssid) == 0) {
+            strncpy(creds[i].pass, pass, sizeof(creds[i].pass) - 1);
+            ESP_LOGI(TAG, "Updated password for '%s' (slot %d)", ssid, i);
+            goto save;
+        }
+    }
+
+    if (count < WIFI_MAX_SAVED) {
+        strncpy(creds[count].ssid, ssid, sizeof(creds[count].ssid) - 1);
+        strncpy(creds[count].pass, pass, sizeof(creds[count].pass) - 1);
+        count++;
+        ESP_LOGI(TAG, "Added '%s' (slot %d)", ssid, count - 1);
+    } else {
+        for (int i = 0; i < WIFI_MAX_SAVED - 1; i++) {
+            creds[i] = creds[i + 1];
+        }
+        strncpy(creds[WIFI_MAX_SAVED - 1].ssid, ssid, sizeof(creds[WIFI_MAX_SAVED - 1].ssid) - 1);
+        strncpy(creds[WIFI_MAX_SAVED - 1].pass, pass, sizeof(creds[WIFI_MAX_SAVED - 1].pass) - 1);
+        ESP_LOGI(TAG, "Replaced oldest, added '%s' (slot %d)", ssid, WIFI_MAX_SAVED - 1);
+    }
+
+save:;
     nvs_handle_t h;
     ESP_ERROR_CHECK(nvs_open("wifi_cfg", NVS_READWRITE, &h));
-    nvs_set_str(h, "ssid", ssid);
-    nvs_set_str(h, "password", pass);
-    nvs_set_u8(h, "configured", 1);
+    nvs_set_u8(h, "count", (uint8_t)count);
+    for (int i = 0; i < count; i++) {
+        char key_s[16], key_p[16];
+        snprintf(key_s, sizeof(key_s), "ssid%d", i);
+        snprintf(key_p, sizeof(key_p), "pass%d", i);
+        nvs_set_str(h, key_s, creds[i].ssid);
+        nvs_set_str(h, key_p, creds[i].pass);
+    }
     nvs_commit(h);
     nvs_close(h);
-    ESP_LOGI(TAG, "WiFi credentials saved to NVS");
+    ESP_LOGI(TAG, "Saved %d WiFi network(s) to NVS", count);
     return ESP_OK;
 }
 
@@ -339,6 +393,9 @@ static esp_err_t wifi_nvs_clear(void)
 }
 
 // --- STA connection ---
+
+static esp_event_handler_instance_t sta_any_id_handle, sta_got_ip_handle;
+static bool sta_initialized = false;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                 int32_t event_id, void *event_data)
@@ -361,11 +418,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-static bool wifi_try_sta(const char *ssid, const char *pass)
+static void wifi_sta_init(void)
 {
-    ESP_LOGI(TAG, "Trying WiFi: '%s'", ssid);
-    wifi_retry_count = 0;
-
+    if (sta_initialized) return;
     wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -374,16 +429,44 @@ static bool wifi_try_sta(const char *ssid, const char *pass)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    esp_event_handler_instance_t any_id, got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
-                                                         &wifi_event_handler, NULL, &any_id));
+                                                         &wifi_event_handler, NULL, &sta_any_id_handle));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
-                                                         &wifi_event_handler, NULL, &got_ip));
+                                                         &wifi_event_handler, NULL, &sta_got_ip_handle));
+    sta_initialized = true;
+}
+
+static void wifi_sta_deinit(void)
+{
+    if (!sta_initialized) return;
+    esp_wifi_stop();
+    esp_wifi_deinit();
+    esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, sta_any_id_handle);
+    esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, sta_got_ip_handle);
+    esp_event_loop_delete_default();
+    esp_netif_destroy_default_wifi(sta_netif);
+    sta_netif = NULL;
+    vEventGroupDelete(wifi_event_group);
+    wifi_event_group = NULL;
+    sta_initialized = false;
+}
+
+static bool wifi_try_connect(const char *ssid, const char *pass)
+{
+    ESP_LOGI(TAG, "Trying WiFi: '%s'", ssid);
+    wifi_retry_count = 0;
+    xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
 
     wifi_config_t wifi_config = {0};
     strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
     strncpy((char *)wifi_config.sta.password, pass, sizeof(wifi_config.sta.password) - 1);
+    wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+    wifi_config.sta.pmf_cfg.capable = true;
+    wifi_config.sta.pmf_cfg.required = false;
+    wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    wifi_config.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
 
+    esp_wifi_stop();
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -394,18 +477,61 @@ static bool wifi_try_sta(const char *ssid, const char *pass)
         return true;
     }
 
-    // Failed — tear down for clean AP start
-    ESP_LOGW(TAG, "WiFi '%s' failed, cleaning up", ssid);
-    esp_wifi_stop();
-    esp_wifi_deinit();
-    esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, any_id);
-    esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, got_ip);
-    esp_event_loop_delete_default();
-    esp_netif_destroy_default_wifi(sta_netif);
-    sta_netif = NULL;
-    vEventGroupDelete(wifi_event_group);
-    wifi_event_group = NULL;
+    ESP_LOGW(TAG, "WiFi '%s' failed", ssid);
+    return false;
+}
 
+static bool wifi_try_saved_networks(wifi_cred_t *creds, int cred_count)
+{
+    if (cred_count == 0) return false;
+
+    ESP_LOGI(TAG, "Scanning for saved networks...");
+    xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
+
+    wifi_config_t empty_config = {0};
+    esp_wifi_stop();
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &empty_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    wifi_scan_config_t scan_cfg = {
+        .show_hidden = false,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time.active.min = 100,
+        .scan_time.active.max = 300,
+    };
+    esp_wifi_scan_start(&scan_cfg, true);
+
+    uint16_t ap_count = 0;
+    esp_wifi_scan_get_ap_num(&ap_count);
+    if (ap_count == 0) {
+        ESP_LOGW(TAG, "No networks found in scan");
+        esp_wifi_scan_get_ap_records(&ap_count, NULL);
+        return false;
+    }
+    if (ap_count > 20) ap_count = 20;
+
+    wifi_ap_record_t *ap_list = malloc(ap_count * sizeof(wifi_ap_record_t));
+    if (!ap_list) return false;
+    esp_wifi_scan_get_ap_records(&ap_count, ap_list);
+
+    ESP_LOGI(TAG, "Found %d networks, checking against %d saved", ap_count, cred_count);
+
+    for (int i = 0; i < ap_count; i++) {
+        for (int j = 0; j < cred_count; j++) {
+            if (strcmp((char *)ap_list[i].ssid, creds[j].ssid) == 0) {
+                ESP_LOGI(TAG, "Found saved network '%s' (RSSI %d)", creds[j].ssid, ap_list[i].rssi);
+                esp_wifi_stop();
+                if (wifi_try_connect(creds[j].ssid, creds[j].pass)) {
+                    free(ap_list);
+                    return true;
+                }
+                break;
+            }
+        }
+    }
+
+    free(ap_list);
     return false;
 }
 
@@ -766,22 +892,41 @@ static void wifi_provision_init(void)
     }
 
     if (!force_provision) {
-        // Try NVS saved credentials first
-        char nvs_ssid[33] = {0}, nvs_pass[65] = {0};
-        if (wifi_nvs_load(nvs_ssid, sizeof(nvs_ssid), nvs_pass, sizeof(nvs_pass))) {
-            ESP_LOGI(TAG, "Found saved WiFi: '%s'", nvs_ssid);
-            if (wifi_try_sta(nvs_ssid, nvs_pass)) {
+        wifi_sta_init();
+
+        // Load all saved networks and try matching ones (best signal first)
+        wifi_cred_t creds[WIFI_MAX_SAVED] = {0};
+        int count = wifi_nvs_load_all(creds, WIFI_MAX_SAVED);
+
+        // Always include hardcoded home network as fallback
+        bool have_hardcoded = false;
+        for (int i = 0; i < count; i++) {
+            if (strcmp(creds[i].ssid, WIFI_SSID) == 0) { have_hardcoded = true; break; }
+        }
+        if (!have_hardcoded && count < WIFI_MAX_SAVED) {
+            strncpy(creds[count].ssid, WIFI_SSID, sizeof(creds[count].ssid) - 1);
+            strncpy(creds[count].pass, WIFI_PASSWORD, sizeof(creds[count].pass) - 1);
+            count++;
+        }
+
+        if (wifi_try_saved_networks(creds, count)) {
+            wifi_config_t current = {0};
+            esp_wifi_get_config(WIFI_IF_STA, &current);
+            if (strcmp((char *)current.sta.ssid, WIFI_SSID) == 0) {
+                wifi_nvs_save(WIFI_SSID, WIFI_PASSWORD);
+            }
+            return;  // Connected!
+        }
+
+        // Scan found nothing — try each saved network directly as fallback
+        ESP_LOGI(TAG, "Scan didn't match, trying saved networks directly...");
+        for (int i = 0; i < count; i++) {
+            if (wifi_try_connect(creds[i].ssid, creds[i].pass)) {
                 return;  // Connected!
             }
         }
 
-        // Try hardcoded fallback
-        ESP_LOGI(TAG, "Trying hardcoded WiFi: '%s'", WIFI_SSID);
-        if (wifi_try_sta(WIFI_SSID, WIFI_PASSWORD)) {
-            // Save hardcoded creds to NVS so we don't retry the flow next boot
-            wifi_nvs_save(WIFI_SSID, WIFI_PASSWORD);
-            return;  // Connected!
-        }
+        wifi_sta_deinit();
     }
 
     // All failed or force provision — start captive portal
@@ -911,12 +1056,13 @@ static void ws_event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "WebSocket connected to server");
             ws_connected = true;
 
-            // Send connect event with device identity and API key
+            // Send connect event with device identity, API key, and firmware version
             {
-                char connect_msg[256];
+                char connect_msg[384];
                 snprintf(connect_msg, sizeof(connect_msg),
-                    "{\"event\":\"connect\",\"device_id\":\"%s\",\"api_key\":\"%s\"}",
-                    DEVICE_ID, DEVICE_API_KEY);
+                    "{\"event\":\"connect\",\"device_id\":\"%s\",\"api_key\":\"%s\","
+                    "\"fw_version\":\"%s\",\"fw_variant\":\"%s\"}",
+                    DEVICE_ID, DEVICE_API_KEY, FW_VERSION, FW_VARIANT);
                 esp_websocket_client_send_text(ws_client, connect_msg,
                                                 strlen(connect_msg), pdMS_TO_TICKS(1000));
             }
@@ -1127,11 +1273,198 @@ static void mic_stream_task(void *arg)
 }
 
 
+/* --- OTA Firmware Update --- */
+
+static void ota_check_task(void *arg)
+{
+    vTaskDelay(pdMS_TO_TICKS(30000));
+
+    while (1) {
+        if (!ws_connected) {
+            vTaskDelay(pdMS_TO_TICKS(60000));
+            continue;
+        }
+
+        ESP_LOGI(TAG, "OTA: Checking for firmware updates (current: %s)", FW_VERSION);
+
+        char url[256];
+        snprintf(url, sizeof(url),
+            "http://%s:%d/api/firmware/check?device_id=%s&variant=%s&current_version=%s",
+            SERVER_HOST, SERVER_PORT, DEVICE_ID, FW_VARIANT, FW_VERSION);
+
+        esp_http_client_config_t check_cfg = {
+            .url = url,
+            .timeout_ms = 10000,
+        };
+        esp_http_client_handle_t client = esp_http_client_init(&check_cfg);
+
+        esp_err_t err = esp_http_client_open(client, 0);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "OTA: Check connection failed: %s", esp_err_to_name(err));
+            esp_http_client_cleanup(client);
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        int content_len = esp_http_client_fetch_headers(client);
+        int status = esp_http_client_get_status_code(client);
+        if (status != 200 || content_len <= 0 || content_len > 1024) {
+            ESP_LOGW(TAG, "OTA: Check failed (status=%d, len=%d)", status, content_len);
+            esp_http_client_close(client);
+            esp_http_client_cleanup(client);
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        char *resp = malloc(content_len + 1);
+        if (!resp) {
+            esp_http_client_close(client);
+            esp_http_client_cleanup(client);
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+        int read_len = esp_http_client_read(client, resp, content_len);
+        resp[read_len > 0 ? read_len : 0] = '\0';
+        esp_http_client_close(client);
+        esp_http_client_cleanup(client);
+
+        cJSON *root = cJSON_Parse(resp);
+        free(resp);
+        if (!root) {
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        cJSON *update = cJSON_GetObjectItem(root, "update_available");
+        if (!update || !cJSON_IsTrue(update)) {
+            ESP_LOGI(TAG, "OTA: Firmware is up to date");
+            cJSON_Delete(root);
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        cJSON *ver = cJSON_GetObjectItem(root, "version");
+        cJSON *dl_url = cJSON_GetObjectItem(root, "download_url");
+        if (!ver || !dl_url) {
+            cJSON_Delete(root);
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        ESP_LOGI(TAG, "OTA: Update available! %s -> %s", FW_VERSION, ver->valuestring);
+
+        char full_url[256];
+        snprintf(full_url, sizeof(full_url), "http://%s:%d%s",
+                 SERVER_HOST, SERVER_PORT, dl_url->valuestring);
+        cJSON_Delete(root);
+
+        ESP_LOGI(TAG, "OTA: Waiting for audio idle...");
+        int wait_count = 0;
+        while ((streaming_paused || story_recording) && wait_count < 60) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            wait_count++;
+        }
+
+        ota_in_progress = true;
+        ESP_LOGI(TAG, "OTA: Starting download from %s", full_url);
+
+        const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+        if (!update_partition) {
+            ESP_LOGE(TAG, "OTA: No update partition found!");
+            ota_in_progress = false;
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        ESP_LOGI(TAG, "OTA: Writing to partition '%s' at 0x%"PRIx32,
+                 update_partition->label, update_partition->address);
+
+        esp_http_client_config_t dl_cfg = {
+            .url = full_url,
+            .timeout_ms = 30000,
+        };
+        esp_http_client_handle_t dl_client = esp_http_client_init(&dl_cfg);
+        esp_http_client_set_header(dl_client, "X-API-Key", DEVICE_API_KEY);
+        esp_http_client_open(dl_client, 0);
+        int total_len = esp_http_client_fetch_headers(dl_client);
+        if (total_len <= 0) {
+            ESP_LOGE(TAG, "OTA: Download failed — no content");
+            esp_http_client_cleanup(dl_client);
+            ota_in_progress = false;
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        esp_ota_handle_t ota_handle;
+        err = esp_ota_begin(update_partition, total_len, &ota_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "OTA: esp_ota_begin failed: %s", esp_err_to_name(err));
+            esp_http_client_cleanup(dl_client);
+            ota_in_progress = false;
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        char *buf = malloc(4096);
+        int received = 0;
+        bool ota_ok = true;
+        while (received < total_len) {
+            int read_len = esp_http_client_read(dl_client, buf, 4096);
+            if (read_len <= 0) {
+                ESP_LOGE(TAG, "OTA: Read error at %d/%d bytes", received, total_len);
+                ota_ok = false;
+                break;
+            }
+            err = esp_ota_write(ota_handle, buf, read_len);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "OTA: Write error: %s", esp_err_to_name(err));
+                ota_ok = false;
+                break;
+            }
+            received += read_len;
+            if (received % (100 * 1024) == 0 || received == total_len) {
+                ESP_LOGI(TAG, "OTA: %d/%d bytes (%d%%)", received, total_len, received * 100 / total_len);
+            }
+        }
+        free(buf);
+        esp_http_client_cleanup(dl_client);
+
+        if (!ota_ok) {
+            esp_ota_abort(ota_handle);
+            ota_in_progress = false;
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        err = esp_ota_end(ota_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "OTA: Validation failed: %s", esp_err_to_name(err));
+            ota_in_progress = false;
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        err = esp_ota_set_boot_partition(update_partition);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "OTA: Set boot partition failed: %s", esp_err_to_name(err));
+            ota_in_progress = false;
+            vTaskDelay(pdMS_TO_TICKS(3600000));
+            continue;
+        }
+
+        ESP_LOGI(TAG, "OTA: Update successful! Rebooting...");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        esp_restart();
+    }
+}
+
+
 /* --- App Main --- */
 
 void app_main(void)
 {
     ESP_LOGI(TAG, "=== Polly Connect - ESP32-S3 WebSocket Streaming ===");
+    ESP_LOGI(TAG, "Firmware: v%s (%s)", FW_VERSION, FW_VARIANT);
     ESP_LOGI(TAG, "Free heap: %u bytes", (unsigned)esp_get_free_heap_size());
     ESP_LOGI(TAG, "Free PSRAM: %u bytes", (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
@@ -1142,6 +1475,17 @@ void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    // OTA rollback validation
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
+        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+            ESP_LOGI(TAG, "OTA: First boot after update — marking firmware valid");
+            esp_ota_mark_app_valid_cancel_rollback();
+        }
+    }
+    ESP_LOGI(TAG, "Running from partition: %s", running->label);
 
     // Init LED
     led_init();
@@ -1185,4 +1529,7 @@ void app_main(void)
 
     // Start mic streaming task on core 1 (core 0 handles WiFi/WebSocket)
     xTaskCreatePinnedToCore(mic_stream_task, "mic_stream", 8192, NULL, 5, NULL, 1);
+
+    // Start OTA update checker (low priority, checks every hour)
+    xTaskCreate(ota_check_task, "ota_check", 8192, NULL, 2, NULL);
 }
