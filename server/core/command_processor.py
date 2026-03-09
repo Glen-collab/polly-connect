@@ -25,7 +25,7 @@ class CommandProcessor:
                  weather_service=None,
                  med_scheduler=None, family_identity=None, echo_engine=None,
                  memory_extractor=None, narrative_arc=None,
-                 engagement=None):
+                 engagement=None, followup_gen=None):
         self.db = db
         self.data = data
         self.bible = bible_service
@@ -37,6 +37,7 @@ class CommandProcessor:
         self.memory_extractor = memory_extractor
         self.narrative_arc = narrative_arc
         self.engagement = engagement
+        self.followup_gen = followup_gen
         self._last_response = {}
         self._conversation_states = {}  # device_id -> ConversationState
 
@@ -446,17 +447,87 @@ class CommandProcessor:
         state = self._get_state(device_id)
         tid = state.tenant_id
         query = intent_result.get("query")
-        if not query:
-            return "Who would you like to hear stories about?"
-        stories = self.db.search_stories_by_speaker_or_topic(query, tenant_id=tid)
-        if not stories:
-            return f"I don't have any stories about {query} yet. Maybe you could tell me one?"
+
+        if query:
+            # Specific topic/person request
+            stories = self.db.search_stories_by_speaker_or_topic(query, tenant_id=tid)
+            if not stories:
+                return f"I don't have any stories about {query} yet. Maybe you could tell me one?"
+        else:
+            # General "read me a story" — pull recent stories
+            stories = self.db.get_stories(tenant_id=tid, limit=20)
+            if not stories:
+                return "I don't have any stories recorded yet. Want to tell me one?"
+
+        # Build narrative from stories using OpenAI
+        if self.followup_gen and self.followup_gen.available:
+            try:
+                import asyncio
+                narrative = await asyncio.to_thread(
+                    self._generate_story_narrative, stories, query
+                )
+                if narrative:
+                    return narrative
+            except Exception as e:
+                logger.error(f"Story narrative generation error: {e}")
+
+        # Fallback: read back the most relevant story directly
         story = stories[0]
-        speaker = story.get("speaker_name") or "someone"
-        transcript = story.get("transcript", "")
-        if len(transcript) > 300:
-            transcript = transcript[:300] + "..."
-        return f"Here's something {speaker} shared: {transcript}"
+        transcript = story.get("corrected_transcript") or story.get("transcript", "")
+        if len(transcript) > 500:
+            transcript = transcript[:500] + "..."
+        return f"Here's a story that was shared: {transcript}"
+
+    def _generate_story_narrative(self, stories: list, query: str = None) -> str:
+        """Use OpenAI to weave stored stories into a warm narrative."""
+        # Collect story excerpts (cap total to ~3000 chars for prompt)
+        excerpts = []
+        total_len = 0
+        for s in stories:
+            text = s.get("corrected_transcript") or s.get("transcript", "")
+            if not text:
+                continue
+            if total_len + len(text) > 3000:
+                # Truncate this one to fit
+                remaining = 3000 - total_len
+                if remaining > 200:
+                    excerpts.append(text[:remaining])
+                break
+            excerpts.append(text)
+            total_len += len(text)
+
+        if not excerpts:
+            return None
+
+        story_text = "\n\n---\n\n".join(excerpts)
+        topic_hint = f" Focus on stories about {query}." if query else ""
+
+        prompt = f"""You are Polly, a warm companion for an elderly person and their family.
+Below are real family stories that were shared with you. Weave them into a single
+warm, heartfelt narrative — like a grandparent reading a family storybook aloud.
+
+Rules:
+- Keep it 2-3 minutes when read aloud (roughly 300-400 words)
+- Use a warm, conversational storytelling voice
+- Honor the original words and feelings — don't invent new facts
+- Connect the stories naturally with gentle transitions
+- End with something warm and reflective
+- Do NOT use quotation marks or attribution like "they said"
+- Write it as one flowing narrative, not a list{topic_hint}
+
+FAMILY STORIES:
+{story_text}
+
+NARRATIVE:"""
+
+        response = self.followup_gen._client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=800,
+            temperature=0.7,
+        )
+
+        return response.choices[0].message.content.strip()
 
     async def _handle_family_question(self, device_id: str) -> str:
         state = self._get_state(device_id)

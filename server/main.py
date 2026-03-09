@@ -134,6 +134,7 @@ async def lifespan(app: FastAPI):
         memory_extractor=app.state.memory_extractor,
         narrative_arc=app.state.narrative_arc,
         engagement=app.state.engagement,
+        followup_gen=app.state.followup_gen,
     )
 
     # Squawk / ambient parrot sounds

@@ -17,7 +17,7 @@ class IntentParser:
         ]
         self._tell_story_phrases = [
             "let me tell you about", "i remember when", "i want to tell you",
-            "let me share", "i have a story", "tell me a story",
+            "let me share", "i have a story",
             "i want to share", "record my story", "take my story",
             "story time", "i want to record", "i have something to share",
             "i want to tell a story", "let me tell you something",
@@ -31,6 +31,10 @@ class IntentParser:
             "what have you heard about", "play my stories", "read my stories",
             "what did grandma say", "what did she say", "what did he say",
             "what has grandma said", "what has she said",
+            "read me my stories", "tell me one of my stories",
+            "read a story", "tell me my story", "share a story",
+            "read back my stories", "narrate a story", "story reading",
+            "tell me a story",
         ]
         self._family_question_phrases = [
             "ask me about my family", "family question", "ask me a family question",
