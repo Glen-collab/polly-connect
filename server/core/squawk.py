@@ -1,8 +1,12 @@
 """
 Parrot squawk / ambient sound system for Polly Connect.
 
-Short squawks: play randomly every 5-15 minutes idle, after TTS (~20%), on wake.
-Long chatter: play every ~2 hours, interruptible with wake word / "be quiet" / "stop".
+Clock-based scheduling: squawks and chatter fire on wall-clock intervals,
+surviving WebSocket reconnects without resetting timers.
+
+Short squawks: play at regular intervals (default every 10 min) with jitter.
+Long chatter: play at longer intervals (default every 45 min) with jitter.
+Post-response squawks: 50% chance after TTS, with delay to avoid mic feedback.
 """
 
 import asyncio
@@ -11,7 +15,6 @@ import io
 import logging
 import os
 import random
-import struct
 import time
 import wave
 from datetime import datetime
@@ -22,10 +25,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # Default intervals (can be overridden per-device via settings)
-IDLE_SQUAWK_MIN = 5 * 60    # 5 minutes
-IDLE_SQUAWK_MAX = 15 * 60   # 15 minutes
-
-# Default chatter interval (minutes) — configurable in web settings
+DEFAULT_SQUAWK_MINUTES = 10
 DEFAULT_CHATTER_MINUTES = 45
 
 # Chance of squawk after a TTS response
@@ -33,6 +33,12 @@ POST_RESPONSE_SQUAWK_CHANCE = 0.50  # 50%
 
 # Volume reduction (0.0 = silent, 1.0 = full)
 SQUAWK_VOLUME = 0.30  # 30% volume so mic doesn't pick it up
+
+# Jitter range (seconds) added to scheduled times so sounds feel natural
+JITTER_SECONDS = 120  # ±2 minutes
+
+# Delay before first squawk after reconnect (seconds)
+RECONNECT_GRACE = 10
 
 
 def _convert_to_16k_mono(wav_bytes: bytes, volume: float = SQUAWK_VOLUME) -> bytes:
@@ -85,29 +91,33 @@ class SquawkManager:
         self.squawks: List[bytes] = []       # short squawk WAVs (16kHz mono)
         self.chatter: List[bytes] = []       # long chatter WAVs (16kHz mono)
         self._active_devices: Dict[str, asyncio.WebSocketServerProtocol] = {}
-        self._idle_tasks: Dict[str, asyncio.Task] = {}
-        self._chatter_tasks: Dict[str, asyncio.Task] = {}
         self._playing: Dict[str, bool] = {}  # True if currently sending squawk/chatter
         self._send_locks: Dict[str, asyncio.Lock] = {}  # prevent concurrent WS writes
-        self._squawk_interval: Dict[str, int] = {}   # per-device squawk interval (minutes)
-        self._chatter_interval: Dict[str, int] = {}  # per-device chatter interval (minutes)
         self._snoozed_until: Dict[str, Optional[float]] = {}  # epoch time when snooze ends
         self._quiet_hours: Dict[str, tuple] = {}  # per-device (start_hour, end_hour)
         self.last_squawk_end: Dict[str, float] = {}  # monotonic time when last squawk/chatter finished
+
+        # Clock-based scheduling: wall-clock epoch timestamps
+        self._next_squawk_time: Dict[str, float] = {}  # next squawk epoch
+        self._next_chatter_time: Dict[str, float] = {}  # next chatter epoch
+        self._squawk_interval: Dict[str, int] = {}   # per-device squawk interval (minutes)
+        self._chatter_interval: Dict[str, int] = {}  # per-device chatter interval (minutes)
+
+        # Single scheduler task per device (polling loop)
+        self._scheduler_tasks: Dict[str, asyncio.Task] = {}
 
         self._load_sounds(sounds_dir)
 
     def _load_sounds(self, sounds_dir: str):
         """Load and convert all squawk/chatter WAV files."""
-        squawk_dir = sounds_dir
-        if not os.path.isdir(squawk_dir):
-            logger.warning(f"Sounds directory not found: {squawk_dir}")
+        if not os.path.isdir(sounds_dir):
+            logger.warning(f"Sounds directory not found: {sounds_dir}")
             return
 
-        for fname in sorted(os.listdir(squawk_dir)):
+        for fname in sorted(os.listdir(sounds_dir)):
             if not fname.endswith('.wav'):
                 continue
-            path = os.path.join(squawk_dir, fname)
+            path = os.path.join(sounds_dir, fname)
             try:
                 with open(path, 'rb') as f:
                     raw = f.read()
@@ -123,62 +133,77 @@ class SquawkManager:
 
         logger.info(f"SquawkManager ready: {len(self.squawks)} squawks, {len(self.chatter)} chatter files")
 
+    def _schedule_next_squawk(self, device_id: str, min_delay: float = 0):
+        """Set the next squawk time based on interval + jitter."""
+        interval = self._squawk_interval.get(device_id, DEFAULT_SQUAWK_MINUTES) * 60
+        jitter = random.uniform(-JITTER_SECONDS, JITTER_SECONDS)
+        delay = max(min_delay, interval + jitter)
+        self._next_squawk_time[device_id] = time.time() + delay
+        logger.debug(f"Next squawk for {device_id} in {delay:.0f}s")
+
+    def _schedule_next_chatter(self, device_id: str, min_delay: float = 0):
+        """Set the next chatter time based on interval + jitter."""
+        interval = self._chatter_interval.get(device_id, DEFAULT_CHATTER_MINUTES) * 60
+        jitter = random.uniform(-JITTER_SECONDS, JITTER_SECONDS)
+        delay = max(min_delay, interval + jitter)
+        self._next_chatter_time[device_id] = time.time() + delay
+        logger.debug(f"Next chatter for {device_id} in {delay:.0f}s")
+
     def register_device(self, device_id: str, websocket,
                         squawk_interval: int = None, chatter_interval: int = None,
                         quiet_hours_start: int = 21, quiet_hours_end: int = 7):
-        """Start idle squawk timer for a connected device."""
+        """Register or re-register a connected device. Preserves existing schedules."""
+        # Always update the websocket reference
         self._active_devices[device_id] = websocket
         self._playing[device_id] = False
         self._send_locks[device_id] = asyncio.Lock()
-        self._squawk_interval[device_id] = squawk_interval or 10
-        self._chatter_interval[device_id] = chatter_interval or DEFAULT_CHATTER_MINUTES
         self._quiet_hours[device_id] = (quiet_hours_start, quiet_hours_end)
-        self._start_idle_timer(device_id)
-        if self.chatter:
-            self._start_chatter_timer(device_id)
+
+        # Update intervals
+        self._squawk_interval[device_id] = squawk_interval or DEFAULT_SQUAWK_MINUTES
+        self._chatter_interval[device_id] = chatter_interval or DEFAULT_CHATTER_MINUTES
+
+        # Only schedule if no existing schedule (don't reset on reconnect!)
+        now = time.time()
+        if device_id not in self._next_squawk_time or self._next_squawk_time[device_id] < now:
+            # Either first time or schedule already passed — schedule with grace period
+            self._schedule_next_squawk(device_id, min_delay=RECONNECT_GRACE)
+
+        if device_id not in self._next_chatter_time or self._next_chatter_time[device_id] < now:
+            self._schedule_next_chatter(device_id, min_delay=RECONNECT_GRACE * 3)
+
+        # Start scheduler loop if not already running
+        existing_task = self._scheduler_tasks.get(device_id)
+        if not existing_task or existing_task.done():
+            task = asyncio.ensure_future(self._scheduler_loop(device_id))
+            self._scheduler_tasks[device_id] = task
+
+        logger.info(
+            f"Squawk registered {device_id}: "
+            f"squawk every {self._squawk_interval[device_id]}min, "
+            f"chatter every {self._chatter_interval[device_id]}min, "
+            f"next squawk in {self._next_squawk_time[device_id] - now:.0f}s, "
+            f"next chatter in {self._next_chatter_time[device_id] - now:.0f}s"
+        )
 
     def unregister_device(self, device_id: str):
-        """Stop timers when device disconnects."""
+        """Mark device as disconnected. Does NOT cancel schedules."""
         self._active_devices.pop(device_id, None)
         self._playing.pop(device_id, None)
-        self._send_locks.pop(device_id, None)
-        self._squawk_interval.pop(device_id, None)
-        self._chatter_interval.pop(device_id, None)
-        self._snoozed_until.pop(device_id, None)
-        self._quiet_hours.pop(device_id, None)
-        task = self._idle_tasks.pop(device_id, None)
-        if task:
-            task.cancel()
-        task = self._chatter_tasks.pop(device_id, None)
-        if task:
-            task.cancel()
+        # Keep send lock, schedules, intervals, quiet hours — they survive reconnects
+        # The scheduler loop will idle while device is not in _active_devices
 
     def snooze(self, device_id: str, minutes: int):
         """Snooze all squawks/chatter for N minutes."""
-        import time
         self._snoozed_until[device_id] = time.time() + minutes * 60
-        # Cancel current timers, they'll skip when they fire if snoozed
-        task = self._idle_tasks.pop(device_id, None)
-        if task:
-            task.cancel()
-        task = self._chatter_tasks.pop(device_id, None)
-        if task:
-            task.cancel()
-        # Schedule timers to resume after snooze ends
-        asyncio.ensure_future(self._resume_after_snooze(device_id, minutes * 60))
         logger.info(f"Squawks snoozed for {minutes}min → {device_id}")
 
     def unsnooze(self, device_id: str):
         """Cancel snooze and resume squawks immediately."""
         self._snoozed_until.pop(device_id, None)
-        if device_id in self._active_devices:
-            self._start_idle_timer(device_id)
-            if self.chatter:
-                self._start_chatter_timer(device_id)
         logger.info(f"Squawks unsnoozed → {device_id}")
 
     def is_snoozed(self, device_id: str) -> bool:
-        import time
         until = self._snoozed_until.get(device_id)
         if until and time.time() < until:
             return True
@@ -188,11 +213,15 @@ class SquawkManager:
         """Check if current time is within quiet hours (no squawks at night)."""
         from config import settings as app_settings
         try:
-            import pytz
-            tz = pytz.timezone(app_settings.TIMEZONE)
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(app_settings.TIMEZONE)
         except Exception:
-            from datetime import timezone
-            tz = timezone.utc
+            try:
+                import pytz
+                tz = pytz.timezone(app_settings.TIMEZONE)
+            except Exception:
+                from datetime import timezone
+                tz = timezone.utc
         now_hour = datetime.now(tz).hour
         start, end = self._quiet_hours.get(device_id, (21, 7))
         if start > end:
@@ -202,20 +231,6 @@ class SquawkManager:
             # Same day: e.g. 14-16 means 2PM to 4PM
             return start <= now_hour < end
         return False
-
-    async def _resume_after_snooze(self, device_id: str, delay: float):
-        """Resume squawk timers after snooze expires."""
-        try:
-            await asyncio.sleep(delay)
-            if device_id in self._active_devices and self.is_snoozed(device_id):
-                self._snoozed_until.pop(device_id, None)
-            if device_id in self._active_devices:
-                self._start_idle_timer(device_id)
-                if self.chatter:
-                    self._start_chatter_timer(device_id)
-                logger.info(f"Squawks resumed after snooze → {device_id}")
-        except asyncio.CancelledError:
-            pass
 
     def update_intervals(self, device_id: str, squawk_interval: int = None,
                          chatter_interval: int = None,
@@ -227,17 +242,9 @@ class SquawkManager:
             self._chatter_interval[device_id] = chatter_interval
         if quiet_hours_start is not None and quiet_hours_end is not None:
             self._quiet_hours[device_id] = (quiet_hours_start, quiet_hours_end)
-        # Restart timers with new intervals
-        if device_id in self._active_devices:
-            task = self._idle_tasks.pop(device_id, None)
-            if task:
-                task.cancel()
-            task = self._chatter_tasks.pop(device_id, None)
-            if task:
-                task.cancel()
-            self._start_idle_timer(device_id)
-            if self.chatter:
-                self._start_chatter_timer(device_id)
+        # Reschedule with new intervals
+        self._schedule_next_squawk(device_id, min_delay=30)
+        self._schedule_next_chatter(device_id, min_delay=60)
 
     def get_send_lock(self, device_id: str) -> Optional[asyncio.Lock]:
         """Get the websocket send lock for a device (used by _send_tts too)."""
@@ -251,60 +258,51 @@ class SquawkManager:
         return self._playing.get(device_id, False)
 
     def reset_idle_timer(self, device_id: str):
-        """Reset the idle squawk timer (call after any activity)."""
-        task = self._idle_tasks.pop(device_id, None)
-        if task:
-            task.cancel()
-        if device_id in self._active_devices:
-            self._start_idle_timer(device_id)
+        """Push back the next squawk after user activity (so it doesn't squawk mid-conversation)."""
+        grace = self._squawk_interval.get(device_id, DEFAULT_SQUAWK_MINUTES) * 60 * 0.5
+        next_time = time.time() + grace
+        # Only push forward, never pull back
+        if next_time > self._next_squawk_time.get(device_id, 0):
+            self._next_squawk_time[device_id] = next_time
 
-    def _start_idle_timer(self, device_id: str):
-        """Schedule next idle squawk."""
-        if not self.squawks:
-            return
-        interval = self._squawk_interval.get(device_id, 10) * 60
-        delay = random.randint(int(interval * 0.5), int(interval * 1.5))
-        task = asyncio.ensure_future(self._idle_squawk_loop(device_id, delay))
-        self._idle_tasks[device_id] = task
+    # ── Scheduler loop ──────────────────────────────────────────────
 
-    def _start_chatter_timer(self, device_id: str):
-        """Schedule next chatter session."""
-        if not self.chatter:
-            return
-        interval = self._chatter_interval.get(device_id, DEFAULT_CHATTER_MINUTES) * 60
-        delay = random.randint(int(interval * 0.75), int(interval * 1.25))
-        task = asyncio.ensure_future(self._chatter_loop(device_id, delay))
-        self._chatter_tasks[device_id] = task
-
-    async def _idle_squawk_loop(self, device_id: str, delay: int):
-        """Wait, then play a random squawk, then reschedule."""
+    async def _scheduler_loop(self, device_id: str):
+        """Single polling loop per device. Checks wall-clock schedules every 15s."""
+        logger.info(f"Scheduler loop started → {device_id}")
         try:
-            await asyncio.sleep(delay)
-            ws = self._active_devices.get(device_id)
-            if ws and self.squawks and not self.is_snoozed(device_id):
-                await self.send_squawk(device_id)
-            # Reschedule
-            if device_id in self._active_devices:
-                self._start_idle_timer(device_id)
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            logger.error(f"Idle squawk error for {device_id}: {e}")
+            while True:
+                await asyncio.sleep(15)  # Check every 15 seconds
 
-    async def _chatter_loop(self, device_id: str, delay: int):
-        """Wait, then play a random chatter clip, then reschedule."""
-        try:
-            await asyncio.sleep(delay)
-            ws = self._active_devices.get(device_id)
-            if ws and self.chatter and not self.is_snoozed(device_id):
-                await self.send_chatter(device_id)
-            # Reschedule
-            if device_id in self._active_devices:
-                self._start_chatter_timer(device_id)
+                # If device not connected, just idle
+                ws = self._active_devices.get(device_id)
+                if not ws:
+                    continue
+
+                # Skip during quiet hours or snooze
+                if self.is_snoozed(device_id):
+                    continue
+
+                now = time.time()
+
+                # Check squawk schedule
+                next_sq = self._next_squawk_time.get(device_id, 0)
+                if now >= next_sq and self.squawks:
+                    await self.send_squawk(device_id)
+                    self._schedule_next_squawk(device_id)
+
+                # Check chatter schedule
+                next_ch = self._next_chatter_time.get(device_id, 0)
+                if now >= next_ch and self.chatter:
+                    await self.send_chatter(device_id)
+                    self._schedule_next_chatter(device_id)
+
         except asyncio.CancelledError:
-            pass
+            logger.info(f"Scheduler loop cancelled → {device_id}")
         except Exception as e:
-            logger.error(f"Chatter error for {device_id}: {e}")
+            logger.error(f"Scheduler loop error for {device_id}: {e}")
+
+    # ── Sound sending ───────────────────────────────────────────────
 
     async def send_squawk(self, device_id: str):
         """Send a random short squawk to a device."""
@@ -329,7 +327,7 @@ class SquawkManager:
         await self._send_wav(ws, device_id, chatter, interruptible=True)
 
     async def maybe_post_response_squawk(self, device_id: str):
-        """20% chance of a short squawk after a TTS response."""
+        """50% chance of a short squawk after a TTS response."""
         if not self.squawks or self.is_snoozed(device_id):
             return
         if random.random() < POST_RESPONSE_SQUAWK_CHANCE:
@@ -344,7 +342,6 @@ class SquawkManager:
         ws = self._active_devices.get(device_id)
         if not ws:
             return
-        # Pick a random short squawk
         squawk = random.choice(self.squawks)
         logger.info(f"Wake squawk → {device_id}")
         await self._send_wav(ws, device_id, squawk)
