@@ -139,9 +139,6 @@ async def continuous_stream(websocket: WebSocket):
                     # Record firmware version if provided
                     fw_version = msg_data.get("fw_version")
                     fw_variant = msg_data.get("fw_variant")
-                    if fw_version:
-                        db.update_device_firmware_info(device_id, fw_version, fw_variant)
-                        logger.info(f"Device {device_id} firmware: v{fw_version} ({fw_variant})")
                     # Authenticate device
                     device_info = verify_device_api_key(msg_data.get("api_key", ""), db)
                     if device_info:
@@ -152,6 +149,11 @@ async def continuous_stream(websocket: WebSocket):
                         conv_state.tenant_id = device_info["tenant_id"]
                         conv_state.user_id = device_info["user_id"]
                         tenant_id = device_info["tenant_id"]
+                        # Save firmware info using the DB device_id
+                        db_device_id = device_info.get("device_id") or device_id
+                        if fw_version:
+                            db.update_device_firmware_info(db_device_id, fw_version, fw_variant)
+                            logger.info(f"Device {device_id} firmware: v{fw_version} ({fw_variant})")
                         logger.info(f"Continuous stream device: {device_id} (tenant={device_info['tenant_id']})")
                     elif not verify_websocket_key(msg_data):
                         logger.warning(f"Continuous stream auth failed: {device_id}")
@@ -745,9 +747,6 @@ async def audio_stream(websocket: WebSocket):
                 # Record firmware version if provided
                 fw_version = message.get("fw_version")
                 fw_variant = message.get("fw_variant")
-                if fw_version:
-                    app.state.db.update_device_firmware_info(device_id, fw_version, fw_variant)
-                    logger.info(f"Device {device_id} firmware: v{fw_version} ({fw_variant})")
                 # Authenticate device
                 device_info = verify_device_api_key(message.get("api_key", ""), app.state.db)
                 if device_info:
@@ -755,6 +754,11 @@ async def audio_stream(websocket: WebSocket):
                     conv_state_obj.tenant_id = device_info["tenant_id"]
                     conv_state_obj.user_id = device_info["user_id"]
                     tenant_id_ev = device_info["tenant_id"]
+                    # Save firmware info using the DB device_id
+                    db_device_id = device_info.get("device_id") or device_id
+                    if fw_version:
+                        app.state.db.update_device_firmware_info(db_device_id, fw_version, fw_variant)
+                        logger.info(f"Device {device_id} firmware: v{fw_version} ({fw_variant})")
                     logger.info(f"Device connected: {device_id} (tenant={device_info['tenant_id']})")
                 elif not verify_websocket_key(message):
                     logger.warning(f"Device auth failed: {device_id}")
