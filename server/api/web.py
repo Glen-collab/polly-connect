@@ -2049,6 +2049,44 @@ async def book_export_pdf(request: Request):
     )
 
 
+# ── Admin Dashboard (cross-tenant) ──
+
+@router.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    session = await get_web_session(request)
+    redirect = require_admin(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    stats = db.get_admin_dashboard_stats()
+    devices = db.get_admin_device_list()
+    intents = db.get_admin_intent_stats(days=7)
+    errors = db.get_admin_error_log(limit=50)
+
+    # Add is_online flag for template
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+    for d in devices:
+        if d.get("last_seen"):
+            try:
+                ls = datetime.fromisoformat(d["last_seen"])
+                d["is_online"] = (now - ls) < timedelta(minutes=5)
+            except Exception:
+                d["is_online"] = False
+        else:
+            d["is_online"] = False
+
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "session": session,
+        "stats": stats,
+        "devices": devices,
+        "intents": intents,
+        "errors": errors,
+    })
+
+
 # ── Firmware OTA Management ──
 
 @router.get("/firmware", response_class=HTMLResponse)

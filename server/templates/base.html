@@ -67,6 +67,10 @@
                     </div>
                     {% endif %}
 
+                    {% if session.is_admin %}
+                    <a href="/web/admin" class="hover:underline">Admin</a>
+                    {% endif %}
+
                     <span class="text-emerald-200 text-xs">|</span>
                     <span class="text-emerald-200 text-sm">{{ session.name }}{% if session.role == 'family' %} <span class="bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded ml-1">Family</span>{% endif %}</span>
                     <a href="/web/logout" class="hover:underline text-emerald-200 text-sm">Logout</a>
@@ -118,6 +122,10 @@
                         <a href="/web/firmware" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Firmware</a>
                         {% endif %}
                     </div>
+                    {% endif %}
+
+                    {% if session.is_admin %}
+                    <a href="/web/admin" class="block py-2 px-3 rounded hover:bg-emerald-700 text-base font-medium">Admin</a>
                     {% endif %}
 
                     <div class="border-t border-emerald-500 mt-2 pt-2">

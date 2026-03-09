@@ -345,6 +345,22 @@ class PollyDB:
                 )
             """)
 
+            # ── Device events (admin telemetry) ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS device_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    device_id TEXT NOT NULL,
+                    tenant_id INTEGER,
+                    event_type TEXT NOT NULL,
+                    intent TEXT,
+                    success INTEGER DEFAULT 1,
+                    detail TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_device_events_device_time ON device_events(device_id, created_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_device_events_type_time ON device_events(event_type, created_at)")
+
             conn.commit()
         finally:
             if not self._conn:
@@ -1874,6 +1890,123 @@ class PollyDB:
             conn.execute("DELETE FROM firmware_versions WHERE id = ?", (firmware_id,))
             conn.commit()
             return row[0]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Admin dashboard (cross-tenant) ──
+
+    def log_device_event(self, device_id: str, tenant_id: int,
+                         event_type: str, intent: str = None,
+                         success: int = 1, detail: str = None):
+        """Insert a device event row for admin telemetry."""
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                """INSERT INTO device_events
+                   (device_id, tenant_id, event_type, intent, success, detail)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (device_id, tenant_id, event_type, intent, success, detail),
+            )
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_admin_dashboard_stats(self) -> Dict:
+        """Cross-tenant stats for the admin dashboard."""
+        conn = self._get_connection()
+        try:
+            total_devices = conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
+            # Online = last_seen within 5 minutes
+            online_devices = conn.execute(
+                "SELECT COUNT(*) FROM devices WHERE last_seen > datetime('now', '-5 minutes')"
+            ).fetchone()[0]
+            total_tenants = conn.execute("SELECT COUNT(*) FROM tenants").fetchone()[0]
+            total_stories = conn.execute("SELECT COUNT(*) FROM stories").fetchone()[0]
+            total_stories_today = conn.execute(
+                "SELECT COUNT(*) FROM stories WHERE created_at > datetime('now', '-1 day')"
+            ).fetchone()[0]
+            total_commands_today = conn.execute(
+                "SELECT COUNT(*) FROM device_events WHERE event_type = 'command' AND created_at > datetime('now', '-1 day')"
+            ).fetchone()[0]
+            total_errors_today = conn.execute(
+                "SELECT COUNT(*) FROM device_events WHERE event_type = 'error' AND created_at > datetime('now', '-1 day')"
+            ).fetchone()[0]
+            return {
+                "total_devices": total_devices,
+                "online_devices": online_devices,
+                "total_tenants": total_tenants,
+                "total_stories": total_stories,
+                "total_stories_today": total_stories_today,
+                "total_commands_today": total_commands_today,
+                "total_errors_today": total_errors_today,
+            }
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_admin_device_list(self) -> List[Dict]:
+        """All devices with tenant name, firmware info, and event counts."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT d.device_id, d.name, d.last_seen, d.fw_version, d.fw_variant,
+                       d.tenant_id, t.name AS tenant_name,
+                       (SELECT COUNT(*) FROM device_events e
+                        WHERE e.device_id = d.device_id AND e.event_type = 'command'
+                        AND e.created_at > datetime('now', '-1 day')) AS commands_today,
+                       (SELECT COUNT(*) FROM device_events e
+                        WHERE e.device_id = d.device_id AND e.event_type = 'error'
+                        AND e.created_at > datetime('now', '-1 day')) AS errors_today,
+                       (SELECT COUNT(*) FROM stories s
+                        WHERE s.tenant_id = d.tenant_id) AS stories_total,
+                       (SELECT e.created_at FROM device_events e
+                        WHERE e.device_id = d.device_id AND e.event_type = 'command'
+                        ORDER BY e.created_at DESC LIMIT 1) AS last_command
+                FROM devices d
+                LEFT JOIN tenants t ON d.tenant_id = t.id
+                ORDER BY d.last_seen DESC
+            """).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_admin_intent_stats(self, days: int = 7) -> List[Dict]:
+        """Intent usage counts for the last N days, ordered by count DESC."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """SELECT intent, COUNT(*) AS cnt
+                   FROM device_events
+                   WHERE event_type = 'command' AND intent IS NOT NULL
+                     AND created_at > datetime('now', ? || ' days')
+                   GROUP BY intent
+                   ORDER BY cnt DESC""",
+                (f"-{days}",),
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_admin_error_log(self, limit: int = 50) -> List[Dict]:
+        """Recent error events with device_id and detail."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """SELECT device_id, tenant_id, detail, created_at
+                   FROM device_events
+                   WHERE event_type = 'error'
+                   ORDER BY created_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+            return [dict(r) for r in rows]
         finally:
             if not self._conn:
                 conn.close()

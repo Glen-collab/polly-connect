@@ -116,6 +116,17 @@ async def continuous_stream(websocket: WebSocket):
     med_scheduler = getattr(app.state, "med_scheduler", None)
     squawk_mgr = getattr(app.state, "squawk", None)
 
+    # Mutable container so _log_event captures current tenant_id
+    _evt_ctx = {"tenant_id": 1}
+
+    def _log_event(evt_type, intent=None, success=1, detail=None):
+        """Log a device event for admin dashboard (never crashes pipeline)."""
+        try:
+            db.log_device_event(device_id, _evt_ctx["tenant_id"],
+                                evt_type, intent=intent, success=success, detail=detail)
+        except Exception:
+            pass
+
     try:
         while True:
             try:
@@ -200,6 +211,8 @@ async def continuous_stream(websocket: WebSocket):
                         logger.info(f"Client IP for {device_id}: {client_host}")
 
                     await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
+                    _evt_ctx["tenant_id"] = tenant_id
+                    _log_event("connect")
 
                     # Load squawk intervals from user profile
                     squawk_int = 10
@@ -546,10 +559,12 @@ async def continuous_stream(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info(f"Continuous stream disconnected: {device_id}")
+        _log_event("disconnect")
     except Exception as e:
         import traceback
         logger.error(f"Continuous stream error: {e}")
         traceback.print_exc()
+        _log_event("error", detail=str(e)[:500])
     finally:
         if squawk_mgr:
             squawk_mgr.set_busy(device_id, False)
@@ -647,6 +662,17 @@ async def _process_command(
     intent_result = intent_parser.parse(transcription)
     logger.info(f"Intent: {intent_result}")
 
+    # Log command event for admin dashboard
+    try:
+        _db = getattr(websocket.app.state, "db", None)
+        if _db:
+            _conv = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+            _tid = _conv.tenant_id if _conv else 1
+            _db.log_device_event(device_id, _tid, "command",
+                                 intent=intent_result.get("intent"))
+    except Exception:
+        pass
+
     # Use conversation-aware processing if available
     if hasattr(cmd, 'process_in_context'):
         response_text, new_mode = await cmd.process_in_context(intent_result, transcription, device_id)
@@ -711,6 +737,13 @@ async def _send_tts(websocket: WebSocket, tts, text: str, squawk_mgr=None, devic
         import traceback
         logger.error(f"TTS error: {e}")
         traceback.print_exc()
+        try:
+            _db = getattr(websocket.app.state, "db", None)
+            if _db:
+                _db.log_device_event(device_id or "unknown", 1, "error",
+                                     detail=f"TTS: {str(e)[:400]}")
+        except Exception:
+            pass
         return 0.0
 
 
