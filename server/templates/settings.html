@@ -47,6 +47,13 @@
                 </select>
             </div>
         </div>
+        <div class="mt-3">
+            <label class="block text-sm text-gray-600 mb-1">Location (for weather)</label>
+            <input type="text" name="location_city" value="{{ user.location_city or '' }}"
+                   placeholder="e.g. Hartland, WI"
+                   class="w-full sm:w-1/2 border rounded px-3 py-2 text-sm">
+            <p class="text-xs text-gray-400 mt-1">City and state for accurate weather reports</p>
+        </div>
         <div class="mt-4">
             <label class="flex items-center gap-2">
                 <input type="checkbox" name="memory_care_mode" value="1"

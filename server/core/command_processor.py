@@ -373,7 +373,19 @@ class CommandProcessor:
         elif intent == "weather":
             if self.weather:
                 client_ip = state.client_ip
-                resp = self.weather.get_weather(client_ip=client_ip)
+                # Check for user-configured location
+                location_override = None
+                user = self.db.get_or_create_user(tenant_id=state.tenant_id)
+                if user and user.get("location_lat") and user.get("location_lon"):
+                    location_override = (
+                        user["location_lat"],
+                        user["location_lon"],
+                        user.get("location_city") or "your area",
+                    )
+                resp = self.weather.get_weather(
+                    client_ip=client_ip,
+                    location_override=location_override,
+                )
                 self._last_response[device_id] = resp
                 return resp
             return "Weather forecasts are coming soon."

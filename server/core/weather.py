@@ -142,11 +142,20 @@ class AlmanacWeather:
         except Exception as e:
             logger.error(f"Error loading almanac weather: {e}")
 
-    def get_weather(self, client_ip: str = None) -> str:
+    def get_weather(self, client_ip: str = None,
+                    location_override: tuple = None) -> str:
         """
         Get real weather + almanac fun fact. Falls back to almanac-only if API fails.
+        location_override: (lat, lon, city_name) from user settings.
         """
-        # Try real weather first
+        # Try user-configured location first
+        if location_override:
+            lat, lon, city = location_override
+            weather = self._get_cached_weather_by_coords(lat, lon, city)
+            if weather:
+                return self._format_real_weather(weather)
+
+        # Try IP geolocation
         if client_ip:
             weather = self._get_cached_weather(client_ip)
             if weather:
@@ -154,6 +163,26 @@ class AlmanacWeather:
 
         # Fallback to almanac
         return self.get_weekly_forecast()
+
+    def _get_cached_weather_by_coords(self, lat: float, lon: float,
+                                       location_name: str) -> Optional[Dict]:
+        """Get weather data by coordinates with 2-hour cache."""
+        now = time.time()
+        cache_key = f"{lat},{lon}"
+
+        if cache_key in self._weather_cache:
+            cached_time, cached_data = self._weather_cache[cache_key]
+            if now - cached_time < WEATHER_CACHE_TTL:
+                logger.info(f"Weather cache hit for {location_name}")
+                return cached_data
+
+        logger.info(f"Weather lookup: {location_name} ({lat}, {lon})")
+        weather = _get_weather_gov(lat, lon)
+        if weather:
+            weather["location_name"] = location_name
+            self._weather_cache[cache_key] = (now, weather)
+            return weather
+        return None
 
     def _get_cached_weather(self, client_ip: str) -> Optional[Dict]:
         """Get weather data with 2-hour cache."""

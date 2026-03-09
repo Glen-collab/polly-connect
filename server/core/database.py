@@ -366,6 +366,9 @@ class PollyDB:
                 "squawk_snoozed_until": "ALTER TABLE user_profiles ADD COLUMN squawk_snoozed_until TIMESTAMP",
                 "quiet_hours_start": "ALTER TABLE user_profiles ADD COLUMN quiet_hours_start INTEGER DEFAULT 21",
                 "quiet_hours_end": "ALTER TABLE user_profiles ADD COLUMN quiet_hours_end INTEGER DEFAULT 7",
+                "location_city": "ALTER TABLE user_profiles ADD COLUMN location_city TEXT",
+                "location_lat": "ALTER TABLE user_profiles ADD COLUMN location_lat REAL",
+                "location_lon": "ALTER TABLE user_profiles ADD COLUMN location_lon REAL",
             }
             for col, sql in migrations.items():
                 if col not in cols:

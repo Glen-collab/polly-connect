@@ -20,6 +20,24 @@ from core.medications import format_time_12hr, _get_local_now
 from config import settings
 
 import re
+import urllib.request
+import urllib.parse
+
+
+def _geocode_city(city: str):
+    """Geocode a city name to (lat, lon) using Nominatim (free, no key)."""
+    try:
+        q = urllib.parse.quote(city)
+        url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "PollyConnect/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+            if data:
+                return float(data[0]["lat"]), float(data[0]["lon"])
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Geocode error for '{city}': {e}")
+    return None
+
 
 def parse_time_input(raw: str) -> str:
     """Convert user-friendly time ('8am', '2:30 PM', '2 PM', '14:00') to 24hr 'HH:MM'."""
@@ -847,6 +865,7 @@ async def settings_save(request: Request, name: str = Form(...),
                         bible_topic_preference: str = Form(""),
                         music_genre_preference: str = Form(""),
                         memory_care_mode: str = Form(""),
+                        location_city: str = Form(""),
                         squawk_interval: int = Form(10),
                         chatter_interval: int = Form(45),
                         quiet_hours_start: int = Form(21),
@@ -865,6 +884,21 @@ async def settings_save(request: Request, name: str = Form(...),
     quiet_hours_start = max(0, min(23, quiet_hours_start))
     quiet_hours_end = max(0, min(23, quiet_hours_end))
 
+    # Geocode location if changed
+    location_lat = user.get("location_lat")
+    location_lon = user.get("location_lon")
+    if location_city and location_city.strip():
+        location_city = location_city.strip()
+        # Only re-geocode if city changed
+        if location_city != (user.get("location_city") or ""):
+            coords = _geocode_city(location_city)
+            if coords:
+                location_lat, location_lon = coords
+    else:
+        location_city = None
+        location_lat = None
+        location_lon = None
+
     conn = db._get_connection()
     try:
         conn.execute("""
@@ -872,12 +906,14 @@ async def settings_save(request: Request, name: str = Form(...),
             bible_topic_preference = ?, music_genre_preference = ?,
             memory_care_mode = ?, squawk_interval = ?, chatter_interval = ?,
             quiet_hours_start = ?, quiet_hours_end = ?,
+            location_city = ?, location_lat = ?, location_lon = ?,
             updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (name, familiar_name or None, bible_topic_preference or None,
               music_genre_preference or None, 1 if memory_care_mode else 0,
               squawk_interval, chatter_interval,
-              quiet_hours_start, quiet_hours_end, user["id"]))
+              quiet_hours_start, quiet_hours_end,
+              location_city, location_lat, location_lon, user["id"]))
         conn.commit()
     finally:
         if not db._conn:
