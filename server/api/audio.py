@@ -225,7 +225,7 @@ async def continuous_stream(websocket: WebSocket):
                         # Delayed startup squawk — give device time to finish init
                         async def _startup_squawk(mgr, dev_id):
                             await asyncio.sleep(10)  # grace period for device init
-                            if not mgr.is_snoozed(dev_id) and dev_id in mgr._active_devices:
+                            if not mgr.is_snoozed(dev_id) and not mgr.is_busy(dev_id) and dev_id in mgr._active_devices:
                                 await mgr.send_squawk(dev_id)
                         asyncio.ensure_future(_startup_squawk(squawk_mgr, device_id))
 

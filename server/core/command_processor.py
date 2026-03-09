@@ -507,7 +507,7 @@ Below are real family stories that were shared with you. Weave them into a singl
 warm, heartfelt narrative — like a grandparent reading a family storybook aloud.
 
 Rules:
-- Keep it 2-3 minutes when read aloud (roughly 300-400 words)
+- Keep it SHORT — about 1 minute when read aloud (100-150 words max)
 - Use a warm, conversational storytelling voice
 - Honor the original words and feelings — don't invent new facts
 - Connect the stories naturally with gentle transitions
@@ -523,7 +523,7 @@ NARRATIVE:"""
         response = self.followup_gen._client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=800,
+            max_tokens=300,
             temperature=0.7,
         )
 
