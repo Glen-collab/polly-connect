@@ -944,7 +944,7 @@ async def settings_save(request: Request, name: str = Form(...),
             detector.rms_threshold = rms_threshold
             logger.info(f"RMS threshold updated to {rms_threshold} from settings")
 
-    return RedirectResponse("/web/settings", status_code=303)
+    return RedirectResponse("/web/settings?saved=1", status_code=303)
 
 
 @router.post("/settings/pronunciation/add")

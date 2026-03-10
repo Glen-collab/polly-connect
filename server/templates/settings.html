@@ -4,6 +4,12 @@
 {% block content %}
 <h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Settings</h1>
 
+{% if request.query_params.get('saved') %}
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4 text-sm text-emerald-800 font-medium">
+    Settings saved successfully!
+</div>
+{% endif %}
+
 <form method="POST" action="/web/settings">
     <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
         <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">User Profile</h2>
