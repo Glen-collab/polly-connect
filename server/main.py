@@ -201,4 +201,5 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
+    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG,
+                ws_ping_interval=None, ws_ping_timeout=None)
