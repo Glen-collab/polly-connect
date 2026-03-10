@@ -777,7 +777,8 @@ async def _process_command(
             "Let me weave together a nice story from the memories.",
         ]
         buffer_phrase = _rnd.choice(buffer_phrases)
-        await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr, device_id=device_id)
+        await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr,
+                        device_id=device_id, pronunciations=_pronunciations)
 
     # Send a reverent buffer for prayer before GPT runs
     if intent_result.get("intent") == "prayer":
@@ -794,7 +795,8 @@ async def _process_command(
             "Let's be still for a moment and pray.",
         ]
         buffer_phrase = _rnd.choice(buffer_phrases)
-        await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr, device_id=device_id)
+        await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr,
+                        device_id=device_id, pronunciations=_pronunciations)
 
     # Use conversation-aware processing if available
     if hasattr(cmd, 'process_in_context'):
