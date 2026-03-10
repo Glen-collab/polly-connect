@@ -408,7 +408,6 @@ class IntentParser:
                 theme = "family"
 
             # Check for "pray for [person]" pattern
-            import re
             pray_for_match = re.search(r'pray\s+(?:for|over)\s+(?:my\s+)?(.+?)(?:\s+please)?$', text_lower)
             if pray_for_match:
                 target = pray_for_match.group(1).strip()
