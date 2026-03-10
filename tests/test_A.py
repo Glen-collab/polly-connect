@@ -343,7 +343,6 @@ class TestFamilyStories:
         assert parser.parse(text)["intent"] == "family_question"
 
     @pytest.mark.parametrize("text", [
-        "tell me a story",
         "let me tell you about my childhood",
         "i remember when we lived on the farm",
         "record my story",
@@ -352,6 +351,10 @@ class TestFamilyStories:
     ])
     def test_tell_story(self, parser, text):
         assert parser.parse(text)["intent"] == "tell_story"
+
+    def test_tell_me_a_story_is_hear(self, parser):
+        """'tell me a story' means user wants to HEAR a story, not record one."""
+        assert parser.parse("tell me a story")["intent"] == "hear_stories"
 
     @pytest.mark.parametrize("text", [
         "how many stories do i have",

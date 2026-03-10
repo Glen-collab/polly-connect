@@ -33,7 +33,8 @@ class IntentParser:
             "what has grandma said", "what has she said",
             "read me my stories", "tell me one of my stories",
             "read a story", "tell me my story", "share a story",
-            "read back my stories", "narrate a story", "story reading",
+            "read back my stories", "read me one of my stories",
+            "narrate a story", "story reading",
             "tell me a story",
         ]
         self._family_question_phrases = [
@@ -277,11 +278,13 @@ class IntentParser:
             "whats ": "what's ", "thats ": "that's ", "hows ": "how's ",
             "todays ": "today's ", "lets ": "let's ", "dont ": "don't ",
             "didnt ": "didn't ", "doesnt ": "doesn't ", "cant ": "can't ",
-            "wont ": "won't ", "isnt ": "isn't ", "im ": "i'm ",
-            "ive ": "i've ", "youre ": "you're ",
+            "wont ": "won't ", "isnt ": "isn't ", "youre ": "you're ",
         }
         for abbrev, full in contraction_map.items():
             text_lower = text_lower.replace(abbrev, full)
+        # Word-boundary contractions that can match inside other words
+        text_lower = re.sub(r'\bim ', "i'm ", text_lower)
+        text_lower = re.sub(r'\bive ', "i've ", text_lower)
 
         # ── Family storytelling intents (check first, order matters) ──
 
@@ -397,11 +400,11 @@ class IntentParser:
                 theme = "strength"
             elif any(w in text_lower for w in ["faith", "believe", "trust", "doubt", "wisdom", "guidance", "guide"]):
                 theme = "faith"
-            elif any(w in text_lower for w in ["thank", "grateful", "blessing", "thankful", "blessed", "praise", "glory", "glorious"]):
+            elif any(w in text_lower for w in ["thank", "grateful", "blessing", "thankful", "blessed", "bless", "praise", "glory", "glorious"]):
                 theme = "gratitude"
             elif any(w in text_lower for w in ["purpose", "meaning", "legacy", "why am i"]):
                 theme = "purpose"
-            elif any(w in text_lower for w in ["happy", "joy", "celebrate", "celebration", "wonderful"]):
+            elif any(w in text_lower for w in ["happy", "happiness", "joy", "celebrate", "celebration", "wonderful"]):
                 theme = "joy"
             # Family
             elif any(w in text_lower for w in ["kid", "kids", "children", "grandkid", "grandchildren", "grandson", "granddaughter", "family"]):
