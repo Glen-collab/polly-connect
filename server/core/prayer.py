@@ -101,17 +101,44 @@ class PrayerService:
         if not theme and time_context == "nighttime":
             theme = "bedtime"
 
-        # Gather family context
+        # Gather close family only (parents, children, grandchildren, spouse, siblings)
+        _close_relations = {
+            "father", "mother", "son", "daughter", "husband", "wife", "spouse",
+            "brother", "sister", "grandson", "granddaughter", "stepson", "stepdaughter",
+            "father-in-law", "mother-in-law", "son-in-law", "daughter-in-law",
+            "great-grandson", "great-granddaughter",
+            "grandfather", "grandmother",
+        }
         family_members = self.db.get_family_members(tenant_id=tenant_id)
-        family_names = []
+        living_family = []
+        deceased_family = []
         relationships = {}
         for fm in family_members:
             name = fm.get("name", "")
-            rel = fm.get("relationship", "")
-            if name:
-                family_names.append(name)
-                if rel:
-                    relationships[name] = rel
+            rel = fm.get("relation_to_owner") or fm.get("relationship", "")
+            if not name:
+                continue
+            # Only include close family in prayers
+            if rel and rel.lower() not in _close_relations:
+                continue
+            if rel:
+                relationships[name] = rel
+            info = name
+            if fm.get("spouse_name"):
+                info += f" (married to {fm['spouse_name']})"
+            if fm.get("bio"):
+                info += f" — {fm['bio']}"
+            if fm.get("deceased"):
+                deceased_family.append(info)
+            else:
+                living_family.append(info)
+
+        # Gather prayer requests
+        prayer_requests = []
+        try:
+            prayer_requests = self.db.get_prayer_requests(tenant_id, active_only=True)
+        except Exception:
+            pass
 
         # Gather recent story snippets for context
         stories = self.db.get_stories(tenant_id=tenant_id, limit=10)
@@ -136,9 +163,11 @@ class PrayerService:
         prompt = self._build_prayer_prompt(
             situation=situation,
             time_context=time_context,
-            family_names=family_names,
+            living_family=living_family,
+            deceased_family=deceased_family,
             relationships=relationships,
             story_snippets=story_snippets,
+            prayer_requests=prayer_requests,
             theme=theme,
         )
 
@@ -174,19 +203,31 @@ class PrayerService:
         return prayer
 
     def _build_prayer_prompt(self, situation: str, time_context: str,
-                              family_names: list, relationships: dict,
-                              story_snippets: list, theme: str = None) -> str:
-        # Family context block
+                              living_family: list, deceased_family: list,
+                              relationships: dict, story_snippets: list,
+                              prayer_requests: list = None,
+                              theme: str = None) -> str:
+        # Family context blocks
         family_block = ""
-        if family_names:
-            family_lines = []
-            for name in family_names[:10]:
-                rel = relationships.get(name, "")
-                if rel:
-                    family_lines.append(f"- {name} ({rel})")
-                else:
-                    family_lines.append(f"- {name}")
-            family_block = "FAMILY MEMBERS:\n" + "\n".join(family_lines)
+        if living_family:
+            family_block = "LIVING FAMILY (close):\n" + "\n".join(
+                f"- {f}" for f in living_family[:8]
+            )
+        if deceased_family:
+            family_block += "\n\nDECEASED FAMILY (in heaven):\n" + "\n".join(
+                f"- {f}" for f in deceased_family[:6]
+            )
+
+        # Prayer requests block
+        request_block = ""
+        if prayer_requests:
+            lines = []
+            for pr in prayer_requests[:5]:
+                line = pr["name"]
+                if pr.get("request"):
+                    line += f": {pr['request']}"
+                lines.append(f"- {line}")
+            request_block = "PRAYER REQUESTS:\n" + "\n".join(lines)
 
         # Memory context block
         memory_block = ""
@@ -199,18 +240,18 @@ class PrayerService:
         situation_guide = {
             "gratitude_family": "Thank God for specific family members BY NAME. Express gratitude for who they are and what they mean.",
             "gratitude_memories": "Thank God for the family memories and stories that have been shared. Reference the actual memories gently.",
-            "protection_family": "Pray for God's protection over family members BY NAME. Ask for safety, health, and guidance for each.",
+            "protection_family": "Pray for God's protection over living family members BY NAME. Ask for safety, health, and guidance.",
             "children_grandchildren": "Pray specifically for the children and grandchildren in the family BY NAME. Ask for their growth, joy, and faith.",
             "comfort_aging": "Pray for comfort and peace in growing older. Thank God for the years and ask for grace in the days ahead.",
             "strength_daily": "Pray for strength to face today. Ask for energy, patience, and purpose.",
-            "healing": "Pray for healing of body, mind, and spirit. Ask for God's restoring hand.",
+            "healing": "Pray for healing of body, mind, and spirit. Ask for God's restoring hand. If there are prayer requests for healing, mention them.",
             "togetherness": "Pray for the family to stay close and connected. Thank God for the bonds of love.",
             "wisdom_guidance": "Pray for wisdom and guidance in daily decisions. Ask for clarity and peace.",
             "peace_home": "Pray for peace in the home. Ask for harmony, laughter, and God's presence in every room.",
             "joy_simple_things": "Pray for joy in simple blessings — a warm meal, a phone call, a sunny day.",
-            "legacy_purpose": "Pray about the legacy being left behind. Thank God for the stories and wisdom being passed down.",
+            "legacy_purpose": "Pray about the legacy being left behind. Thank God for the stories and wisdom being passed down. Mention deceased family members fondly.",
             "bedtime": "A gentle bedtime prayer. Ask for peaceful rest, safety through the night, and God's presence while sleeping.",
-            "family": "Pray for the whole family by name. Lift each person up.",
+            "family": "Pray for the whole close family by name. Lift each person up.",
             "hope": "Pray for hope and encouragement. Remind that God's plans are good.",
             "faith": "Pray for deeper faith and trust in God's plan.",
             "resilience": "Pray for strength and resilience in hard times.",
@@ -228,13 +269,18 @@ TIME OF DAY: {time_context}
 
 {family_block}
 
+{request_block}
+
 {memory_block}
 
 Rules:
 - Start with "Dear Lord," or "Heavenly Father," or "Dear God,"
 - End with "Amen."
 - MAXIMUM 4-5 sentences, 60-80 words. Keep it short enough to speak aloud.
-- Use family member names naturally (don't list them all mechanically)
+- Use family member names naturally (don't list them all mechanically — pick 2-3)
+- For DECEASED family: speak of them with love and gratitude ("thank You for the time we had with [name]", "we know [name] is with You now"). Never pray for their health or safety.
+- For LIVING family: pray for protection, health, guidance, blessings
+- If there are PRAYER REQUESTS, weave one or two in naturally
 - If referencing memories, weave them in gently — don't quote them directly
 - Warm, sincere, spoken tone — like praying out loud with a friend
 - Christian prayer, non-denominational

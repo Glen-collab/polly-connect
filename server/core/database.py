@@ -475,6 +475,29 @@ class PollyDB:
                 if col not in cols:
                     conn.execute(sql)
 
+            # Add extended info to family_members
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(family_members)").fetchall()}
+            fm_ext = {
+                "deceased": "ALTER TABLE family_members ADD COLUMN deceased INTEGER DEFAULT 0",
+                "spouse_name": "ALTER TABLE family_members ADD COLUMN spouse_name TEXT",
+                "bio": "ALTER TABLE family_members ADD COLUMN bio TEXT",
+            }
+            for col, sql in fm_ext.items():
+                if col not in cols:
+                    conn.execute(sql)
+
+            # Prayer requests table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS prayer_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    name TEXT NOT NULL,
+                    request TEXT,
+                    active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # Add family_name and role columns to web_sessions
             cols = {row[1] for row in conn.execute("PRAGMA table_info(web_sessions)").fetchall()}
             if "family_name" not in cols:
@@ -1249,7 +1272,9 @@ class PollyDB:
 
     def update_family_member(self, member_id: int, name: str = None,
                              relationship: str = None, relation_to_owner: str = None,
-                             parent_member_id: int = None, generation: int = None) -> bool:
+                             parent_member_id: int = None, generation: int = None,
+                             deceased: int = None, spouse_name: str = None,
+                             bio: str = None) -> bool:
         conn = self._get_connection()
         try:
             updates = []
@@ -1271,6 +1296,15 @@ class PollyDB:
             if generation is not None:
                 updates.append("generation = ?")
                 params.append(generation)
+            if deceased is not None:
+                updates.append("deceased = ?")
+                params.append(deceased)
+            if spouse_name is not None:
+                updates.append("spouse_name = ?")
+                params.append(spouse_name if spouse_name.strip() else None)
+            if bio is not None:
+                updates.append("bio = ?")
+                params.append(bio if bio.strip() else None)
             if not updates:
                 return False
             params.append(member_id)
@@ -1350,6 +1384,50 @@ class PollyDB:
                 conn.close()
 
     # ── Narrative log ──
+
+    # ── Prayer requests ──
+
+    def add_prayer_request(self, name: str, request: str = None,
+                           tenant_id: int = None) -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO prayer_requests (tenant_id, name, request)
+                VALUES (?, ?, ?)
+            """, (tenant_id, name, request))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_prayer_requests(self, tenant_id: int, active_only: bool = True) -> list:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            if active_only:
+                rows = conn.execute(
+                    "SELECT * FROM prayer_requests WHERE tenant_id = ? AND active = 1 ORDER BY created_at DESC",
+                    (tenant_id,)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM prayer_requests WHERE tenant_id = ? ORDER BY created_at DESC",
+                    (tenant_id,)
+                ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_prayer_request(self, request_id: int):
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM prayer_requests WHERE id = ?", (request_id,))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
 
     def log_narrative_stories(self, story_ids: list, tenant_id: int = None,
                               query: str = None):

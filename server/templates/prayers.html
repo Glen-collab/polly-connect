@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Prayer Requests - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+    <div>
+        <h1 class="text-xl sm:text-2xl font-bold">Prayer Requests</h1>
+        <p class="text-sm text-gray-500 mt-1">Add names and requests. Polly will include them in personalized prayers.</p>
+    </div>
+</div>
+
+<!-- Add prayer request form -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+    <h2 class="text-base font-semibold mb-3">Add a Prayer Request</h2>
+    <form method="POST" action="/web/prayers/add">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Name (who to pray for)</label>
+                <input type="text" name="name" required
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Aunt Susan">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Prayer request (optional)</label>
+                <input type="text" name="prayer_request"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Healing from surgery, strength during chemo">
+            </div>
+        </div>
+        <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded text-sm hover:bg-emerald-700">
+            Add Prayer Request
+        </button>
+    </form>
+</div>
+
+<!-- Active prayer requests -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6">
+    <h2 class="text-base font-semibold mb-3">Active Requests</h2>
+
+    {% if prayer_requests %}
+    <div class="space-y-3">
+        {% for pr in prayer_requests %}
+        <div class="flex justify-between items-start border-b pb-3 last:border-0">
+            <div>
+                <p class="font-medium text-sm">{{ pr.name }}</p>
+                {% if pr.request %}
+                <p class="text-sm text-gray-500">{{ pr.request }}</p>
+                {% endif %}
+                <p class="text-xs text-gray-400 mt-1">Added {{ pr.created_at[:10] if pr.created_at else '' }}</p>
+            </div>
+            <form method="POST" action="/web/prayers/{{ pr.id }}/delete"
+                  onsubmit="return confirm('Remove this prayer request?')">
+                <button type="submit" class="text-xs text-red-400 hover:text-red-600">Remove</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-400 text-sm">No prayer requests yet. Add one above and Polly will weave it into prayers.</p>
+    {% endif %}
+</div>
+
+<div class="mt-4 text-center">
+    <p class="text-xs text-gray-400">Say "Polly, say a prayer" and she'll include these requests along with family context.</p>
+</div>
+{% endblock %}

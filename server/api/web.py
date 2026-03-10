@@ -1552,7 +1552,10 @@ async def family_tree_page(request: Request):
 async def family_tree_add(request: Request,
                            name: str = Form(...),
                            relation_to_owner: str = Form(...),
-                           parent_member_id: str = Form("")):
+                           parent_member_id: str = Form(""),
+                           spouse_name: str = Form(""),
+                           bio: str = Form(""),
+                           deceased: str = Form("")):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -1576,6 +1579,9 @@ async def family_tree_add(request: Request,
         relation_to_owner=relation_to_owner,
         parent_member_id=parent_id,
         generation=generation,
+        spouse_name=spouse_name.strip(),
+        bio=bio.strip(),
+        deceased=1 if deceased else 0,
     )
 
     return RedirectResponse("/web/family-tree", status_code=303)
@@ -1585,7 +1591,10 @@ async def family_tree_add(request: Request,
 async def family_tree_edit(request: Request, member_id: int,
                             name: str = Form(...),
                             relation_to_owner: str = Form(...),
-                            parent_member_id: str = Form("")):
+                            parent_member_id: str = Form(""),
+                            spouse_name: str = Form(""),
+                            bio: str = Form(""),
+                            deceased: str = Form("")):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -1608,6 +1617,9 @@ async def family_tree_edit(request: Request, member_id: int,
         relation_to_owner=relation_to_owner,
         parent_member_id=parent_id,
         generation=generation,
+        spouse_name=spouse_name.strip(),
+        bio=bio.strip(),
+        deceased=1 if deceased else 0,
     )
 
     return RedirectResponse("/web/family-tree", status_code=303)
@@ -1665,6 +1677,53 @@ async def family_member_photos(request: Request, member_id: int):
             for p in photos
         ],
     })
+
+
+# ── Prayer Requests ──
+
+@router.get("/prayers", response_class=HTMLResponse)
+async def prayers_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    requests_list = db.get_prayer_requests(tid, active_only=False)
+
+    return templates.TemplateResponse("prayers.html", {
+        "request": request,
+        "session": session,
+        "prayer_requests": requests_list,
+    })
+
+
+@router.post("/prayers/add")
+async def prayers_add(request: Request,
+                       name: str = Form(...),
+                       prayer_request: str = Form("")):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    db.add_prayer_request(name.strip(), prayer_request.strip() or None, tenant_id=tid)
+    return RedirectResponse("/web/prayers", status_code=303)
+
+
+@router.post("/prayers/{request_id}/delete")
+async def prayers_delete(request: Request, request_id: int):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    db.delete_prayer_request(request_id)
+    return RedirectResponse("/web/prayers", status_code=303)
 
 
 # ── Device Management ──
