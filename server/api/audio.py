@@ -738,32 +738,62 @@ async def _process_command(
             asyncio.ensure_future(squawk_mgr.maybe_post_response_squawk(device_id, tts_duration=duration))
         return duration
 
+    # Get owner's familiar name for personalized buffers
+    _owner_name = None
+    try:
+        _db = getattr(websocket.app.state, "db", None)
+        if _db:
+            _conv = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+            _tid = _conv.tenant_id if _conv else 1
+            _usr = _db.get_or_create_user(tenant_id=_tid)
+            _owner_name = _usr.get("familiar_name") or _usr.get("name") or None
+    except Exception:
+        pass
+
     # Send a "thinking" buffer for hear_stories before GPT runs
     if intent_result.get("intent") == "hear_stories":
         import random as _rnd
-        buffer_phrase = _rnd.choice([
-            "Let me think of a story for you.",
-            "Oh, let me find a good one.",
-            "Hold on, let me look through some memories.",
-            "Let's reminisce on some stories from the past.",
-            "Give me just a moment to find something special.",
-            "Ooh, I know just the one. One moment.",
-            "Let me flip through the memory book.",
-            "Hmm, let me remember. Just a second.",
-            "Oh, I love this part. Let me find it.",
+        _n = _owner_name
+        buffer_phrases = [
+            f"Oh {_n}, let me find a good one." if _n else "Oh, let me find a good one.",
+            f"Hold on {_n}, let me look through some memories." if _n else "Hold on, let me look through some memories.",
+            f"Give me just a moment {_n}, I want to find something special." if _n else "Give me just a moment to find something special.",
+            f"Ooh {_n}, I know just the one. One moment." if _n else "Ooh, I know just the one. One moment.",
+            f"Let me flip through the memory book for you, {_n}." if _n else "Let me flip through the memory book.",
+            f"Hmm, let me remember. Just a second, {_n}." if _n else "Hmm, let me remember. Just a second.",
+            f"Oh {_n}, I love this part. Let me find it." if _n else "Oh, I love this part. Let me find it.",
+            f"Let me think of a good story for you, {_n}." if _n else "Let me think of a story for you.",
             "Let me pull up something from the family stories.",
-        ])
+            "Oh, this is going to be a good one. Hang tight.",
+            f"You're going to love this one, {_n}. Just a moment." if _n else "You're going to love this one. Just a moment.",
+            "Let me dig into the family memories real quick.",
+            f"Alright {_n}, let's see what we've got." if _n else "Alright, let's see what we've got.",
+            "Oh, I've got just the thing. One second.",
+            f"Let me find something wonderful for you, {_n}." if _n else "Let me find something wonderful for you.",
+            "Hmm, so many good ones to choose from. Give me a moment.",
+            f"Sit tight {_n}, I'm looking for something special." if _n else "Sit tight, I'm looking for something special.",
+            "Let me think back. There's a great one I want to share.",
+            f"Oh {_n}, you'll enjoy this. Let me pull it together." if _n else "Oh, you'll enjoy this. Let me pull it together.",
+            "Let me weave together a nice story from the memories.",
+        ]
+        buffer_phrase = _rnd.choice(buffer_phrases)
         await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr, device_id=device_id)
 
     # Send a reverent buffer for prayer before GPT runs
     if intent_result.get("intent") == "prayer":
         import random as _rnd
-        buffer_phrase = _rnd.choice([
-            "Let's bow our heads.",
+        _n = _owner_name
+        buffer_phrases = [
+            f"Let's bow our heads, {_n}." if _n else "Let's bow our heads.",
             "Let us pray together.",
             "Let me lead us in prayer.",
-            "Let's take a moment with the Lord.",
-        ])
+            f"Let's take a moment with the Lord, {_n}." if _n else "Let's take a moment with the Lord.",
+            f"Close your eyes, {_n}. Let's pray." if _n else "Close your eyes. Let's pray.",
+            "Let's come before the Lord together.",
+            f"{_n}, let me say a prayer for you." if _n else "Let me say a prayer for you.",
+            "Let's be still for a moment and pray.",
+        ]
+        buffer_phrase = _rnd.choice(buffer_phrases)
         await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr, device_id=device_id)
 
     # Use conversation-aware processing if available
