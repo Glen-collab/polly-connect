@@ -117,6 +117,35 @@ def _get_weather_gov(lat: float, lon: float) -> Optional[Dict]:
     return result
 
 
+_STATE_ABBREVS = {
+    "al": "Alabama", "ak": "Alaska", "az": "Arizona", "ar": "Arkansas",
+    "ca": "California", "co": "Colorado", "ct": "Connecticut", "de": "Delaware",
+    "fl": "Florida", "ga": "Georgia", "hi": "Hawaii", "id": "Idaho",
+    "il": "Illinois", "in": "Indiana", "ia": "Iowa", "ks": "Kansas",
+    "ky": "Kentucky", "la": "Louisiana", "me": "Maine", "md": "Maryland",
+    "ma": "Massachusetts", "mi": "Michigan", "mn": "Minnesota", "ms": "Mississippi",
+    "mo": "Missouri", "mt": "Montana", "ne": "Nebraska", "nv": "Nevada",
+    "nh": "New Hampshire", "nj": "New Jersey", "nm": "New Mexico", "ny": "New York",
+    "nc": "North Carolina", "nd": "North Dakota", "oh": "Ohio", "ok": "Oklahoma",
+    "or": "Oregon", "pa": "Pennsylvania", "ri": "Rhode Island", "sc": "South Carolina",
+    "sd": "South Dakota", "tn": "Tennessee", "tx": "Texas", "ut": "Utah",
+    "vt": "Vermont", "va": "Virginia", "wa": "Washington", "wv": "West Virginia",
+    "wi": "Wisconsin", "wy": "Wyoming", "dc": "District of Columbia",
+}
+
+
+def _expand_state_abbrev(location: str) -> str:
+    """Expand 'Hartland, WI' → 'Hartland, Wisconsin' for TTS."""
+    if not location or "," not in location:
+        return location
+    parts = location.rsplit(",", 1)
+    if len(parts) == 2:
+        state = parts[1].strip().lower()
+        if state in _STATE_ABBREVS:
+            return f"{parts[0].strip()}, {_STATE_ABBREVS[state]}"
+    return location
+
+
 class AlmanacWeather:
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
@@ -217,28 +246,28 @@ class AlmanacWeather:
         """Format real weather data into brief conversational speech."""
         parts = []
         location = weather.get("location_name") or weather.get("location", "your area")
+        location = _expand_state_abbrev(location)
 
         # Current conditions — keep it short
         temp = weather.get("current_temp_f")
         desc = weather.get("current_desc", "")
         if temp is not None:
             if desc:
-                parts.append(f"Right now in {location}, it's {temp} degrees and {desc.lower()}.")
+                parts.append(f"In {location}, it's {temp} degrees and {desc.lower()}.")
             else:
-                parts.append(f"Right now in {location}, it's {temp} degrees.")
+                parts.append(f"In {location}, it's {temp} degrees.")
         elif desc:
-            parts.append(f"Right now in {location}, it's {desc.lower()}.")
+            parts.append(f"In {location}, it's {desc.lower()}.")
 
-        # Today's short forecast only (not the detailed paragraph)
+        # Today's short forecast only
         current_period = weather.get("current_period")
         if current_period:
-            name = current_period.get("name", "Today")
             short = current_period.get("shortForecast", "")
             high_low = current_period.get("temperature")
-            trend = current_period.get("temperatureTrend", "")
+            name = current_period.get("name", "Today")
             if short and high_low:
-                temp_word = "a high" if "day" in name.lower() or name == "Today" else "a low"
-                parts.append(f"{name}, {short.lower()} with {temp_word} of {high_low}.")
+                temp_word = "High" if "day" in name.lower() or name == "Today" else "Low"
+                parts.append(f"{temp_word} of {high_low}, {short.lower()}.")
             elif short:
                 parts.append(f"{name}: {short.lower()}.")
 
@@ -250,11 +279,8 @@ class AlmanacWeather:
                 short = p.get("shortForecast", "")
                 temp_val = p.get("temperature")
                 if short and temp_val:
-                    parts.append(f"{name}, {short.lower()}, {temp_val} degrees.")
+                    parts.append(f"Tomorrow, {short.lower()}, {temp_val}.")
                 break
-
-        # Almanac fun fact
-        parts.append(random.choice(ALMANAC_NOTES))
 
         return " ".join(parts)
 
