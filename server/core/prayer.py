@@ -239,40 +239,57 @@ class PrayerService:
         category = self._pick_category(theme, tenant_id)
         logger.info(f"Prayer category: {category['key']} ({category['label']})")
 
-        # Gather family context if the category uses it or praying for someone
+        # Gather family context if the category uses it
         living_family = []
         deceased_family = []
         prayer_requests = []
         memory_snippets = []
+        pray_for_is_family = False
+
+        _close_relations = {
+            "father", "mother", "son", "daughter", "husband", "wife", "spouse",
+            "brother", "sister", "grandson", "granddaughter", "stepson", "stepdaughter",
+            "father-in-law", "mother-in-law", "son-in-law", "daughter-in-law",
+            "great-grandson", "great-granddaughter",
+            "grandfather", "grandmother",
+        }
 
         if category["uses_family"] or pray_for:
-            _close_relations = {
-                "father", "mother", "son", "daughter", "husband", "wife", "spouse",
-                "brother", "sister", "grandson", "granddaughter", "stepson", "stepdaughter",
-                "father-in-law", "mother-in-law", "son-in-law", "daughter-in-law",
-                "great-grandson", "great-granddaughter",
-                "grandfather", "grandmother",
-            }
             family_members = self.db.get_family_members(tenant_id=tenant_id)
-            for fm in family_members:
-                name = fm.get("name", "")
-                rel = fm.get("relation_to_owner") or fm.get("relationship", "")
-                if not name:
-                    continue
-                if rel and rel.lower() not in _close_relations:
-                    continue
-                info = name
-                if fm.get("spouse_name"):
-                    info += f" (married to {fm['spouse_name']})"
-                if fm.get("deceased"):
-                    deceased_family.append(info)
-                else:
-                    living_family.append(info)
+
+            # Check if pray_for person is in the family tree
+            if pray_for:
+                pray_for_lower = pray_for.lower().strip()
+                for fm in family_members:
+                    if fm.get("name", "").lower().strip() == pray_for_lower:
+                        pray_for_is_family = True
+                        break
+
+            # Only load family names if category needs them OR pray_for is a family member
+            if category["uses_family"] or pray_for_is_family:
+                for fm in family_members:
+                    name = fm.get("name", "")
+                    rel = fm.get("relation_to_owner") or fm.get("relationship", "")
+                    if not name:
+                        continue
+                    if rel and rel.lower() not in _close_relations:
+                        continue
+                    info = name
+                    if fm.get("spouse_name"):
+                        info += f" (married to {fm['spouse_name']})"
+                    if fm.get("deceased"):
+                        deceased_family.append(info)
+                    else:
+                        living_family.append(info)
 
             # Prayer requests — for healing/family/grief, or when praying for someone specific
             if category["key"] in ("healing", "family", "grief") or pray_for:
                 try:
                     prayer_requests = self.db.get_prayer_requests(tenant_id, active_only=True)
+                    # If praying for a specific non-family person, only include their request
+                    if pray_for and not pray_for_is_family:
+                        prayer_requests = [pr for pr in prayer_requests
+                                           if pr["name"].lower().strip() == pray_for.lower().strip()]
                 except Exception:
                     pass
 
@@ -285,10 +302,15 @@ class PrayerService:
                         snippet = text[:120] + ("..." if len(text) > 120 else "")
                         memory_snippets.append(snippet)
 
-        # Build prompt
-        prompt = self._build_prompt(category, time_context, living_family,
-                                     deceased_family, prayer_requests, memory_snippets,
-                                     pray_for=pray_for)
+        # Build prompt — don't pass family context for non-family pray_for
+        if pray_for and not pray_for_is_family:
+            prompt = self._build_prompt(category, time_context, [], [],
+                                         prayer_requests, [],
+                                         pray_for=pray_for, pray_for_is_family=False)
+        else:
+            prompt = self._build_prompt(category, time_context, living_family,
+                                         deceased_family, prayer_requests, memory_snippets,
+                                         pray_for=pray_for, pray_for_is_family=pray_for_is_family)
 
         response = self.followup_gen._client.chat.completions.create(
             model="gpt-4o",
@@ -321,7 +343,7 @@ class PrayerService:
     def _build_prompt(self, category: dict, time_context: str,
                        living_family: list, deceased_family: list,
                        prayer_requests: list, memory_snippets: list,
-                       pray_for: str = None) -> str:
+                       pray_for: str = None, pray_for_is_family: bool = False) -> str:
         context_blocks = []
 
         if living_family:
@@ -346,7 +368,10 @@ class PrayerService:
 
         pray_for_line = ""
         if pray_for:
-            pray_for_line = f"\nPRAY SPECIFICALLY FOR: {pray_for}. Make this prayer centered on {pray_for}. If they match a prayer request, include that context. Otherwise, pray for God's blessings, protection, and guidance for {pray_for}.\n"
+            if pray_for_is_family:
+                pray_for_line = f"\nPRAY SPECIFICALLY FOR: {pray_for} (family member). Center this prayer on {pray_for}. If they match a prayer request, include that context.\n"
+            else:
+                pray_for_line = f"\nPRAY SPECIFICALLY FOR: {pray_for}. Center this prayer entirely on {pray_for}. Do NOT mention any family members — {pray_for} is not part of the family. Use rich prayer language: strength, courage, hope, wisdom, glory, grace, perseverance, peace, comfort, resilience. If a prayer request is provided for {pray_for}, weave it in.\n"
 
         return f"""You are Polly, praying aloud with an elderly person.
 
