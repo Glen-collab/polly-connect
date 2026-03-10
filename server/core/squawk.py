@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_SQUAWK_MINUTES = 10
 DEFAULT_CHATTER_MINUTES = 45
 
-# Chance of squawk after a TTS response
-POST_RESPONSE_SQUAWK_CHANCE = 0.50  # 50%
+# Chance of squawk after a TTS response (disabled — causes ESP32 crash)
+POST_RESPONSE_SQUAWK_CHANCE = 0.0  # disabled
 
 # Volume reduction (0.0 = silent, 1.0 = full)
 SQUAWK_VOLUME = 0.30  # 30% volume so mic doesn't pick it up
