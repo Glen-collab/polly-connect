@@ -594,6 +594,17 @@ async def _process_command(
 ) -> float:
     """Run STT → intent parse → CommandProcessor → TTS on buffered command audio.
     Returns estimated TTS playback duration in seconds for cooldown calculation."""
+    # Load pronunciation guide for this tenant
+    _pronunciations = []
+    try:
+        _db = getattr(websocket.app.state, "db", None)
+        if _db:
+            _conv = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+            _tid = _conv.tenant_id if _conv else 1
+            _pronunciations = _db.get_pronunciations(_tid)
+    except Exception:
+        pass
+
     if len(command_audio) == 0 and not pre_transcription:
         await websocket.send_json({"event": "response", "text": "I didn't hear anything.", "audio": None})
         return 0.0
@@ -725,8 +736,9 @@ async def _process_command(
         "mode": new_mode.value,
     })
 
-    # Generate and send TTS audio
-    duration = await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
+    # Generate and send TTS audio (with pronunciation guide)
+    duration = await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr,
+                               device_id=device_id, pronunciations=_pronunciations)
 
     # Maybe squawk after responding (parrot personality)
     if squawk_mgr:
@@ -735,9 +747,15 @@ async def _process_command(
     return duration
 
 
-async def _send_tts(websocket: WebSocket, tts, text: str, squawk_mgr=None, device_id: str = None) -> float:
+async def _send_tts(websocket: WebSocket, tts, text: str, squawk_mgr=None,
+                    device_id: str = None, pronunciations: list = None) -> float:
     """Generate TTS audio and send as chunked base64. Returns estimated playback duration in seconds."""
     try:
+        # Apply pronunciation guide if available
+        if pronunciations:
+            from core.pronunciation import apply_pronunciations
+            text = apply_pronunciations(text, pronunciations)
+
         tts_audio = tts.synthesize(text)
         if not tts_audio:
             return 0.0

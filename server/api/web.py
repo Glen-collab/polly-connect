@@ -850,12 +850,15 @@ async def settings_page(request: Request):
                 is_snoozed = True
                 break
 
+    pronunciations = db.get_pronunciations(session["tenant_id"])
+
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "session": session,
         "user": user,
         "tenant": tenant,
         "is_snoozed": is_snoozed,
+        "pronunciations": pronunciations,
     })
 
 
@@ -927,6 +930,31 @@ async def settings_save(request: Request, name: str = Form(...),
                                         quiet_hours_start, quiet_hours_end)
 
     return RedirectResponse("/web/settings", status_code=303)
+
+
+@router.post("/settings/pronunciation/add")
+async def pronunciation_add(request: Request, word: str = Form(...), phonetic: str = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    word = word.strip()
+    phonetic = phonetic.strip()
+    if word and phonetic:
+        db = request.app.state.db
+        db.add_pronunciation(session["tenant_id"], word, phonetic)
+    return RedirectResponse("/web/settings#pronunciation", status_code=303)
+
+
+@router.post("/settings/pronunciation/delete")
+async def pronunciation_delete(request: Request, pronunciation_id: int = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    db.delete_pronunciation(pronunciation_id)
+    return RedirectResponse("/web/settings#pronunciation", status_code=303)
 
 
 @router.post("/settings/squawk-snooze")

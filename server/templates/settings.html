@@ -63,6 +63,63 @@
         </div>
     </div>
 
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6" id="pronunciation">
+        <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Pronunciation Guide</h2>
+        <p class="text-xs text-gray-500 mb-3">
+            Teach Polly how to say names correctly. Type the word as it's spelled, then how it sounds.
+            For example: <strong>Nawrott</strong> → <strong>Nore-Rott</strong>
+        </p>
+
+        {% if pronunciations %}
+        <div class="mb-4">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600 text-left">
+                    <tr>
+                        <th class="px-3 py-2 font-medium">Spelled</th>
+                        <th class="px-3 py-2 font-medium">Says It As</th>
+                        <th class="px-3 py-2 font-medium w-16"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for p in pronunciations %}
+                    <tr>
+                        <td class="px-3 py-2 font-medium text-gray-800">{{ p.word }}</td>
+                        <td class="px-3 py-2 text-emerald-700 italic">{{ p.phonetic }}</td>
+                        <td class="px-3 py-2">
+                            <form method="POST" action="/web/settings/pronunciation/delete" class="inline"
+                                  onsubmit="return confirm('Remove this pronunciation?');">
+                                <input type="hidden" name="pronunciation_id" value="{{ p.id }}">
+                                <button type="submit" class="text-red-400 hover:text-red-600 text-lg" title="Delete">&times;</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <div class="flex flex-col sm:flex-row gap-2 items-end">
+            <div class="flex-1">
+                <label class="block text-xs text-gray-500 mb-1">Word (as spelled)</label>
+                <input type="text" form="pron-form" name="word" placeholder="Nawrott"
+                       class="w-full border rounded px-3 py-2 text-sm">
+            </div>
+            <div class="flex-1">
+                <label class="block text-xs text-gray-500 mb-1">How to say it</label>
+                <input type="text" form="pron-form" name="phonetic" placeholder="Nore-Rott"
+                       class="w-full border rounded px-3 py-2 text-sm">
+            </div>
+            <div>
+                <button type="submit" form="pron-form"
+                        class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm whitespace-nowrap">
+                    Add
+                </button>
+            </div>
+        </div>
+        <form id="pron-form" method="POST" action="/web/settings/pronunciation/add"></form>
+    </div>
+
     <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
         <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Polly Sounds</h2>
         <p class="text-xs text-gray-500 mb-3">Control how often Polly makes bird sounds. Short squawks are quick chirps. Chatter is longer parakeet conversations.</p>

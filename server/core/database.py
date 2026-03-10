@@ -498,6 +498,17 @@ class PollyDB:
                 )
             """)
 
+            # Pronunciation guide table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS pronunciations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    word TEXT NOT NULL,
+                    phonetic TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # Add family_name and role columns to web_sessions
             cols = {row[1] for row in conn.execute("PRAGMA table_info(web_sessions)").fetchall()}
             if "family_name" not in cols:
@@ -1424,6 +1435,55 @@ class PollyDB:
         conn = self._get_connection()
         try:
             conn.execute("DELETE FROM prayer_requests WHERE id = ?", (request_id,))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Pronunciation guide ──
+
+    def get_pronunciations(self, tenant_id: int) -> list:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM pronunciations WHERE tenant_id = ? ORDER BY word",
+                (tenant_id,)
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def add_pronunciation(self, tenant_id: int, word: str, phonetic: str) -> int:
+        conn = self._get_connection()
+        try:
+            # Upsert: if same word exists for this tenant, update it
+            existing = conn.execute(
+                "SELECT id FROM pronunciations WHERE tenant_id = ? AND LOWER(word) = LOWER(?)",
+                (tenant_id, word)
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE pronunciations SET phonetic = ? WHERE id = ?",
+                    (phonetic, existing[0])
+                )
+                conn.commit()
+                return existing[0]
+            cursor = conn.execute(
+                "INSERT INTO pronunciations (tenant_id, word, phonetic) VALUES (?, ?, ?)",
+                (tenant_id, word, phonetic)
+            )
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_pronunciation(self, pronunciation_id: int):
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM pronunciations WHERE id = ?", (pronunciation_id,))
             conn.commit()
         finally:
             if not self._conn:
