@@ -389,15 +389,15 @@ class IntentParser:
                 theme = "healing"
             elif any(w in text_lower for w in ["forgive", "forgiveness", "let go", "bitter", "angry"]):
                 theme = "forgiveness"
-            elif any(w in text_lower for w in ["peace", "calm", "quiet", "still", "rest"]):
+            elif any(w in text_lower for w in ["peace", "calm", "quiet", "still", "rest", "comfort", "grace", "mercy"]):
                 theme = "peace"
             elif any(w in text_lower for w in ["hope", "hopeful", "hopeless", "feeling down", "feeling low", "down"]):
                 theme = "hope"
-            elif any(w in text_lower for w in ["strength", "strong", "courage", "brave"]):
+            elif any(w in text_lower for w in ["strength", "strong", "courage", "brave", "resilience", "resilient", "perseverance", "endurance"]):
                 theme = "strength"
-            elif any(w in text_lower for w in ["faith", "believe", "trust", "doubt"]):
+            elif any(w in text_lower for w in ["faith", "believe", "trust", "doubt", "wisdom", "guidance", "guide"]):
                 theme = "faith"
-            elif any(w in text_lower for w in ["thank", "grateful", "blessing", "thankful", "blessed", "praise"]):
+            elif any(w in text_lower for w in ["thank", "grateful", "blessing", "thankful", "blessed", "praise", "glory", "glorious"]):
                 theme = "gratitude"
             elif any(w in text_lower for w in ["purpose", "meaning", "legacy", "why am i"]):
                 theme = "purpose"
@@ -411,11 +411,25 @@ class IntentParser:
             pray_for_match = re.search(r'pray\s+(?:for|over)\s+(?:my\s+)?(.+?)(?:\s+please)?$', text_lower)
             if pray_for_match:
                 target = pray_for_match.group(1).strip()
-                # Skip generic words that aren't people
-                skip = {"me", "us", "family", "kids", "children", "grandchildren",
-                        "grandkids", "healing", "strength", "peace", "hope"}
+                # Skip generic/theme words that aren't people names
+                skip = {
+                    "me", "us", "family", "kids", "children", "grandchildren",
+                    "grandkids", "the family", "my family", "the kids",
+                    # Prayer themes — not people
+                    "healing", "strength", "peace", "hope", "faith", "courage",
+                    "resilience", "grace", "comfort", "guidance", "joy", "love",
+                    "gratitude", "forgiveness", "patience", "wisdom", "rest",
+                    "calm", "purpose", "blessings", "protection", "health",
+                    "happiness", "glory", "mercy", "perseverance",
+                    # Emotional states
+                    "anxiety", "grief", "loneliness", "fear", "worry",
+                }
                 if target and target not in skip:
-                    pray_for = target
+                    # If theme was already detected from the same word, it's a theme not a person
+                    if theme:
+                        pray_for = None
+                    else:
+                        pray_for = target
 
             return {"intent": "prayer", "theme": theme, "pray_for": pray_for, "confidence": 0.9}
 
