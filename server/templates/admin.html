@@ -142,7 +142,13 @@
                     <tr class="hover:bg-gray-50">
                         <td class="px-5 py-2.5 text-sm text-gray-500 whitespace-nowrap">{{ err.created_at }}</td>
                         <td class="px-5 py-2.5 text-gray-700 whitespace-nowrap">{{ err.device_id }}</td>
-                        <td class="px-5 py-2.5 text-sm text-red-600 break-all">{{ err.detail or '—' }}</td>
+                        <td class="px-5 py-2.5 text-sm text-red-600">
+                            {% if err.detail and err.detail|length > 60 %}
+                                <span class="cursor-pointer hover:underline" onclick="showError(this)" data-detail="{{ err.detail|e }}">{{ err.detail[:60] }}…</span>
+                            {% else %}
+                                {{ err.detail or '—' }}
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                     {% if not errors %}
@@ -153,4 +159,28 @@
         </div>
     </div>
 </div>
+
+<!-- Error detail modal -->
+<div id="error-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeError()">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-auto">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800">Error Detail</h3>
+            <button onclick="closeError()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div id="error-detail-text" class="px-5 py-4 text-sm text-red-700 font-mono whitespace-pre-wrap break-words"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showError(el) {
+    var detail = el.getAttribute('data-detail');
+    document.getElementById('error-detail-text').textContent = detail;
+    document.getElementById('error-modal').classList.remove('hidden');
+}
+function closeError() {
+    document.getElementById('error-modal').classList.add('hidden');
+}
+</script>
 {% endblock %}
