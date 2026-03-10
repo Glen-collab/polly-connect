@@ -514,18 +514,15 @@ class CommandProcessor:
         story_text = "\n\n---\n\n".join(excerpts)
         topic_hint = f" Focus on stories about {query}." if query else ""
 
-        prompt = f"""You are Polly, a warm companion for an elderly person and their family.
-Below are real family stories that were shared with you. Weave them into a single
-warm, heartfelt narrative — like a grandparent reading a family storybook aloud.
+        prompt = f"""You are Polly, a warm companion for an elderly person.
+Weave these family stories into ONE short spoken paragraph.
 
 Rules:
-- Keep it SHORT — about 1 minute when read aloud (100-150 words max)
-- Use a warm, conversational storytelling voice
-- Honor the original words and feelings — don't invent new facts
-- Connect the stories naturally with gentle transitions
-- End with something warm and reflective
-- Do NOT use quotation marks or attribution like "they said"
-- Write it as one flowing narrative, not a list{topic_hint}
+- MAXIMUM 3 sentences, 40-60 words total. Never exceed this.
+- Warm, conversational tone — like a grandparent reminiscing
+- Honor the original words — don't invent new facts
+- No quotation marks or "they said"
+- One flowing paragraph, not a list{topic_hint}
 
 FAMILY STORIES:
 {story_text}
@@ -535,11 +532,21 @@ NARRATIVE:"""
         response = self.followup_gen._client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
+            max_tokens=150,
             temperature=0.7,
         )
 
-        return response.choices[0].message.content.strip()
+        narrative = response.choices[0].message.content.strip()
+        # Hard cap: truncate to ~80 words to prevent TTS timeout
+        words = narrative.split()
+        if len(words) > 80:
+            # Cut at last sentence boundary within 80 words
+            truncated = " ".join(words[:80])
+            last_period = truncated.rfind(".")
+            if last_period > 20:
+                truncated = truncated[:last_period + 1]
+            narrative = truncated
+        return narrative
 
     async def _handle_family_question(self, device_id: str) -> str:
         state = self._get_state(device_id)
