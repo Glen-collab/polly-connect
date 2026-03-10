@@ -161,16 +161,35 @@ class IntentParser:
             "verse of the day", "daily bible verse",
         ]
         self._prayer_phrases = [
+            # Direct prayer requests
             "say a prayer", "pray for me", "pray with me",
             "let's pray", "let us pray", "can you pray",
             "i need a prayer", "prayer", "pray",
             "say a prayer for me", "will you pray",
-            "bedtime prayer", "goodnight prayer",
-            "nighttime prayer", "evening prayer",
-            "pray for my family", "family prayer",
             "i want to pray", "help me pray",
             "lead me in prayer", "lead a prayer",
             "can we pray", "would you pray",
+            "pray for us", "pray over me",
+            # Time-based
+            "bedtime prayer", "goodnight prayer",
+            "nighttime prayer", "evening prayer",
+            "morning prayer", "start the day with prayer",
+            # Emotional triggers (natural speech)
+            "i'm having a hard day", "i need some hope",
+            "i'm feeling down", "i'm feeling low",
+            "i'm worried", "i'm scared", "i'm anxious",
+            "i feel alone", "i feel lonely",
+            "i miss him", "i miss her", "i miss them",
+            "i'm struggling", "things are tough",
+            "give me strength", "i need strength",
+            "i need peace", "i need comfort",
+            "i'm thankful", "i'm grateful", "i'm blessed",
+            "thank the lord", "praise god", "praise the lord",
+            "bless this day", "bless my family",
+            # Family-specific
+            "pray for my family", "family prayer",
+            "pray for my kids", "pray for the children",
+            "pray for my grandchildren", "pray for my grandkids",
         ]
         self._medication_phrases = [
             "remind me to take", "medication", "my pills",
@@ -350,33 +369,56 @@ class IntentParser:
 
         if self._matches(text_lower, self._prayer_phrases):
             theme = None
-            if any(w in text_lower for w in ["bedtime", "goodnight", "nighttime", "evening"]):
-                theme = "bedtime"
+            pray_for = None  # specific person to pray for
+
+            # Time-based
+            if any(w in text_lower for w in ["bedtime", "goodnight", "nighttime", "evening", "sleep"]):
+                theme = "rest"
             elif any(w in text_lower for w in ["morning", "start the day", "new day"]):
-                theme = "strength_daily"
-            elif any(w in text_lower for w in ["kid", "kids", "children", "grandkid", "grandchildren", "grandson", "granddaughter"]):
-                theme = "children_grandchildren"
-            elif "family" in text_lower:
-                theme = "family"
-            elif any(w in text_lower for w in ["heal", "healing", "sick", "health"]):
+                theme = "strength"
+            # Emotional categories
+            elif any(w in text_lower for w in ["worried", "worry", "anxious", "anxiety", "scared", "fear", "nervous"]):
+                theme = "anxiety"
+            elif any(w in text_lower for w in ["miss him", "miss her", "miss them", "passed away", "lost", "grief", "heaven"]):
+                theme = "grief"
+            elif any(w in text_lower for w in ["alone", "lonely", "loneliness", "isolated", "by myself"]):
+                theme = "loneliness"
+            elif any(w in text_lower for w in ["hard day", "tough", "struggling", "difficult", "having a hard"]):
+                theme = "strength"
+            elif any(w in text_lower for w in ["heal", "healing", "sick", "health", "surgery", "doctor", "pain"]):
                 theme = "healing"
-            elif any(w in text_lower for w in ["comfort", "lonely", "alone", "miss"]):
-                theme = "comfort_aging"
-            elif any(w in text_lower for w in ["peace", "calm", "anxious", "worry"]):
-                theme = "peace_home"
-            elif any(w in text_lower for w in ["strength", "strong", "courage"]):
-                theme = "resilience"
-            elif any(w in text_lower for w in ["hope", "hopeful"]):
+            elif any(w in text_lower for w in ["forgive", "forgiveness", "let go", "bitter", "angry"]):
+                theme = "forgiveness"
+            elif any(w in text_lower for w in ["peace", "calm", "quiet", "still", "rest"]):
+                theme = "peace"
+            elif any(w in text_lower for w in ["hope", "hopeful", "hopeless", "feeling down", "feeling low", "down"]):
                 theme = "hope"
-            elif any(w in text_lower for w in ["faith", "believe", "trust"]):
+            elif any(w in text_lower for w in ["strength", "strong", "courage", "brave"]):
+                theme = "strength"
+            elif any(w in text_lower for w in ["faith", "believe", "trust", "doubt"]):
                 theme = "faith"
-            elif any(w in text_lower for w in ["thank", "grateful", "blessing", "thankful"]):
+            elif any(w in text_lower for w in ["thank", "grateful", "blessing", "thankful", "blessed", "praise"]):
                 theme = "gratitude"
-            elif any(w in text_lower for w in ["memor", "stories", "remember"]):
-                theme = "gratitude_memories"
-            elif any(w in text_lower for w in ["protect", "safe", "safety", "watch over"]):
-                theme = "protection_family"
-            return {"intent": "prayer", "theme": theme, "confidence": 0.9}
+            elif any(w in text_lower for w in ["purpose", "meaning", "legacy", "why am i"]):
+                theme = "purpose"
+            elif any(w in text_lower for w in ["happy", "joy", "celebrate", "celebration", "wonderful"]):
+                theme = "joy"
+            # Family
+            elif any(w in text_lower for w in ["kid", "kids", "children", "grandkid", "grandchildren", "grandson", "granddaughter", "family"]):
+                theme = "family"
+
+            # Check for "pray for [person]" pattern
+            import re
+            pray_for_match = re.search(r'pray\s+(?:for|over)\s+(?:my\s+)?(.+?)(?:\s+please)?$', text_lower)
+            if pray_for_match:
+                target = pray_for_match.group(1).strip()
+                # Skip generic words that aren't people
+                skip = {"me", "us", "family", "kids", "children", "grandchildren",
+                        "grandkids", "healing", "strength", "peace", "hope"}
+                if target and target not in skip:
+                    pray_for = target
+
+            return {"intent": "prayer", "theme": theme, "pray_for": pray_for, "confidence": 0.9}
 
         if self._matches(text_lower, self._medication_phrases):
             return {"intent": "medication", "confidence": 0.9, "raw": text}
