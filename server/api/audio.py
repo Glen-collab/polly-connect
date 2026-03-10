@@ -689,6 +689,11 @@ async def _process_command(
             "Hold on, let me look through some memories.",
             "Let's reminisce on some stories from the past.",
             "Give me just a moment to find something special.",
+            "Ooh, I know just the one. One moment.",
+            "Let me flip through the memory book.",
+            "Hmm, let me remember. Just a second.",
+            "Oh, I love this part. Let me find it.",
+            "Let me pull up something from the family stories.",
         ])
         await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr, device_id=device_id)
 

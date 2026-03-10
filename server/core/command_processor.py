@@ -490,6 +490,11 @@ class CommandProcessor:
                     # Log which stories were used
                     if used_ids:
                         self.db.log_narrative_stories(used_ids, tenant_id=tid, query=query)
+
+                    # Build attribution intro from story speakers
+                    intro = self._build_story_attribution(stories, used_ids, query)
+                    if intro:
+                        narrative = f"{intro} {narrative}"
                     return narrative
             except Exception as e:
                 logger.error(f"Story narrative generation error: {e}")
@@ -500,6 +505,46 @@ class CommandProcessor:
         if len(transcript) > 500:
             transcript = transcript[:500] + "..."
         return f"Here's a story that was shared: {transcript}"
+
+    def _build_story_attribution(self, stories: list, used_ids: list, query: str = None) -> str:
+        """Build a spoken intro like 'This story is from Glen' or 'Here's a story about the lake from Brooklyn'."""
+        import random
+        # Get unique speaker names from the stories that were actually used
+        speakers = []
+        for s in stories:
+            if s["id"] in used_ids and s.get("speaker_name"):
+                name = s["speaker_name"]
+                if name not in speakers:
+                    speakers.append(name)
+
+        if not speakers:
+            return ""
+
+        if len(speakers) == 1:
+            name = speakers[0]
+            if query:
+                return random.choice([
+                    f"Here's a story about {query} from {name}.",
+                    f"This one about {query} comes from {name}.",
+                    f"{name} shared this one about {query}.",
+                ])
+            else:
+                return random.choice([
+                    f"This story is from {name}.",
+                    f"Here's one from {name}.",
+                    f"{name} shared this one.",
+                    f"This comes from {name}.",
+                ])
+        else:
+            names = ", ".join(speakers[:-1]) + f" and {speakers[-1]}"
+            if query:
+                return f"Here's a story about {query} from {names}."
+            else:
+                return random.choice([
+                    f"This story comes from {names}.",
+                    f"Here's one from {names}.",
+                    f"{names} shared these memories.",
+                ])
 
     def _generate_story_narrative(self, stories: list, query: str = None) -> tuple:
         """Use OpenAI to weave stored stories into a warm narrative.
