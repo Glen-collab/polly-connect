@@ -38,7 +38,7 @@ SQUAWK_VOLUME = 0.30  # 30% volume so mic doesn't pick it up
 JITTER_SECONDS = 120  # ±2 minutes
 
 # Delay before first squawk after reconnect (seconds)
-RECONNECT_GRACE = 10
+RECONNECT_GRACE = 60
 
 
 def _convert_to_16k_mono(wav_bytes: bytes, volume: float = SQUAWK_VOLUME) -> bytes:
@@ -275,7 +275,7 @@ class SquawkManager:
 
     def reset_idle_timer(self, device_id: str):
         """Push back the next squawk after user activity (so it doesn't squawk mid-conversation)."""
-        grace = self._squawk_interval.get(device_id, DEFAULT_SQUAWK_MINUTES) * 60 * 0.5
+        grace = self._squawk_interval.get(device_id, DEFAULT_SQUAWK_MINUTES) * 60
         next_time = time.time() + grace
         # Only push forward, never pull back
         if next_time > self._next_squawk_time.get(device_id, 0):
