@@ -86,10 +86,28 @@ def _convert_to_16k_mono(wav_bytes: bytes, volume: float = SQUAWK_VOLUME) -> byt
     return out.getvalue()
 
 
+def _convert_to_16k_mono_from_pcm(wav_bytes: bytes, volume: float) -> bytes:
+    """Apply volume to an already-converted 16kHz mono WAV."""
+    with wave.open(io.BytesIO(wav_bytes), 'rb') as w:
+        raw = w.readframes(w.getnframes())
+    samples = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
+    samples = samples * volume
+    samples = np.clip(samples, -32768, 32767).astype(np.int16)
+    out = io.BytesIO()
+    with wave.open(out, 'wb') as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(samples.tobytes())
+    return out.getvalue()
+
+
 class SquawkManager:
     def __init__(self, sounds_dir: str):
-        self.squawks: List[bytes] = []       # short squawk WAVs (16kHz mono)
-        self.chatter: List[bytes] = []       # long chatter WAVs (16kHz mono)
+        self.squawks: List[bytes] = []       # short squawk WAVs (16kHz mono, default volume)
+        self.chatter: List[bytes] = []       # long chatter WAVs (16kHz mono, default volume)
+        self._raw_squawks: List[bytes] = []  # raw WAVs at full volume (for per-device volume)
+        self._raw_chatter: List[bytes] = []  # raw WAVs at full volume (for per-device volume)
         self._active_devices: Dict[str, asyncio.WebSocketServerProtocol] = {}
         self._playing: Dict[str, bool] = {}  # True if currently sending squawk/chatter
         self._busy: Dict[str, bool] = {}     # True if device is recording/processing/playing TTS
@@ -97,6 +115,7 @@ class SquawkManager:
         self._snoozed_until: Dict[str, Optional[float]] = {}  # epoch time when snooze ends
         self._quiet_hours: Dict[str, tuple] = {}  # per-device (start_hour, end_hour)
         self.last_squawk_end: Dict[str, float] = {}  # monotonic time when last squawk/chatter finished
+        self._volume: Dict[str, float] = {}  # per-device volume (0.0-1.0)
 
         # Clock-based scheduling: wall-clock epoch timestamps
         self._next_squawk_time: Dict[str, float] = {}  # next squawk epoch
@@ -121,13 +140,16 @@ class SquawkManager:
             path = os.path.join(sounds_dir, fname)
             try:
                 with open(path, 'rb') as f:
-                    raw = f.read()
-                converted = _convert_to_16k_mono(raw)
+                    raw_bytes = f.read()
+                converted = _convert_to_16k_mono(raw_bytes)
+                raw_full = _convert_to_16k_mono(raw_bytes, volume=1.0)
                 if fname.startswith('chatter'):
                     self.chatter.append(converted)
+                    self._raw_chatter.append(raw_full)
                     logger.info(f"Loaded chatter sound: {fname}")
                 elif fname.startswith('squawk'):
                     self.squawks.append(converted)
+                    self._raw_squawks.append(raw_full)
                     logger.info(f"Loaded squawk sound: {fname}")
             except Exception as e:
                 logger.error(f"Failed to load sound {fname}: {e}")
@@ -160,13 +182,15 @@ class SquawkManager:
 
     def register_device(self, device_id: str, websocket,
                         squawk_interval: int = None, chatter_interval: int = None,
-                        quiet_hours_start: int = 21, quiet_hours_end: int = 7):
+                        quiet_hours_start: int = 21, quiet_hours_end: int = 7,
+                        squawk_volume: int = 30):
         """Register or re-register a connected device. Preserves existing schedules."""
         # Always update the websocket reference
         self._active_devices[device_id] = websocket
         self._playing[device_id] = False
         self._send_locks[device_id] = asyncio.Lock()
         self._quiet_hours[device_id] = (quiet_hours_start, quiet_hours_end)
+        self._volume[device_id] = max(0, min(100, squawk_volume)) / 100.0
 
         # Update intervals
         self._squawk_interval[device_id] = squawk_interval or DEFAULT_SQUAWK_MINUTES
@@ -243,7 +267,8 @@ class SquawkManager:
 
     def update_intervals(self, device_id: str, squawk_interval: int = None,
                          chatter_interval: int = None,
-                         quiet_hours_start: int = None, quiet_hours_end: int = None):
+                         quiet_hours_start: int = None, quiet_hours_end: int = None,
+                         squawk_volume: int = None):
         """Update intervals for a device (from web settings)."""
         if squawk_interval is not None:
             self._squawk_interval[device_id] = squawk_interval
@@ -251,6 +276,8 @@ class SquawkManager:
             self._chatter_interval[device_id] = chatter_interval
         if quiet_hours_start is not None and quiet_hours_end is not None:
             self._quiet_hours[device_id] = (quiet_hours_start, quiet_hours_end)
+        if squawk_volume is not None:
+            self._volume[device_id] = max(0, min(100, squawk_volume)) / 100.0
         # Reschedule with new intervals
         self._schedule_next_squawk(device_id, min_delay=30)
         self._schedule_next_chatter(device_id, min_delay=60)
@@ -324,6 +351,15 @@ class SquawkManager:
 
     # ── Sound sending ───────────────────────────────────────────────
 
+    def _pick_sound(self, device_id: str, raw_list: List[bytes], default_list: List[bytes]) -> bytes:
+        """Pick a random sound with per-device volume applied."""
+        vol = self._volume.get(device_id, SQUAWK_VOLUME)
+        idx = random.randrange(len(raw_list))
+        # If volume matches default, use pre-converted version
+        if abs(vol - SQUAWK_VOLUME) < 0.01:
+            return default_list[idx]
+        return _convert_to_16k_mono_from_pcm(raw_list[idx], vol)
+
     async def send_squawk(self, device_id: str):
         """Send a random short squawk to a device."""
         if not self.squawks:
@@ -331,8 +367,8 @@ class SquawkManager:
         ws = self._active_devices.get(device_id)
         if not ws:
             return
-        squawk = random.choice(self.squawks)
-        logger.info(f"Squawk! → {device_id}")
+        squawk = self._pick_sound(device_id, self._raw_squawks, self.squawks)
+        logger.info(f"Squawk! → {device_id} (vol {self._volume.get(device_id, SQUAWK_VOLUME):.0%})")
         await self._send_wav(ws, device_id, squawk)
 
     async def send_chatter(self, device_id: str):
@@ -342,8 +378,8 @@ class SquawkManager:
         ws = self._active_devices.get(device_id)
         if not ws:
             return
-        chatter = random.choice(self.chatter)
-        logger.info(f"Chatter starting → {device_id}")
+        chatter = self._pick_sound(device_id, self._raw_chatter, self.chatter)
+        logger.info(f"Chatter starting → {device_id} (vol {self._volume.get(device_id, SQUAWK_VOLUME):.0%})")
         await self._send_wav(ws, device_id, chatter, interruptible=True)
 
     async def maybe_post_response_squawk(self, device_id: str, tts_duration: float = 0.0):
@@ -368,7 +404,7 @@ class SquawkManager:
         ws = self._active_devices.get(device_id)
         if not ws:
             return
-        squawk = random.choice(self.squawks)
+        squawk = self._pick_sound(device_id, self._raw_squawks, self.squawks)
         logger.info(f"Wake squawk → {device_id}")
         await self._send_wav(ws, device_id, squawk)
 

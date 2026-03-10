@@ -872,7 +872,9 @@ async def settings_save(request: Request, name: str = Form(...),
                         squawk_interval: int = Form(10),
                         chatter_interval: int = Form(45),
                         quiet_hours_start: int = Form(21),
-                        quiet_hours_end: int = Form(7)):
+                        quiet_hours_end: int = Form(7),
+                        squawk_volume: int = Form(30),
+                        rms_threshold: int = Form(200)):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -886,6 +888,8 @@ async def settings_save(request: Request, name: str = Form(...),
     chatter_interval = max(0, min(240, chatter_interval))    # 0 = off
     quiet_hours_start = max(0, min(23, quiet_hours_start))
     quiet_hours_end = max(0, min(23, quiet_hours_end))
+    squawk_volume = max(0, min(100, squawk_volume))          # 0-100%
+    rms_threshold = max(50, min(2000, rms_threshold))        # 50-2000
 
     # Geocode location if changed
     location_lat = user.get("location_lat")
@@ -910,13 +914,15 @@ async def settings_save(request: Request, name: str = Form(...),
             memory_care_mode = ?, squawk_interval = ?, chatter_interval = ?,
             quiet_hours_start = ?, quiet_hours_end = ?,
             location_city = ?, location_lat = ?, location_lon = ?,
+            squawk_volume = ?, rms_threshold = ?,
             updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (name, familiar_name or None, bible_topic_preference or None,
               music_genre_preference or None, 1 if memory_care_mode else 0,
               squawk_interval, chatter_interval,
               quiet_hours_start, quiet_hours_end,
-              location_city, location_lat, location_lon, user["id"]))
+              location_city, location_lat, location_lon,
+              squawk_volume, rms_threshold, user["id"]))
         conn.commit()
     finally:
         if not db._conn:
@@ -927,7 +933,16 @@ async def settings_save(request: Request, name: str = Form(...),
     if squawk_mgr:
         for dev_id in list(squawk_mgr._active_devices.keys()):
             squawk_mgr.update_intervals(dev_id, squawk_interval, chatter_interval,
-                                        quiet_hours_start, quiet_hours_end)
+                                        quiet_hours_start, quiet_hours_end,
+                                        squawk_volume=squawk_volume)
+
+    # Update live VAD threshold if devices are connected
+    detector = getattr(request.app.state, "wake_word_detector", None)
+    if detector:
+        from core.vad_wakeword import VADWakeWordDetector
+        if isinstance(detector, VADWakeWordDetector):
+            detector.rms_threshold = rms_threshold
+            logger.info(f"RMS threshold updated to {rms_threshold} from settings")
 
     return RedirectResponse("/web/settings", status_code=303)
 
@@ -2163,6 +2178,14 @@ async def admin_dashboard(request: Request):
                 d["is_online"] = False
         else:
             d["is_online"] = False
+
+    # Milestone alert: time to switch to on-device wake word
+    if stats.get("total_devices", 0) >= 20:
+        logger.warning(
+            f"MILESTONE: {stats['total_devices']} devices registered! "
+            "Time to switch to on-device wake word (microWakeWord TFLite on ESP32-S3). "
+            "Training data ready in wake-word/. See WAKE_WORD_STATUS.md."
+        )
 
     return templates.TemplateResponse("admin.html", {
         "request": request,

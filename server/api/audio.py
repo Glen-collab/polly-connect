@@ -216,19 +216,32 @@ async def continuous_stream(websocket: WebSocket):
                     _evt_ctx["db_device_id"] = device_info.get("device_id", device_id) if device_info else device_id
                     _log_event("connect")
 
-                    # Load squawk intervals from user profile
+                    # Load squawk intervals + tuning from user profile
                     squawk_int = 10
                     chatter_int = 45
                     quiet_start = 21
                     quiet_end = 7
+                    squawk_vol = 30
+                    user_rms_threshold = None
                     try:
                         profile = db.get_or_create_user(tenant_id=tenant_id)
                         squawk_int = profile.get("squawk_interval") or 10
                         chatter_int = profile.get("chatter_interval") or 45
                         quiet_start = profile.get("quiet_hours_start") if profile.get("quiet_hours_start") is not None else 21
                         quiet_end = profile.get("quiet_hours_end") if profile.get("quiet_hours_end") is not None else 7
+                        squawk_vol = profile.get("squawk_volume") if profile.get("squawk_volume") is not None else 30
+                        user_rms_threshold = profile.get("rms_threshold")
                     except Exception:
                         pass
+
+                    # Apply user's RMS threshold if set
+                    if user_rms_threshold is not None:
+                        from core.vad_wakeword import VADWakeWordDetector
+                        if isinstance(detector, VADWakeWordDetector):
+                            detector.rms_threshold = user_rms_threshold
+                            vad_threshold = user_rms_threshold
+                            recording_silence_threshold = max(vad_threshold // 2, 50)
+                            logger.info(f"RMS threshold set to {user_rms_threshold} from user profile")
 
                     # Register for ambient squawk sounds + startup squawk
                     if squawk_mgr:
@@ -236,7 +249,8 @@ async def continuous_stream(websocket: WebSocket):
                                                    squawk_interval=squawk_int,
                                                    chatter_interval=chatter_int,
                                                    quiet_hours_start=quiet_start,
-                                                   quiet_hours_end=quiet_end)
+                                                   quiet_hours_end=quiet_end,
+                                                   squawk_volume=squawk_vol)
                         # No startup squawk — scheduler handles timing with RECONNECT_GRACE
 
                     continue

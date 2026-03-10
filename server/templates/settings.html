@@ -141,6 +141,17 @@
                 </select>
             </div>
         </div>
+        <div class="mt-3 sm:mt-4">
+            <label class="block text-sm text-gray-600 mb-1">Bird Sound Volume</label>
+            <div class="flex items-center gap-3">
+                <input type="range" name="squawk_volume" min="0" max="100" step="5"
+                       value="{{ user.squawk_volume if user.squawk_volume is not none else 30 }}"
+                       class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                       oninput="document.getElementById('vol-label').textContent = this.value + '%'">
+                <span id="vol-label" class="text-sm font-medium text-gray-700 w-10 text-right">{{ user.squawk_volume if user.squawk_volume is not none else 30 }}%</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">How loud Polly's squawks and chatter are (default 30%)</p>
+        </div>
         <div class="mt-4">
             <label class="block text-sm text-gray-700 font-medium mb-2">Quiet Hours (no bird sounds)</label>
             <p class="text-xs text-gray-500 mb-2">Polly goes to sleep and wakes up automatically each day. She'll still respond if you talk to her.</p>
@@ -164,6 +175,24 @@
                     {% endfor %}
                 </select>
             </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+        <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Voice Sensitivity</h2>
+        <p class="text-xs text-gray-500 mb-3">Controls how loud someone needs to speak before Polly starts listening. Lower = more sensitive (picks up quiet speech but may false-trigger in noisy rooms). Higher = less sensitive (ignores background noise but needs louder speech).</p>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">RMS Threshold</label>
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-400">Sensitive</span>
+                <input type="range" name="rms_threshold" min="50" max="2000" step="25"
+                       value="{{ user.rms_threshold if user.rms_threshold is not none else 200 }}"
+                       class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                       oninput="document.getElementById('rms-label').textContent = this.value">
+                <span class="text-xs text-gray-400">Loud only</span>
+                <span id="rms-label" class="text-sm font-medium text-gray-700 w-12 text-right">{{ user.rms_threshold if user.rms_threshold is not none else 200 }}</span>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">Default: 200. Quiet home: 100-200. Noisy room: 300-500. Very loud environment: 500+</p>
         </div>
     </div>
 

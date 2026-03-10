@@ -398,6 +398,8 @@ class PollyDB:
                 "location_city": "ALTER TABLE user_profiles ADD COLUMN location_city TEXT",
                 "location_lat": "ALTER TABLE user_profiles ADD COLUMN location_lat REAL",
                 "location_lon": "ALTER TABLE user_profiles ADD COLUMN location_lon REAL",
+                "squawk_volume": "ALTER TABLE user_profiles ADD COLUMN squawk_volume INTEGER DEFAULT 30",
+                "rms_threshold": "ALTER TABLE user_profiles ADD COLUMN rms_threshold INTEGER DEFAULT 200",
             }
             for col, sql in migrations.items():
                 if col not in cols:
