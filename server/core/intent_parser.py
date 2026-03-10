@@ -229,7 +229,7 @@ class IntentParser:
 
         self._weather_phrases = [
             "what's the weather", "what is the weather", "weather this week",
-            "weather today", "farmer's almanac", "forecast",
+            "weather today", "the weather", "farmer's almanac", "forecast",
             "how's the weather", "what's it like outside",
             "is it going to rain", "what's the forecast",
             "what's the weather like", "weather report",

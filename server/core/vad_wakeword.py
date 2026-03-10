@@ -80,15 +80,22 @@ class VADWakeWordDetector:
 
     def check_transcription(self, text: str) -> tuple:
         """
-        Check if transcription starts with a wake phrase.
-        Returns (is_wake, cleaned_text) where cleaned_text has the wake phrase stripped.
+        Check if transcription contains a wake phrase.
+        Returns (is_wake, cleaned_text) where cleaned_text has everything
+        up to and including the wake phrase stripped.
         """
         text_lower = text.lower().strip()
+        # Try startswith first (most common case)
         for phrase in self.wake_phrases:
             if text_lower.startswith(phrase):
-                # Strip the wake phrase and clean up
                 remainder = text_lower[len(phrase):].strip()
-                # Remove leading punctuation/comma
+                remainder = re.sub(r'^[,.\s]+', '', remainder)
+                return True, remainder if remainder else text
+        # Also check if wake phrase appears anywhere (e.g. "good job buddy hey polly what time")
+        for phrase in self.wake_phrases:
+            idx = text_lower.find(phrase)
+            if idx > 0:
+                remainder = text_lower[idx + len(phrase):].strip()
                 remainder = re.sub(r'^[,.\s]+', '', remainder)
                 return True, remainder if remainder else text
         return False, text
