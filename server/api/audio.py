@@ -93,6 +93,7 @@ async def continuous_stream(websocket: WebSocket):
     command_start_time = 0.0
     last_response_time = 0.0  # cooldown after response to avoid speaker feedback
     RESPONSE_COOLDOWN = 3.0   # ignore triggers for 3s after a response
+    SQUAWK_COOLDOWN = 5.0     # ignore triggers for 5s after squawk (speaker echo)
     still_there_prompted = False  # tracks if we've asked "still there?"
     accumulated_parts = []        # partial audio from before the prompt
 
@@ -116,13 +117,13 @@ async def continuous_stream(websocket: WebSocket):
     med_scheduler = getattr(app.state, "med_scheduler", None)
     squawk_mgr = getattr(app.state, "squawk", None)
 
-    # Mutable container so _log_event captures current tenant_id
-    _evt_ctx = {"tenant_id": 1}
+    # Mutable container so _log_event captures current tenant_id and DB device_id
+    _evt_ctx = {"tenant_id": 1, "db_device_id": device_id}
 
     def _log_event(evt_type, intent=None, success=1, detail=None):
         """Log a device event for admin dashboard (never crashes pipeline)."""
         try:
-            db.log_device_event(device_id, _evt_ctx["tenant_id"],
+            db.log_device_event(_evt_ctx["db_device_id"], _evt_ctx["tenant_id"],
                                 evt_type, intent=intent, success=success, detail=detail)
         except Exception:
             pass
@@ -212,6 +213,7 @@ async def continuous_stream(websocket: WebSocket):
 
                     await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
                     _evt_ctx["tenant_id"] = tenant_id
+                    _evt_ctx["db_device_id"] = device_info.get("device_id", device_id) if device_info else device_id
                     _log_event("connect")
 
                     # Load squawk intervals from user profile
@@ -235,12 +237,7 @@ async def continuous_stream(websocket: WebSocket):
                                                    chatter_interval=chatter_int,
                                                    quiet_hours_start=quiet_start,
                                                    quiet_hours_end=quiet_end)
-                        # Delayed startup squawk — give device time to finish init
-                        async def _startup_squawk(mgr, dev_id):
-                            await asyncio.sleep(10)  # grace period for device init
-                            if not mgr.is_snoozed(dev_id) and not mgr.is_busy(dev_id) and dev_id in mgr._active_devices:
-                                await mgr.send_squawk(dev_id)
-                        asyncio.ensure_future(_startup_squawk(squawk_mgr, device_id))
+                        # No startup squawk — scheduler handles timing with RECONNECT_GRACE
 
                     continue
 
@@ -421,7 +418,7 @@ async def continuous_stream(websocket: WebSocket):
                             # Ignore speaker feedback after squawk/chatter
                             if squawk_mgr and not squawk_mgr.is_playing(device_id):
                                 squawk_end = squawk_mgr.last_squawk_end.get(device_id, 0)
-                                if time.monotonic() - squawk_end < RESPONSE_COOLDOWN:
+                                if time.monotonic() - squawk_end < SQUAWK_COOLDOWN:
                                     continue
                             # Interrupt squawk if playing
                             if squawk_mgr and squawk_mgr.is_playing(device_id):
@@ -545,6 +542,7 @@ async def continuous_stream(websocket: WebSocket):
                             skip_wake_check=skip_wake_check,
                             pre_transcription=pre_transcription,
                             squawk_mgr=squawk_mgr,
+                            db_device_id=_evt_ctx.get("db_device_id"),
                         ) or 0.0
 
                         # After processing, reset state
@@ -592,6 +590,7 @@ async def _process_command(
     skip_wake_check: bool = False,
     pre_transcription: str = None,
     squawk_mgr=None,
+    db_device_id: str = None,
 ) -> float:
     """Run STT → intent parse → CommandProcessor → TTS on buffered command audio.
     Returns estimated TTS playback duration in seconds for cooldown calculation."""
@@ -675,7 +674,7 @@ async def _process_command(
         if _db:
             _conv = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
             _tid = _conv.tenant_id if _conv else 1
-            _db.log_device_event(device_id, _tid, "command",
+            _db.log_device_event(db_device_id or device_id, _tid, "command",
                                  intent=intent_result.get("intent"))
     except Exception:
         pass
