@@ -150,6 +150,8 @@ class PrayerService:
         )
 
         prayer = response.choices[0].message.content.strip()
+        # Collapse newlines into single spaces (TTS reads it as one spoken prayer)
+        prayer = " ".join(prayer.split())
 
         # Hard cap at 100 words
         words = prayer.split()
