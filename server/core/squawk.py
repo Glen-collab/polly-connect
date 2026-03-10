@@ -346,15 +346,19 @@ class SquawkManager:
         logger.info(f"Chatter starting → {device_id}")
         await self._send_wav(ws, device_id, chatter, interruptible=True)
 
-    async def maybe_post_response_squawk(self, device_id: str):
+    async def maybe_post_response_squawk(self, device_id: str, tts_duration: float = 0.0):
         """50% chance of a short squawk after a TTS response."""
         if not self.squawks or self.is_snoozed(device_id):
             return
         if self._squawk_interval.get(device_id, DEFAULT_SQUAWK_MINUTES) == 0:
             return  # squawks disabled
         if random.random() < POST_RESPONSE_SQUAWK_CHANCE:
-            # Wait past the 3s response cooldown so mic feedback doesn't retrigger
-            await asyncio.sleep(random.uniform(3.5, 5.0))
+            # Wait for TTS to finish playing on ESP32, plus buffer for speaker→mic fade
+            wait = max(3.5, tts_duration + 2.0) + random.uniform(0.5, 2.0)
+            await asyncio.sleep(wait)
+            # Re-check busy/snoozed after waiting (user may have started talking)
+            if self.is_busy(device_id) or self.is_snoozed(device_id):
+                return
             await self.send_squawk(device_id)
 
     async def send_wake_squawk(self, device_id: str):

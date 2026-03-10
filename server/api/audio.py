@@ -731,7 +731,7 @@ async def _process_command(
 
     # Maybe squawk after responding (parrot personality)
     if squawk_mgr:
-        asyncio.ensure_future(squawk_mgr.maybe_post_response_squawk(device_id))
+        asyncio.ensure_future(squawk_mgr.maybe_post_response_squawk(device_id, tts_duration=duration))
 
     return duration
 
