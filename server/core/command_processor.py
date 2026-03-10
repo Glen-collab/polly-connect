@@ -461,24 +461,35 @@ class CommandProcessor:
         query = intent_result.get("query")
 
         if query:
-            # Specific topic/person request
+            # Specific topic/person request — no rotation filter
             stories = self.db.search_stories_by_speaker_or_topic(query, tenant_id=tid)
             if not stories:
                 return f"I don't have any stories about {query} yet. Maybe you could tell me one?"
         else:
-            # General "read me a story" — pull recent stories
-            stories = self.db.get_stories(tenant_id=tid, limit=20)
-            if not stories:
+            # General "read me a story" — pull stories, filter recently narrated
+            all_stories = self.db.get_stories(tenant_id=tid, limit=50)
+            if not all_stories:
                 return "I don't have any stories recorded yet. Want to tell me one?"
+
+            # Filter out stories narrated in the last 7 days
+            recent_ids = self.db.get_recently_narrated_story_ids(tid, days=7)
+            stories = [s for s in all_stories if s["id"] not in recent_ids]
+
+            # If all stories were recently used, reset and use all (better than nothing)
+            if not stories:
+                stories = all_stories
 
         # Build narrative from stories using OpenAI
         if self.followup_gen and self.followup_gen.available:
             try:
                 import asyncio
-                narrative = await asyncio.to_thread(
+                narrative, used_ids = await asyncio.to_thread(
                     self._generate_story_narrative, stories, query
                 )
                 if narrative:
+                    # Log which stories were used
+                    if used_ids:
+                        self.db.log_narrative_stories(used_ids, tenant_id=tid, query=query)
                     return narrative
             except Exception as e:
                 logger.error(f"Story narrative generation error: {e}")
@@ -490,26 +501,29 @@ class CommandProcessor:
             transcript = transcript[:500] + "..."
         return f"Here's a story that was shared: {transcript}"
 
-    def _generate_story_narrative(self, stories: list, query: str = None) -> str:
-        """Use OpenAI to weave stored stories into a warm narrative."""
+    def _generate_story_narrative(self, stories: list, query: str = None) -> tuple:
+        """Use OpenAI to weave stored stories into a warm narrative.
+        Returns (narrative_text, list_of_story_ids_used)."""
         # Collect story excerpts (cap total to ~3000 chars for prompt)
         excerpts = []
+        used_ids = []
         total_len = 0
         for s in stories:
             text = s.get("corrected_transcript") or s.get("transcript", "")
             if not text:
                 continue
             if total_len + len(text) > 3000:
-                # Truncate this one to fit
                 remaining = 3000 - total_len
                 if remaining > 200:
                     excerpts.append(text[:remaining])
+                    used_ids.append(s["id"])
                 break
             excerpts.append(text)
+            used_ids.append(s["id"])
             total_len += len(text)
 
         if not excerpts:
-            return None
+            return None, []
 
         story_text = "\n\n---\n\n".join(excerpts)
         topic_hint = f" Focus on stories about {query}." if query else ""
@@ -546,7 +560,7 @@ NARRATIVE:"""
             if last_period > 20:
                 truncated = truncated[:last_period + 1]
             narrative = truncated
-        return narrative
+        return narrative, used_ids
 
     async def _handle_family_question(self, device_id: str) -> str:
         state = self._get_state(device_id)
@@ -715,6 +729,11 @@ NARRATIVE:"""
                             tenant_id=tid,
                             question_text=state.current_question,
                         )
+                        # Auto-tag story
+                        try:
+                            self.db.auto_tag_story(story_id, clean_text, tenant_id=tid)
+                        except Exception:
+                            pass
                         if self.memory_extractor:
                             mem_data = self.memory_extractor.extract(
                                 text=clean_text,
@@ -854,6 +873,11 @@ NARRATIVE:"""
             tenant_id=tid,
             question_text=state.current_question,
         )
+        # Auto-tag story
+        try:
+            self.db.auto_tag_story(story_id, answer_text, tenant_id=tid)
+        except Exception:
+            pass
 
         # Extract structured memory and save
         if self.memory_extractor:
@@ -930,6 +954,11 @@ NARRATIVE:"""
             source="family_story",
             tenant_id=tid,
         )
+        # Auto-tag story
+        try:
+            self.db.auto_tag_story(story_id, transcript, tenant_id=tid)
+        except Exception:
+            pass
 
         # Extract and save structured memory
         if self.memory_extractor:

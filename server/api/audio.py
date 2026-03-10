@@ -297,6 +297,13 @@ async def continuous_stream(websocket: WebSocket):
                                 tenant_id=conv_state.tenant_id,
                             )
 
+                            # Auto-tag story with people, places, years
+                            if transcript:
+                                try:
+                                    db.auto_tag_story(story_id, transcript, tenant_id=conv_state.tenant_id)
+                                except Exception:
+                                    pass
+
                             # Extract memory metadata if we have transcript
                             if transcript and len(transcript) > 20:
                                 extractor = getattr(app.state, "memory_extractor", None)
@@ -672,6 +679,18 @@ async def _process_command(
                                  intent=intent_result.get("intent"))
     except Exception:
         pass
+
+    # Send a "thinking" buffer for hear_stories before GPT runs
+    if intent_result.get("intent") == "hear_stories":
+        import random as _rnd
+        buffer_phrase = _rnd.choice([
+            "Let me think of a story for you.",
+            "Oh, let me find a good one.",
+            "Hold on, let me look through some memories.",
+            "Let's reminisce on some stories from the past.",
+            "Give me just a moment to find something special.",
+        ])
+        await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr, device_id=device_id)
 
     # Use conversation-aware processing if available
     if hasattr(cmd, 'process_in_context'):

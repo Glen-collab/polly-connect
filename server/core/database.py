@@ -345,6 +345,19 @@ class PollyDB:
                 )
             """)
 
+            # ── Narrative log (track which stories were read back) ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS narrative_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    story_id INTEGER REFERENCES stories(id),
+                    query TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_narrative_log_tenant ON narrative_log(tenant_id, created_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_narrative_log_story ON narrative_log(story_id, created_at)")
+
             # ── Device events (admin telemetry) ──
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS device_events (
@@ -1332,6 +1345,100 @@ class PollyDB:
             """, (story_id, tag_type, tag_value, tenant_id))
             conn.commit()
             return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Narrative log ──
+
+    def log_narrative_stories(self, story_ids: list, tenant_id: int = None,
+                              query: str = None):
+        """Log which stories were used in a narrative reading."""
+        conn = self._get_connection()
+        try:
+            for sid in story_ids:
+                conn.execute("""
+                    INSERT INTO narrative_log (tenant_id, story_id, query)
+                    VALUES (?, ?, ?)
+                """, (tenant_id, sid, query))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_recently_narrated_story_ids(self, tenant_id: int, days: int = 7) -> set:
+        """Get story IDs that were used in narratives within the last N days."""
+        conn = self._get_connection()
+        try:
+            rows = conn.execute("""
+                SELECT DISTINCT story_id FROM narrative_log
+                WHERE tenant_id = ? AND created_at > datetime('now', ?)
+            """, (tenant_id, f"-{days} days")).fetchall()
+            return {r[0] for r in rows}
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def auto_tag_story(self, story_id: int, transcript: str, tenant_id: int = None):
+        """Extract and save people, places, year tags from transcript."""
+        if not transcript:
+            return
+        import re
+        conn = self._get_connection()
+        try:
+            # Check existing tags to avoid duplicates
+            existing = {(r[0], r[1]) for r in conn.execute(
+                "SELECT tag_type, tag_value FROM story_tags WHERE story_id = ?",
+                (story_id,)
+            ).fetchall()}
+
+            tags = []
+            text_lower = transcript.lower()
+
+            # Years (4-digit numbers between 1900-2030)
+            for m in re.finditer(r'\b(19\d{2}|20[0-2]\d)\b', transcript):
+                tags.append(("year", m.group(1)))
+
+            # People — match against known family members
+            if tenant_id:
+                members = conn.execute(
+                    "SELECT name FROM family_members WHERE tenant_id = ?",
+                    (tenant_id,)
+                ).fetchall()
+                for (name,) in members:
+                    if name and name.lower() in text_lower:
+                        tags.append(("person", name))
+
+            # Also tag the speaker if set on the story
+            speaker = conn.execute(
+                "SELECT speaker_name FROM stories WHERE id = ?", (story_id,)
+            ).fetchone()
+            if speaker and speaker[0]:
+                tags.append(("person", speaker[0]))
+
+            # Common place indicators
+            place_patterns = [
+                r'\bin\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                r'\bat\s+(?:the\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+                r'\bfrom\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)',
+            ]
+            for pat in place_patterns:
+                for m in re.finditer(pat, transcript):
+                    val = m.group(1).strip()
+                    if len(val) > 2 and val.lower() not in (
+                        "the", "and", "but", "was", "were", "had", "has",
+                        "that", "this", "there", "then", "when", "where",
+                    ):
+                        tags.append(("place", val))
+
+            for tag_type, tag_value in tags:
+                if (tag_type, tag_value) not in existing:
+                    conn.execute("""
+                        INSERT INTO story_tags (story_id, tag_type, tag_value, tenant_id)
+                        VALUES (?, ?, ?, ?)
+                    """, (story_id, tag_type, tag_value, tenant_id))
+
+            conn.commit()
         finally:
             if not self._conn:
                 conn.close()
