@@ -97,13 +97,16 @@ async def lifespan(app: FastAPI):
 
     # Initialize feature services
     app.state.bible = BibleVerseService(app.state.db, settings.DATA_DIR)
-    app.state.prayer = PrayerService(settings.DATA_DIR)
+    app.state.prayer = PrayerService(settings.DATA_DIR)  # db/followup_gen set below
     app.state.weather = AlmanacWeather(settings.DATA_DIR)
     app.state.med_scheduler = MedicationScheduler(app.state.db, tts=app.state.tts)
 
     # Family identity and narrative services
     app.state.family_identity = FamilyIdentityService(app.state.db)
     app.state.followup_gen = FollowupGenerator()
+    # Wire up prayer service with db + OpenAI now that they're ready
+    app.state.prayer.db = app.state.db
+    app.state.prayer.followup_gen = app.state.followup_gen
     app.state.narrative_arc = NarrativeArc(app.state.db)
     app.state.memory_extractor = MemoryExtractor()
     app.state.echo_engine = EchoEngine(

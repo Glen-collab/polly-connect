@@ -352,16 +352,30 @@ class IntentParser:
             theme = None
             if any(w in text_lower for w in ["bedtime", "goodnight", "nighttime", "evening"]):
                 theme = "bedtime"
+            elif any(w in text_lower for w in ["morning", "start the day", "new day"]):
+                theme = "strength_daily"
+            elif any(w in text_lower for w in ["kid", "kids", "children", "grandkid", "grandchildren", "grandson", "granddaughter"]):
+                theme = "children_grandchildren"
             elif "family" in text_lower:
                 theme = "family"
+            elif any(w in text_lower for w in ["heal", "healing", "sick", "health"]):
+                theme = "healing"
+            elif any(w in text_lower for w in ["comfort", "lonely", "alone", "miss"]):
+                theme = "comfort_aging"
+            elif any(w in text_lower for w in ["peace", "calm", "anxious", "worry"]):
+                theme = "peace_home"
             elif any(w in text_lower for w in ["strength", "strong", "courage"]):
                 theme = "resilience"
             elif any(w in text_lower for w in ["hope", "hopeful"]):
                 theme = "hope"
             elif any(w in text_lower for w in ["faith", "believe", "trust"]):
                 theme = "faith"
-            elif any(w in text_lower for w in ["thank", "grateful", "blessing"]):
+            elif any(w in text_lower for w in ["thank", "grateful", "blessing", "thankful"]):
                 theme = "gratitude"
+            elif any(w in text_lower for w in ["memor", "stories", "remember"]):
+                theme = "gratitude_memories"
+            elif any(w in text_lower for w in ["protect", "safe", "safety", "watch over"]):
+                theme = "protection_family"
             return {"intent": "prayer", "theme": theme, "confidence": 0.9}
 
         if self._matches(text_lower, self._medication_phrases):

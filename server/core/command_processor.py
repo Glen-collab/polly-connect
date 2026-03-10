@@ -338,7 +338,8 @@ class CommandProcessor:
         elif intent == "prayer":
             if self.prayer:
                 theme = intent_result.get("theme")
-                resp = self.prayer.get_prayer(theme)
+                state = self._get_state(device_id)
+                resp = self.prayer.get_prayer(theme, tenant_id=state.tenant_id)
                 self._last_response[device_id] = resp
                 return resp
             return "Let us bow our heads. Dear Lord, be with us today. Give us strength, give us peace, and remind us that we are loved. Amen."
