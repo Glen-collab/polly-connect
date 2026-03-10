@@ -690,6 +690,54 @@ async def _process_command(
     except Exception:
         pass
 
+    # Weather: play Almanac buffer while fetching weather in parallel
+    if intent_result.get("intent") == "weather" and getattr(cmd, 'weather', None):
+        from core.weather import get_almanac_note
+
+        # Build location override from user settings
+        _weather_loc = None
+        try:
+            _db = getattr(websocket.app.state, "db", None)
+            if _db:
+                _conv = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+                _tid = _conv.tenant_id if _conv else 1
+                _wu = _db.get_or_create_user(tenant_id=_tid)
+                if _wu and _wu.get("location_lat") and _wu.get("location_lon"):
+                    _weather_loc = (_wu["location_lat"], _wu["location_lon"],
+                                    _wu.get("location_city") or "your area")
+        except Exception:
+            pass
+        _weather_ip = (cmd._get_state(device_id).client_ip
+                       if hasattr(cmd, '_get_state') else None)
+
+        # Start weather fetch in background thread (runs during TTS playback)
+        weather_task = asyncio.ensure_future(
+            asyncio.to_thread(_fetch_weather_sync, cmd.weather, _weather_ip, _weather_loc)
+        )
+
+        # Play Almanac fun fact immediately (takes ~8-10s to speak = plenty of fetch time)
+        almanac_note = get_almanac_note()
+        buffer_text = f"Did you know? {almanac_note}"
+        await _send_tts(websocket, tts, buffer_text, squawk_mgr=squawk_mgr, device_id=device_id)
+
+        # Weather should be ready by now
+        try:
+            weather_text = await weather_task
+        except Exception as e:
+            logger.error(f"Weather fetch error: {e}")
+            weather_text = "I couldn't get the weather right now. Try again in a moment."
+
+        await websocket.send_json({
+            "event": "response", "text": weather_text,
+            "intent": "weather", "transcription": transcription,
+            "mode": ConversationMode.COMMAND.value,
+        })
+        duration = await _send_tts(websocket, tts, weather_text, squawk_mgr=squawk_mgr,
+                                   device_id=device_id, pronunciations=_pronunciations)
+        if squawk_mgr:
+            asyncio.ensure_future(squawk_mgr.maybe_post_response_squawk(device_id, tts_duration=duration))
+        return duration
+
     # Send a "thinking" buffer for hear_stories before GPT runs
     if intent_result.get("intent") == "hear_stories":
         import random as _rnd
@@ -745,6 +793,14 @@ async def _process_command(
         asyncio.ensure_future(squawk_mgr.maybe_post_response_squawk(device_id, tts_duration=duration))
 
     return duration
+
+
+def _fetch_weather_sync(weather_service, client_ip, location_override):
+    """Synchronous weather fetch for use in asyncio.to_thread."""
+    return weather_service.get_weather(
+        client_ip=client_ip,
+        location_override=location_override,
+    )
 
 
 async def _send_tts(websocket: WebSocket, tts, text: str, squawk_mgr=None,

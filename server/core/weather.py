@@ -146,6 +146,11 @@ def _expand_state_abbrev(location: str) -> str:
     return location
 
 
+def get_almanac_note() -> str:
+    """Return a random Almanac fun fact (instant, no API call)."""
+    return random.choice(ALMANAC_NOTES)
+
+
 class AlmanacWeather:
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
