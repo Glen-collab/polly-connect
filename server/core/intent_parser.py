@@ -407,8 +407,8 @@ class IntentParser:
             elif any(w in text_lower for w in ["kid", "kids", "children", "grandkid", "grandchildren", "grandson", "granddaughter", "family"]):
                 theme = "family"
 
-            # Check for "pray for [person]" pattern
-            pray_for_match = re.search(r'pray\s+(?:for|over)\s+(?:my\s+)?(.+?)(?:\s+please)?$', text_lower)
+            # Check for "pray for [person]" / "prayer for [person]" pattern
+            pray_for_match = re.search(r'pray(?:er)?\s+(?:for|over)\s+(?:my\s+)?(.+?)(?:\s+please)?$', text_lower)
             if pray_for_match:
                 target = pray_for_match.group(1).strip()
                 # Skip generic/theme words that aren't people names
