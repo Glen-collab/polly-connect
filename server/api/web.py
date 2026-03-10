@@ -1684,7 +1684,7 @@ async def family_member_photos(request: Request, member_id: int):
 @router.get("/prayers", response_class=HTMLResponse)
 async def prayers_page(request: Request):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -1704,7 +1704,7 @@ async def prayers_add(request: Request,
                        name: str = Form(...),
                        prayer_request: str = Form("")):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
@@ -1717,7 +1717,7 @@ async def prayers_add(request: Request,
 @router.post("/prayers/{request_id}/delete")
 async def prayers_delete(request: Request, request_id: int):
     session = await get_web_session(request)
-    redirect = require_login(session)
+    redirect = require_owner(session)
     if redirect:
         return redirect
 
