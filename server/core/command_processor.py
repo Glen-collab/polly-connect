@@ -531,7 +531,7 @@ class CommandProcessor:
             try:
                 import asyncio
                 narrative, used_ids = await asyncio.to_thread(
-                    self._generate_story_narrative, stories, query
+                    self._generate_story_narrative, stories, query, tid
                 )
                 if narrative:
                     # Log which stories were used
@@ -611,9 +611,10 @@ class CommandProcessor:
                     f"{names} shared these memories.",
                 ])
 
-    def _generate_story_narrative(self, stories: list, query: str = None) -> tuple:
+    def _generate_story_narrative(self, stories: list, query: str = None, tenant_id: int = None) -> tuple:
         """Use OpenAI to weave stored stories into a warm narrative.
         Returns (narrative_text, list_of_story_ids_used)."""
+        import random
         # Collect story excerpts (cap total to ~3000 chars for prompt)
         excerpts = []
         used_ids = []
@@ -638,6 +639,33 @@ class CommandProcessor:
         story_text = "\n\n---\n\n".join(excerpts)
         topic_hint = f" Focus on stories about {query}." if query else ""
 
+        # Vary the narrative style each time
+        styles = [
+            "Focus on the emotions and feelings in these memories.",
+            "Highlight a fun or surprising detail from the stories.",
+            "Start with the most vivid moment and work outward.",
+            "Connect the stories through the people involved.",
+            "Focus on what made these moments special.",
+            "Tell it like sharing a favorite memory with a friend.",
+            "Highlight the relationships between the people in the stories.",
+            "Focus on a small detail that makes the story come alive.",
+        ]
+        style = random.choice(styles)
+
+        # Check for previous narratives using these same stories so GPT avoids repeating
+        avoid_hint = ""
+        if tenant_id and used_ids:
+            try:
+                prev = self.db.get_narratives(tenant_id)
+                prev_set = set(used_ids)
+                for n in prev[:5]:
+                    n_ids = set(int(x) for x in n["story_ids"].split(",") if x.strip()) if n.get("story_ids") else set()
+                    if n_ids & prev_set:
+                        avoid_hint = f"\n- DO NOT repeat or closely paraphrase this previous version: \"{n['narrative'][:200]}\""
+                        break
+            except Exception:
+                pass
+
         prompt = f"""You are Polly, a warm companion for an elderly person.
 Weave these family stories into ONE short spoken paragraph.
 
@@ -646,7 +674,8 @@ Rules:
 - Warm, conversational tone — like a grandparent reminiscing
 - Honor the original words — don't invent new facts
 - No quotation marks or "they said"
-- One flowing paragraph, not a list{topic_hint}
+- One flowing paragraph, not a list
+- Style direction: {style}{topic_hint}{avoid_hint}
 
 FAMILY STORIES:
 {story_text}
