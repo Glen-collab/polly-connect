@@ -429,6 +429,7 @@ class PollyDB:
                 "question_text": "ALTER TABLE stories ADD COLUMN question_text TEXT",
                 "photo_id": "ALTER TABLE stories ADD COLUMN photo_id INTEGER REFERENCES photos(id)",
                 "qr_in_book": "ALTER TABLE stories ADD COLUMN qr_in_book INTEGER DEFAULT 1",
+                "photo_in_book": "ALTER TABLE stories ADD COLUMN photo_in_book INTEGER DEFAULT 1",
             }
             for col, sql in migrations.items():
                 if col not in cols:

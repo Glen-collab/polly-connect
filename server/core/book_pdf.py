@@ -47,7 +47,10 @@ TEXT_HEIGHT = PAGE_HEIGHT - TOP - BOTTOM
 
 # QR code config
 QR_SIZE = 0.8 * INCH
+PHOTO_MAX_WIDTH = TEXT_WIDTH - 0.5 * INCH  # leave some margin
+PHOTO_MAX_HEIGHT = 3.5 * INCH              # max height for inline photos
 AUDIO_BASE_URL = "https://polly-connect.com/static/recordings"
+UPLOADS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "server", "static", "uploads")
 
 BUCKET_LABELS = {
     "ordinary_world": "Everyday Life",
@@ -403,6 +406,31 @@ class LegacyBookPDF:
                         self.styles['BodyFirst'],
                     ))
 
+            # Photos linked to chapter memories
+            chapter_photos = self._get_chapter_photos(ch)
+            if chapter_photos:
+                story.append(Spacer(1, 18))
+                for photo_info in chapter_photos:
+                    photo_path = photo_info.get("path")
+                    if photo_path and os.path.exists(photo_path):
+                        try:
+                            img = Image(photo_path)
+                            # Scale to fit within max dimensions while keeping aspect ratio
+                            iw, ih = img.drawWidth, img.drawHeight
+                            if iw > 0 and ih > 0:
+                                scale = min(PHOTO_MAX_WIDTH / iw, PHOTO_MAX_HEIGHT / ih, 1.0)
+                                img.drawWidth = iw * scale
+                                img.drawHeight = ih * scale
+                            img.hAlign = 'CENTER'
+                            story.append(img)
+                            # Caption under photo
+                            cap = photo_info.get("caption", "")
+                            if cap:
+                                story.append(Paragraph(cap, self.styles['QRCaption']))
+                            story.append(Spacer(1, 12))
+                        except Exception as e:
+                            logger.warning(f"Failed to embed photo: {e}")
+
             # QR codes for audio companions (per-memory, filtered by qr_in_book)
             if include_qr_codes:
                 audio_entries = self._get_chapter_audio_entries(ch)
@@ -475,6 +503,35 @@ class LegacyBookPDF:
             str(page_num),
         )
         canvas.restoreState()
+
+    def _get_chapter_photos(self, chapter: dict) -> List[dict]:
+        """Get photos linked to stories in this chapter."""
+        photos = []
+        seen_ids = set()
+        for mid in chapter.get("memory_ids", []):
+            mem = self.db.get_memory_by_id(mid)
+            if mem and mem.get("story_id"):
+                story = self.db.get_story_by_id(mem["story_id"])
+                if story and story.get("photo_id") and story.get("photo_in_book", 1):
+                    pid = story["photo_id"]
+                    if pid in seen_ids:
+                        continue
+                    seen_ids.add(pid)
+                    photo = self.db.get_photo_by_id(pid)
+                    if photo and photo.get("filename"):
+                        # Try multiple possible upload directories
+                        for base in [UPLOADS_DIR,
+                                     os.path.join(os.path.dirname(__file__), "..", "static", "uploads"),
+                                     "server/static/uploads"]:
+                            path = os.path.join(base, photo["filename"])
+                            if os.path.exists(path):
+                                photos.append({
+                                    "path": path,
+                                    "caption": photo.get("caption", ""),
+                                    "date_taken": photo.get("date_taken", ""),
+                                })
+                                break
+        return photos
 
     def _get_chapter_audio_entries(self, chapter: dict) -> List[dict]:
         """Get audio entries for memories in a chapter, filtered by qr_in_book."""

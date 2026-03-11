@@ -41,6 +41,14 @@
                 {% else %}
                 <span class="text-xs text-gray-400">QR not in book</span>
                 {% endif %}
+                {% if story.photo_id %}
+                &middot;
+                {% if story.photo_in_book %}
+                <span class="text-xs text-emerald-600 font-medium">Photo in book</span>
+                {% else %}
+                <span class="text-xs text-gray-400">Photo not in book</span>
+                {% endif %}
+                {% endif %}
             </div>
             <form method="POST" action="/web/stories/{{ story.id }}/delete"
                   onsubmit="return confirm('Delete this story and its audio? This cannot be undone.')">
