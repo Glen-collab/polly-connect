@@ -39,7 +39,7 @@ class IntentParser:
             "got any stories", "hear a story", "let's hear a story",
             "i want to hear a story", "i'd like to hear a story",
             "let me hear a story", "can you tell me a story",
-            "do you have a story", "got a story",
+            "do you have a story",
         ]
         self._family_question_phrases = [
             "ask me about my family", "family question", "ask me a family question",
