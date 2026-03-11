@@ -26,7 +26,7 @@ class IntentParser:
         ]
         self._hear_stories_phrases = [
             "tell me about", "play back",
-            "what stories", "any stories about",
+            "what stories", "any stories about", "any stories",
             "read me a story", "play a story", "do you have any stories",
             "what have you heard about", "play my stories", "read my stories",
             "what did grandma say", "what did she say", "what did he say",
@@ -35,7 +35,11 @@ class IntentParser:
             "read a story", "tell me my story", "share a story",
             "read back my stories", "read me one of my stories",
             "narrate a story", "story reading",
-            "tell me a story",
+            "tell me a story", "say a story", "give me a story",
+            "got any stories", "hear a story", "let's hear a story",
+            "i want to hear a story", "i'd like to hear a story",
+            "let me hear a story", "can you tell me a story",
+            "do you have a story", "got a story",
         ]
         self._family_question_phrases = [
             "ask me about my family", "family question", "ask me a family question",
@@ -297,10 +301,24 @@ class IntentParser:
         if self._matches(text_lower, self._hear_stories_phrases):
             # Extract who they want to hear about
             query = None
-            for phrase in ["tell me about", "what did", "any stories about", "what has"]:
+            # Longer "about" phrases first so they capture the full topic
+            for phrase in [
+                "tell me a story about", "say a story about",
+                "give me a story about", "read me a story about",
+                "share a story about", "hear a story about",
+                "play a story about", "narrate a story about",
+                "can you tell me a story about", "i want to hear a story about",
+                "i'd like to hear a story about", "do you have a story about",
+                "do you have any stories about", "got any stories about",
+                "any stories about", "story about",
+                "tell me about", "what have you heard about",
+                "what did", "what has",
+            ]:
                 if phrase in text_lower:
                     idx = text_lower.index(phrase) + len(phrase)
                     query = text_lower[idx:].strip().rstrip("?. ")
+                    if not query:
+                        query = None
                     break
             return {"intent": "hear_stories", "query": query, "confidence": 0.9}
 

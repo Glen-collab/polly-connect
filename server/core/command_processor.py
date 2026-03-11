@@ -463,11 +463,28 @@ class CommandProcessor:
         tid = state.tenant_id
         query = intent_result.get("query")
 
+        _fallback_intro = None  # set if we fall back from a topic miss
         if query:
             # Specific topic/person request — no rotation filter
             stories = self.db.search_stories_by_speaker_or_topic(query, tenant_id=tid)
             if not stories:
-                return f"I don't have any stories about {query} yet. Maybe you could tell me one?"
+                # No match — fall back to a random story with a friendly redirect
+                import random as _rnd
+                all_stories = self.db.get_stories(tenant_id=tid, limit=50)
+                if not all_stories:
+                    return f"I don't have any stories about {query} yet. Maybe you could tell me one?"
+                stories = all_stories
+                _fallback_intros = [
+                    f"I don't recall a story about {query}, but let me tell you another one.",
+                    f"Hmm, I'm not finding one about {query}. But here's a good one.",
+                    f"I don't think I have one about {query} yet, but I've got this.",
+                    f"Nothing about {query} comes to mind, but listen to this one.",
+                    f"I'm drawing a blank on {query}, but here's a memory I love.",
+                    f"I don't have one about {query} right now, but let me share this instead.",
+                    f"Let me think... I don't have {query} yet, but how about this one?",
+                ]
+                _fallback_intro = _rnd.choice(_fallback_intros)
+                query = None  # treat as general from here on
         else:
             # General "read me a story" — pull stories, filter recently narrated
             all_stories = self.db.get_stories(tenant_id=tid, limit=50)
@@ -497,6 +514,8 @@ class CommandProcessor:
                         if kn.get("attribution"):
                             result = f"{kn['attribution']} {result}"
                         logger.info(f"Using kept narrative #{kn['id']}")
+                        if _fallback_intro:
+                            result = f"{_fallback_intro} {result}"
                         return result
             except Exception as e:
                 logger.error(f"Kept narrative lookup error: {e}")
@@ -523,7 +542,9 @@ class CommandProcessor:
                     except Exception:
                         pass
 
-                    if intro:
+                    if _fallback_intro:
+                        narrative = f"{_fallback_intro} {narrative}"
+                    elif intro:
                         narrative = f"{intro} {narrative}"
                     return narrative
             except Exception as e:
@@ -534,7 +555,8 @@ class CommandProcessor:
         transcript = story.get("corrected_transcript") or story.get("transcript", "")
         if len(transcript) > 500:
             transcript = transcript[:500] + "..."
-        return f"Here's a story that was shared: {transcript}"
+        prefix = _fallback_intro if _fallback_intro else "Here's a story that was shared:"
+        return f"{prefix} {transcript}"
 
     def _build_story_attribution(self, stories: list, used_ids: list, query: str = None) -> str:
         """Build a spoken intro like 'This story is from Glen' or 'Here's a story about the lake from Brooklyn'."""
