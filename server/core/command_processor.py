@@ -513,11 +513,18 @@ class CommandProcessor:
         """Build a spoken intro like 'This story is from Glen' or 'Here's a story about the lake from Brooklyn'."""
         import random
         # Get unique speaker names from the stories that were actually used
+        # Normalize: strip whitespace, deduplicate by first name to avoid
+        # "Glen Rogers, Glen and Glen" when the same person has variants
         speakers = []
+        seen_first_names = set()
         for s in stories:
             if s["id"] in used_ids and s.get("speaker_name"):
-                name = s["speaker_name"]
-                if name not in speakers:
+                name = s["speaker_name"].strip()
+                if not name:
+                    continue
+                first_name = name.split()[0].lower()
+                if first_name not in seen_first_names:
+                    seen_first_names.add(first_name)
                     speakers.append(name)
 
         if not speakers:
