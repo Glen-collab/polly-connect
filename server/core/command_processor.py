@@ -283,11 +283,11 @@ class CommandProcessor:
             now = datetime.now(ZoneInfo("America/Chicago"))
             hour = now.strftime("%I").lstrip("0")
             minute = now.strftime("%M")
-            ampm = now.strftime("%p").replace("AM", "A M").replace("PM", "P M")
+            ampm = "AY M" if now.strftime("%p") == "AM" else "P M"
             if minute == "00":
                 resp = f"It's {hour} o'clock {ampm}."
             else:
-                resp = f"It's {hour}:{minute} {ampm}."
+                resp = f"It's {hour} {minute} {ampm}."
             self._last_response[device_id] = resp
             return resp
 
