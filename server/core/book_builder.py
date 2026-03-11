@@ -60,7 +60,8 @@ class BookBuilder:
                               and followup_generator.available)
 
     def generate_chapter_outline(self, speaker: str = None,
-                                  verified_only: bool = False) -> List[Dict]:
+                                  verified_only: bool = False,
+                                  tenant_id: int = None) -> List[Dict]:
         """
         Generate a chapter outline from available memories.
 
@@ -71,6 +72,7 @@ class BookBuilder:
             speaker=speaker,
             verification_status="verified" if verified_only else None,
             limit=9999,
+            tenant_id=tenant_id,
         )
 
         if not memories:
@@ -118,11 +120,11 @@ class BookBuilder:
 
         return chapters
 
-    def get_book_progress(self, speaker: str = None) -> Dict:
+    def get_book_progress(self, speaker: str = None, tenant_id: int = None) -> Dict:
         """Get overall book-building progress stats."""
-        memories = self.db.get_memories(speaker=speaker, limit=9999)
+        memories = self.db.get_memories(speaker=speaker, limit=9999, tenant_id=tenant_id)
         verified = [m for m in memories if m.get("verification_status") == "verified"]
-        outline = self.generate_chapter_outline(speaker)
+        outline = self.generate_chapter_outline(speaker, tenant_id=tenant_id)
         ready_chapters = [c for c in outline if c["status"] == "ready"]
 
         return {

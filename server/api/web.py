@@ -271,7 +271,7 @@ async def dashboard(request: Request):
 
     # Book progress
     book_builder = getattr(request.app.state, "book_builder", None)
-    book_progress = book_builder.get_book_progress() if book_builder else None
+    book_progress = book_builder.get_book_progress(tenant_id=session["tenant_id"]) if book_builder else None
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
@@ -1940,8 +1940,8 @@ async def book_overview(request: Request):
     narrative_arc = request.app.state.narrative_arc
     engagement = request.app.state.engagement
 
-    progress = book_builder.get_book_progress()
-    chapters = book_builder.generate_chapter_outline()
+    progress = book_builder.get_book_progress(tenant_id=tid)
+    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
 
     # Check which chapters already have drafts
     existing_drafts = {d["chapter_number"]: d for d in db.get_chapter_drafts(tenant_id=tid)}
@@ -1994,7 +1994,7 @@ async def book_chapters_list(request: Request):
     tid = session["tenant_id"]
     book_builder = request.app.state.book_builder
 
-    chapters = book_builder.generate_chapter_outline()
+    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
     existing_drafts = {d["chapter_number"]: d for d in db.get_chapter_drafts(tenant_id=tid)}
 
     for ch in chapters:
@@ -2027,7 +2027,7 @@ async def book_chapter_detail(request: Request, chapter_num: int):
     tid = session["tenant_id"]
     book_builder = request.app.state.book_builder
 
-    chapters = book_builder.generate_chapter_outline()
+    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
     chapter = None
     for ch in chapters:
         if ch["chapter_number"] == chapter_num:
@@ -2091,7 +2091,7 @@ async def book_chapter_generate(request: Request, chapter_num: int):
     tid = session["tenant_id"]
     book_builder = request.app.state.book_builder
 
-    chapters = book_builder.generate_chapter_outline()
+    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
     chapter = None
     for ch in chapters:
         if ch["chapter_number"] == chapter_num:
