@@ -358,6 +358,20 @@ class PollyDB:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_narrative_log_tenant ON narrative_log(tenant_id, created_at)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_narrative_log_story ON narrative_log(story_id, created_at)")
 
+            # ── Story narratives (cached GPT narratives for replay) ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS story_narratives (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    narrative TEXT NOT NULL,
+                    attribution TEXT,
+                    story_ids TEXT,
+                    query TEXT,
+                    status TEXT DEFAULT 'draft',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # ── Device events (admin telemetry) ──
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS device_events (
@@ -1515,6 +1529,100 @@ class PollyDB:
                 WHERE tenant_id = ? AND created_at > datetime('now', ?)
             """, (tenant_id, f"-{days} days")).fetchall()
             return {r[0] for r in rows}
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Story narratives (cached) ──
+
+    def save_narrative(self, tenant_id: int, narrative: str, attribution: str = None,
+                       story_ids: list = None, query: str = None) -> int:
+        """Save a GPT-generated narrative for potential replay."""
+        conn = self._get_connection()
+        try:
+            ids_str = ",".join(str(s) for s in story_ids) if story_ids else None
+            cursor = conn.execute("""
+                INSERT INTO story_narratives (tenant_id, narrative, attribution, story_ids, query)
+                VALUES (?, ?, ?, ?, ?)
+            """, (tenant_id, narrative, attribution, ids_str, query))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_narratives(self, tenant_id: int, status: str = None) -> list:
+        """Get saved narratives, optionally filtered by status."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            if status:
+                rows = conn.execute(
+                    "SELECT * FROM story_narratives WHERE tenant_id = ? AND status = ? ORDER BY created_at DESC",
+                    (tenant_id, status)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM story_narratives WHERE tenant_id = ? ORDER BY created_at DESC",
+                    (tenant_id,)
+                ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_narrative(self, narrative_id: int) -> dict:
+        """Get a single narrative by ID."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM story_narratives WHERE id = ?", (narrative_id,)
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_kept_narrative_for_stories(self, tenant_id: int, story_ids: list) -> dict:
+        """Find a kept narrative that uses the same story IDs."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            ids_str = ",".join(str(s) for s in sorted(story_ids))
+            row = conn.execute(
+                "SELECT * FROM story_narratives WHERE tenant_id = ? AND status = 'kept' AND story_ids = ? ORDER BY created_at DESC LIMIT 1",
+                (tenant_id, ids_str)
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_narrative(self, narrative_id: int, narrative: str = None, status: str = None):
+        """Update a narrative's text and/or status."""
+        conn = self._get_connection()
+        try:
+            if narrative is not None and status is not None:
+                conn.execute("UPDATE story_narratives SET narrative = ?, status = ? WHERE id = ?",
+                             (narrative, status, narrative_id))
+            elif narrative is not None:
+                conn.execute("UPDATE story_narratives SET narrative = ? WHERE id = ?",
+                             (narrative, narrative_id))
+            elif status is not None:
+                conn.execute("UPDATE story_narratives SET status = ? WHERE id = ?",
+                             (status, narrative_id))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_narrative(self, narrative_id: int):
+        """Delete a narrative."""
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM story_narratives WHERE id = ?", (narrative_id,))
+            conn.commit()
         finally:
             if not self._conn:
                 conn.close()

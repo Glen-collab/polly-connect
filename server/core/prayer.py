@@ -338,6 +338,17 @@ class PrayerService:
         if not prayer.rstrip().lower().endswith("amen."):
             prayer = prayer.rstrip().rstrip(".") + ". Amen."
 
+        # Auto-delete used prayer requests (queue behavior)
+        if prayer_requests:
+            used_requests = prayer_requests[:3]  # same ones included in prompt
+            for pr in used_requests:
+                try:
+                    self.db.delete_prayer_request(pr["id"])
+                except Exception:
+                    pass
+            if used_requests:
+                logger.info(f"Prayer queue: auto-deleted {len(used_requests)} request(s)")
+
         return prayer
 
     def _build_prompt(self, category: dict, time_context: str,

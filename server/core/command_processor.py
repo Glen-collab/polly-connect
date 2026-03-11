@@ -482,6 +482,25 @@ class CommandProcessor:
             if not stories:
                 stories = all_stories
 
+        # Check for a kept (cached) narrative that uses these stories
+        if not query:
+            try:
+                kept_narratives = self.db.get_narratives(tid, status="kept")
+                # Find one whose story_ids haven't been narrated recently
+                recent_ids = self.db.get_recently_narrated_story_ids(tid, days=7)
+                for kn in kept_narratives:
+                    kn_ids = [int(x) for x in kn["story_ids"].split(",") if x.strip()] if kn.get("story_ids") else []
+                    if kn_ids and not all(sid in recent_ids for sid in kn_ids):
+                        # Use this kept narrative — log the story IDs and return
+                        self.db.log_narrative_stories(kn_ids, tenant_id=tid, query=query)
+                        result = kn["narrative"]
+                        if kn.get("attribution"):
+                            result = f"{kn['attribution']} {result}"
+                        logger.info(f"Using kept narrative #{kn['id']}")
+                        return result
+            except Exception as e:
+                logger.error(f"Kept narrative lookup error: {e}")
+
         # Build narrative from stories using OpenAI
         if self.followup_gen and self.followup_gen.available:
             try:
@@ -496,6 +515,14 @@ class CommandProcessor:
 
                     # Build attribution intro from story speakers
                     intro = self._build_story_attribution(stories, used_ids, query)
+
+                    # Save narrative as draft for review in dashboard
+                    try:
+                        self.db.save_narrative(tid, narrative, attribution=intro,
+                                               story_ids=used_ids, query=query)
+                    except Exception:
+                        pass
+
                     if intro:
                         narrative = f"{intro} {narrative}"
                     return narrative

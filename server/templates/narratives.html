@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Story Narratives - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+    <div>
+        <h1 class="text-xl sm:text-2xl font-bold">Story Narratives</h1>
+        <p class="text-sm text-gray-500 mt-1">GPT-generated stories from your memories. Keep the ones you like and they'll be replayed without calling GPT again.</p>
+    </div>
+    <div class="flex gap-2 text-sm">
+        <a href="/web/narratives?filter=all"
+           class="px-3 py-1.5 rounded {% if filter == 'all' %}bg-emerald-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">All</a>
+        <a href="/web/narratives?filter=kept"
+           class="px-3 py-1.5 rounded {% if filter == 'kept' %}bg-emerald-600 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">Kept</a>
+        <a href="/web/narratives?filter=draft"
+           class="px-3 py-1.5 rounded {% if filter == 'draft' %}bg-amber-500 text-white{% else %}bg-gray-200 text-gray-700{% endif %}">Drafts</a>
+    </div>
+</div>
+
+{% if narratives %}
+<div class="space-y-3 sm:space-y-4">
+    {% for n in narratives %}
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6" id="narrative-{{ n.id }}">
+        <div class="flex flex-wrap justify-between items-start gap-2 mb-3">
+            <div class="flex flex-wrap items-center gap-2">
+                {% if n.attribution %}
+                <span class="text-sm font-medium text-gray-700">{{ n.attribution }}</span>
+                {% endif %}
+                {% if n.status == 'kept' %}
+                <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded font-medium">Kept</span>
+                {% else %}
+                <span class="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded font-medium">Draft</span>
+                {% endif %}
+                {% if n.query %}
+                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Topic: {{ n.query }}</span>
+                {% endif %}
+            </div>
+            <span class="text-xs text-gray-400">{{ n.created_at[:16] if n.created_at else '' }}</span>
+        </div>
+
+        <!-- Display mode -->
+        <div id="display-{{ n.id }}">
+            <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap mb-3">{{ n.narrative }}</p>
+            <div class="flex flex-wrap gap-3 mt-2">
+                <button onclick="toggleEdit({{ n.id }})"
+                        class="text-sm text-emerald-600 hover:underline py-1">
+                    {% if n.status == 'kept' %}Edit{% else %}Review &amp; Keep{% endif %}
+                </button>
+                {% if n.status == 'kept' %}
+                <form method="POST" action="/web/narratives/{{ n.id }}/unkeep" class="inline">
+                    <button type="submit" class="text-sm text-amber-500 hover:underline py-1">Unkeep</button>
+                </form>
+                {% endif %}
+                <form method="POST" action="/web/narratives/{{ n.id }}/delete" class="inline"
+                      onsubmit="return confirm('Delete this narrative?')">
+                    <button type="submit" class="text-sm text-red-400 hover:text-red-600 py-1">Delete</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Edit mode (hidden by default) -->
+        <div id="edit-{{ n.id }}" class="hidden">
+            <form method="POST" action="/web/narratives/{{ n.id }}/keep">
+                <div class="mb-3">
+                    <label class="block text-sm text-gray-600 mb-1">Narrative Text</label>
+                    <textarea name="narrative" rows="6"
+                              class="w-full border rounded px-3 py-2 text-sm sm:text-base leading-relaxed">{{ n.narrative }}</textarea>
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit"
+                            class="flex-1 sm:flex-none bg-emerald-600 text-white px-4 py-2.5 sm:py-2 rounded text-sm hover:bg-emerald-700">
+                        {% if n.status == 'kept' %}Save Changes{% else %}Keep This Narrative{% endif %}
+                    </button>
+                    <button type="button" onclick="toggleEdit({{ n.id }})"
+                            class="flex-1 sm:flex-none bg-gray-200 text-gray-700 px-4 py-2.5 sm:py-2 rounded text-sm hover:bg-gray-300">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow p-8 sm:p-12 text-center">
+    <p class="text-gray-400 text-base sm:text-lg">No narratives yet.</p>
+    <p class="text-gray-400 text-sm">Ask Polly to tell you a story and the GPT narrative will appear here for review.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleEdit(id) {
+    document.getElementById('display-' + id).classList.toggle('hidden');
+    document.getElementById('edit-' + id).classList.toggle('hidden');
+}
+</script>
+{% endblock %}

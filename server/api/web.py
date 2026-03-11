@@ -1769,6 +1769,72 @@ async def prayers_delete(request: Request, request_id: int):
     return RedirectResponse("/web/prayers", status_code=303)
 
 
+# ── Story Narratives (cached GPT stories) ──
+
+@router.get("/narratives", response_class=HTMLResponse)
+async def narratives_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    filter_status = request.query_params.get("filter", "all")
+    if filter_status in ("draft", "kept"):
+        narratives = db.get_narratives(tid, status=filter_status)
+    else:
+        narratives = db.get_narratives(tid)
+
+    return templates.TemplateResponse("narratives.html", {
+        "request": request,
+        "session": session,
+        "narratives": narratives,
+        "filter": filter_status,
+    })
+
+
+@router.post("/narratives/{narrative_id}/keep")
+async def narrative_keep(request: Request, narrative_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    form = await request.form()
+    edited_text = form.get("narrative", "").strip()
+    db = request.app.state.db
+    if edited_text:
+        db.update_narrative(narrative_id, narrative=edited_text, status="kept")
+    else:
+        db.update_narrative(narrative_id, status="kept")
+    return RedirectResponse("/web/narratives", status_code=303)
+
+
+@router.post("/narratives/{narrative_id}/unkeep")
+async def narrative_unkeep(request: Request, narrative_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    db.update_narrative(narrative_id, status="draft")
+    return RedirectResponse("/web/narratives", status_code=303)
+
+
+@router.post("/narratives/{narrative_id}/delete")
+async def narrative_delete(request: Request, narrative_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    db.delete_narrative(narrative_id)
+    return RedirectResponse("/web/narratives", status_code=303)
+
+
 # ── Device Management ──
 
 @router.get("/devices", response_class=HTMLResponse)
