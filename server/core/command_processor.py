@@ -486,34 +486,40 @@ class CommandProcessor:
                 _fallback_intro = _rnd.choice(_fallback_intros)
                 query = None  # treat as general from here on
         else:
-            # General "read me a story" — pull stories, filter recently narrated
+            # General "read me a story" — pull stories, sorted least-recently-narrated first
             all_stories = self.db.get_stories(tenant_id=tid, limit=50)
             if not all_stories:
                 return "I don't have any stories recorded yet. Want to tell me one?"
 
-            # Filter out stories narrated in the last 7 days
-            recent_ids = self.db.get_recently_narrated_story_ids(tid, days=7)
-            stories = [s for s in all_stories if s["id"] not in recent_ids]
+            # Sort by least recently narrated so we always pick the freshest stories
+            last_narrated = self.db.get_story_last_narrated(tid)
+            stories = sorted(all_stories, key=lambda s: last_narrated.get(s["id"], ""))
 
-            # If all stories were recently used, reset and use all (better than nothing)
-            if not stories:
-                stories = all_stories
-
-        # Check for a kept (cached) narrative that uses these stories
+        # Check for a kept (cached) narrative — prefer least-recently-used
         if not query:
             try:
                 kept_narratives = self.db.get_narratives(tid, status="kept")
-                # Find one whose story_ids haven't been narrated recently
-                recent_ids = self.db.get_recently_narrated_story_ids(tid, days=7)
-                for kn in kept_narratives:
-                    kn_ids = [int(x) for x in kn["story_ids"].split(",") if x.strip()] if kn.get("story_ids") else []
-                    if kn_ids and not all(sid in recent_ids for sid in kn_ids):
-                        # Use this kept narrative — log the story IDs and return
+                if kept_narratives:
+                    last_narrated = self.db.get_story_last_narrated(tid)
+                    # Score each kept narrative by how recently its stories were told
+                    best_kn = None
+                    best_score = None
+                    for kn in kept_narratives:
+                        kn_ids = [int(x) for x in kn["story_ids"].split(",") if x.strip()] if kn.get("story_ids") else []
+                        if not kn_ids:
+                            continue
+                        # Score = max last-narrated timestamp of its stories (lower = older = better)
+                        score = max(last_narrated.get(sid, "") for sid in kn_ids)
+                        if best_score is None or score < best_score:
+                            best_score = score
+                            best_kn = kn
+                    if best_kn:
+                        kn_ids = [int(x) for x in best_kn["story_ids"].split(",") if x.strip()]
                         self.db.log_narrative_stories(kn_ids, tenant_id=tid, query=query)
-                        result = kn["narrative"]
-                        if kn.get("attribution"):
-                            result = f"{kn['attribution']} {result}"
-                        logger.info(f"Using kept narrative #{kn['id']}")
+                        result = best_kn["narrative"]
+                        if best_kn.get("attribution"):
+                            result = f"{best_kn['attribution']} {result}"
+                        logger.info(f"Using kept narrative #{best_kn['id']}")
                         if _fallback_intro:
                             result = f"{_fallback_intro} {result}"
                         return result

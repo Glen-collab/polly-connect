@@ -1533,6 +1533,20 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def get_story_last_narrated(self, tenant_id: int) -> dict:
+        """Return {story_id: last_narrated_timestamp} for all stories ever narrated."""
+        conn = self._get_connection()
+        try:
+            rows = conn.execute("""
+                SELECT story_id, MAX(created_at) as last_used
+                FROM narrative_log WHERE tenant_id = ?
+                GROUP BY story_id
+            """, (tenant_id,)).fetchall()
+            return {r[0]: r[1] for r in rows}
+        finally:
+            if not self._conn:
+                conn.close()
+
     # ── Story narratives (cached) ──
 
     def save_narrative(self, tenant_id: int, narrative: str, attribution: str = None,
