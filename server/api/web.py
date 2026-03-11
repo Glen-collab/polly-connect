@@ -1617,7 +1617,8 @@ async def family_tree_add(request: Request,
         relationship=relation_to_owner,
         tenant_id=tid,
     )
-    # Set tree-specific fields
+    # Set tree-specific fields + track who added this member
+    added_by_name = session.get("name", "")
     db.update_family_member(
         member_id,
         relation_to_owner=relation_to_owner,
@@ -1626,6 +1627,7 @@ async def family_tree_add(request: Request,
         spouse_name=spouse_name.strip(),
         bio=bio.strip(),
         deceased=1 if deceased else 0,
+        added_by=added_by_name,
     )
 
     return RedirectResponse("/web/family-tree", status_code=303)
@@ -1650,6 +1652,11 @@ async def family_tree_edit(request: Request, member_id: int,
     member = db.get_family_member_by_id(member_id)
     if not member or member.get("tenant_id") != tid:
         return RedirectResponse("/web/family-tree", status_code=303)
+
+    # Family role can only edit members they added
+    if session.get("role") == "family":
+        if member.get("added_by") != session.get("name"):
+            return RedirectResponse("/web/family-tree", status_code=303)
 
     generation = RELATION_GENERATION.get(relation_to_owner, 0)
     parent_id = int(parent_member_id) if parent_member_id else None
@@ -1681,6 +1688,11 @@ async def family_tree_delete(request: Request, member_id: int):
     member = db.get_family_member_by_id(member_id)
     if not member or member.get("tenant_id") != tid:
         return RedirectResponse("/web/family-tree", status_code=303)
+
+    # Family role can only delete members they added
+    if session.get("role") == "family":
+        if member.get("added_by") != session.get("name"):
+            return RedirectResponse("/web/family-tree", status_code=303)
 
     db.delete_family_member(member_id)
     return RedirectResponse("/web/family-tree", status_code=303)

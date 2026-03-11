@@ -135,7 +135,7 @@
                 <button onclick="closePhotos()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
             </div>
             <div class="flex gap-3 mt-2">
-                <button onclick="closePhotos(); editMember(currentMemberId)" class="text-sm text-blue-500 hover:text-blue-700">Edit Member</button>
+                <button id="photo-modal-edit-btn" onclick="closePhotos(); editMember(currentMemberId)" class="text-sm text-blue-500 hover:text-blue-700">Edit Member</button>
                 <form id="photo-modal-delete-form" method="POST" class="inline"
                       onsubmit="return confirm('Are you sure you want to delete this family member?')">
                     <button type="submit" class="text-sm text-red-400 hover:text-red-600">Delete Member</button>
@@ -203,11 +203,19 @@
 {% block scripts %}
 <script>
 var currentMemberId = null;
+var userRole = "{{ session.role or 'owner' }}";
+var userName = "{{ session.name or '' }}";
 var memberData = {
 {% for m in members %}
-{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }} },
+{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}" },
 {% endfor %}
 };
+
+function canEditMember(id) {
+    if (userRole !== "family") return true;
+    var m = memberData[id];
+    return m && m.added_by && m.added_by === userName;
+}
 
 function editMember(id) {
     var m = memberData[id];
@@ -229,6 +237,9 @@ function closeEdit() {
 function showPhotos(memberId) {
     currentMemberId = memberId;
     document.getElementById('photo-modal-delete-form').action = '/web/family-tree/' + memberId + '/delete';
+    var editable = canEditMember(memberId);
+    document.getElementById('photo-modal-edit-btn').style.display = editable ? '' : 'none';
+    document.getElementById('photo-modal-delete-form').style.display = editable ? '' : 'none';
     var content = document.getElementById('photo-modal-content');
     content.innerHTML = '<div class="text-center py-8"><div class="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div><p class="text-sm text-gray-400 mt-2">Loading photos...</p></div>';
     document.getElementById('photo-modal').classList.remove('hidden');

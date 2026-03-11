@@ -498,6 +498,7 @@ class PollyDB:
                 "deceased": "ALTER TABLE family_members ADD COLUMN deceased INTEGER DEFAULT 0",
                 "spouse_name": "ALTER TABLE family_members ADD COLUMN spouse_name TEXT",
                 "bio": "ALTER TABLE family_members ADD COLUMN bio TEXT",
+                "added_by": "ALTER TABLE family_members ADD COLUMN added_by TEXT",
             }
             for col, sql in fm_ext.items():
                 if col not in cols:
@@ -1302,7 +1303,7 @@ class PollyDB:
                              relationship: str = None, relation_to_owner: str = None,
                              parent_member_id: int = None, generation: int = None,
                              deceased: int = None, spouse_name: str = None,
-                             bio: str = None) -> bool:
+                             bio: str = None, added_by: str = None) -> bool:
         conn = self._get_connection()
         try:
             updates = []
@@ -1333,6 +1334,9 @@ class PollyDB:
             if bio is not None:
                 updates.append("bio = ?")
                 params.append(bio if bio.strip() else None)
+            if added_by is not None:
+                updates.append("added_by = ?")
+                params.append(added_by if added_by.strip() else None)
             if not updates:
                 return False
             params.append(member_id)
