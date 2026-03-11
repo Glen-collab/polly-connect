@@ -244,7 +244,7 @@ class LegacyBookPDF:
         buf = io.BytesIO()
 
         # Get chapters and drafts
-        chapters = self.book_builder.generate_chapter_outline(speaker=speaker_name)
+        chapters = self.book_builder.generate_chapter_outline(speaker=speaker_name, tenant_id=self.tenant_id)
         drafts = {d["chapter_number"]: d for d in self.db.get_chapter_drafts(tenant_id=self.tenant_id)}
 
         # Filter to chapters that have drafts or enough content
