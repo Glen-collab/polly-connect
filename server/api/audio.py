@@ -765,6 +765,13 @@ async def _process_command(
         pass
 
     # Send a "thinking" buffer for hear_stories before GPT runs
+    # Track buffer send time so we can ensure ESP32 finishes playback before
+    # sending the main response (ESP32 holds a mutex during playback — if new
+    # audio chunks arrive before it releases, the WS handler blocks and the
+    # TCP buffer overflows, crashing the device).
+    _buffer_sent_at = None
+    _buffer_duration = 0.0
+
     if intent_result.get("intent") == "hear_stories":
         import random as _rnd
         _n = _owner_name
@@ -791,7 +798,8 @@ async def _process_command(
             "Let me weave together a nice story from the memories.",
         ]
         buffer_phrase = _rnd.choice(buffer_phrases)
-        await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr,
+        _buffer_sent_at = time.monotonic()
+        _buffer_duration = await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr,
                         device_id=device_id, pronunciations=_pronunciations)
 
     # Send a reverent buffer for prayer before GPT runs
@@ -809,7 +817,8 @@ async def _process_command(
             "Let's be still for a moment and pray.",
         ]
         buffer_phrase = _rnd.choice(buffer_phrases)
-        await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr,
+        _buffer_sent_at = time.monotonic()
+        _buffer_duration = await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr,
                         device_id=device_id, pronunciations=_pronunciations)
 
     # Use conversation-aware processing if available
@@ -820,6 +829,19 @@ async def _process_command(
         response_text = await cmd.process(intent_result, transcription, device_id)
         new_mode = ConversationMode.COMMAND
         logger.info(f"Response: {response_text}")
+
+    # Ensure ESP32 has finished playing the buffer phrase before we send
+    # the main response audio.  The ESP32 holds a mutex during i2s playback;
+    # if new audio_chunk messages arrive while the mutex is held, the WS
+    # event handler blocks and the TCP receive buffer overflows → crash.
+    # Wait for: buffer playback + 2s mic drain + 0.5s margin.
+    if _buffer_sent_at and _buffer_duration > 0:
+        elapsed = time.monotonic() - _buffer_sent_at
+        needed = _buffer_duration + 2.5  # playback + drain + margin
+        if elapsed < needed:
+            wait_time = needed - elapsed
+            logger.info(f"Waiting {wait_time:.1f}s for ESP32 buffer playback to finish")
+            await asyncio.sleep(wait_time)
 
     # Send text response
     await websocket.send_json({
