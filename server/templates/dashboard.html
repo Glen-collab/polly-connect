@@ -48,21 +48,21 @@
 
 <!-- Legacy Book Progress -->
 {% if book_progress %}
-<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6 max-w-lg mx-auto">
+<div class="bg-emerald-50 border border-emerald-100 rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6 max-w-lg mx-auto">
     <div class="flex items-center justify-between mb-3">
-        <h2 class="text-base sm:text-lg font-semibold">Legacy Book Progress</h2>
+        <h2 class="text-base sm:text-lg font-semibold text-emerald-800">Legacy Book Progress</h2>
         <a href="/web/book" class="text-emerald-600 text-sm hover:underline">View Book</a>
     </div>
     <div class="flex items-center gap-4">
         <div class="flex-1">
-            <div class="flex justify-between text-xs text-gray-500 mb-1">
+            <div class="flex justify-between text-xs text-emerald-600 mb-1">
                 <span>{{ book_progress.total_memories }} memories captured</span>
                 <span>{{ book_progress.percent_complete }}%</span>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-4">
+            <div class="w-full bg-emerald-100 rounded-full h-4">
                 <div class="bg-emerald-500 h-4 rounded-full transition-all" style="width: {{ book_progress.percent_complete }}%"></div>
             </div>
-            <p class="text-xs text-gray-400 mt-1">{{ book_progress.chapters_ready }} chapters ready &middot; ~{{ book_progress.estimated_pages }} pages</p>
+            <p class="text-xs text-emerald-500 mt-1">{{ book_progress.chapters_ready }} chapters ready &middot; ~{{ book_progress.estimated_pages }} pages</p>
         </div>
     </div>
 </div>
@@ -70,17 +70,17 @@
 
 <!-- Stats Cards -->
 <div class="grid grid-cols-3 gap-3 sm:gap-4 max-w-lg mx-auto">
-    <div class="bg-white rounded-lg shadow p-3 sm:p-4 text-center">
-        <h3 class="text-gray-500 text-xs">Stories</h3>
-        <p class="text-xl sm:text-2xl font-bold text-emerald-600">{{ story_count }}</p>
+    <div class="bg-emerald-50 border border-emerald-100 rounded-lg shadow p-3 sm:p-4 text-center">
+        <h3 class="text-emerald-600 text-xs">Stories</h3>
+        <p class="text-xl sm:text-2xl font-bold text-emerald-700">{{ story_count }}</p>
     </div>
-    <div class="bg-white rounded-lg shadow p-3 sm:p-4 text-center">
-        <h3 class="text-gray-500 text-xs">Questions</h3>
-        <p class="text-xl sm:text-2xl font-bold text-blue-600">{{ question_count }}</p>
+    <div class="bg-blue-50 border border-blue-100 rounded-lg shadow p-3 sm:p-4 text-center">
+        <h3 class="text-blue-600 text-xs">Questions</h3>
+        <p class="text-xl sm:text-2xl font-bold text-blue-700">{{ question_count }}</p>
     </div>
-    <div class="bg-white rounded-lg shadow p-3 sm:p-4 text-center">
-        <h3 class="text-gray-500 text-xs">Items</h3>
-        <p class="text-xl sm:text-2xl font-bold text-purple-600">{{ item_count }}</p>
+    <div class="bg-purple-50 border border-purple-100 rounded-lg shadow p-3 sm:p-4 text-center">
+        <h3 class="text-purple-600 text-xs">Items</h3>
+        <p class="text-xl sm:text-2xl font-bold text-purple-700">{{ item_count }}</p>
     </div>
 </div>
 {% endblock %}
