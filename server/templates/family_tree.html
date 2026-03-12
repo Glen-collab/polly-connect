@@ -102,7 +102,7 @@
         <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center">{{ label|safe }}</h3>
         <div class="flex flex-wrap justify-center gap-3">
             {% for m in tree[gen_num] %}
-            <div class="{{ card_class }} rounded-lg p-3 text-center w-[140px] h-[100px] flex flex-col justify-center cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
+            <div class="{{ card_class }} rounded-lg p-3 pb-5 text-center w-[140px] h-[100px] flex flex-col justify-center relative cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
                  onclick="showPhotos({{ m.id }})">
                 <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}</p>
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
@@ -110,20 +110,22 @@
                 <p class="text-xs text-gray-400 mt-0.5 truncate">{{ m.bio[:30] }}{% if m.bio|length > 30 %}...{% endif %}</p>
                 {% endif %}
                 {% if session.role == 'family' and not session.family_member_id and not m.access_code and not m.deceased %}
-                <form method="POST" action="/web/family-tree/{{ m.id }}/claim" class="mt-1" onclick="event.stopPropagation()">
-                    <button type="submit" class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">
+                <form method="POST" action="/web/family-tree/{{ m.id }}/claim" class="absolute bottom-1 left-0 right-0 text-center" onclick="event.stopPropagation()">
+                    <button type="submit" class="text-xs text-blue-500 hover:text-blue-700">
                         This is me
                     </button>
                 </form>
                 {% endif %}
                 {% if session.role != 'family' and m.access_code %}
-                <p class="text-xs text-gray-500 mt-1 font-mono" onclick="event.stopPropagation()">Code: {{ m.access_code }}</p>
-                <form method="POST" action="/web/family-tree/{{ m.id }}/revoke-code" class="inline" onclick="event.stopPropagation()"
-                      onsubmit="return confirm('Revoke access code for {{ m.name }}?')">
-                    <button type="submit" class="text-xs text-red-400 hover:text-red-600">Revoke</button>
-                </form>
+                <div class="absolute bottom-1 left-0 right-0 text-center" onclick="event.stopPropagation()">
+                    <span class="text-xs text-gray-500 font-mono">{{ m.access_code }}</span>
+                    <form method="POST" action="/web/family-tree/{{ m.id }}/revoke-code" class="inline"
+                          onsubmit="return confirm('Revoke access code for {{ m.name }}?')">
+                        <button type="submit" class="text-xs text-red-400 hover:text-red-600 ml-1">✕</button>
+                    </form>
+                </div>
                 {% elif session.role != 'family' and not m.access_code and not m.deceased %}
-                <form method="POST" action="/web/family-tree/{{ m.id }}/generate-code" class="inline mt-1" onclick="event.stopPropagation()">
+                <form method="POST" action="/web/family-tree/{{ m.id }}/generate-code" class="absolute bottom-1 left-0 right-0 text-center" onclick="event.stopPropagation()">
                     <button type="submit" class="text-xs text-blue-400 hover:text-blue-600">Generate Code</button>
                 </form>
                 {% endif %}
