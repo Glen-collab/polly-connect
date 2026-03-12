@@ -218,15 +218,23 @@ async def family_login_submit(request: Request, name: str = Form(...),
             "name": name, "code": code, "session": None,
         })
 
-    tenant = db.validate_family_code(code)
-    if not tenant:
+    result = db.validate_family_code(code)
+    if not result:
         return templates.TemplateResponse("family_login.html", {
             "request": request, "error": "Invalid access code.",
             "name": name, "code": code, "session": None,
         })
 
+    tenant = result["tenant"]
+    member = result.get("member")
+
+    # Personal code — use the member's name regardless of what was typed
+    if member:
+        name = member["name"]
+
     session_id = db.create_family_session(
         tenant["id"], name,
+        family_member_id=member["id"] if member else None,
         duration_hours=settings.SESSION_DURATION_HOURS,
     )
 
@@ -1741,6 +1749,71 @@ async def family_tree_delete(request: Request, member_id: int):
             return RedirectResponse("/web/family-tree", status_code=303)
 
     db.delete_family_member(member_id)
+    return RedirectResponse("/web/family-tree", status_code=303)
+
+
+@router.post("/family-tree/{member_id}/claim")
+async def family_tree_claim(request: Request, member_id: int):
+    """Family member claims their identity — generates a personal access code."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    # Only anonymous family sessions can claim (not already identified)
+    if session.get("role") != "family" or session.get("family_member_id"):
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    member = db.get_family_member_by_id(member_id)
+    if not member or member.get("tenant_id") != tid:
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    # Can't claim deceased members or members that already have a code
+    if member.get("deceased") or member.get("access_code"):
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    code = db.generate_member_access_code(member_id, tid)
+    return RedirectResponse(f"/web/family-tree?claimed={code}&name={member['name']}", status_code=303)
+
+
+@router.post("/family-tree/{member_id}/generate-code")
+async def family_tree_generate_code(request: Request, member_id: int):
+    """Owner generates a personal access code for a family member."""
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    member = db.get_family_member_by_id(member_id)
+    if not member or member.get("tenant_id") != tid:
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    if member.get("access_code"):
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    db.generate_member_access_code(member_id, tid)
+    return RedirectResponse("/web/family-tree", status_code=303)
+
+
+@router.post("/family-tree/{member_id}/revoke-code")
+async def family_tree_revoke_code(request: Request, member_id: int):
+    """Owner revokes a family member's personal access code."""
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    member = db.get_family_member_by_id(member_id)
+    if not member or member.get("tenant_id") != tid:
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    db.revoke_member_access_code(member_id, tid)
     return RedirectResponse("/web/family-tree", status_code=303)
 
 

@@ -1409,3 +1409,97 @@ class TestChapterRefreshFlag:
             mems = [db.get_memory_by_id(mid) for mid in ch["memory_ids"]]
             years = [m["estimated_year"] for m in mems if m["estimated_year"]]
             assert years == sorted(years), "Memories should be in chronological order"
+
+
+# ═══════════════════════════════════════════════════════════════
+#              FAMILY MEMBER ACCESS CODES
+# ═══════════════════════════════════════════════════════════════
+
+class TestFamilyMemberAccessCodes:
+    """Per-family-member access codes for identified family sessions."""
+
+    def test_generate_member_access_code(self, db, tenant_a):
+        tid = tenant_a["tenant_id"]
+        mid = db.add_family_member(name="Test Person", relationship="cousin", tenant_id=tid)
+        code = db.generate_member_access_code(mid, tid)
+        assert code is not None
+        assert len(code) == 6
+        assert code.isdigit()
+
+    def test_member_code_unique_from_tenant_code(self, db, tenant_a):
+        tid = tenant_a["tenant_id"]
+        # Set a known tenant family code
+        conn = db._get_connection()
+        conn.execute("UPDATE tenants SET family_code = '111111' WHERE id = ?", (tid,))
+        conn.commit()
+        mid = db.add_family_member(name="Test Person", relationship="cousin", tenant_id=tid)
+        code = db.generate_member_access_code(mid, tid)
+        assert code != "111111"
+
+    def test_validate_personal_code(self, db, tenant_a):
+        tid = tenant_a["tenant_id"]
+        mid = db.add_family_member(name="Sandy", relationship="aunt", tenant_id=tid)
+        code = db.generate_member_access_code(mid, tid)
+        result = db.validate_family_code(code)
+        assert result is not None
+        assert result["type"] == "personal"
+        assert result["member"]["name"] == "Sandy"
+        assert result["tenant"]["id"] == tid
+
+    def test_validate_general_code(self, db, tenant_a):
+        tid = tenant_a["tenant_id"]
+        conn = db._get_connection()
+        conn.execute("UPDATE tenants SET family_code = '222222' WHERE id = ?", (tid,))
+        conn.commit()
+        result = db.validate_family_code("222222")
+        assert result is not None
+        assert result["type"] == "general"
+        assert result["member"] is None
+
+    def test_validate_invalid_code(self, db, tenant_a):
+        result = db.validate_family_code("999999")
+        assert result is None
+
+    def test_revoke_member_code(self, db, tenant_a):
+        tid = tenant_a["tenant_id"]
+        mid = db.add_family_member(name="Revokee", relationship="cousin", tenant_id=tid)
+        code = db.generate_member_access_code(mid, tid)
+        # Verify it works
+        assert db.validate_family_code(code) is not None
+        # Revoke
+        db.revoke_member_access_code(mid, tid)
+        assert db.validate_family_code(code) is None
+        # Check column is null
+        member = db.get_family_member_by_id(mid)
+        assert member["access_code"] is None
+
+    def test_create_family_session_with_member_id(self, db, tenant_a):
+        tid = tenant_a["tenant_id"]
+        mid = db.add_family_member(name="Identified", relationship="sibling", tenant_id=tid)
+        session_id = db.create_family_session(tid, "Identified", family_member_id=mid)
+        assert session_id is not None
+        session = db.get_web_session(session_id)
+        assert session["family_member_id"] == mid
+
+    def test_revoke_kills_sessions(self, db, tenant_a):
+        tid = tenant_a["tenant_id"]
+        mid = db.add_family_member(name="SessionKill", relationship="cousin", tenant_id=tid)
+        code = db.generate_member_access_code(mid, tid)
+        session_id = db.create_family_session(tid, "SessionKill", family_member_id=mid)
+        # Session should exist
+        assert db.get_web_session(session_id) is not None
+        # Revoke — should kill session
+        db.revoke_member_access_code(mid, tid)
+        assert db.get_web_session(session_id) is None
+
+    def test_duplicate_chapter_prevention(self, db, tenant_a):
+        """When memories < 10, only one chapter per bucket/life_phase, not duplicates."""
+        tid = tenant_a["tenant_id"]
+        bb = BookBuilder(db)
+        chapters = bb.generate_chapter_outline(tenant_id=tid)
+        # Check no two chapters share the same bucket+life_phase
+        seen = set()
+        for ch in chapters:
+            key = (ch["bucket"], ch["life_phase"])
+            assert key not in seen, f"Duplicate chapter for {key}"
+            seen.add(key)

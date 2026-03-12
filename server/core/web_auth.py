@@ -57,6 +57,7 @@ async def get_web_session(request: Request) -> Optional[Dict]:
             "name": session.get("family_name") or "Family",
             "email": None,
             "role": "family",
+            "family_member_id": session.get("family_member_id"),
         }
 
     return {

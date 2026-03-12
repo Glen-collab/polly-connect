@@ -84,7 +84,7 @@
                     {% endif %}
 
                     <span class="text-emerald-200 text-xs">|</span>
-                    <span class="text-emerald-200 text-sm">{{ session.name }}{% if session.role == 'family' %} <span class="bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded ml-1">Family</span>{% endif %}</span>
+                    <span class="text-emerald-200 text-sm">{{ session.name }}{% if session.role == 'family' %} <span class="bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded ml-1">{% if session.family_member_id %}Verified{% else %}Family{% endif %}</span>{% endif %}</span>
                     <a href="/web/logout" class="hover:underline text-emerald-200 text-sm">Logout</a>
                 </div>
                 {% endif %}
@@ -146,7 +146,7 @@
                     {% endif %}
 
                     <div class="border-t border-emerald-500 mt-2 pt-2">
-                        <span class="block py-1 px-3 text-emerald-200 text-sm">Signed in as {{ session.name }}{% if session.role == 'family' %} (Family){% endif %}</span>
+                        <span class="block py-1 px-3 text-emerald-200 text-sm">Signed in as {{ session.name }}{% if session.role == 'family' %} ({% if session.family_member_id %}Verified{% else %}Family{% endif %}){% endif %}</span>
                         <a href="/web/logout" class="block py-2 px-3 rounded hover:bg-emerald-700 text-base">Logout</a>
                     </div>
                 </div>

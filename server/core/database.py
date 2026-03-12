@@ -503,10 +503,17 @@ class PollyDB:
                 "added_by": "ALTER TABLE family_members ADD COLUMN added_by TEXT",
                 "birth_year": "ALTER TABLE family_members ADD COLUMN birth_year INTEGER",
                 "deceased_year": "ALTER TABLE family_members ADD COLUMN deceased_year INTEGER",
+                "access_code": "ALTER TABLE family_members ADD COLUMN access_code TEXT",
+                "code_created_at": "ALTER TABLE family_members ADD COLUMN code_created_at TIMESTAMP",
             }
             for col, sql in fm_ext.items():
                 if col not in cols:
                     conn.execute(sql)
+
+            # Add family_member_id to web_sessions
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(web_sessions)").fetchall()}
+            if "family_member_id" not in cols:
+                conn.execute("ALTER TABLE web_sessions ADD COLUMN family_member_id INTEGER")
 
             # Add timeline columns to memories
             cols = {row[1] for row in conn.execute("PRAGMA table_info(memories)").fetchall()}
@@ -774,27 +781,93 @@ class PollyDB:
                 conn.close()
 
     def validate_family_code(self, code: str) -> Optional[Dict]:
+        """Validate a family access code. Checks personal member codes first, then general tenant code.
+        Returns dict with 'tenant' and optionally 'member' keys."""
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
+            # Check personal member codes first
+            member = conn.execute("""
+                SELECT fm.*, t.id AS _tenant_id, t.name AS _tenant_name
+                FROM family_members fm
+                JOIN tenants t ON fm.tenant_id = t.id
+                WHERE fm.access_code = ?
+            """, (code,)).fetchone()
+            if member:
+                member_dict = dict(member)
+                tenant = conn.execute("SELECT * FROM tenants WHERE id = ?",
+                                      (member_dict["_tenant_id"],)).fetchone()
+                return {
+                    "tenant": dict(tenant),
+                    "member": member_dict,
+                    "type": "personal",
+                }
+
+            # Fall back to general tenant code
             result = conn.execute(
                 "SELECT * FROM tenants WHERE family_code = ?", (code,)
             ).fetchone()
-            return dict(result) if result else None
+            if result:
+                return {"tenant": dict(result), "member": None, "type": "general"}
+            return None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def generate_member_access_code(self, member_id: int, tenant_id: int) -> str:
+        """Generate a unique 6-digit access code for a family member."""
+        import random
+        conn = self._get_connection()
+        try:
+            for _ in range(100):  # retry loop for uniqueness
+                code = f"{random.randint(0, 999999):06d}"
+                # Check against all tenant codes and all member codes
+                t_clash = conn.execute(
+                    "SELECT 1 FROM tenants WHERE family_code = ?", (code,)
+                ).fetchone()
+                m_clash = conn.execute(
+                    "SELECT 1 FROM family_members WHERE access_code = ?", (code,)
+                ).fetchone()
+                if not t_clash and not m_clash:
+                    conn.execute("""
+                        UPDATE family_members SET access_code = ?, code_created_at = CURRENT_TIMESTAMP
+                        WHERE id = ? AND tenant_id = ?
+                    """, (code, member_id, tenant_id))
+                    conn.commit()
+                    return code
+            raise RuntimeError("Could not generate unique access code after 100 attempts")
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def revoke_member_access_code(self, member_id: int, tenant_id: int):
+        """Revoke a family member's personal access code and kill their sessions."""
+        conn = self._get_connection()
+        try:
+            conn.execute("""
+                UPDATE family_members SET access_code = NULL, code_created_at = NULL
+                WHERE id = ? AND tenant_id = ?
+            """, (member_id, tenant_id))
+            conn.execute(
+                "DELETE FROM web_sessions WHERE family_member_id = ? AND tenant_id = ?",
+                (member_id, tenant_id)
+            )
+            conn.commit()
         finally:
             if not self._conn:
                 conn.close()
 
     def create_family_session(self, tenant_id: int, family_name: str,
+                              family_member_id: int = None,
                               duration_hours: int = 72) -> str:
         session_id = secrets.token_urlsafe(32)
         expires_at = (datetime.utcnow() + timedelta(hours=duration_hours)).isoformat()
         conn = self._get_connection()
         try:
             conn.execute("""
-                INSERT INTO web_sessions (id, account_id, tenant_id, expires_at, family_name, role)
-                VALUES (?, NULL, ?, ?, ?, 'family')
-            """, (session_id, tenant_id, expires_at, family_name))
+                INSERT INTO web_sessions (id, account_id, tenant_id, expires_at, family_name, role, family_member_id)
+                VALUES (?, NULL, ?, ?, ?, 'family', ?)
+            """, (session_id, tenant_id, expires_at, family_name, family_member_id))
             conn.commit()
             return session_id
         finally:

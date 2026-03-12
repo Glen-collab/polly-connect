@@ -10,6 +10,15 @@
     </button>
 </div>
 
+{% if request.query_params.get('claimed') %}
+<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+    <p class="text-sm font-semibold text-blue-800">Welcome, {{ request.query_params.get('name', 'family member') }}!</p>
+    <p class="text-sm text-blue-700 mt-1">Your personal access code is:</p>
+    <p class="text-2xl font-mono font-bold text-blue-900 my-2">{{ request.query_params.get('claimed') }}</p>
+    <p class="text-xs text-blue-600">Use this code next time you log in — everything you add will be tagged with your name. Save it somewhere safe!</p>
+</div>
+{% endif %}
+
 <!-- Add member form (hidden by default) -->
 <div id="add-form" class="hidden bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <h2 class="text-base font-semibold mb-3">Add a Family Member</h2>
@@ -113,6 +122,24 @@
                 {% for p in members %}{% if p.id == m.parent_member_id %}
                 <p class="text-xs text-gray-400">via {{ p.name }}</p>
                 {% endif %}{% endfor %}
+                {% endif %}
+                {% if session.role == 'family' and not session.family_member_id and not m.access_code and not m.deceased %}
+                <form method="POST" action="/web/family-tree/{{ m.id }}/claim" class="mt-1" onclick="event.stopPropagation()">
+                    <button type="submit" class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">
+                        This is me
+                    </button>
+                </form>
+                {% endif %}
+                {% if session.role != 'family' and m.access_code %}
+                <p class="text-xs text-gray-500 mt-1 font-mono" onclick="event.stopPropagation()">Code: {{ m.access_code }}</p>
+                <form method="POST" action="/web/family-tree/{{ m.id }}/revoke-code" class="inline" onclick="event.stopPropagation()"
+                      onsubmit="return confirm('Revoke access code for {{ m.name }}?')">
+                    <button type="submit" class="text-xs text-red-400 hover:text-red-600">Revoke</button>
+                </form>
+                {% elif session.role != 'family' and not m.access_code and not m.deceased %}
+                <form method="POST" action="/web/family-tree/{{ m.id }}/generate-code" class="inline mt-1" onclick="event.stopPropagation()">
+                    <button type="submit" class="text-xs text-blue-400 hover:text-blue-600">Generate Code</button>
+                </form>
                 {% endif %}
             </div>
             {% endfor %}
