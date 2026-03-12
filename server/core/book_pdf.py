@@ -355,6 +355,9 @@ class LegacyBookPDF:
         story.append(PageBreak())
 
         # ── Chapters ──
+        # Track globally used photos and audio to avoid duplicates across chapters
+        global_used_photos = set()
+        global_used_audio = set()
         for ch in printable:
             # Chapter heading
             story.append(Paragraph(
@@ -418,16 +421,16 @@ class LegacyBookPDF:
                         self.styles['BodyFirst'],
                     ))
 
-            # Photos linked to chapter memories
-            chapter_photos = self._get_chapter_photos(ch)
-            if chapter_photos:
+            # Photos and QR codes — deduplicated globally, paired together
+            media_items = self._get_chapter_media(ch, global_used_photos, global_used_audio)
+            if media_items:
                 story.append(Spacer(1, 18))
-                for photo_info in chapter_photos:
-                    photo_path = photo_info.get("path")
+                for item in media_items:
+                    # Photo (if present)
+                    photo_path = item.get("photo_path")
                     if photo_path and os.path.exists(photo_path):
                         try:
                             img = Image(photo_path)
-                            # Scale to fit within max dimensions while keeping aspect ratio
                             iw, ih = img.drawWidth, img.drawHeight
                             if iw > 0 and ih > 0:
                                 scale = min(PHOTO_MAX_WIDTH / iw, PHOTO_MAX_HEIGHT / ih, 1.0)
@@ -435,29 +438,22 @@ class LegacyBookPDF:
                                 img.drawHeight = ih * scale
                             img.hAlign = 'CENTER'
                             story.append(img)
-                            # Caption under photo
-                            cap = photo_info.get("caption", "")
+                            cap = item.get("photo_caption", "")
                             if cap:
                                 story.append(Paragraph(cap, self.styles['QRCaption']))
-                            story.append(Spacer(1, 12))
                         except Exception as e:
                             logger.warning(f"Failed to embed photo: {e}")
-
-            # QR codes for audio companions (per-memory, filtered by qr_in_book)
-            if include_qr_codes:
-                audio_entries = self._get_chapter_audio_entries(ch)
-                if audio_entries:
-                    story.append(Spacer(1, 18))
-                    for entry in audio_entries:
-                        audio_url = f"{AUDIO_BASE_URL}/{entry['audio_key']}"
+                    # QR code (if present, paired under the photo)
+                    if include_qr_codes and item.get("audio_key"):
+                        audio_url = f"{AUDIO_BASE_URL}/{item['audio_key']}"
                         qr_buf = _generate_qr_image(audio_url)
                         if qr_buf:
                             story.append(Spacer(1, 6))
                             img = Image(qr_buf, width=QR_SIZE, height=QR_SIZE)
                             story.append(img)
-                            caption = f"Hear {entry['speaker']}'s voice" if entry.get('speaker') else "Scan to hear the original voice recording"
-                            story.append(Paragraph(caption, self.styles['QRCaption']))
-                            story.append(Spacer(1, 8))
+                            qr_caption = f"Hear {item['speaker']}'s voice" if item.get('speaker') else "Scan to hear the original voice recording"
+                            story.append(Paragraph(qr_caption, self.styles['QRCaption']))
+                    story.append(Spacer(1, 12))
 
             story.append(PageBreak())
 
@@ -562,3 +558,62 @@ class LegacyBookPDF:
                         "speaker": story.get("speaker_name", ""),
                     })
         return entries
+
+    def _get_chapter_media(self, chapter: dict,
+                           global_used_photos: set,
+                           global_used_audio: set) -> List[dict]:
+        """Get paired photo+QR media items for a chapter, globally deduplicated.
+
+        Each photo and QR code appears only ONCE across the entire book.
+        When a story has both a photo and audio, they are paired together
+        (photo above, QR underneath). Returns list of media items.
+        """
+        items = []
+        seen_stories = set()
+
+        for mid in chapter.get("memory_ids", []):
+            mem = self.db.get_memory_by_id(mid)
+            if not mem or not mem.get("story_id"):
+                continue
+            story_id = mem["story_id"]
+            if story_id in seen_stories:
+                continue
+            seen_stories.add(story_id)
+
+            story = self.db.get_story_by_id(story_id)
+            if not story:
+                continue
+
+            item = {}
+            has_content = False
+
+            # Check photo
+            photo_id = story.get("photo_id")
+            if (photo_id and photo_id not in global_used_photos
+                    and story.get("photo_in_book", 1)):
+                photo = self.db.get_photo_by_id(photo_id)
+                if photo and photo.get("filename"):
+                    for base in [UPLOADS_DIR,
+                                 os.path.join(os.path.dirname(__file__), "..", "static", "uploads"),
+                                 "server/static/uploads"]:
+                        path = os.path.join(base, photo["filename"])
+                        if os.path.exists(path):
+                            item["photo_path"] = path
+                            item["photo_caption"] = photo.get("caption", "")
+                            global_used_photos.add(photo_id)
+                            has_content = True
+                            break
+
+            # Check audio/QR
+            audio_key = story.get("audio_s3_key")
+            if (audio_key and audio_key not in global_used_audio
+                    and story.get("qr_in_book", 1)):
+                item["audio_key"] = audio_key
+                item["speaker"] = story.get("speaker_name", "")
+                global_used_audio.add(audio_key)
+                has_content = True
+
+            if has_content:
+                items.append(item)
+
+        return items
