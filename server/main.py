@@ -77,9 +77,10 @@ async def lifespan(app: FastAPI):
     logger.info(f"TTS backend: {settings.TTS_BACKEND}")
     app.state.tts = create_tts_backend()
 
-    # Pre-cache acknowledgment chirps for instant playback
+    # Pre-cache acknowledgment squawk chirps for instant playback
     app.state.ack_cache = AckCache()
-    app.state.ack_cache.warm_up(app.state.tts)
+    sounds_dir = os.path.join(os.path.dirname(__file__), "static", "sounds")
+    app.state.ack_cache.warm_up(sounds_dir)
 
     logger.info(f"Loading wake word model: {settings.WAKE_WORD_MODEL_PATH}")
     detector = WakeWordDetector(

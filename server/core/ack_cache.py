@@ -1,58 +1,95 @@
 """
-Pre-cached acknowledgment audio for instant playback.
+Pre-cached acknowledgment squawk audio for instant playback.
 
-At server startup, generates short Polly TTS clips and caches them in memory.
-When the user finishes speaking, one is fired immediately over WebSocket
-BEFORE STT starts — eliminates dead air perception.
+At server startup, loads short parrot squawk WAV files and converts them
+to 16kHz mono PCM (matching ESP32 format). When the user finishes speaking,
+a random chirp is fired immediately over WebSocket BEFORE STT starts —
+eliminates dead air perception.
 
-Clips are ~0.3-0.5s so they finish well before STT returns (1-3s).
+Clips are ~0.5-1.0s so they finish well before STT returns (1-3s).
 No collision with response TTS is possible.
 """
 
 import asyncio
 import base64
+import io
 import logging
+import os
 import random
+import struct
+import wave
 from typing import Optional, List
 
 logger = logging.getLogger(__name__)
 
-
-# Short acknowledgment phrases — Polly speaks these in ~0.3-0.5 seconds
-ACK_PHRASES = [
-    '<speak><prosody rate="105%">Mm-hmm.</prosody></speak>',
-    '<speak><prosody rate="105%">Okay.</prosody></speak>',
-    '<speak><prosody rate="110%">Got it.</prosody></speak>',
-    '<speak><prosody rate="105%">Hmm.</prosody></speak>',
-    '<speak><prosody rate="110%">Let me see.</prosody></speak>',
-    '<speak><prosody rate="110%">One moment.</prosody></speak>',
-]
+# Short squawk files to use as acknowledgment chirps (under 1 second)
+ACK_SQUAWK_FILES = ["squawk1.wav", "squawk6.wav", "squawk2.wav"]
 
 
 class AckCache:
-    """Pre-generated acknowledgment audio clips cached in memory."""
+    """Pre-loaded squawk audio clips cached in memory for instant ack."""
 
     def __init__(self):
-        self._clips: List[bytes] = []  # raw WAV bytes
+        self._clips: List[bytes] = []  # 16kHz mono WAV bytes
         self._ready = False
 
     @property
     def ready(self) -> bool:
         return self._ready and len(self._clips) > 0
 
-    def warm_up(self, tts_backend):
-        """Generate and cache all acknowledgment clips. Call at startup."""
-        for phrase in ACK_PHRASES:
+    def warm_up(self, sounds_dir: str):
+        """Load and convert squawk files to 16kHz mono WAV. Call at startup."""
+        for filename in ACK_SQUAWK_FILES:
+            path = os.path.join(sounds_dir, filename)
+            if not os.path.exists(path):
+                logger.warning(f"Ack squawk not found: {path}")
+                continue
             try:
-                audio = tts_backend.synthesize(phrase)
-                if audio and len(audio) > 100:
-                    self._clips.append(audio)
-                    logger.debug(f"Cached ack: {phrase[:30]}... ({len(audio)} bytes)")
+                clip = self._load_and_convert(path)
+                if clip and len(clip) > 100:
+                    dur = len(clip) / 32000.0
+                    self._clips.append(clip)
+                    logger.debug(f"Cached ack squawk: {filename} ({dur:.2f}s)")
             except Exception as e:
-                logger.warning(f"Failed to cache ack phrase: {e}")
+                logger.warning(f"Failed to cache ack squawk {filename}: {e}")
 
         self._ready = len(self._clips) > 0
-        logger.info(f"Ack cache ready: {len(self._clips)} clips cached")
+        logger.info(f"Ack cache ready: {len(self._clips)} squawk clips cached")
+
+    def _load_and_convert(self, path: str) -> Optional[bytes]:
+        """Load a WAV file and convert to 16kHz mono WAV bytes."""
+        with wave.open(path, 'rb') as wav_in:
+            n_channels = wav_in.getnchannels()
+            sample_width = wav_in.getsampwidth()
+            framerate = wav_in.getframerate()
+            frames = wav_in.readframes(wav_in.getnframes())
+
+        if sample_width != 2:
+            logger.warning(f"Unsupported sample width {sample_width} in {path}")
+            return None
+
+        # Decode to int16 samples
+        n_samples = len(frames) // 2
+        samples = list(struct.unpack(f'<{n_samples}h', frames))
+
+        # Stereo → mono (take left channel)
+        if n_channels == 2:
+            samples = samples[::2]
+
+        # Downsample to 16kHz if needed
+        if framerate > 16000:
+            ratio = max(1, round(framerate / 16000))
+            samples = samples[::ratio]
+
+        # Wrap in 16kHz mono WAV
+        output = io.BytesIO()
+        with wave.open(output, 'wb') as wav_out:
+            wav_out.setnchannels(1)
+            wav_out.setsampwidth(2)
+            wav_out.setframerate(16000)
+            wav_out.writeframes(struct.pack(f'<{len(samples)}h', *samples))
+
+        return output.getvalue()
 
     def get_random_clip(self) -> Optional[bytes]:
         """Return a random cached audio clip (WAV bytes)."""
