@@ -241,16 +241,23 @@ Write the chapter now:"""
 
         try:
             import asyncio
-            result = await asyncio.to_thread(
-                self.followup_gen._call_openai,
-                "Write this chapter", prompt, 1
-            )
-            if result:
-                return result[0] if isinstance(result, list) else str(result)
+            result = await asyncio.to_thread(self._call_chapter_openai, prompt)
+            return result
         except Exception as e:
             logger.error(f"Chapter generation failed: {e}")
 
         return None
+
+    def _call_chapter_openai(self, prompt: str) -> Optional[str]:
+        """Direct OpenAI call for chapter generation (not the follow-up generator)."""
+        response = self.followup_gen._client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=4000,
+            temperature=0.7,
+        )
+        text = response.choices[0].message.content.strip()
+        return text if text else None
 
     def save_chapter_draft(self, chapter_number: int, title: str,
                            bucket: str, life_phase: str,
