@@ -51,17 +51,24 @@ class FollowupGenerator:
 
     def _call_openai(self, question: str, answer: str, count: int) -> List[str]:
         """Synchronous OpenAI API call."""
-        prompt = f"""You are Polly, a warm companion for an elderly person recording their life stories.
+        prompt = f"""You are Polly, a warm companion helping someone record their life stories.
 
 The person was asked: "{question}"
 They answered: "{answer}"
 
-Generate {count} warm, gentle follow-up questions that dig deeper into their story.
-Keep questions simple, one sentence each. Be encouraging and curious.
+Generate {count} follow-up question(s). Each question MUST:
+- Reference something SPECIFIC the person actually said (a name, place, event, detail)
+- Be a complete standalone question with enough context that it makes sense on its own
+- Be warm, conversational, and one sentence (under 20 words)
+- Ignore any speech-to-text errors, filler words (um, uh, like), or garbled text
+
+Example good follow-up: "You mentioned your wife's dad — what did he think of you at first?"
+Example bad follow-up: "What was going through your mind?" (too generic, no context)
+
 Return only the questions, one per line, no numbering."""
 
         response = self._client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=200,
             temperature=0.7,

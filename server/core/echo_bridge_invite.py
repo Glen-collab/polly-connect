@@ -36,6 +36,11 @@ STOP_WORDS = {
     "something", "thing", "things", "stuff", "lot", "kind", "sort",
     "got", "get", "go", "went", "come", "came", "make", "made", "take",
     "took", "said", "say", "tell", "told", "put", "back", "one", "two",
+    # STT filler / garble words
+    "um", "uh", "ah", "hmm", "right", "okay", "actually", "basically",
+    "literally", "honestly", "obviously", "anyway", "anyways", "whatever",
+    "mean", "guess", "sure", "probably", "maybe", "question", "good",
+    "great", "nice", "pretty", "gonna", "gotta", "wanna", "kinda",
 }
 
 # Words that signal specific emotions
@@ -434,8 +439,8 @@ class EchoEngine:
                 if followup_count % 2 == 1:
                     return deepening
 
-        # Try AI if available
-        if self._ai_available and followup_count < 2:
+        # Always try AI if available — GPT generates contextual follow-ups
+        if self._ai_available:
             try:
                 ai_questions = await self.followup_gen.generate(question, answer, count=1)
                 if ai_questions:
