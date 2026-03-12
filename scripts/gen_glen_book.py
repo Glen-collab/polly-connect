@@ -192,7 +192,7 @@ async def main():
     print(f"\nGenerating PDF...")
     pdf_gen = LegacyBookPDF(db, bb, tenant_id=TENANT_ID)
     pdf_bytes = pdf_gen.generate(
-        speaker_name="Glen Rogers",
+        speaker_name=None,  # Don't filter by speaker — use tenant_id only
         book_title="The Story of Glen Rogers",
         dedication="For Brooklyn, Liam, and Mia — so you know where you came from.",
     )
