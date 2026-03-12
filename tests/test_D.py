@@ -969,3 +969,210 @@ class TestEdgeCases:
         pdf_bytes = pdf_gen.generate(speaker_name="Solo Person")
         assert len(pdf_bytes) > 0
         assert pdf_bytes[:5] == b"%PDF-"
+
+
+# ═══════════════════════════════════════════════════════════════
+#              DATE/TIMELINE TRACKING
+# ═══════════════════════════════════════════════════════════════
+
+class TestTimelineEstimation:
+    """Timeline year estimation from relative phrases + birth_year."""
+
+    def test_family_member_birth_year_migration(self, db):
+        """birth_year column should exist on family_members."""
+        tid = db.create_tenant("Timeline Test")
+        mid = db.add_family_member(name="Grandpa", relationship="grandfather", tenant_id=tid)
+        db.update_family_member(mid, birth_year=1940)
+        member = db.get_family_member_by_id(mid)
+        assert member["birth_year"] == 1940
+
+    def test_memory_estimated_year_migration(self, db):
+        """estimated_year column should exist on memories."""
+        tid = db.create_tenant("Timeline Test")
+        sid = db.save_story(transcript="Test", tenant_id=tid)
+        mid = db.save_memory(
+            story_id=sid, bucket="ordinary_world", life_phase="childhood",
+            text="Test memory", tenant_id=tid,
+        )
+        mem = db.get_memory_by_id(mid)
+        assert "estimated_year" in mem
+
+    def test_explicit_year_tagged(self, db):
+        """Explicit 4-digit years in transcript should be tagged."""
+        tid = db.create_tenant("Timeline Test")
+        sid = db.save_story(
+            transcript="I remember the summer of 1965 when we went fishing.",
+            speaker_name="Grandpa",
+            tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "I remember the summer of 1965 when we went fishing.", tid)
+
+        conn = db._get_connection()
+        tags = conn.execute(
+            "SELECT tag_type, tag_value FROM story_tags WHERE story_id = ? AND tag_type = 'year'",
+            (sid,)
+        ).fetchall()
+        year_values = [t[1] for t in tags]
+        assert "1965" in year_values
+
+    def test_explicit_year_sets_estimated_year(self, db):
+        """Explicit year should set estimated_year on the linked memory."""
+        tid = db.create_tenant("Timeline Test")
+        sid = db.save_story(
+            transcript="Back in 1972 we moved to Wisconsin.",
+            speaker_name="Dad",
+            tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="call_to_adventure", life_phase="young_adult",
+            text="Back in 1972 we moved to Wisconsin.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "Back in 1972 we moved to Wisconsin.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["estimated_year"] == 1972
+
+    def test_childhood_phrase_estimates_year(self, db):
+        """'when I was a kid' + speaker birth_year should estimate a year."""
+        tid = db.create_tenant("Timeline Test")
+        # Set up owner with birth_year
+        profile = db.get_or_create_user("Grandpa Joe", tenant_id=tid)
+        conn = db._get_connection()
+        conn.execute("UPDATE user_profiles SET birth_year = 1945 WHERE id = ?", (profile["id"],))
+        conn.commit()
+
+        sid = db.save_story(
+            transcript="When I was a kid we used to walk to school every day.",
+            speaker_name="Grandpa Joe",
+            tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="ordinary_world", life_phase="childhood",
+            text="When I was a kid we used to walk to school every day.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "When I was a kid we used to walk to school every day.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["estimated_year"] == 1953  # 1945 + 8
+
+    def test_high_school_phrase_estimates_year(self, db):
+        """'in high school' + speaker birth_year should estimate ~16yo."""
+        tid = db.create_tenant("Timeline Test")
+        profile = db.get_or_create_user("Mom", tenant_id=tid)
+        conn = db._get_connection()
+        conn.execute("UPDATE user_profiles SET birth_year = 1950 WHERE id = ?", (profile["id"],))
+        conn.commit()
+
+        sid = db.save_story(
+            transcript="In high school I was on the basketball team.",
+            speaker_name="Mom",
+            tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="call_to_adventure", life_phase="adolescence",
+            text="In high school I was on the basketball team.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "In high school I was on the basketball team.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["estimated_year"] == 1966  # 1950 + 16
+
+    def test_family_member_birth_year_lookup(self, db):
+        """Speaker birth_year should be looked up from family_members if not owner."""
+        tid = db.create_tenant("Timeline Test")
+        # Owner with no birth_year
+        db.get_or_create_user("Someone", tenant_id=tid)
+
+        # Family member with birth_year
+        fmid = db.add_family_member(name="Uncle Bob", relationship="uncle", tenant_id=tid)
+        db.update_family_member(fmid, birth_year=1935)
+
+        sid = db.save_story(
+            transcript="When I was a kid we had a big garden out back.",
+            speaker_name="Uncle Bob",
+            tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="ordinary_world", life_phase="childhood",
+            text="When I was a kid we had a big garden out back.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "When I was a kid we had a big garden out back.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["estimated_year"] == 1943  # 1935 + 8
+
+    def test_decade_reference_tagged(self, db):
+        """'back in the 60s' should estimate ~1965."""
+        tid = db.create_tenant("Timeline Test")
+        sid = db.save_story(
+            transcript="Back in the 60s everything was different.",
+            speaker_name="Grandpa",
+            tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="ordinary_world", life_phase="childhood",
+            text="Back in the 60s everything was different.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "Back in the 60s everything was different.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["estimated_year"] == 1965  # 1900 + 60 + 5
+
+    def test_no_birth_year_no_estimation(self, db):
+        """Without birth_year, relative phrases should NOT estimate year."""
+        tid = db.create_tenant("Timeline Test")
+        db.get_or_create_user("Nobody", tenant_id=tid)
+
+        sid = db.save_story(
+            transcript="When I was a kid I loved playing outside.",
+            speaker_name="Nobody",
+            tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="ordinary_world", life_phase="childhood",
+            text="When I was a kid I loved playing outside.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "When I was a kid I loved playing outside.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["estimated_year"] is None
+
+    def test_wedding_phrase_estimates_year(self, db):
+        """'when we got married' + birth_year should estimate ~25yo."""
+        tid = db.create_tenant("Timeline Test")
+        profile = db.get_or_create_user("Gi", tenant_id=tid)
+        conn = db._get_connection()
+        conn.execute("UPDATE user_profiles SET birth_year = 1948 WHERE id = ?", (profile["id"],))
+        conn.commit()
+
+        sid = db.save_story(
+            transcript="When we got married we didn't have two nickels to rub together.",
+            speaker_name="Gi",
+            tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="crossing_threshold", life_phase="young_adult",
+            text="When we got married we didn't have two nickels.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "when we got married we didn't have two nickels to rub together.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["estimated_year"] == 1973  # 1948 + 25
+
+    def test_birth_year_zero_clears(self, db):
+        """Setting birth_year=0 should store NULL."""
+        tid = db.create_tenant("Timeline Test")
+        fmid = db.add_family_member(name="Test", relationship="cousin", tenant_id=tid)
+        db.update_family_member(fmid, birth_year=1960)
+        db.update_family_member(fmid, birth_year=0)
+        member = db.get_family_member_by_id(fmid)
+        assert member["birth_year"] is None
+
+    def test_estimate_year_static_method(self, db):
+        """Direct test of _estimate_year_from_phrases."""
+        from server.core.database import PollyDB
+        assert PollyDB._estimate_year_from_phrases("when i was a kid", 1950) == 1958
+        assert PollyDB._estimate_year_from_phrases("in high school", 1950) == 1966
+        assert PollyDB._estimate_year_from_phrases("in college", 1950) == 1972
+        assert PollyDB._estimate_year_from_phrases("after i retired", 1950) == 2015
+        assert PollyDB._estimate_year_from_phrases("nothing special here", 1950) is None

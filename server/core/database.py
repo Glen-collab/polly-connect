@@ -501,10 +501,16 @@ class PollyDB:
                 "spouse_name": "ALTER TABLE family_members ADD COLUMN spouse_name TEXT",
                 "bio": "ALTER TABLE family_members ADD COLUMN bio TEXT",
                 "added_by": "ALTER TABLE family_members ADD COLUMN added_by TEXT",
+                "birth_year": "ALTER TABLE family_members ADD COLUMN birth_year INTEGER",
             }
             for col, sql in fm_ext.items():
                 if col not in cols:
                     conn.execute(sql)
+
+            # Add estimated_year to memories for timeline tracking
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(memories)").fetchall()}
+            if "estimated_year" not in cols:
+                conn.execute("ALTER TABLE memories ADD COLUMN estimated_year INTEGER")
 
             # Prayer requests table
             conn.execute("""
@@ -1319,7 +1325,8 @@ class PollyDB:
                              relationship: str = None, relation_to_owner: str = None,
                              parent_member_id: int = None, generation: int = None,
                              deceased: int = None, spouse_name: str = None,
-                             bio: str = None, added_by: str = None) -> bool:
+                             bio: str = None, added_by: str = None,
+                             birth_year: int = None) -> bool:
         conn = self._get_connection()
         try:
             updates = []
@@ -1353,6 +1360,9 @@ class PollyDB:
             if added_by is not None:
                 updates.append("added_by = ?")
                 params.append(added_by if added_by.strip() else None)
+            if birth_year is not None:
+                updates.append("birth_year = ?")
+                params.append(birth_year if birth_year > 0 else None)
             if not updates:
                 return False
             params.append(member_id)
@@ -1741,7 +1751,8 @@ class PollyDB:
                 conn.close()
 
     def auto_tag_story(self, story_id: int, transcript: str, tenant_id: int = None):
-        """Extract and save people, places, year tags from transcript."""
+        """Extract and save people, places, year tags from transcript.
+        Also estimates year from relative date phrases + speaker birth_year."""
         if not transcript:
             return
         import re
@@ -1755,10 +1766,13 @@ class PollyDB:
 
             tags = []
             text_lower = transcript.lower()
+            explicit_years = []
 
             # Years (4-digit numbers between 1900-2030)
             for m in re.finditer(r'\b(19\d{2}|20[0-2]\d)\b', transcript):
-                tags.append(("year", m.group(1)))
+                yr = m.group(1)
+                tags.append(("year", yr))
+                explicit_years.append(int(yr))
 
             # People — match against known family members
             if tenant_id:
@@ -1771,11 +1785,12 @@ class PollyDB:
                         tags.append(("person", name))
 
             # Also tag the speaker if set on the story
-            speaker = conn.execute(
+            speaker_row = conn.execute(
                 "SELECT speaker_name FROM stories WHERE id = ?", (story_id,)
             ).fetchone()
-            if speaker and speaker[0]:
-                tags.append(("person", speaker[0]))
+            speaker_name = speaker_row[0] if speaker_row and speaker_row[0] else None
+            if speaker_name:
+                tags.append(("person", speaker_name))
 
             # Common place indicators
             place_patterns = [
@@ -1799,10 +1814,110 @@ class PollyDB:
                         VALUES (?, ?, ?, ?)
                     """, (story_id, tag_type, tag_value, tenant_id))
 
+            # ── Estimate year from relative date phrases + birth_year ──
+            estimated_year = None
+
+            # If we found explicit years, use the first one
+            if explicit_years:
+                estimated_year = explicit_years[0]
+            elif tenant_id:
+                # Look up speaker's birth_year
+                speaker_birth_year = self._get_speaker_birth_year(
+                    conn, speaker_name, tenant_id
+                )
+                if speaker_birth_year:
+                    estimated_year = self._estimate_year_from_phrases(
+                        text_lower, speaker_birth_year
+                    )
+
+            # Also check for direct decade references ("back in the 60s")
+            if not estimated_year:
+                decade_match = re.search(
+                    r'\b(?:in|back in|during)\s+the\s+[\'"]?(\d{2})s\b', text_lower
+                )
+                if decade_match:
+                    decade = int(decade_match.group(1))
+                    # 20s-90s = 1920s-1990s, 00s-10s = 2000s-2010s
+                    if decade >= 20:
+                        estimated_year = 1900 + decade + 5  # midpoint
+                    else:
+                        estimated_year = 2000 + decade + 5
+
+            # Save estimated year to the memory linked to this story
+            if estimated_year:
+                if ("year", str(estimated_year)) not in existing:
+                    conn.execute("""
+                        INSERT INTO story_tags (story_id, tag_type, tag_value, tenant_id)
+                        VALUES (?, ?, ?, ?)
+                    """, (story_id, "year", str(estimated_year), tenant_id))
+                # Update the memory's estimated_year
+                conn.execute("""
+                    UPDATE memories SET estimated_year = ?
+                    WHERE story_id = ? AND estimated_year IS NULL
+                """, (estimated_year, story_id))
+
             conn.commit()
         finally:
             if not self._conn:
                 conn.close()
+
+    def _get_speaker_birth_year(self, conn, speaker_name: str,
+                                tenant_id: int) -> Optional[int]:
+        """Look up a speaker's birth year from user_profiles or family_members."""
+        if not speaker_name:
+            return None
+        speaker_lower = speaker_name.lower().strip()
+
+        # Check if speaker is the owner (user_profiles)
+        owner = conn.execute(
+            "SELECT name, birth_year FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+            (tenant_id,)
+        ).fetchone()
+        if owner and owner[1]:
+            owner_name = (owner[0] or "").lower().strip()
+            if owner_name and (speaker_lower == owner_name
+                               or speaker_lower in owner_name
+                               or owner_name in speaker_lower):
+                return owner[1]
+
+        # Check family_members
+        member = conn.execute(
+            "SELECT birth_year FROM family_members WHERE tenant_id = ? AND birth_year IS NOT NULL AND LOWER(name) = ?",
+            (tenant_id, speaker_lower)
+        ).fetchone()
+        if member and member[0]:
+            return member[0]
+
+        return None
+
+    @staticmethod
+    def _estimate_year_from_phrases(text_lower: str, birth_year: int) -> Optional[int]:
+        """Estimate a calendar year from relative date phrases + birth_year."""
+        # Ordered by specificity — first match wins
+        PHRASE_MAP = [
+            # Specific ages / life stages
+            (r'\b(?:when i was|as) a (?:little )?(?:kid|child|boy|girl)\b', 8),
+            (r'\b(?:growing up|childhood|as a child)\b', 10),
+            (r'\b(?:in (?:grade|elementary) school)\b', 10),
+            (r'\b(?:in (?:middle|junior high) school)\b', 13),
+            (r'\b(?:in high school|as a teenager|teenage years)\b', 16),
+            (r'\b(?:in college|at university|in my twenties)\b', 22),
+            (r'\b(?:when (?:we|i) got married|newlywed|wedding day)\b', 25),
+            (r'\b(?:when the kids were (?:little|young|small|born))\b', 32),
+            (r'\b(?:in my thirties)\b', 35),
+            (r'\b(?:in my forties|middle.?aged?)\b', 45),
+            (r'\b(?:in my fifties)\b', 55),
+            (r'\b(?:in my sixties)\b', 65),
+            (r'\b(?:after (?:i )?retired|in retirement)\b', 65),
+            # Vaguer references
+            (r'\b(?:when i was young|back then|years ago|long time ago)\b', 15),
+            (r'\b(?:during the war)\b', 22),  # generic — assumes young adult
+        ]
+        import re
+        for pattern, age_offset in PHRASE_MAP:
+            if re.search(pattern, text_lower):
+                return birth_year + age_offset
+        return None
 
     # ── Structured memories ──
 

@@ -1613,7 +1613,8 @@ async def family_tree_add(request: Request,
                            parent_member_id: str = Form(""),
                            spouse_name: str = Form(""),
                            bio: str = Form(""),
-                           deceased: str = Form("")):
+                           deceased: str = Form(""),
+                           birth_year: str = Form("")):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -1624,6 +1625,11 @@ async def family_tree_add(request: Request,
 
     generation = RELATION_GENERATION.get(relation_to_owner, 0)
     parent_id = int(parent_member_id) if parent_member_id else None
+
+    # Parse birth_year
+    by = None
+    if birth_year and birth_year.strip().isdigit():
+        by = max(1900, min(2025, int(birth_year.strip())))
 
     # Use add_family_member to create or update
     member_id = db.add_family_member(
@@ -1642,6 +1648,7 @@ async def family_tree_add(request: Request,
         bio=bio.strip(),
         deceased=1 if deceased else 0,
         added_by=added_by_name,
+        birth_year=by or 0,
     )
 
     return RedirectResponse("/web/family-tree", status_code=303)
@@ -1654,7 +1661,8 @@ async def family_tree_edit(request: Request, member_id: int,
                             parent_member_id: str = Form(""),
                             spouse_name: str = Form(""),
                             bio: str = Form(""),
-                            deceased: str = Form("")):
+                            deceased: str = Form(""),
+                            birth_year: str = Form("")):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -1675,6 +1683,10 @@ async def family_tree_edit(request: Request, member_id: int,
     generation = RELATION_GENERATION.get(relation_to_owner, 0)
     parent_id = int(parent_member_id) if parent_member_id else None
 
+    by = None
+    if birth_year and birth_year.strip().isdigit():
+        by = max(1900, min(2025, int(birth_year.strip())))
+
     db.update_family_member(
         member_id,
         name=name.strip(),
@@ -1685,6 +1697,7 @@ async def family_tree_edit(request: Request, member_id: int,
         spouse_name=spouse_name.strip(),
         bio=bio.strip(),
         deceased=1 if deceased else 0,
+        birth_year=by or 0,
     )
 
     return RedirectResponse("/web/family-tree", status_code=303)
@@ -2248,7 +2261,7 @@ async def book_chapter_generate(request: Request, chapter_num: int):
         return RedirectResponse("/web/book/chapters", status_code=302)
 
     # Generate AI draft
-    content = await book_builder.generate_chapter_draft(chapter)
+    content = await book_builder.generate_chapter_draft(chapter, tenant_id=tid)
 
     if content:
         book_builder.save_chapter_draft(

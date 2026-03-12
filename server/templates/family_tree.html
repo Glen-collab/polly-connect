@@ -39,10 +39,14 @@
                 </select>
             </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-3">
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Spouse/Partner</label>
                 <input type="text" name="spouse_name" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Linda">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
+                <input type="number" name="birth_year" min="1900" max="2025" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1952">
             </div>
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Short bio / family ties</label>
@@ -88,6 +92,9 @@
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
                 {% if m.spouse_name %}
                 <p class="text-xs text-gray-500">married to {{ m.spouse_name }}</p>
+                {% endif %}
+                {% if m.birth_year %}
+                <p class="text-xs text-gray-400">b. {{ m.birth_year }}</p>
                 {% endif %}
                 {% if m.bio %}
                 <p class="text-xs text-gray-400 mt-0.5">{{ m.bio }}</p>
@@ -181,6 +188,10 @@
                     <input type="text" name="spouse_name" id="edit-spouse" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Linda">
                 </div>
                 <div>
+                    <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
+                    <input type="number" name="birth_year" id="edit-birth-year" min="1900" max="2025" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1952">
+                </div>
+                <div>
                     <label class="block text-sm text-gray-600 mb-1">Short bio / family ties</label>
                     <input type="text" name="bio" id="edit-bio" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Married to Roger, 3 kids">
                 </div>
@@ -207,7 +218,7 @@ var userRole = "{{ session.role or 'owner' }}";
 var userName = "{{ session.name or '' }}";
 var memberData = {
 {% for m in members %}
-{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}" },
+{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}", birth_year: {{ m.birth_year or 0 }} },
 {% endfor %}
 };
 
@@ -224,6 +235,7 @@ function editMember(id) {
     document.getElementById('edit-relation').value = m.relation;
     document.getElementById('edit-parent').value = m.parent;
     document.getElementById('edit-spouse').value = m.spouse;
+    document.getElementById('edit-birth-year').value = m.birth_year > 0 ? m.birth_year : '';
     document.getElementById('edit-bio').value = m.bio;
     document.getElementById('edit-deceased').checked = m.deceased == 1;
     document.getElementById('edit-form').action = '/web/family-tree/' + id + '/edit';

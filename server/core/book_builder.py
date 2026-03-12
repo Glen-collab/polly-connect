@@ -138,7 +138,8 @@ class BookBuilder:
         }
 
     async def generate_chapter_draft(self, chapter: Dict,
-                                      speaker: str = None) -> Optional[str]:
+                                      speaker: str = None,
+                                      tenant_id: int = None) -> Optional[str]:
         """
         Generate a narrative chapter draft from memories.
         Requires AI (OPENAI_API_KEY). Returns None if not available.
@@ -159,6 +160,28 @@ class BookBuilder:
 
         if not memories:
             return None
+
+        # Build timeline context from estimated_year and birth_year data
+        timeline_notes = []
+        for mem in memories:
+            est_year = mem.get("estimated_year")
+            speaker_name = mem.get("speaker", "someone")
+            summary = (mem.get("text_summary") or mem.get("text", ""))[:60]
+            if est_year:
+                timeline_notes.append(f"- \"{summary}...\" — estimated ~{est_year}")
+
+        # Look up speaker birth years for context
+        if speaker and tenant_id:
+            conn = self.db._get_connection()
+            try:
+                owner = conn.execute(
+                    "SELECT birth_year FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                    (tenant_id,)
+                ).fetchone()
+                if owner and owner[0]:
+                    timeline_notes.insert(0, f"- {speaker} was born in {owner[0]}")
+            finally:
+                pass
 
         # Build prompt for AI
         memory_texts = []
@@ -185,11 +208,20 @@ class BookBuilder:
                         entry += photo_note
             memory_texts.append(entry)
 
+        timeline_block = ""
+        if timeline_notes:
+            timeline_block = f"""
+
+Timeline context:
+{chr(10).join(timeline_notes)}
+
+"""
+
         prompt = f"""You are writing a chapter of a family legacy book.
 Chapter title: "{chapter['title']}"
 Theme: {chapter['bucket'].replace('_', ' ')}
 Life phase: {chapter['life_phase']}
-
+{timeline_block}
 Here are the memories to weave into this chapter:
 
 {chr(10).join(memory_texts)}
@@ -203,6 +235,7 @@ Write a warm, narrative chapter (7-10 paragraphs) that:
 - Uses second person sparingly, mostly third person narrative
 - Keeps a blue-collar, honest, heartfelt tone
 - If a memory was prompted by a photo, reference it naturally (e.g. "In the photo, you can still see...")
+- When timeline dates are available, ground the narrative in specific years or decades (e.g. "It was the summer of '58..." instead of "Back then...")
 
 Write the chapter now:"""
 
