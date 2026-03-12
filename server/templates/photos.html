@@ -57,7 +57,7 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
     {% for photo in photos %}
     <div class="bg-white rounded-lg shadow overflow-hidden" id="photo-card-{{ photo.id }}">
-        <a href="/static/uploads/{{ photo.filename }}" target="_blank">
+        <a href="#" onclick="openLightbox('/static/uploads/{{ photo.filename }}', '{{ (photo.caption or photo.original_name or '') | replace("'", "\\'") }}'); return false;">
             <img src="/static/uploads/{{ photo.filename }}" alt="{{ photo.caption or photo.original_name }}"
                  class="w-full h-40 sm:h-52 object-cover hover:opacity-90 transition" loading="lazy">
         </a>
@@ -125,6 +125,13 @@
     <p class="text-gray-400 text-sm">Upload family photos to pair with stories for the legacy book.</p>
 </div>
 {% endif %}
+
+<!-- Photo Lightbox -->
+<div id="lightbox-modal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4" onclick="closeLightbox()">
+    <button onclick="closeLightbox()" class="absolute top-3 right-3 bg-black bg-opacity-50 text-white rounded-full w-10 h-10 flex items-center justify-center text-2xl z-10">&times;</button>
+    <img id="lightbox-img" src="" alt="" class="max-w-full max-h-[85vh] object-contain rounded" onclick="event.stopPropagation()">
+    <p id="lightbox-caption" class="absolute bottom-4 left-0 right-0 text-center text-white text-sm bg-black bg-opacity-40 py-2 px-4"></p>
+</div>
 
 <!-- Recording Modal -->
 <div id="recorder-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -213,6 +220,18 @@
 
 {% block scripts %}
 <script>
+function openLightbox(src, caption) {
+    document.getElementById('lightbox-img').src = src;
+    document.getElementById('lightbox-caption').textContent = caption || '';
+    document.getElementById('lightbox-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+    document.getElementById('lightbox-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
 var currentPhotoId = null;
 var audioCtx = null;
 var mediaStream = null;
