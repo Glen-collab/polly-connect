@@ -102,27 +102,12 @@
         <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center">{{ label|safe }}</h3>
         <div class="flex flex-wrap justify-center gap-3">
             {% for m in tree[gen_num] %}
-            <div class="{{ card_class }} rounded-lg p-3 text-center min-w-[130px] max-w-[200px] cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
+            <div class="{{ card_class }} rounded-lg p-3 text-center w-[140px] h-[100px] flex flex-col justify-center cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
                  onclick="showPhotos({{ m.id }})">
                 <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}</p>
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
-                {% if m.spouse_name %}
-                <p class="text-xs text-gray-500">married to {{ m.spouse_name }}</p>
-                {% endif %}
-                {% if m.birth_year and m.deceased_year %}
-                <p class="text-xs text-gray-400">{{ m.birth_year }} &ndash; {{ m.deceased_year }}</p>
-                {% elif m.birth_year %}
-                <p class="text-xs text-gray-400">b. {{ m.birth_year }}</p>
-                {% elif m.deceased_year %}
-                <p class="text-xs text-gray-400">d. {{ m.deceased_year }}</p>
-                {% endif %}
                 {% if m.bio %}
-                <p class="text-xs text-gray-400 mt-0.5">{{ m.bio }}</p>
-                {% endif %}
-                {% if m.parent_member_id %}
-                {% for p in members %}{% if p.id == m.parent_member_id %}
-                <p class="text-xs text-gray-400">via {{ p.name }}</p>
-                {% endif %}{% endfor %}
+                <p class="text-xs text-gray-400 mt-0.5 truncate">{{ m.bio[:30] }}{% if m.bio|length > 30 %}...{% endif %}</p>
                 {% endif %}
                 {% if session.role == 'family' and not session.family_member_id and not m.access_code and not m.deceased %}
                 <form method="POST" action="/web/family-tree/{{ m.id }}/claim" class="mt-1" onclick="event.stopPropagation()">
@@ -261,7 +246,7 @@ var userRole = "{{ session.role or 'owner' }}";
 var userName = "{{ session.name or '' }}";
 var memberData = {
 {% for m in members %}
-{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}", birth_year: {{ m.birth_year or 0 }}, deceased_year: {{ m.deceased_year or 0 }} },
+{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}", birth_year: {{ m.birth_year or 0 }}, deceased_year: {{ m.deceased_year or 0 }}, parent_name: "{% for p in members %}{% if p.id == m.parent_member_id %}{{ p.name | replace('"', '\\"') }}{% endif %}{% endfor %}" },
 {% endfor %}
 };
 
@@ -302,37 +287,59 @@ function showPhotos(memberId) {
     document.getElementById('photo-modal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 
+    var m = memberData[memberId];
+
     fetch('/web/api/family-tree/' + memberId + '/photos')
     .then(function(r) { return r.json(); })
     .then(function(data) {
         document.getElementById('photo-modal-name').textContent = data.member_name;
         document.getElementById('photo-modal-relation').textContent = data.relation;
 
-        if (!data.photos || data.photos.length === 0) {
-            content.innerHTML = '<div class="text-center py-8">' +
-                '<p class="text-gray-400 text-base">No photos tagged with ' + data.member_name + ' yet.</p>' +
-                '<p class="text-gray-400 text-sm mt-1">Tag them in photos on the <a href="/web/photos" class="text-emerald-600 hover:underline">Photos page</a> or use the <a href="/web/photos" class="text-emerald-600 hover:underline">Edit</a> button on any photo.</p>' +
-                '</div>';
-            return;
+        var html = '';
+
+        // Bio & details section
+        if (m) {
+            var details = [];
+            if (m.spouse) details.push('Married to ' + m.spouse);
+            if (m.birth_year > 0 && m.deceased_year > 0) details.push(m.birth_year + ' – ' + m.deceased_year);
+            else if (m.birth_year > 0) details.push('Born ' + m.birth_year);
+            else if (m.deceased_year > 0) details.push('Passed ' + m.deceased_year);
+            if (m.parent_name) details.push('Via ' + m.parent_name);
+
+            if (m.bio || details.length > 0) {
+                html += '<div class="bg-gray-50 rounded-lg p-3 mb-4">';
+                if (m.bio) html += '<p class="text-sm text-gray-700">' + m.bio + '</p>';
+                if (details.length > 0) html += '<p class="text-xs text-gray-500 mt-1">' + details.join(' · ') + '</p>';
+                html += '</div>';
+            }
         }
 
-        var html = '<p class="text-sm text-gray-500 mb-3">' + data.photos.length + ' photo' + (data.photos.length !== 1 ? 's' : '') + '</p>';
-        html += '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">';
-        data.photos.forEach(function(p) {
-            html += '<div class="rounded-lg overflow-hidden shadow-sm border">';
-            html += '<a href="/static/uploads/' + p.filename + '" target="_blank">';
-            html += '<img src="/static/uploads/' + p.filename + '" class="w-full h-32 sm:h-40 object-cover hover:opacity-90 transition" loading="lazy">';
-            html += '</a>';
-            html += '<div class="p-2">';
-            if (p.caption) html += '<p class="text-xs text-gray-700 font-medium line-clamp-2">' + p.caption + '</p>';
-            if (p.date_taken) html += '<p class="text-xs text-gray-400">' + p.date_taken + '</p>';
-            var links = '';
-            if (p.story_id) links += '<a href="/web/stories/' + p.story_id + '/edit" class="text-xs text-emerald-600 hover:underline">Story</a>';
-            links += '<a href="/web/photos/' + p.id + '/edit" class="text-xs text-blue-500 hover:underline">Edit</a>';
-            html += '<div class="flex gap-2 mt-1">' + links + '</div>';
-            html += '</div></div>';
-        });
-        html += '</div>';
+        // Photos section
+        if (!data.photos || data.photos.length === 0) {
+            html += '<div class="text-center py-8">' +
+                '<p class="text-gray-400 text-base">No photos tagged with ' + data.member_name + ' yet.</p>' +
+                '<p class="text-gray-400 text-sm mt-1">Tag them in photos on the <a href="/web/photos" class="text-emerald-600 hover:underline">Photos page</a>.</p>' +
+                '</div>';
+        } else {
+            html += '<p class="text-sm text-gray-500 mb-3">' + data.photos.length + ' photo' + (data.photos.length !== 1 ? 's' : '') + '</p>';
+            html += '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">';
+            data.photos.forEach(function(p) {
+                html += '<div class="rounded-lg overflow-hidden shadow-sm border">';
+                html += '<a href="/static/uploads/' + p.filename + '" target="_blank">';
+                html += '<img src="/static/uploads/' + p.filename + '" class="w-full h-32 sm:h-40 object-cover hover:opacity-90 transition" loading="lazy">';
+                html += '</a>';
+                html += '<div class="p-2">';
+                if (p.caption) html += '<p class="text-xs text-gray-700 font-medium line-clamp-2">' + p.caption + '</p>';
+                if (p.date_taken) html += '<p class="text-xs text-gray-400">' + p.date_taken + '</p>';
+                var links = '';
+                if (p.story_id) links += '<a href="/web/stories/' + p.story_id + '/edit" class="text-xs text-emerald-600 hover:underline">Story</a>';
+                links += '<a href="/web/photos/' + p.id + '/edit" class="text-xs text-blue-500 hover:underline">Edit</a>';
+                html += '<div class="flex gap-2 mt-1">' + links + '</div>';
+                html += '</div></div>';
+            });
+            html += '</div>';
+        }
+
         content.innerHTML = html;
     })
     .catch(function() {
