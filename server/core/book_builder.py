@@ -222,7 +222,13 @@ class BookBuilder:
         for i, mem in enumerate(memories, 1):
             speaker_name = mem.get("speaker", "someone")
             text = mem.get("text", mem.get("text_summary", ""))
-            emotions = ", ".join(mem.get("emotions", "").split(",")) if mem.get("emotions") else ""
+            raw_emotions = mem.get("emotions", "")
+            if isinstance(raw_emotions, list):
+                emotions = ", ".join(raw_emotions)
+            elif raw_emotions:
+                emotions = ", ".join(raw_emotions.split(","))
+            else:
+                emotions = ""
             est_year = mem.get("estimated_year")
             o_age = mem.get("owner_age")
 
