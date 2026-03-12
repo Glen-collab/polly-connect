@@ -24,6 +24,7 @@ class DataLoader:
         self._all_jokes: List[Dict] = []
         self._all_kid_jokes: List[Dict] = []
         self._all_questions: List[Dict] = []
+        self._standalone_questions: List[Dict] = []  # only context-free questions (first per week)
         self._all_family_questions: List[Dict] = []
 
         self._load_jokes()
@@ -62,12 +63,17 @@ class DataLoader:
         with open(path, "r", encoding="utf-8") as f:
             self.questions = json.load(f)
         # Flatten all questions into a single list
+        # Also build standalone list (first question per week = always context-free)
         for week_block in self.questions:
-            for q in week_block.get("questions", []):
+            questions = week_block.get("questions", [])
+            for i, q in enumerate(questions):
                 q["theme"] = week_block.get("theme", "general")
                 q["week"] = week_block.get("week", 0)
                 self._all_questions.append(q)
-        logger.info(f"Loaded {len(self._all_questions)} questions")
+                if i == 0:
+                    # First question in each week is always standalone
+                    self._standalone_questions.append(q)
+        logger.info(f"Loaded {len(self._all_questions)} questions ({len(self._standalone_questions)} standalone)")
 
     def _load_family_questions(self):
         path = os.path.join(self.data_dir, "family_questions.json")
@@ -106,10 +112,12 @@ class DataLoader:
         return random.choice(self._all_kid_jokes)
 
     def get_question(self) -> Optional[Dict]:
-        """Return a random question dict with 'question', 'theme', 'type'."""
-        if not self._all_questions:
-            return None
-        return random.choice(self._all_questions)
+        """Return a random standalone question (context-free, works cold)."""
+        if not self._standalone_questions:
+            if not self._all_questions:
+                return None
+            return random.choice(self._all_questions)
+        return random.choice(self._standalone_questions)
 
     def get_family_question(self, theme: str = None) -> Optional[Dict]:
         """Return a random family question dict, optionally filtered by theme."""
