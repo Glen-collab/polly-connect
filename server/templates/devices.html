@@ -5,19 +5,58 @@
 <a href="/web/hub/settings" class="text-emerald-600 hover:underline text-sm">&larr; Settings</a>
 <h1 class="text-2xl font-bold text-emerald-700 mb-4 mt-1">Devices</h1>
 
-{% if new_api_key %}
-<div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-6">
-    <h3 class="font-bold text-yellow-800 mb-2">New Device API Key (save this now!)</h3>
-    <p class="text-sm text-yellow-700 mb-2">This key is shown only once. Copy it and flash it to your ESP32.</p>
-    <div class="flex items-center gap-2">
-        <code id="api-key-display" class="bg-white border px-3 py-2 rounded text-sm font-mono flex-1 break-all select-all">{{ new_api_key }}</code>
-        <button onclick="copyKey()" class="bg-yellow-600 text-white px-3 py-2 rounded text-sm hover:bg-yellow-700">Copy</button>
-    </div>
-    <p class="text-xs text-yellow-600 mt-2">Device ID: <code>{{ new_device_id }}</code></p>
+{% if claim_success %}
+<div class="bg-emerald-50 border border-emerald-300 rounded-lg p-4 mb-6">
+    <p class="text-emerald-800 font-medium">Device "{{ claim_success }}" has been added to your account!</p>
 </div>
 {% endif %}
 
-<!-- Add Device -->
+{% if claim_error %}
+<div class="bg-red-50 border border-red-300 rounded-lg p-4 mb-6">
+    <p class="text-red-800 font-medium">{{ claim_error }}</p>
+</div>
+{% endif %}
+
+{% if new_api_key %}
+<div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-6">
+    <h3 class="font-bold text-yellow-800 mb-2">New Device Created</h3>
+    <p class="text-sm text-yellow-700 mb-2">API Key (shown once — copy it and flash to ESP32):</p>
+    <div class="flex items-center gap-2 mb-3">
+        <code id="api-key-display" class="bg-white border px-3 py-2 rounded text-sm font-mono flex-1 break-all select-all">{{ new_api_key }}</code>
+        <button onclick="copyKey()" class="bg-yellow-600 text-white px-3 py-2 rounded text-sm hover:bg-yellow-700">Copy</button>
+    </div>
+    <p class="text-xs text-yellow-600">Device ID: <code>{{ new_device_id }}</code></p>
+    {% if new_claim_code %}
+    <div class="mt-3 bg-white border-2 border-yellow-400 rounded-lg p-3 text-center">
+        <p class="text-sm text-yellow-800 font-medium mb-1">Claim Code (write this on a sticker):</p>
+        <p class="text-3xl font-bold font-mono tracking-widest text-yellow-900">{{ new_claim_code }}</p>
+        <p class="text-xs text-yellow-600 mt-1">Customer enters this code to link the device to their account</p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Claim a Device (non-admin users) -->
+{% if not session.is_admin %}
+<div class="bg-white rounded-lg shadow-md p-4 mb-6">
+    <h2 class="text-lg font-semibold mb-2">Claim a Device</h2>
+    <p class="text-sm text-gray-500 mb-3">Enter the 6-digit code from the sticker on your Polly device.</p>
+    <form method="POST" action="/web/devices/claim" class="flex flex-col sm:flex-row gap-3">
+        <input type="text" name="claim_code" required
+               inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+               placeholder="000000"
+               class="flex-1 border rounded-lg px-4 py-3 text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+               style="max-width: 200px;">
+        <button type="submit"
+                class="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 font-medium whitespace-nowrap">
+            Claim Device
+        </button>
+    </form>
+</div>
+{% endif %}
+
+<!-- Add Device (admin only) -->
+{% if session.is_admin %}
 <div class="bg-white rounded-lg shadow-md p-4 mb-6">
     <h2 class="text-lg font-semibold mb-3">Add New Device</h2>
     <form method="POST" action="/web/devices/add" class="flex flex-col sm:flex-row gap-3">
@@ -29,6 +68,7 @@
         </button>
     </form>
 </div>
+{% endif %}
 
 <!-- Device List -->
 <div class="bg-white rounded-lg shadow-md overflow-hidden">
@@ -39,6 +79,9 @@
                 <th class="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Device ID</th>
                 <th class="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Last Seen</th>
                 <th class="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+                {% if session.is_admin %}
+                <th class="text-left px-4 py-3 font-medium text-gray-600">Claim Code</th>
+                {% endif %}
                 <th class="px-4 py-3"></th>
             </tr>
         </thead>
@@ -55,6 +98,17 @@
                     <span class="inline-block bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">No Key</span>
                     {% endif %}
                 </td>
+                {% if session.is_admin %}
+                <td class="px-4 py-3">
+                    {% if device.claim_code %}
+                    <span class="font-mono text-sm font-bold text-yellow-700 bg-yellow-50 px-2 py-1 rounded">{{ device.claim_code }}</span>
+                    {% elif device.claimed_at %}
+                    <span class="text-xs text-gray-400">Claimed</span>
+                    {% else %}
+                    <span class="text-xs text-gray-400">—</span>
+                    {% endif %}
+                </td>
+                {% endif %}
                 <td class="px-4 py-3 text-right">
                     <form method="POST" action="/web/devices/{{ device.device_id }}/delete"
                           onsubmit="return confirm('Delete this device?')">
@@ -65,7 +119,7 @@
             {% endfor %}
             {% if not devices %}
             <tr class="border-t">
-                <td colspan="5" class="px-4 py-8 text-center text-gray-400">No devices registered yet</td>
+                <td colspan="{% if session.is_admin %}6{% else %}5{% endif %}" class="px-4 py-8 text-center text-gray-400">No devices registered yet</td>
             </tr>
             {% endif %}
         </tbody>

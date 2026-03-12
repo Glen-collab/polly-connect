@@ -1492,6 +1492,66 @@ class TestFamilyMemberAccessCodes:
         db.revoke_member_access_code(mid, tid)
         assert db.get_web_session(session_id) is None
 
+    def test_generate_claim_code(self, db, tenant_a):
+        """Admin can generate a 6-digit claim code for a device."""
+        tid = tenant_a["tenant_id"]
+        device = db.register_device("polly-claim01", tid, name="Test Device", api_key="testkey123")
+        code = db.generate_claim_code("polly-claim01", tid)
+        assert len(code) == 6
+        assert code.isdigit()
+        # Verify it's stored on the device
+        devices = db.get_devices_by_tenant(tid)
+        found = [d for d in devices if d["device_id"] == "polly-claim01"]
+        assert found[0]["claim_code"] == code
+
+    def test_claim_device_transfers_tenant(self, db, tenant_a):
+        """Claiming a device transfers it to a new tenant."""
+        tid_admin = tenant_a["tenant_id"]
+        device = db.register_device("polly-claim02", tid_admin, name="Claimable", api_key="key456")
+        code = db.generate_claim_code("polly-claim02", tid_admin)
+        # Create a second tenant (the customer)
+        tid_customer = db.create_tenant("Customer Family")
+        # Claim it
+        result = db.claim_device(code, tid_customer)
+        assert result is not None
+        assert result["tenant_id"] == tid_customer
+        assert result["claim_code"] is None  # cleared after claim
+        assert result["claimed_at"] is not None
+        # No longer in admin's devices
+        admin_devices = db.get_devices_by_tenant(tid_admin)
+        assert not any(d["device_id"] == "polly-claim02" for d in admin_devices)
+        # Now in customer's devices
+        customer_devices = db.get_devices_by_tenant(tid_customer)
+        assert any(d["device_id"] == "polly-claim02" for d in customer_devices)
+
+    def test_claim_invalid_code_returns_none(self, db):
+        """Invalid or already-claimed codes return None."""
+        assert db.claim_device("999999", 1) is None
+
+    def test_claim_code_no_collision_with_family_codes(self, db, tenant_a):
+        """Claim codes don't collide with tenant family codes or member access codes."""
+        tid = tenant_a["tenant_id"]
+        device = db.register_device("polly-claim03", tid, name="No Collide", api_key="key789")
+        code = db.generate_claim_code("polly-claim03", tid)
+        # Verify code doesn't match any tenant family_code
+        conn = db._get_connection()
+        t_clash = conn.execute("SELECT 1 FROM tenants WHERE family_code = ?", (code,)).fetchone()
+        m_clash = conn.execute("SELECT 1 FROM family_members WHERE access_code = ?", (code,)).fetchone()
+        assert t_clash is None
+        assert m_clash is None
+
+    def test_double_claim_fails(self, db, tenant_a):
+        """Cannot claim a device twice."""
+        tid = tenant_a["tenant_id"]
+        device = db.register_device("polly-claim04", tid, name="Once Only", api_key="keyabc")
+        code = db.generate_claim_code("polly-claim04", tid)
+        tid2 = db.create_tenant("First Claimer")
+        tid3 = db.create_tenant("Second Claimer")
+        result1 = db.claim_device(code, tid2)
+        assert result1 is not None
+        result2 = db.claim_device(code, tid3)
+        assert result2 is None  # already claimed
+
     def test_duplicate_chapter_prevention(self, db, tenant_a):
         """When memories < 10, only one chapter per bucket/life_phase, not duplicates."""
         tid = tenant_a["tenant_id"]

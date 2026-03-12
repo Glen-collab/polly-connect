@@ -2166,9 +2166,12 @@ async def devices_page(request: Request):
     tid = session["tenant_id"]
     devices = db.get_devices_by_tenant(tid)
 
-    # Check for flash message about new device
+    # Check for flash messages
     new_api_key = request.query_params.get("new_key")
     new_device_id = request.query_params.get("new_device_id")
+    new_claim_code = request.query_params.get("new_claim_code")
+    claim_error = request.query_params.get("claim_error")
+    claim_success = request.query_params.get("claim_success")
 
     return templates.TemplateResponse("devices.html", {
         "request": request,
@@ -2176,6 +2179,9 @@ async def devices_page(request: Request):
         "devices": devices,
         "new_api_key": new_api_key,
         "new_device_id": new_device_id,
+        "new_claim_code": new_claim_code,
+        "claim_error": claim_error,
+        "claim_success": claim_success,
     })
 
 
@@ -2195,11 +2201,15 @@ async def device_add(request: Request, device_name: str = Form(...)):
 
     db.register_device(device_id, tid, name=device_name, api_key=api_key)
 
-    # Redirect back with the key shown once
-    return RedirectResponse(
-        f"/web/devices?new_key={api_key}&new_device_id={device_id}",
-        status_code=303,
-    )
+    # Admin devices automatically get a claim code
+    claim_code = None
+    if session.get("is_admin"):
+        claim_code = db.generate_claim_code(device_id, tid)
+
+    redirect_url = f"/web/devices?new_key={api_key}&new_device_id={device_id}"
+    if claim_code:
+        redirect_url += f"&new_claim_code={claim_code}"
+    return RedirectResponse(redirect_url, status_code=303)
 
 
 @router.post("/devices/{device_id}/delete")
@@ -2212,6 +2222,34 @@ async def device_delete(request: Request, device_id: str):
     db = request.app.state.db
     db.delete_device(device_id, session["tenant_id"])
     return RedirectResponse("/web/devices", status_code=303)
+
+
+@router.post("/devices/claim")
+async def device_claim(request: Request, claim_code: str = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    code = claim_code.strip()
+
+    if not code or len(code) != 6 or not code.isdigit():
+        return RedirectResponse(
+            "/web/devices?claim_error=Please+enter+a+valid+6-digit+claim+code",
+            status_code=303)
+
+    device = db.claim_device(code, tid)
+    if not device:
+        return RedirectResponse(
+            "/web/devices?claim_error=Invalid+or+already+claimed+code",
+            status_code=303)
+
+    name = device.get("name") or device["device_id"]
+    return RedirectResponse(
+        f"/web/devices?claim_success={name}",
+        status_code=303)
 
 
 # ── Legacy Book ──

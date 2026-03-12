@@ -464,6 +464,10 @@ class PollyDB:
                 conn.execute("ALTER TABLE devices ADD COLUMN fw_version TEXT")
             if "fw_variant" not in cols:
                 conn.execute("ALTER TABLE devices ADD COLUMN fw_variant TEXT")
+            if "claim_code" not in cols:
+                conn.execute("ALTER TABLE devices ADD COLUMN claim_code TEXT")
+            if "claimed_at" not in cols:
+                conn.execute("ALTER TABLE devices ADD COLUMN claimed_at TIMESTAMP")
 
             # Create default tenant #1 and backfill
             conn.execute("INSERT OR IGNORE INTO tenants (id, name) VALUES (1, 'Default')")
@@ -828,7 +832,10 @@ class PollyDB:
                 m_clash = conn.execute(
                     "SELECT 1 FROM family_members WHERE access_code = ?", (code,)
                 ).fetchone()
-                if not t_clash and not m_clash:
+                d_clash = conn.execute(
+                    "SELECT 1 FROM devices WHERE claim_code = ?", (code,)
+                ).fetchone()
+                if not t_clash and not m_clash and not d_clash:
                     conn.execute("""
                         UPDATE family_members SET access_code = ?, code_created_at = CURRENT_TIMESTAMP
                         WHERE id = ? AND tenant_id = ?
@@ -951,6 +958,58 @@ class PollyDB:
             )
             conn.commit()
             return cursor.rowcount > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def generate_claim_code(self, device_id: str, tenant_id: int) -> str:
+        """Generate a unique 6-digit claim code for a device."""
+        import random
+        conn = self._get_connection()
+        try:
+            for _ in range(100):
+                code = f"{random.randint(0, 999999):06d}"
+                t_clash = conn.execute(
+                    "SELECT 1 FROM tenants WHERE family_code = ?", (code,)
+                ).fetchone()
+                m_clash = conn.execute(
+                    "SELECT 1 FROM family_members WHERE access_code = ?", (code,)
+                ).fetchone()
+                d_clash = conn.execute(
+                    "SELECT 1 FROM devices WHERE claim_code = ?", (code,)
+                ).fetchone()
+                if not t_clash and not m_clash and not d_clash:
+                    conn.execute(
+                        "UPDATE devices SET claim_code = ? WHERE device_id = ? AND tenant_id = ?",
+                        (code, device_id, tenant_id)
+                    )
+                    conn.commit()
+                    return code
+            raise RuntimeError("Could not generate unique claim code after 100 attempts")
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def claim_device(self, claim_code: str, new_tenant_id: int) -> Optional[Dict]:
+        """Claim a device by its 6-digit code. Transfers to new tenant."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            device = conn.execute(
+                "SELECT * FROM devices WHERE claim_code = ? AND claimed_at IS NULL",
+                (claim_code,)
+            ).fetchone()
+            if not device:
+                return None
+            conn.execute("""
+                UPDATE devices SET tenant_id = ?, claim_code = NULL,
+                claimed_at = CURRENT_TIMESTAMP WHERE device_id = ?
+            """, (new_tenant_id, device["device_id"]))
+            conn.commit()
+            result = conn.execute(
+                "SELECT * FROM devices WHERE device_id = ?", (device["device_id"],)
+            ).fetchone()
+            return dict(result)
         finally:
             if not self._conn:
                 conn.close()
