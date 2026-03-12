@@ -95,6 +95,9 @@ class BookBuilder:
 
         chapters = []
         chapter_num = 1
+        # Track how many memories have been assigned per bucket/life_phase
+        # so the second template only fires when there are surplus memories (>10)
+        assigned = {}
 
         for template in CHAPTER_TEMPLATES:
             key = (template["bucket"], template["life_phase"])
@@ -103,34 +106,37 @@ class BookBuilder:
             if not group_memories:
                 continue
 
-            # Split large groups into multiple chapters (max 10 per chapter)
-            for i in range(0, len(group_memories), 10):
-                chunk = group_memories[i:i + 10]
-                if len(chunk) < 2:
-                    continue
+            # Skip memories already assigned to a previous template for this key
+            offset = assigned.get(key, 0)
+            remaining = group_memories[offset:]
 
-                title = template["title_template"]
-                if i > 0:
-                    title += f" (Part {i // 10 + 1})"
+            if len(remaining) < 2:
+                continue
 
-                # Calculate year range for this chunk
-                years = [m.get("estimated_year") for m in chunk
-                         if m.get("estimated_year")]
-                year_range = None
-                if years:
-                    year_range = (min(years), max(years))
+            # Take up to 10 memories for this chapter
+            chunk = remaining[:10]
+            assigned[key] = offset + len(chunk)
 
-                chapters.append({
-                    "chapter_number": chapter_num,
-                    "title": title,
-                    "bucket": template["bucket"],
-                    "life_phase": template["life_phase"],
-                    "memory_count": len(chunk),
-                    "memory_ids": [m["id"] for m in chunk],
-                    "year_range": year_range,
-                    "status": "ready" if len(chunk) >= template["min_memories"] else "needs_more",
-                })
-                chapter_num += 1
+            title = template["title_template"]
+
+            # Calculate year range for this chunk
+            years = [m.get("estimated_year") for m in chunk
+                     if m.get("estimated_year")]
+            year_range = None
+            if years:
+                year_range = (min(years), max(years))
+
+            chapters.append({
+                "chapter_number": chapter_num,
+                "title": title,
+                "bucket": template["bucket"],
+                "life_phase": template["life_phase"],
+                "memory_count": len(chunk),
+                "memory_ids": [m["id"] for m in chunk],
+                "year_range": year_range,
+                "status": "ready" if len(chunk) >= template["min_memories"] else "needs_more",
+            })
+            chapter_num += 1
 
         return chapters
 
