@@ -72,7 +72,8 @@
                 {% if mem.verification_status == 'verified' %}
                 <span class="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Verified</span>
                 {% endif %}
-                {% for emotion in (mem.emotions or '').split(',') if emotion.strip() %}
+                {% set emo_list = mem.emotions if mem.emotions is iterable and mem.emotions is not string else (mem.emotions or '').split(',') %}
+                {% for emotion in emo_list if emotion.strip() if emotion is string %}
                 <span class="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">{{ emotion.strip() }}</span>
                 {% endfor %}
             </div>
