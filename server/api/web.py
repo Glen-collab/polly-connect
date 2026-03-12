@@ -293,6 +293,73 @@ async def dashboard(request: Request):
     })
 
 
+# ── Hub pages (Jitterbug navigation) ──
+
+@router.get("/hub/stories", response_class=HTMLResponse)
+async def hub_stories(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    book_builder = getattr(request.app.state, "book_builder", None)
+    book_progress = book_builder.get_book_progress(tenant_id=session["tenant_id"]) if book_builder else None
+    return templates.TemplateResponse("hub_stories.html", {
+        "request": request,
+        "session": session,
+        "book_progress": book_progress,
+    })
+
+
+@router.get("/hub/family", response_class=HTMLResponse)
+async def hub_family(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    book_builder = getattr(request.app.state, "book_builder", None)
+    book_progress = book_builder.get_book_progress(tenant_id=session["tenant_id"]) if book_builder else None
+    return templates.TemplateResponse("hub_family.html", {
+        "request": request,
+        "session": session,
+        "book_progress": book_progress,
+    })
+
+
+@router.get("/hub/care", response_class=HTMLResponse)
+async def hub_care(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    medications = db.get_medications(tenant_id=session["tenant_id"])
+    book_builder = getattr(request.app.state, "book_builder", None)
+    book_progress = book_builder.get_book_progress(tenant_id=session["tenant_id"]) if book_builder else None
+    return templates.TemplateResponse("hub_care.html", {
+        "request": request,
+        "session": session,
+        "medications": medications,
+        "book_progress": book_progress,
+    })
+
+
+@router.get("/hub/settings", response_class=HTMLResponse)
+async def hub_settings(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    if session.get("role") == "family":
+        return RedirectResponse("/web/dashboard", status_code=302)
+    book_builder = getattr(request.app.state, "book_builder", None)
+    book_progress = book_builder.get_book_progress(tenant_id=session["tenant_id"]) if book_builder else None
+    return templates.TemplateResponse("hub_settings.html", {
+        "request": request,
+        "session": session,
+        "book_progress": book_progress,
+    })
+
+
 @router.get("/stories", response_class=HTMLResponse)
 async def stories_list(request: Request):
     session = await get_web_session(request)

@@ -1,31 +1,57 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - Polly Connect{% endblock %}
+{% block title %}Home - Polly Connect{% endblock %}
 
 {% block content %}
-<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Dashboard</h1>
+<!-- Welcome -->
+<div class="text-center mb-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">Welcome{% if session.name %}, {{ session.name }}{% endif %}</h1>
+    <p class="text-sm text-gray-500 mt-1">What would you like to do?</p>
+</div>
 
-<!-- Stats Cards -->
-<div class="grid grid-cols-3 gap-3 sm:gap-6 mb-6">
-    <div class="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
-        <h3 class="text-gray-500 text-xs sm:text-sm">Stories</h3>
-        <p class="text-2xl sm:text-3xl font-bold text-emerald-600">{{ story_count }}</p>
+<!-- Big Button Grid -->
+<div class="grid grid-cols-2 gap-4 sm:gap-6 mb-8 max-w-lg mx-auto">
+    <a href="/web/hub/stories" class="bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
+        <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+        </svg>
+        <span class="text-lg sm:text-xl font-bold">Stories</span>
+    </a>
+    <a href="/web/hub/family" class="bg-blue-500 hover:bg-blue-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
+        <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        <span class="text-lg sm:text-xl font-bold">Family</span>
+    </a>
+    <a href="/web/hub/care" class="bg-purple-500 hover:bg-purple-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
+        <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+        </svg>
+        <span class="text-lg sm:text-xl font-bold">Care</span>
+    </a>
+    {% if session.role != 'family' %}
+    <a href="/web/hub/settings" class="bg-gray-500 hover:bg-gray-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
+        <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span class="text-lg sm:text-xl font-bold">Settings</span>
+    </a>
+    {% else %}
+    <div class="bg-gray-200 rounded-2xl p-6 sm:p-8 text-center opacity-40">
+        <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        <span class="text-lg sm:text-xl font-bold text-gray-400">Settings</span>
     </div>
-    <div class="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
-        <h3 class="text-gray-500 text-xs sm:text-sm">Questions</h3>
-        <p class="text-2xl sm:text-3xl font-bold text-blue-600">{{ question_count }}</p>
-    </div>
-    <div class="bg-white rounded-lg shadow p-4 sm:p-6 text-center">
-        <h3 class="text-gray-500 text-xs sm:text-sm">Items</h3>
-        <p class="text-2xl sm:text-3xl font-bold text-purple-600">{{ item_count }}</p>
-    </div>
+    {% endif %}
 </div>
 
 <!-- Legacy Book Progress -->
 {% if book_progress %}
-<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6 max-w-lg mx-auto">
     <div class="flex items-center justify-between mb-3">
-        <h2 class="text-base sm:text-lg font-semibold">Legacy Book</h2>
-        <a href="/web/book" class="text-emerald-600 text-sm hover:underline">View Details</a>
+        <h2 class="text-base sm:text-lg font-semibold">Legacy Book Progress</h2>
+        <a href="/web/book" class="text-emerald-600 text-sm hover:underline">View Book</a>
     </div>
     <div class="flex items-center gap-4">
         <div class="flex-1">
@@ -33,8 +59,8 @@
                 <span>{{ book_progress.total_memories }} memories captured</span>
                 <span>{{ book_progress.percent_complete }}%</span>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-3">
-                <div class="bg-emerald-500 h-3 rounded-full transition-all" style="width: {{ book_progress.percent_complete }}%"></div>
+            <div class="w-full bg-gray-200 rounded-full h-4">
+                <div class="bg-emerald-500 h-4 rounded-full transition-all" style="width: {{ book_progress.percent_complete }}%"></div>
             </div>
             <p class="text-xs text-gray-400 mt-1">{{ book_progress.chapters_ready }} chapters ready &middot; ~{{ book_progress.estimated_pages }} pages</p>
         </div>
@@ -42,104 +68,19 @@
 </div>
 {% endif %}
 
-<!-- Recent Stories -->
-<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
-    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Recent Stories</h2>
-    {% if stories %}
-    <ul class="space-y-3">
-        {% for story in stories %}
-        <li class="border-b pb-2">
-            {% if story.question_text %}
-            <p class="text-xs text-blue-600 italic mb-1">Q: {{ story.question_text }}</p>
-            {% endif %}
-            {% set display_text = story.corrected_transcript or story.transcript %}
-            <p class="text-sm sm:text-base text-gray-700">{{ display_text[:200] }}{% if display_text|length > 200 %}...{% endif %}</p>
-            <span class="text-xs text-gray-400">{{ story.created_at }}</span>
-        </li>
-        {% endfor %}
-    </ul>
-    <a href="/web/stories" class="block text-center text-emerald-600 text-sm mt-3 hover:underline">View all stories</a>
-    {% else %}
-    <p class="text-gray-400 text-sm">No stories recorded yet. Say "record my story" to get started!</p>
-    {% endif %}
-</div>
-
-<!-- Medication Schedule (dynamic) -->
-<div class="bg-white rounded-lg shadow p-4 sm:p-6">
-    <div class="flex items-center justify-between mb-3 sm:mb-4">
-        <h2 class="text-base sm:text-lg font-semibold">Medication Schedule</h2>
-        <span id="med-time" class="text-xs text-gray-400"></span>
+<!-- Stats Cards -->
+<div class="grid grid-cols-3 gap-3 sm:gap-4 max-w-lg mx-auto">
+    <div class="bg-white rounded-lg shadow p-3 sm:p-4 text-center">
+        <h3 class="text-gray-500 text-xs">Stories</h3>
+        <p class="text-xl sm:text-2xl font-bold text-emerald-600">{{ story_count }}</p>
     </div>
-    <div id="med-list">
-        <!-- Static fallback while JS loads -->
-        {% if medications %}
-        <ul class="space-y-2">
-            {% for med in medications %}
-            <li class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b pb-2">
-                <span class="font-medium text-sm sm:text-base">{{ med.name }}</span>
-                <span class="text-xs sm:text-sm text-gray-500">{{ med.dosage }} &mdash; {{ med.times }}</span>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="text-gray-400 text-sm">No medications set up. Add them in the <a href="/web/medications" class="text-emerald-600 hover:underline">Medications</a> tab.</p>
-        {% endif %}
+    <div class="bg-white rounded-lg shadow p-3 sm:p-4 text-center">
+        <h3 class="text-gray-500 text-xs">Questions</h3>
+        <p class="text-xl sm:text-2xl font-bold text-blue-600">{{ question_count }}</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-3 sm:p-4 text-center">
+        <h3 class="text-gray-500 text-xs">Items</h3>
+        <p class="text-xl sm:text-2xl font-bold text-purple-600">{{ item_count }}</p>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-function loadMeds() {
-    fetch('/web/api/medications/upcoming')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.error) return;
-            var timeEl = document.getElementById('med-time');
-            if (timeEl && data.current_time) timeEl.textContent = data.current_time;
-
-            var list = document.getElementById('med-list');
-            if (!data.medications || data.medications.length === 0) {
-                list.innerHTML = '<p class="text-gray-400 text-sm">No medications set up. Add them in the <a href="/web/medications" class="text-emerald-600 hover:underline">Medications</a> tab.</p>';
-                return;
-            }
-
-            var html = '<ul class="space-y-2">';
-            data.medications.forEach(function(med) {
-                var badgeClass = '';
-                var badgeText = '';
-                if (med.badge === 'overdue') {
-                    badgeClass = 'bg-red-100 text-red-700';
-                    badgeText = 'OVERDUE';
-                } else if (med.badge === 'soon') {
-                    badgeClass = 'bg-yellow-100 text-yellow-700';
-                    var mins = Math.abs(med.countdown_minutes);
-                    badgeText = med.countdown_minutes <= 0 ? 'NOW' : mins + ' min';
-                } else if (med.badge === 'scheduled') {
-                    badgeClass = 'bg-green-100 text-green-700';
-                    badgeText = med.time_display;
-                } else {
-                    badgeClass = 'bg-gray-100 text-gray-500';
-                    badgeText = 'Not today';
-                }
-
-                html += '<li class="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b pb-2">';
-                html += '<div><span class="font-medium text-sm sm:text-base">' + med.name + '</span>';
-                if (med.dosage) html += '<span class="text-xs text-gray-500 ml-2">' + med.dosage + '</span>';
-                html += '</div>';
-                html += '<div class="flex items-center gap-2 mt-1 sm:mt-0">';
-                html += '<span class="text-xs sm:text-sm text-gray-500">' + med.time_display + '</span>';
-                html += '<span class="text-xs px-2 py-0.5 rounded ' + badgeClass + '">' + badgeText + '</span>';
-                html += '</div></li>';
-            });
-            html += '</ul>';
-            list.innerHTML = html;
-        })
-        .catch(function(e) { /* keep static fallback */ });
-}
-
-// Load immediately and then every 60 seconds
-loadMeds();
-setInterval(loadMeds, 60000);
-</script>
 {% endblock %}

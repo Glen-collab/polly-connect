@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Care - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="/web/dashboard" class="text-emerald-600 hover:underline text-sm">&larr; Home</a>
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-2">Care</h1>
+</div>
+
+<div class="grid grid-cols-2 gap-4 sm:gap-6 max-w-lg mx-auto">
+    <a href="/web/medications" class="bg-white border-2 border-purple-200 hover:border-purple-400 rounded-2xl p-5 sm:p-6 text-center shadow transition active:scale-95">
+        <svg class="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+        </svg>
+        <span class="text-base sm:text-lg font-bold text-gray-800">Medications</span>
+        <p class="text-xs text-gray-500 mt-1">Add and manage daily medications. Polly reminds you when it's time.</p>
+    </a>
+    <a href="/web/medications/calendar" class="bg-white border-2 border-purple-200 hover:border-purple-400 rounded-2xl p-5 sm:p-6 text-center shadow transition active:scale-95">
+        <svg class="w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        <span class="text-base sm:text-lg font-bold text-gray-800">Med Calendar</span>
+        <p class="text-xs text-gray-500 mt-1">View medication schedule and check what's been taken today.</p>
+    </a>
+</div>
+
+<!-- Upcoming Meds Quick View -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mt-6 max-w-lg mx-auto">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-gray-600">Today's Medications</h2>
+        <span id="med-time" class="text-xs text-gray-400"></span>
+    </div>
+    <div id="med-list">
+        {% if medications %}
+        <ul class="space-y-2">
+            {% for med in medications %}
+            <li class="flex justify-between items-center border-b pb-2">
+                <span class="font-medium text-sm">{{ med.name }}</span>
+                <span class="text-xs text-gray-500">{{ med.dosage }} &mdash; {{ med.times }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-gray-400 text-sm">No medications set up yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Book Progress -->
+{% if book_progress %}
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mt-4 max-w-lg mx-auto">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-gray-600">Book Progress</h2>
+        <span class="text-xs text-gray-400">{{ book_progress.percent_complete }}%</span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-3">
+        <div class="bg-emerald-500 h-3 rounded-full transition-all" style="width: {{ book_progress.percent_complete }}%"></div>
+    </div>
+    <p class="text-xs text-gray-400 mt-1">{{ book_progress.total_memories }} memories &middot; {{ book_progress.chapters_ready }} chapters ready</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadMeds() {
+    fetch('/web/api/medications/upcoming')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) return;
+            var timeEl = document.getElementById('med-time');
+            if (timeEl && data.current_time) timeEl.textContent = data.current_time;
+
+            var list = document.getElementById('med-list');
+            if (!data.medications || data.medications.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 text-sm">No medications set up yet.</p>';
+                return;
+            }
+
+            var html = '<ul class="space-y-2">';
+            data.medications.forEach(function(med) {
+                var badgeClass = '';
+                var badgeText = '';
+                if (med.badge === 'overdue') {
+                    badgeClass = 'bg-red-100 text-red-700';
+                    badgeText = 'OVERDUE';
+                } else if (med.badge === 'soon') {
+                    badgeClass = 'bg-yellow-100 text-yellow-700';
+                    var mins = Math.abs(med.countdown_minutes);
+                    badgeText = med.countdown_minutes <= 0 ? 'NOW' : mins + ' min';
+                } else if (med.badge === 'scheduled') {
+                    badgeClass = 'bg-green-100 text-green-700';
+                    badgeText = med.time_display;
+                } else {
+                    badgeClass = 'bg-gray-100 text-gray-500';
+                    badgeText = 'Not today';
+                }
+                html += '<li class="flex justify-between items-center border-b pb-2">';
+                html += '<div><span class="font-medium text-sm">' + med.name + '</span>';
+                if (med.dosage) html += '<span class="text-xs text-gray-500 ml-2">' + med.dosage + '</span>';
+                html += '</div>';
+                html += '<span class="text-xs px-2 py-0.5 rounded ' + badgeClass + '">' + badgeText + '</span>';
+                html += '</li>';
+            });
+            html += '</ul>';
+            list.innerHTML = html;
+        })
+        .catch(function(e) { /* keep static fallback */ });
+}
+loadMeds();
+setInterval(loadMeds, 60000);
+</script>
+{% endblock %}
