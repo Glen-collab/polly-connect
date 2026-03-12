@@ -176,6 +176,25 @@ class TestTimeDate:
 
 # ─── MEDICATIONS ───
 
+# ─── NOSTALGIA ───
+
+class TestNostalgia:
+    @pytest.mark.parametrize("text", [
+        "tell me something from the old days",
+        "take me back",
+        "the good old days",
+        "let's reminisce",
+        "remember the old days",
+        "what was it like growing up",
+        "take me down memory lane",
+        "tell me something nostalgic",
+        "back in my day",
+        "back in the day",
+    ])
+    def test_nostalgia(self, parser, text):
+        assert parser.parse(text)["intent"] == "nostalgia"
+
+
 class TestMedications:
     @pytest.mark.parametrize("text", [
         "what are my medications",

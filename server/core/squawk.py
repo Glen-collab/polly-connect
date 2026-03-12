@@ -123,6 +123,9 @@ class SquawkManager:
         self._squawk_interval: Dict[str, int] = {}   # per-device squawk interval (minutes)
         self._chatter_interval: Dict[str, int] = {}  # per-device chatter interval (minutes)
 
+        # Nostalgia callbacks: device_id -> async callable
+        self._nostalgia_callbacks: Dict[str, callable] = {}
+
         # Single scheduler task per device (polling loop)
         self._scheduler_tasks: Dict[str, asyncio.Task] = {}
 
@@ -219,10 +222,18 @@ class SquawkManager:
             f"next chatter in {self._next_chatter_time[device_id] - now:.0f}s"
         )
 
+    def register_nostalgia_callback(self, device_id: str, callback):
+        """Register an async callback for nostalgia TTS during chatter slots."""
+        self._nostalgia_callbacks[device_id] = callback
+
+    def unregister_nostalgia_callback(self, device_id: str):
+        self._nostalgia_callbacks.pop(device_id, None)
+
     def unregister_device(self, device_id: str):
         """Mark device as disconnected. Does NOT cancel schedules."""
         self._active_devices.pop(device_id, None)
         self._playing.pop(device_id, None)
+        self._nostalgia_callbacks.pop(device_id, None)
         # Keep send lock, schedules, intervals, quiet hours — they survive reconnects
         # The scheduler loop will idle while device is not in _active_devices
 
@@ -338,10 +349,18 @@ class SquawkManager:
                     await self.send_squawk(device_id)
                     self._schedule_next_squawk(device_id)
 
-                # Check chatter schedule
+                # Check chatter schedule (20% chance to play nostalgia snippet instead)
                 next_ch = self._next_chatter_time.get(device_id, 0)
                 if now >= next_ch and self.chatter:
-                    await self.send_chatter(device_id)
+                    nostalgia_cb = self._nostalgia_callbacks.get(device_id)
+                    if nostalgia_cb and random.random() < 0.20:
+                        try:
+                            await nostalgia_cb()
+                        except Exception as e:
+                            logger.error(f"Nostalgia callback error: {e}")
+                            await self.send_chatter(device_id)
+                    else:
+                        await self.send_chatter(device_id)
                     self._schedule_next_chatter(device_id)
 
         except asyncio.CancelledError:

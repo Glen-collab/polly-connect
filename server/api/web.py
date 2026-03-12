@@ -870,6 +870,8 @@ async def settings_save(request: Request, name: str = Form(...),
                         music_genre_preference: str = Form(""),
                         memory_care_mode: str = Form(""),
                         location_city: str = Form(""),
+                        hometown: str = Form(""),
+                        birth_year: str = Form(""),
                         squawk_interval: int = Form(10),
                         chatter_interval: int = Form(45),
                         quiet_hours_start: int = Form(21),
@@ -907,6 +909,15 @@ async def settings_save(request: Request, name: str = Form(...),
         location_lat = None
         location_lon = None
 
+    # Parse birth_year
+    birth_year_int = None
+    if birth_year and birth_year.strip():
+        try:
+            birth_year_int = int(birth_year.strip())
+            birth_year_int = max(1900, min(2010, birth_year_int))
+        except ValueError:
+            pass
+
     conn = db._get_connection()
     try:
         conn.execute("""
@@ -916,6 +927,7 @@ async def settings_save(request: Request, name: str = Form(...),
             quiet_hours_start = ?, quiet_hours_end = ?,
             location_city = ?, location_lat = ?, location_lon = ?,
             squawk_volume = ?, rms_threshold = ?,
+            hometown = ?, birth_year = ?,
             updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (name, familiar_name or None, bible_topic_preference or None,
@@ -923,7 +935,9 @@ async def settings_save(request: Request, name: str = Form(...),
               squawk_interval, chatter_interval,
               quiet_hours_start, quiet_hours_end,
               location_city, location_lat, location_lon,
-              squawk_volume, rms_threshold, user["id"]))
+              squawk_volume, rms_threshold,
+              hometown.strip() or None, birth_year_int,
+              user["id"]))
         conn.commit()
     finally:
         if not db._conn:
@@ -1780,6 +1794,125 @@ async def prayers_delete(request: Request, request_id: int):
     db = request.app.state.db
     db.delete_prayer_request(request_id)
     return RedirectResponse("/web/prayers", status_code=303)
+
+
+# ── Nostalgia Snippets ──
+
+@router.get("/nostalgia", response_class=HTMLResponse)
+async def nostalgia_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+    snippets = db.get_nostalgia_snippets(tid)
+    generating = request.query_params.get("generated") == "1"
+
+    return templates.TemplateResponse("nostalgia.html", {
+        "request": request,
+        "session": session,
+        "user": user,
+        "snippets": snippets,
+        "generating": generating,
+    })
+
+
+@router.post("/nostalgia/generate")
+async def nostalgia_generate(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+
+    hometown = user.get("hometown", "")
+    birth_year = user.get("birth_year")
+    familiar_name = user.get("familiar_name") or user.get("name") or "the owner"
+
+    if not hometown or not birth_year:
+        return RedirectResponse("/web/nostalgia", status_code=303)
+
+    current_year = 2026
+    teen_start = birth_year + 13
+    teen_end = birth_year + 19
+
+    prompt = f"""You are creating nostalgic conversation snippets for an elderly person named {familiar_name}.
+They were born in {birth_year} and grew up in {hometown}.
+Their teen years were roughly {teen_start}-{teen_end}.
+
+Generate exactly 25 short nostalgia snippets (2-3 sentences each, 20-40 words).
+5 snippets per category:
+
+1. "hometown" - Roads, cruising, local landmarks, and places specific to {hometown}
+2. "music" - Songs, artists, bands, and radio from the {teen_start//10*10}s-{teen_end//10*10}s
+3. "food" - Foods, recipes, restaurants, snacks, and kitchen memories from that era
+4. "culture" - Movies, TV shows, world events, and fads from their youth
+5. "childhood" - Games, outdoor activities, and daily life for kids in that era and location
+
+Each snippet MUST:
+- Be warm and conversational, as if a friendly parrot companion is reminiscing
+- Start with phrases like "Hey {familiar_name}, remember when...", "Did you know...", "Back in the day..."
+- Be historically accurate for the time period and location
+- Be TTS-friendly: no abbreviations, no special characters, spell out numbers
+- Each variation must cover DIFFERENT specific details — no repetition across the 5
+
+Return ONLY a JSON array of objects: [{{"category": "hometown", "variation": 1, "text": "..."}}, ...]
+All 25 objects, nothing else."""
+
+    try:
+        followup_gen = request.app.state.followup_gen
+        response = followup_gen._client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=3000,
+            temperature=0.9,
+        )
+        import json
+        raw = response.choices[0].message.content.strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+        snippets = json.loads(raw)
+        if isinstance(snippets, list) and len(snippets) > 0:
+            db.save_nostalgia_snippets(tid, snippets)
+            logger.info(f"Generated {len(snippets)} nostalgia snippets for tenant {tid}")
+    except Exception as e:
+        logger.error(f"Nostalgia generation failed: {e}")
+
+    return RedirectResponse("/web/nostalgia?generated=1", status_code=303)
+
+
+@router.post("/nostalgia/{snippet_id}/edit")
+async def nostalgia_edit(request: Request, snippet_id: int, text: str = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    db.update_nostalgia_snippet(snippet_id, text.strip())
+    return RedirectResponse("/web/nostalgia", status_code=303)
+
+
+@router.post("/nostalgia/{snippet_id}/delete")
+async def nostalgia_delete(request: Request, snippet_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    db.delete_nostalgia_snippet(snippet_id)
+    return RedirectResponse("/web/nostalgia", status_code=303)
 
 
 # ── Story Narratives (cached GPT stories) ──

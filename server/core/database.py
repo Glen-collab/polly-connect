@@ -414,6 +414,8 @@ class PollyDB:
                 "location_lon": "ALTER TABLE user_profiles ADD COLUMN location_lon REAL",
                 "squawk_volume": "ALTER TABLE user_profiles ADD COLUMN squawk_volume INTEGER DEFAULT 30",
                 "rms_threshold": "ALTER TABLE user_profiles ADD COLUMN rms_threshold INTEGER DEFAULT 200",
+                "hometown": "ALTER TABLE user_profiles ADD COLUMN hometown TEXT",
+                "birth_year": "ALTER TABLE user_profiles ADD COLUMN birth_year INTEGER",
             }
             for col, sql in migrations.items():
                 if col not in cols:
@@ -526,6 +528,20 @@ class PollyDB:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # Nostalgia snippets table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS nostalgia_snippets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    category TEXT NOT NULL,
+                    variation_number INTEGER NOT NULL,
+                    text TEXT NOT NULL,
+                    last_used TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_nostalgia_tenant ON nostalgia_snippets(tenant_id)")
 
             # Add family_name and role columns to web_sessions
             cols = {row[1] for row in conn.execute("PRAGMA table_info(web_sessions)").fetchall()}
@@ -1505,6 +1521,84 @@ class PollyDB:
         conn = self._get_connection()
         try:
             conn.execute("DELETE FROM pronunciations WHERE id = ?", (pronunciation_id,))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Nostalgia snippets ──
+
+    def get_nostalgia_snippets(self, tenant_id: int, category: str = None) -> list:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            if category:
+                rows = conn.execute(
+                    "SELECT * FROM nostalgia_snippets WHERE tenant_id = ? AND category = ? ORDER BY category, variation_number",
+                    (tenant_id, category)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM nostalgia_snippets WHERE tenant_id = ? ORDER BY category, variation_number",
+                    (tenant_id,)
+                ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_next_nostalgia_snippet(self, tenant_id: int) -> dict:
+        """Get the next snippet to play (oldest last_used first, unused first)."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("""
+                SELECT * FROM nostalgia_snippets WHERE tenant_id = ?
+                ORDER BY last_used IS NOT NULL, last_used ASC, RANDOM()
+                LIMIT 1
+            """, (tenant_id,)).fetchone()
+            return dict(row) if row else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def save_nostalgia_snippets(self, tenant_id: int, snippets: list):
+        """Bulk save snippets (replaces all existing for tenant)."""
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM nostalgia_snippets WHERE tenant_id = ?", (tenant_id,))
+            for s in snippets:
+                conn.execute("""
+                    INSERT INTO nostalgia_snippets (tenant_id, category, variation_number, text)
+                    VALUES (?, ?, ?, ?)
+                """, (tenant_id, s["category"], s["variation"], s["text"]))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_nostalgia_snippet(self, snippet_id: int, text: str):
+        conn = self._get_connection()
+        try:
+            conn.execute("UPDATE nostalgia_snippets SET text = ? WHERE id = ?", (text, snippet_id))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_nostalgia_snippet(self, snippet_id: int):
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM nostalgia_snippets WHERE id = ?", (snippet_id,))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def mark_nostalgia_used(self, snippet_id: int):
+        conn = self._get_connection()
+        try:
+            conn.execute("UPDATE nostalgia_snippets SET last_used = CURRENT_TIMESTAMP WHERE id = ?", (snippet_id,))
             conn.commit()
         finally:
             if not self._conn:

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Nostalgia - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+    <h1 class="text-xl sm:text-2xl font-bold">Nostalgia Snippets</h1>
+    {% if user.hometown and user.birth_year %}
+    <form method="POST" action="/web/nostalgia/generate"
+          onsubmit="return confirm('This will regenerate all 25 snippets using AI. Any edits you made will be lost. Continue?');">
+        <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700">
+            {% if snippets %}Regenerate All{% else %}Generate Snippets{% endif %}
+        </button>
+    </form>
+    {% endif %}
+</div>
+
+{% if generating %}
+<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800 font-medium">
+    Nostalgia snippets generated successfully!
+</div>
+{% endif %}
+
+{% if not user.hometown or not user.birth_year %}
+<div class="bg-white rounded-lg shadow p-6 text-center">
+    <p class="text-gray-500 text-base mb-2">Set up hometown and birth year first</p>
+    <p class="text-gray-400 text-sm mb-4">Go to <a href="/web/settings" class="text-emerald-600 hover:underline">Settings</a> and fill in the hometown and birth year fields. Then come back here to generate nostalgic snippets.</p>
+</div>
+{% elif not snippets %}
+<div class="bg-white rounded-lg shadow p-6 text-center">
+    <p class="text-gray-500 text-base mb-2">No nostalgia snippets yet</p>
+    <p class="text-gray-400 text-sm mb-4">Click "Generate Snippets" above to create 25 personalized nostalgia snippets for {{ user.familiar_name or user.name or 'the owner' }}.</p>
+    <p class="text-gray-400 text-xs">Based on: {{ user.hometown }}, born {{ user.birth_year }}</p>
+</div>
+{% else %}
+
+<p class="text-sm text-gray-500 mb-4">
+    {{ snippets|length }} snippets for {{ user.familiar_name or user.name }} &middot;
+    {{ user.hometown }}, born {{ user.birth_year }} &middot;
+    Polly plays these via voice command ("take me back") or randomly during chatter (20% chance)
+</p>
+
+{% set categories = {
+    'hometown': 'Hometown & Roads',
+    'music': 'Music',
+    'food': 'Food & Restaurants',
+    'culture': 'Movies, TV & Culture',
+    'childhood': 'Childhood Activities'
+} %}
+
+{% for cat_key, cat_label in categories.items() %}
+{% set cat_snippets = snippets|selectattr('category', 'equalto', cat_key)|list %}
+{% if cat_snippets %}
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4">
+    <h2 class="text-base font-semibold mb-3 text-emerald-700">{{ cat_label }}</h2>
+    <div class="space-y-3">
+        {% for s in cat_snippets %}
+        <div class="border rounded-lg p-3 {% if s.last_used %}bg-gray-50{% else %}bg-white{% endif %}">
+            <div class="flex justify-between items-start gap-2">
+                <p class="text-sm text-gray-800 flex-1">{{ s.text }}</p>
+                <div class="flex gap-2 shrink-0">
+                    <button onclick="editSnippet({{ s.id }}, this.closest('.border').querySelector('p').textContent)"
+                            class="text-blue-500 hover:text-blue-700 text-xs">Edit</button>
+                    <form method="POST" action="/web/nostalgia/{{ s.id }}/delete" class="inline"
+                          onsubmit="return confirm('Delete this snippet?');">
+                        <button type="submit" class="text-red-400 hover:text-red-600 text-xs">Delete</button>
+                    </form>
+                </div>
+            </div>
+            {% if s.last_used %}
+            <p class="text-xs text-gray-400 mt-1">Last played: {{ s.last_used }}</p>
+            {% else %}
+            <p class="text-xs text-gray-400 mt-1">Not played yet</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endif %}
+
+<!-- Edit modal -->
+<div id="edit-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
+        <h2 class="text-lg font-semibold mb-4">Edit Snippet</h2>
+        <form id="edit-form" method="POST">
+            <textarea name="text" id="edit-text" rows="4"
+                      class="w-full border rounded px-3 py-2 text-sm mb-4" required></textarea>
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700">Save</button>
+                <button type="button" onclick="document.getElementById('edit-modal').classList.add('hidden')"
+                        class="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editSnippet(id, text) {
+    document.getElementById('edit-text').value = text.trim();
+    document.getElementById('edit-form').action = '/web/nostalgia/' + id + '/edit';
+    document.getElementById('edit-modal').classList.remove('hidden');
+}
+</script>
+{% endblock %}

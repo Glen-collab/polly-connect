@@ -24,6 +24,17 @@
                 <input type="text" name="familiar_name" value="{{ user.familiar_name or '' }}"
                        class="w-full border rounded px-3 py-2 text-sm" placeholder="Grandma">
             </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Hometown (where they grew up)</label>
+                <input type="text" name="hometown" value="{{ user.hometown or '' }}"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Mauston, Wisconsin">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
+                <input type="number" name="birth_year" value="{{ user.birth_year or '' }}"
+                       class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1979"
+                       min="1900" max="2010">
+            </div>
         </div>
     </div>
 

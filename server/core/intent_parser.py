@@ -196,6 +196,18 @@ class IntentParser:
             "pray for my kids", "pray for the children",
             "pray for my grandchildren", "pray for my grandkids",
         ]
+        self._nostalgia_phrases = [
+            "tell me something from the old days", "take me back",
+            "the good old days", "nostalgia",
+            "what was it like back then",
+            "reminisce", "let's reminisce", "remember the old days",
+            "tell me something from my childhood",
+            "back in my day",
+            "what was it like growing up",
+            "memory lane", "take me down memory lane",
+            "tell me something nostalgic",
+            "the old days", "back in the day",
+        ]
         self._medication_phrases = [
             "remind me to take", "medication", "my pills",
             "what medications", "did i take my pills", "medicine",
@@ -453,6 +465,9 @@ class IntentParser:
                         pray_for = target
 
             return {"intent": "prayer", "theme": theme, "pray_for": pray_for, "confidence": 0.9}
+
+        if self._matches(text_lower, self._nostalgia_phrases):
+            return {"intent": "nostalgia", "confidence": 0.9}
 
         if self._matches(text_lower, self._medication_phrases):
             return {"intent": "medication", "confidence": 0.9, "raw": text}

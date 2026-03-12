@@ -346,6 +346,17 @@ class CommandProcessor:
                 return resp
             return "Let us bow our heads. Dear Lord, be with us today. Give us strength, give us peace, and remind us that we are loved. Amen."
 
+        # ── Nostalgia ──
+
+        elif intent == "nostalgia":
+            snippet = self.db.get_next_nostalgia_snippet(tid)
+            if snippet:
+                self.db.mark_nostalgia_used(snippet["id"])
+                resp = snippet["text"]
+                self._last_response[device_id] = resp
+                return resp
+            return "I don't have any nostalgia stories set up yet. Ask your family to add your hometown and birth year in the settings page, and I'll have some wonderful memories to share!"
+
         # ── Medications ──
 
         elif intent == "medication":

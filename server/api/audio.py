@@ -251,6 +251,24 @@ async def continuous_stream(websocket: WebSocket):
                                                    quiet_hours_start=quiet_start,
                                                    quiet_hours_end=quiet_end,
                                                    squawk_volume=squawk_vol)
+
+                        # Register nostalgia callback for chatter slots (20% chance)
+                        _ns_tid = tenant_id
+                        _ns_db = db
+                        _ns_tts = tts
+                        _ns_ws = websocket
+                        _ns_smgr = squawk_mgr
+                        _ns_dev = device_id
+                        async def _nostalgia_chatter():
+                            snippet = _ns_db.get_next_nostalgia_snippet(_ns_tid)
+                            if snippet:
+                                _ns_db.mark_nostalgia_used(snippet["id"])
+                                logger.info(f"Nostalgia snippet → {_ns_dev}: {snippet['text'][:60]}...")
+                                await _send_tts(_ns_ws, _ns_tts, snippet["text"],
+                                                squawk_mgr=_ns_smgr, device_id=_ns_dev)
+                            else:
+                                await _ns_smgr.send_chatter(_ns_dev)
+                        squawk_mgr.register_nostalgia_callback(device_id, _nostalgia_chatter)
                         # No startup squawk — scheduler handles timing with RECONNECT_GRACE
 
                     continue
