@@ -39,24 +39,30 @@
                 </select>
             </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Spouse/Partner</label>
                 <input type="text" name="spouse_name" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Linda">
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
-                <input type="number" name="birth_year" min="1900" max="2025" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1952">
-            </div>
-            <div>
                 <label class="block text-sm text-gray-600 mb-1">Short bio / family ties</label>
                 <input type="text" name="bio" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Married to Roger, 3 kids">
             </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
+                <input type="number" name="birth_year" min="1900" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1952">
+            </div>
             <div class="flex items-end pb-1">
                 <label class="flex items-center gap-2 text-sm text-gray-600">
-                    <input type="checkbox" name="deceased" value="1" class="rounded">
-                    Deceased (in heaven)
+                    <input type="checkbox" name="deceased" value="1" class="rounded" onchange="this.closest('.grid').querySelector('[name=deceased_year]').closest('div').classList.toggle('hidden', !this.checked)">
+                    Deceased
                 </label>
+            </div>
+            <div class="hidden col-span-2 sm:col-span-2">
+                <label class="block text-sm text-gray-600 mb-1">Year Passed</label>
+                <input type="number" name="deceased_year" min="1900" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 2018">
             </div>
         </div>
         <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded text-sm hover:bg-emerald-700">
@@ -93,8 +99,12 @@
                 {% if m.spouse_name %}
                 <p class="text-xs text-gray-500">married to {{ m.spouse_name }}</p>
                 {% endif %}
-                {% if m.birth_year %}
+                {% if m.birth_year and m.deceased_year %}
+                <p class="text-xs text-gray-400">{{ m.birth_year }} &ndash; {{ m.deceased_year }}</p>
+                {% elif m.birth_year %}
                 <p class="text-xs text-gray-400">b. {{ m.birth_year }}</p>
+                {% elif m.deceased_year %}
+                <p class="text-xs text-gray-400">d. {{ m.deceased_year }}</p>
                 {% endif %}
                 {% if m.bio %}
                 <p class="text-xs text-gray-400 mt-0.5">{{ m.bio }}</p>
@@ -189,7 +199,7 @@
                 </div>
                 <div>
                     <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
-                    <input type="number" name="birth_year" id="edit-birth-year" min="1900" max="2025" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1952">
+                    <input type="number" name="birth_year" id="edit-birth-year" min="1900" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1952">
                 </div>
                 <div>
                     <label class="block text-sm text-gray-600 mb-1">Short bio / family ties</label>
@@ -197,9 +207,14 @@
                 </div>
                 <div>
                     <label class="flex items-center gap-2 text-sm text-gray-600">
-                        <input type="checkbox" name="deceased" id="edit-deceased" value="1" class="rounded">
-                        Deceased (in heaven)
+                        <input type="checkbox" name="deceased" id="edit-deceased" value="1" class="rounded"
+                               onchange="document.getElementById('edit-deceased-year-row').classList.toggle('hidden', !this.checked)">
+                        Deceased
                     </label>
+                </div>
+                <div id="edit-deceased-year-row" class="hidden">
+                    <label class="block text-sm text-gray-600 mb-1">Year Passed</label>
+                    <input type="number" name="deceased_year" id="edit-deceased-year" min="1900" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 2018">
                 </div>
             </div>
             <div class="flex gap-2">
@@ -218,7 +233,7 @@ var userRole = "{{ session.role or 'owner' }}";
 var userName = "{{ session.name or '' }}";
 var memberData = {
 {% for m in members %}
-{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}", birth_year: {{ m.birth_year or 0 }} },
+{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}", birth_year: {{ m.birth_year or 0 }}, deceased_year: {{ m.deceased_year or 0 }} },
 {% endfor %}
 };
 
@@ -238,6 +253,8 @@ function editMember(id) {
     document.getElementById('edit-birth-year').value = m.birth_year > 0 ? m.birth_year : '';
     document.getElementById('edit-bio').value = m.bio;
     document.getElementById('edit-deceased').checked = m.deceased == 1;
+    document.getElementById('edit-deceased-year').value = m.deceased_year > 0 ? m.deceased_year : '';
+    document.getElementById('edit-deceased-year-row').classList.toggle('hidden', m.deceased != 1);
     document.getElementById('edit-form').action = '/web/family-tree/' + id + '/edit';
     document.getElementById('edit-modal').classList.remove('hidden');
 }
