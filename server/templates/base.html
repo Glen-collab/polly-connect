@@ -14,16 +14,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Segoe UI', system-ui, sans-serif; }
-        /* Smooth hamburger animation */
-        #mobile-menu { transition: max-height 0.3s ease-out; overflow: hidden; }
-        #mobile-menu.closed { max-height: 0; }
-        #mobile-menu.open { max-height: 800px; }
-        /* Sub-nav dropdown */
+        /* Sub-nav dropdown (desktop) */
         .nav-group:hover .nav-dropdown { display: block; }
         .nav-dropdown { display: none; position: absolute; top: 100%; left: 0; z-index: 50; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 min-h-screen flex flex-col">
     <!-- Nav -->
     <nav class="bg-emerald-600 text-white shadow-md">
         <div class="max-w-6xl mx-auto px-4">
@@ -37,7 +33,7 @@
 
                     <!-- Stories group -->
                     <div class="relative nav-group">
-                        <a href="/web/stories" class="hover:underline cursor-pointer">Stories</a>
+                        <a href="/web/hub/stories" class="hover:underline cursor-pointer">Stories</a>
                         <div class="nav-dropdown bg-emerald-700 rounded-b-lg shadow-lg min-w-[180px]">
                             <a href="/web/stories" class="block px-4 py-2 hover:bg-emerald-600 text-sm">All Stories</a>
                             <a href="/web/book" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Legacy Book</a>
@@ -48,12 +44,11 @@
 
                     <!-- Family group -->
                     <div class="relative nav-group">
-                        <a href="/web/family-tree" class="hover:underline cursor-pointer">Family</a>
+                        <a href="/web/hub/family" class="hover:underline cursor-pointer">Family</a>
                         <div class="nav-dropdown bg-emerald-700 rounded-b-lg shadow-lg min-w-[180px]">
                             <a href="/web/family-tree" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Family Tree</a>
                             <a href="/web/photos" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Photos</a>
                             <a href="/web/messages" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Messages</a>
-                            <a href="/web/memory" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Memory</a>
                             {% if session.role != 'family' %}
                             <a href="/web/prayers" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Prayers</a>
                             <a href="/web/nostalgia" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Nostalgia</a>
@@ -63,11 +58,11 @@
 
                     {% if session.role != 'family' %}
                     <!-- Care group -->
-                    <a href="/web/medications" class="hover:underline">Care</a>
+                    <a href="/web/hub/care" class="hover:underline">Care</a>
 
                     <!-- Settings group -->
                     <div class="relative nav-group">
-                        <a href="/web/settings" class="hover:underline cursor-pointer">Settings</a>
+                        <a href="/web/hub/settings" class="hover:underline cursor-pointer">Settings</a>
                         <div class="nav-dropdown bg-emerald-700 rounded-b-lg shadow-lg min-w-[180px]">
                             <a href="/web/settings" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Preferences</a>
                             <a href="/web/devices" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Devices</a>
@@ -89,100 +84,85 @@
                 </div>
                 {% endif %}
 
-                <!-- Hamburger button (mobile) -->
-                <button id="menu-btn" class="md:hidden p-2 -mr-2 focus:outline-none" onclick="toggleMenu()">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path id="menu-open-icon" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                        <path id="menu-close-icon" class="hidden" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
-
-            <!-- Mobile nav -->
-            <div id="mobile-menu" class="md:hidden closed">
+                <!-- Mobile: Home button -->
                 {% if session %}
-                <div class="pb-4 space-y-1">
-                    <a href="/web/dashboard" class="block py-2 px-3 rounded hover:bg-emerald-700 text-base font-medium">Home</a>
-
-                    <div class="pt-1 pb-1">
-                        <span class="block px-3 text-emerald-300 text-xs uppercase tracking-wide">Stories</span>
-                        <a href="/web/stories" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">All Stories</a>
-                        <a href="/web/book" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Legacy Book</a>
-                        <a href="/web/transcriptions" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Transcriptions</a>
-                        <a href="/web/narratives" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Narratives</a>
-                    </div>
-
-                    <div class="pt-1 pb-1">
-                        <span class="block px-3 text-emerald-300 text-xs uppercase tracking-wide">Family</span>
-                        <a href="/web/family-tree" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Family Tree</a>
-                        <a href="/web/photos" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Photos</a>
-                        <a href="/web/messages" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Messages</a>
-                        <a href="/web/memory" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Memory</a>
-                        {% if session.role != 'family' %}
-                        <a href="/web/prayers" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Prayers</a>
-                        <a href="/web/nostalgia" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Nostalgia</a>
-                        {% endif %}
-                    </div>
-
-                    {% if session.role != 'family' %}
-                    <div class="pt-1 pb-1">
-                        <span class="block px-3 text-emerald-300 text-xs uppercase tracking-wide">Care</span>
-                        <a href="/web/medications" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Medications</a>
-                    </div>
-
-                    <div class="pt-1 pb-1">
-                        <span class="block px-3 text-emerald-300 text-xs uppercase tracking-wide">Settings</span>
-                        <a href="/web/settings" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Preferences</a>
-                        <a href="/web/devices" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Devices</a>
-                        <a href="/web/setup" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Setup</a>
-                        {% if session.is_admin %}
-                        <a href="/web/firmware" class="block py-2 px-6 rounded hover:bg-emerald-700 text-base">Firmware</a>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-
-                    {% if session.is_admin %}
-                    <a href="/web/admin" class="block py-2 px-3 rounded hover:bg-emerald-700 text-base font-medium">Admin</a>
-                    {% endif %}
-
-                    <div class="border-t border-emerald-500 mt-2 pt-2">
-                        <span class="block py-1 px-3 text-emerald-200 text-sm">Signed in as {{ session.name }}{% if session.role == 'family' %} ({% if session.family_member_id %}Verified{% else %}Family{% endif %}){% endif %}</span>
-                        <a href="/web/logout" class="block py-2 px-3 rounded hover:bg-emerald-700 text-base">Logout</a>
-                    </div>
-                </div>
+                <a href="/web/dashboard" class="md:hidden p-2 -mr-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/>
+                    </svg>
+                </a>
                 {% endif %}
             </div>
         </div>
     </nav>
 
     <!-- Content -->
-    <main class="max-w-6xl mx-auto px-4 py-4 sm:py-6">
+    <main class="max-w-6xl mx-auto px-4 py-4 sm:py-6 flex-1">
         {% block content %}{% endblock %}
     </main>
+
+    <!-- Site Map (bottom nav) -->
+    {% if session %}
+    <div class="bg-gray-100 border-t border-gray-200 mt-8">
+        <div class="max-w-6xl mx-auto px-4 py-6">
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">Site Map</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                <div>
+                    <a href="/web/hub/stories" class="font-semibold text-emerald-600 hover:underline">Stories</a>
+                    <ul class="mt-1 space-y-1 text-gray-500">
+                        <li><a href="/web/stories" class="hover:text-gray-800">All Stories</a></li>
+                        <li><a href="/web/book" class="hover:text-gray-800">Legacy Book</a></li>
+                        <li><a href="/web/transcriptions" class="hover:text-gray-800">Transcriptions</a></li>
+                        {% if session.role != 'family' %}
+                        <li><a href="/web/narratives" class="hover:text-gray-800">Narratives</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div>
+                    <a href="/web/hub/family" class="font-semibold text-blue-600 hover:underline">Family</a>
+                    <ul class="mt-1 space-y-1 text-gray-500">
+                        <li><a href="/web/family-tree" class="hover:text-gray-800">Family Tree</a></li>
+                        <li><a href="/web/photos" class="hover:text-gray-800">Photos</a></li>
+                        <li><a href="/web/messages" class="hover:text-gray-800">Messages</a></li>
+                        {% if session.role != 'family' %}
+                        <li><a href="/web/prayers" class="hover:text-gray-800">Prayers</a></li>
+                        <li><a href="/web/nostalgia" class="hover:text-gray-800">Nostalgia</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div>
+                    <a href="/web/hub/care" class="font-semibold text-purple-600 hover:underline">Care</a>
+                    <ul class="mt-1 space-y-1 text-gray-500">
+                        <li><a href="/web/medications" class="hover:text-gray-800">Medications</a></li>
+                    </ul>
+                </div>
+                {% if session.role != 'family' %}
+                <div>
+                    <a href="/web/hub/settings" class="font-semibold text-gray-600 hover:underline">Settings</a>
+                    <ul class="mt-1 space-y-1 text-gray-500">
+                        <li><a href="/web/settings" class="hover:text-gray-800">Preferences</a></li>
+                        <li><a href="/web/setup" class="hover:text-gray-800">Setup</a></li>
+                        <li><a href="/web/devices" class="hover:text-gray-800">Devices</a></li>
+                        {% if session.is_admin %}
+                        <li><a href="/web/firmware" class="hover:text-gray-800">Firmware</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            <div class="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400">
+                <span>Signed in as {{ session.name }}{% if session.role == 'family' %} ({% if session.family_member_id %}Verified{% else %}Family{% endif %}){% endif %}</span>
+                <a href="/web/logout" class="text-gray-500 hover:text-gray-800">Logout</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Footer -->
     <footer class="text-center text-gray-400 text-xs py-4">
         Polly Connect &copy; 2026
     </footer>
 
-    <script>
-    function toggleMenu() {
-        var menu = document.getElementById('mobile-menu');
-        var openIcon = document.getElementById('menu-open-icon');
-        var closeIcon = document.getElementById('menu-close-icon');
-        if (menu.classList.contains('closed')) {
-            menu.classList.remove('closed');
-            menu.classList.add('open');
-            openIcon.classList.add('hidden');
-            closeIcon.classList.remove('hidden');
-        } else {
-            menu.classList.remove('open');
-            menu.classList.add('closed');
-            openIcon.classList.remove('hidden');
-            closeIcon.classList.add('hidden');
-        }
-    }
-    </script>
     <script>
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/static/sw.js').then(function(reg) {

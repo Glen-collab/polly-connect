@@ -2,7 +2,8 @@
 {% block title %}Settings - Polly Connect{% endblock %}
 
 {% block content %}
-<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Settings</h1>
+<a href="/web/hub/settings" class="text-emerald-600 hover:underline text-sm">&larr; Settings</a>
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 mt-1">Settings</h1>
 
 {% if request.query_params.get('saved') %}
 <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4 text-sm text-emerald-800 font-medium">
