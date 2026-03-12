@@ -142,9 +142,10 @@ async def main():
 
     # ── 4. Re-tag all stories to pick up year tags ──
     print("\n=== Re-tagging stories ===")
-    stories = conn.execute("SELECT id FROM stories WHERE tenant_id = ?", (TENANT_ID,)).fetchall()
-    for (sid,) in stories:
-        db.auto_tag_story(sid, tenant_id=TENANT_ID)
+    stories = conn.execute("SELECT id, COALESCE(corrected_transcript, transcript) FROM stories WHERE tenant_id = ?", (TENANT_ID,)).fetchall()
+    for sid, transcript in stories:
+        if transcript:
+            db.auto_tag_story(sid, transcript, tenant_id=TENANT_ID)
     print(f"  Re-tagged {len(stories)} stories")
 
     # ── 5. Clear existing drafts and generate chapters ──
