@@ -254,7 +254,19 @@ class LegacyBookPDF:
         printable = []
         for ch in chapters:
             if ch["chapter_number"] in drafts:
-                ch["draft"] = drafts[ch["chapter_number"]]
+                draft = drafts[ch["chapter_number"]]
+                ch["draft"] = draft
+                # Use the draft's memory_ids for photo/QR lookups
+                # (drafts may reference more memories than the outline chunk)
+                draft_mids = draft.get("memory_ids", "[]")
+                if isinstance(draft_mids, str):
+                    import json as _json
+                    try:
+                        draft_mids = _json.loads(draft_mids)
+                    except (ValueError, TypeError):
+                        draft_mids = []
+                if draft_mids:
+                    ch["memory_ids"] = draft_mids
                 printable.append(ch)
             elif ch["status"] == "ready":
                 # No AI draft — use raw memory text
