@@ -539,6 +539,16 @@ async def continuous_stream(websocket: WebSocket):
 
                         logger.info(f"Command recording ended ({reason}), {len(command_audio)} bytes")
 
+                        # Send instant acknowledgment chirp (pre-cached, ~0.3s)
+                        # Skip in conversational mode — we might decide nobody spoke
+                        ack_cache = getattr(app.state, "ack_cache", None)
+                        is_conversational = conv_state and conv_state.is_conversational
+                        if ack_cache and ack_cache.ready and not is_conversational:
+                            ack_dur = await ack_cache.send_ack(
+                                websocket, squawk_mgr=squawk_mgr, device_id=device_id)
+                            if ack_dur > 0:
+                                logger.info(f"Ack chirp sent ({ack_dur:.2f}s)")
+
                         pre_transcription = None
 
                         # In conversational mode on silence, transcribe first to decide

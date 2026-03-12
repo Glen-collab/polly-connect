@@ -20,7 +20,7 @@ class ConversationMode(Enum):
 # Dynamic timeouts per mode
 # Generous silence timeouts so elderly users can pause and think
 SILENCE_TIMEOUTS = {
-    ConversationMode.COMMAND: 2.0,
+    ConversationMode.COMMAND: 1.2,
     ConversationMode.STORY_PROMPT: 8.0,
     ConversationMode.STORY_LISTEN: 8.0,
     ConversationMode.FOLLOWUP_WAIT: 8.0,

@@ -36,6 +36,7 @@ from core.book_builder import BookBuilder
 from core.vision import VisionService
 from core.auth import APIKeyMiddleware
 from core.squawk import SquawkManager
+from core.ack_cache import AckCache
 from config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -75,6 +76,10 @@ async def lifespan(app: FastAPI):
 
     logger.info(f"TTS backend: {settings.TTS_BACKEND}")
     app.state.tts = create_tts_backend()
+
+    # Pre-cache acknowledgment chirps for instant playback
+    app.state.ack_cache = AckCache()
+    app.state.ack_cache.warm_up(app.state.tts)
 
     logger.info(f"Loading wake word model: {settings.WAKE_WORD_MODEL_PATH}")
     detector = WakeWordDetector(
