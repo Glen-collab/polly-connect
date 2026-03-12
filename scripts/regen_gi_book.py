@@ -40,17 +40,21 @@ async def main():
     conn.commit()
     print("Cleared existing chapter drafts")
 
-    # Regenerate each chapter with timeline context
+    # Regenerate each chapter with timeline context + continuity
+    previous_summaries = []
     for ch in chapters:
+        yr = ch.get("year_range")
+        yr_str = f", ~{yr[0]}-{yr[1]}" if yr else ""
         print(f"\nGenerating Ch {ch['chapter_number']}: {ch['title']} "
-              f"({ch['bucket']}/{ch['life_phase']}, {ch['memory_count']} memories)...")
+              f"({ch['bucket']}/{ch['life_phase']}, {ch['memory_count']} memories{yr_str})...")
 
         content = await bb.generate_chapter_draft(
-            ch, speaker="Gi Lee", tenant_id=TENANT_ID
+            ch, speaker="Gi Lee", tenant_id=TENANT_ID,
+            previous_summaries=previous_summaries if previous_summaries else None,
         )
 
         if content:
-            db.save_chapter_draft(
+            draft_id = db.save_chapter_draft(
                 chapter_number=ch["chapter_number"],
                 title=ch["title"],
                 bucket=ch["bucket"],
@@ -60,6 +64,13 @@ async def main():
                 tenant_id=TENANT_ID,
             )
             print(f"  Saved ({len(content)} chars)")
+
+            # Generate summary for continuity chain
+            summary = await bb.generate_chapter_summary(content)
+            if summary:
+                db.update_chapter_summary(draft_id, summary)
+                previous_summaries.append(summary)
+                print(f"  Summary: {summary[:80]}...")
         else:
             print(f"  FAILED — no content returned")
 

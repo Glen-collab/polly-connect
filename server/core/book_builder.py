@@ -87,6 +87,12 @@ class BookBuilder:
                 grouped[key] = []
             grouped[key].append(mem)
 
+        # Sort each group by estimated_year (chronological within bucket)
+        for key in grouped:
+            grouped[key].sort(
+                key=lambda m: (m.get("estimated_year") or 9999, m.get("id", 0))
+            )
+
         chapters = []
         chapter_num = 1
 
@@ -107,6 +113,13 @@ class BookBuilder:
                 if i > 0:
                     title += f" (Part {i // 10 + 1})"
 
+                # Calculate year range for this chunk
+                years = [m.get("estimated_year") for m in chunk
+                         if m.get("estimated_year")]
+                year_range = None
+                if years:
+                    year_range = (min(years), max(years))
+
                 chapters.append({
                     "chapter_number": chapter_num,
                     "title": title,
@@ -114,6 +127,7 @@ class BookBuilder:
                     "life_phase": template["life_phase"],
                     "memory_count": len(chunk),
                     "memory_ids": [m["id"] for m in chunk],
+                    "year_range": year_range,
                     "status": "ready" if len(chunk) >= template["min_memories"] else "needs_more",
                 })
                 chapter_num += 1
@@ -139,10 +153,14 @@ class BookBuilder:
 
     async def generate_chapter_draft(self, chapter: Dict,
                                       speaker: str = None,
-                                      tenant_id: int = None) -> Optional[str]:
+                                      tenant_id: int = None,
+                                      previous_summaries: List[str] = None) -> Optional[str]:
         """
         Generate a narrative chapter draft from memories.
         Requires AI (OPENAI_API_KEY). Returns None if not available.
+
+        previous_summaries: list of 2-sentence summaries from earlier chapters,
+        used to maintain narrative continuity across the book.
         """
         if not self._ai_available:
             return None
@@ -161,37 +179,63 @@ class BookBuilder:
         if not memories:
             return None
 
+        # Sort memories chronologically
+        memories.sort(
+            key=lambda m: (m.get("estimated_year") or 9999, m.get("id", 0))
+        )
+
         # Build timeline context from estimated_year and birth_year data
         timeline_notes = []
-        for mem in memories:
-            est_year = mem.get("estimated_year")
-            speaker_name = mem.get("speaker", "someone")
-            summary = (mem.get("text_summary") or mem.get("text", ""))[:60]
-            if est_year:
-                timeline_notes.append(f"- \"{summary}...\" — estimated ~{est_year}")
+        owner_birth_year = None
 
-        # Look up speaker birth years for context
-        if speaker and tenant_id:
+        # Look up owner birth year
+        if tenant_id:
             conn = self.db._get_connection()
             try:
                 owner = conn.execute(
-                    "SELECT birth_year FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                    "SELECT name, birth_year FROM user_profiles WHERE tenant_id = ? LIMIT 1",
                     (tenant_id,)
                 ).fetchone()
-                if owner and owner[0]:
-                    timeline_notes.insert(0, f"- {speaker} was born in {owner[0]}")
+                if owner and owner[1]:
+                    owner_birth_year = owner[1]
+                    owner_name = owner[0] or speaker or "the owner"
+                    timeline_notes.append(f"- {owner_name} was born in {owner_birth_year}")
             finally:
                 pass
 
-        # Build prompt for AI
+        for mem in memories:
+            est_year = mem.get("estimated_year")
+            o_age = mem.get("owner_age")
+            confidence = mem.get("year_confidence", "none")
+            speaker_name = mem.get("speaker", "someone")
+            summary = (mem.get("text_summary") or mem.get("text", ""))[:60]
+            if est_year:
+                note = f"- \"{summary}...\" — ~{est_year}"
+                if o_age is not None:
+                    note += f" ({owner_name if owner_birth_year else 'owner'} was {o_age})"
+                if confidence == "low":
+                    note += " [approximate]"
+                timeline_notes.append(note)
+
+        # Build memory entries for prompt
         memory_texts = []
         for i, mem in enumerate(memories, 1):
             speaker_name = mem.get("speaker", "someone")
             text = mem.get("text", mem.get("text_summary", ""))
             emotions = ", ".join(mem.get("emotions", "").split(",")) if mem.get("emotions") else ""
-            entry = f"Memory {i} ({speaker_name}): {text}"
+            est_year = mem.get("estimated_year")
+            o_age = mem.get("owner_age")
+
+            entry = f"Memory {i} ({speaker_name}"
+            if est_year:
+                entry += f", ~{est_year}"
+            if o_age is not None:
+                entry += f", owner age {o_age}"
+            entry += f"): {text}"
+
             if emotions:
                 entry += f" [emotions: {emotions}]"
+
             # Check if this memory came from a photo
             story_id = mem.get("story_id")
             if story_id:
@@ -208,6 +252,14 @@ class BookBuilder:
                         entry += photo_note
             memory_texts.append(entry)
 
+        # Build continuity block from previous chapters
+        continuity_block = ""
+        if previous_summaries:
+            continuity_block = "\n\nPrevious chapters (for continuity — do NOT repeat these stories, build on them):\n"
+            for j, summ in enumerate(previous_summaries, 1):
+                continuity_block += f"Ch {j}: {summ}\n"
+            continuity_block += "\n"
+
         timeline_block = ""
         if timeline_notes:
             timeline_block = f"""
@@ -218,24 +270,26 @@ Timeline context:
 """
 
         prompt = f"""You are writing a chapter of a family legacy book.
-Chapter title: "{chapter['title']}"
+Chapter {chapter.get('chapter_number', '?')}: "{chapter['title']}"
 Theme: {chapter['bucket'].replace('_', ' ')}
 Life phase: {chapter['life_phase']}
-{timeline_block}
-Here are the memories to weave into this chapter:
+{timeline_block}{continuity_block}
+Here are the memories to weave into this chapter (sorted chronologically):
 
 {chr(10).join(memory_texts)}
 
 Write a warm, narrative chapter (7-10 paragraphs) that:
-- Weaves these memories into a cohesive story
+- Weaves these memories into a cohesive story in chronological order
 - Preserves the speaker's voice and emotional tone
 - Adds gentle transitions between memories
-- Opens with a scene-setting paragraph
+- Opens with a scene-setting paragraph grounded in time and place
 - Closes with a reflective paragraph
 - Uses second person sparingly, mostly third person narrative
 - Keeps a blue-collar, honest, heartfelt tone
 - If a memory was prompted by a photo, reference it naturally (e.g. "In the photo, you can still see...")
 - When timeline dates are available, ground the narrative in specific years or decades (e.g. "It was the summer of '58..." instead of "Back then...")
+- When owner age is given, use it to anchor the perspective (e.g. "At nine years old, the world still felt enormous...")
+- Do NOT repeat stories or themes already covered in previous chapters
 
 Write the chapter now:"""
 
@@ -247,6 +301,25 @@ Write the chapter now:"""
             logger.error(f"Chapter generation failed: {e}")
 
         return None
+
+    async def generate_chapter_summary(self, content: str) -> Optional[str]:
+        """Generate a 2-sentence summary of a chapter for continuity."""
+        if not self._ai_available or not content:
+            return None
+
+        prompt = f"""Summarize this book chapter in exactly 2 sentences. Focus on the key events, people, and time period covered. Be specific.
+
+{content[:3000]}
+
+Two-sentence summary:"""
+
+        try:
+            import asyncio
+            result = await asyncio.to_thread(self._call_chapter_openai, prompt)
+            return result
+        except Exception as e:
+            logger.error(f"Summary generation failed: {e}")
+            return None
 
     def _call_chapter_openai(self, prompt: str) -> Optional[str]:
         """Direct OpenAI call for chapter generation (not the follow-up generator)."""

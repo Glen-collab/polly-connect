@@ -341,11 +341,13 @@ async def continuous_stream(websocket: WebSocket):
                                         transcript,
                                         speaker=conv_state.speaker_name,
                                     )
+                                    mem_bucket = metadata.get("bucket", "ordinary_world")
+                                    mem_phase = metadata.get("life_phase", "unknown")
                                     db.save_memory(
                                         story_id=story_id,
                                         speaker=metadata.get("speaker"),
-                                        bucket=metadata.get("bucket", "ordinary_world"),
-                                        life_phase=metadata.get("life_phase", "unknown"),
+                                        bucket=mem_bucket,
+                                        life_phase=mem_phase,
                                         text_summary=metadata.get("text_summary", ""),
                                         text=transcript,
                                         people=",".join(metadata.get("people", [])),
@@ -354,6 +356,14 @@ async def continuous_stream(websocket: WebSocket):
                                         fingerprint=extractor.compute_fingerprint(metadata),
                                         tenant_id=conv_state.tenant_id,
                                     )
+                                    # Flag matching chapters as needing refresh
+                                    try:
+                                        db.flag_chapters_for_refresh(
+                                            mem_bucket, mem_phase,
+                                            tenant_id=conv_state.tenant_id,
+                                        )
+                                    except Exception:
+                                        pass
 
                             logger.info(f"Story saved: id={story_id}, wav={wav_filename}, "
                                         f"transcript={len(transcript)} chars, duration={duration:.1f}s")

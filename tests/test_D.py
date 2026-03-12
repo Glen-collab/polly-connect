@@ -1176,3 +1176,236 @@ class TestTimelineEstimation:
         assert PollyDB._estimate_year_from_phrases("in college", 1950) == 1972
         assert PollyDB._estimate_year_from_phrases("after i retired", 1950) == 2015
         assert PollyDB._estimate_year_from_phrases("nothing special here", 1950) is None
+
+
+class TestOwnerAgeAndConfidence:
+    """Owner age calculation and year confidence scoring."""
+
+    def test_owner_age_calculated(self, db):
+        """owner_age should be estimated_year - owner.birth_year."""
+        tid = db.create_tenant("Age Test")
+        profile = db.get_or_create_user("Grandpa", tenant_id=tid)
+        conn = db._get_connection()
+        conn.execute("UPDATE user_profiles SET birth_year = 1945 WHERE id = ?", (profile["id"],))
+        conn.commit()
+
+        sid = db.save_story(
+            transcript="Back in 1960 we moved to the new house.",
+            speaker_name="Grandpa", tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="ordinary_world", life_phase="childhood",
+            text="Back in 1960 we moved.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "Back in 1960 we moved to the new house.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["estimated_year"] == 1960
+        assert mem["owner_age"] == 15  # 1960 - 1945
+
+    def test_confidence_high_for_explicit_year(self, db):
+        """Explicit 4-digit year should have 'high' confidence."""
+        tid = db.create_tenant("Confidence Test")
+        db.get_or_create_user("Test", tenant_id=tid)
+        sid = db.save_story(transcript="In 1985 everything changed.", tenant_id=tid)
+        mid = db.save_memory(
+            story_id=sid, bucket="ordinary_world", life_phase="childhood",
+            text="In 1985 everything changed.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "In 1985 everything changed.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["year_confidence"] == "high"
+
+    def test_confidence_medium_for_phrase(self, db):
+        """Relative phrase + birth_year should have 'medium' confidence."""
+        tid = db.create_tenant("Confidence Test")
+        profile = db.get_or_create_user("Mom", tenant_id=tid)
+        conn = db._get_connection()
+        conn.execute("UPDATE user_profiles SET birth_year = 1950 WHERE id = ?", (profile["id"],))
+        conn.commit()
+
+        sid = db.save_story(
+            transcript="When I was a kid we played outside all day.",
+            speaker_name="Mom", tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="ordinary_world", life_phase="childhood",
+            text="When I was a kid we played outside.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "when i was a kid we played outside all day.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["year_confidence"] == "medium"
+
+    def test_confidence_low_for_decade(self, db):
+        """Decade reference should have 'low' confidence."""
+        tid = db.create_tenant("Confidence Test")
+        sid = db.save_story(
+            transcript="Back in the 70s music was different.", tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="ordinary_world", life_phase="childhood",
+            text="Back in the 70s music was different.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "back in the 70s music was different.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["year_confidence"] == "low"
+
+    def test_owner_age_negative_for_pre_birth(self, db):
+        """Stories before owner's birth should have negative owner_age."""
+        tid = db.create_tenant("Pre-Birth Test")
+        profile = db.get_or_create_user("Glen", tenant_id=tid)
+        conn = db._get_connection()
+        conn.execute("UPDATE user_profiles SET birth_year = 1978 WHERE id = ?", (profile["id"],))
+        conn.commit()
+
+        # Mom tells a story from 1972 (before Glen was born)
+        db.add_family_member(name="Mom", relationship="mother", tenant_id=tid)
+        conn.execute("UPDATE family_members SET birth_year = 1950 WHERE tenant_id = ? AND name = 'Mom'", (tid,))
+        conn.commit()
+
+        sid = db.save_story(
+            transcript="In 1972 your father and I got married at the courthouse.",
+            speaker_name="Mom", tenant_id=tid,
+        )
+        mid = db.save_memory(
+            story_id=sid, bucket="ordinary_world", life_phase="childhood",
+            text="In 1972 your father and I got married.", tenant_id=tid,
+        )
+        db.auto_tag_story(sid, "In 1972 your father and I got married at the courthouse.", tid)
+
+        mem = db.get_memory_by_id(mid)
+        assert mem["estimated_year"] == 1972
+        assert mem["owner_age"] == -6  # 1972 - 1978
+
+
+class TestAnchorCrossReference:
+    """Anchor cross-referencing with deceased_year."""
+
+    def test_before_person_died_clamps_year(self, db):
+        """'before grandpa died' should clamp year to before deceased_year."""
+        from server.core.database import PollyDB
+        tid = db.create_tenant("Anchor Test")
+        fmid = db.add_family_member(name="Grandpa", relationship="grandfather", tenant_id=tid)
+        db.update_family_member(fmid, birth_year=1920, deceased=1, deceased_year=1990)
+
+        conn = db._get_connection()
+        # Test the static-ish method directly
+        result = PollyDB._refine_year_with_anchors(
+            conn, "before grandpa died we used to fish", 1995, tid
+        )
+        assert result == 1988  # 1990 - 2
+
+    def test_after_person_died_clamps_year(self, db):
+        """'after grandpa passed' should clamp year to after deceased_year."""
+        from server.core.database import PollyDB
+        tid = db.create_tenant("Anchor Test")
+        fmid = db.add_family_member(name="Grandpa", relationship="grandfather", tenant_id=tid)
+        db.update_family_member(fmid, birth_year=1920, deceased=1, deceased_year=1990)
+
+        conn = db._get_connection()
+        result = PollyDB._refine_year_with_anchors(
+            conn, "after grandpa passed away things changed", 1985, tid
+        )
+        assert result == 1991  # 1990 + 1
+
+    def test_when_alive_clamps_year(self, db):
+        """'when grandpa was alive' should clamp year to before deceased_year."""
+        from server.core.database import PollyDB
+        tid = db.create_tenant("Anchor Test")
+        fmid = db.add_family_member(name="Grandpa", relationship="grandfather", tenant_id=tid)
+        db.update_family_member(fmid, birth_year=1920, deceased=1, deceased_year=1990)
+
+        conn = db._get_connection()
+        result = PollyDB._refine_year_with_anchors(
+            conn, "when grandpa was still here we always had christmas together", 1995, tid
+        )
+        assert result == 1987  # 1990 - 3
+
+
+class TestChapterRefreshFlag:
+    """Chapter refresh flagging when new memories arrive."""
+
+    def test_flag_chapters_for_refresh(self, db):
+        """New memory should flag matching chapter drafts."""
+        tid = db.create_tenant("Refresh Test")
+        draft_id = db.save_chapter_draft(
+            chapter_number=1, title="Test", bucket="ordinary_world",
+            life_phase="childhood", memory_ids="[1]", content="Content.",
+            tenant_id=tid,
+        )
+        db.flag_chapters_for_refresh("ordinary_world", "childhood", tenant_id=tid)
+
+        drafts = db.get_chapter_drafts(tenant_id=tid)
+        assert drafts[0]["needs_refresh"] == 1
+
+    def test_clear_chapter_refresh(self, db):
+        """Clearing refresh flag after regeneration."""
+        tid = db.create_tenant("Refresh Test")
+        draft_id = db.save_chapter_draft(
+            chapter_number=1, title="Test", bucket="ordinary_world",
+            life_phase="childhood", memory_ids="[1]", content="Content.",
+            tenant_id=tid,
+        )
+        db.flag_chapters_for_refresh("ordinary_world", "childhood", tenant_id=tid)
+        db.clear_chapter_refresh(draft_id)
+
+        drafts = db.get_chapter_drafts(tenant_id=tid)
+        assert drafts[0]["needs_refresh"] == 0
+
+    def test_non_matching_bucket_not_flagged(self, db):
+        """Only chapters with matching bucket/phase should be flagged."""
+        tid = db.create_tenant("Refresh Test")
+        db.save_chapter_draft(
+            chapter_number=1, title="Childhood", bucket="ordinary_world",
+            life_phase="childhood", memory_ids="[1]", content="Content.",
+            tenant_id=tid,
+        )
+        db.save_chapter_draft(
+            chapter_number=2, title="Adult", bucket="trials_allies_enemies",
+            life_phase="adult", memory_ids="[2]", content="Content.",
+            tenant_id=tid,
+        )
+        db.flag_chapters_for_refresh("ordinary_world", "childhood", tenant_id=tid)
+
+        drafts = db.get_chapter_drafts(tenant_id=tid)
+        assert drafts[0]["needs_refresh"] == 1
+        assert drafts[1]["needs_refresh"] == 0
+
+    def test_chapter_summary_stored(self, db):
+        """Chapter summary should be saved and retrievable."""
+        tid = db.create_tenant("Summary Test")
+        draft_id = db.save_chapter_draft(
+            chapter_number=1, title="Test", bucket="ordinary_world",
+            life_phase="childhood", memory_ids="[1]", content="Full chapter.",
+            tenant_id=tid,
+        )
+        db.update_chapter_summary(draft_id, "This chapter covers childhood in the 1950s. It focuses on family traditions.")
+
+        drafts = db.get_chapter_drafts(tenant_id=tid)
+        assert "childhood in the 1950s" in drafts[0]["summary"]
+
+    def test_memories_sorted_chronologically(self, db):
+        """Chapter outline should sort memories by estimated_year."""
+        tid = db.create_tenant("Sort Test")
+        # Create memories out of chronological order
+        for year, i in [(1970, 1), (1960, 2), (1965, 3)]:
+            sid = db.save_story(transcript=f"Story {i}", tenant_id=tid)
+            mid = db.save_memory(
+                story_id=sid, bucket="ordinary_world", life_phase="childhood",
+                text=f"Story {i}", tenant_id=tid,
+            )
+            conn = db._get_connection()
+            conn.execute("UPDATE memories SET estimated_year = ? WHERE id = ?", (year, mid))
+            conn.commit()
+
+        bb = BookBuilder(db)
+        chapters = bb.generate_chapter_outline(tenant_id=tid)
+        if chapters:
+            ch = chapters[0]
+            # Fetch memories in the order the chapter lists them
+            mems = [db.get_memory_by_id(mid) for mid in ch["memory_ids"]]
+            years = [m["estimated_year"] for m in mems if m["estimated_year"]]
+            assert years == sorted(years), "Memories should be in chronological order"

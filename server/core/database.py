@@ -508,10 +508,26 @@ class PollyDB:
                 if col not in cols:
                     conn.execute(sql)
 
-            # Add estimated_year to memories for timeline tracking
+            # Add timeline columns to memories
             cols = {row[1] for row in conn.execute("PRAGMA table_info(memories)").fetchall()}
-            if "estimated_year" not in cols:
-                conn.execute("ALTER TABLE memories ADD COLUMN estimated_year INTEGER")
+            mem_migrations = {
+                "estimated_year": "ALTER TABLE memories ADD COLUMN estimated_year INTEGER",
+                "owner_age": "ALTER TABLE memories ADD COLUMN owner_age INTEGER",
+                "year_confidence": "ALTER TABLE memories ADD COLUMN year_confidence TEXT DEFAULT 'none'",
+            }
+            for col, sql in mem_migrations.items():
+                if col not in cols:
+                    conn.execute(sql)
+
+            # Add chapter continuity columns to chapter_drafts
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(chapter_drafts)").fetchall()}
+            cd_migrations = {
+                "summary": "ALTER TABLE chapter_drafts ADD COLUMN summary TEXT",
+                "needs_refresh": "ALTER TABLE chapter_drafts ADD COLUMN needs_refresh INTEGER DEFAULT 0",
+            }
+            for col, sql in cd_migrations.items():
+                if col not in cols:
+                    conn.execute(sql)
 
             # Prayer requests table
             conn.execute("""
@@ -1821,10 +1837,12 @@ class PollyDB:
 
             # ── Estimate year from relative date phrases + birth_year ──
             estimated_year = None
+            year_confidence = "none"
 
-            # If we found explicit years, use the first one
+            # If we found explicit years, use the first one (high confidence)
             if explicit_years:
                 estimated_year = explicit_years[0]
+                year_confidence = "high"
             elif tenant_id:
                 # Look up speaker's birth_year
                 speaker_birth_year = self._get_speaker_birth_year(
@@ -1834,6 +1852,8 @@ class PollyDB:
                     estimated_year = self._estimate_year_from_phrases(
                         text_lower, speaker_birth_year
                     )
+                    if estimated_year:
+                        year_confidence = "medium"
 
             # Also check for direct decade references ("back in the 60s")
             if not estimated_year:
@@ -1847,19 +1867,42 @@ class PollyDB:
                         estimated_year = 1900 + decade + 5  # midpoint
                     else:
                         estimated_year = 2000 + decade + 5
+                    year_confidence = "low"
 
-            # Save estimated year to the memory linked to this story
+            # ── Anchor cross-referencing with deceased_year ──
+            if estimated_year and tenant_id:
+                estimated_year = self._refine_year_with_anchors(
+                    conn, text_lower, estimated_year, tenant_id
+                )
+
+            # ── Calculate owner_age ──
+            owner_age = None
+            if estimated_year and tenant_id:
+                owner_row = conn.execute(
+                    "SELECT birth_year FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                    (tenant_id,)
+                ).fetchone()
+                if owner_row and owner_row[0]:
+                    owner_age = estimated_year - owner_row[0]
+
+            # Save estimated year + owner_age + confidence to the memory
             if estimated_year:
                 if ("year", str(estimated_year)) not in existing:
                     conn.execute("""
                         INSERT INTO story_tags (story_id, tag_type, tag_value, tenant_id)
                         VALUES (?, ?, ?, ?)
                     """, (story_id, "year", str(estimated_year), tenant_id))
-                # Update the memory's estimated_year
+                # Update the memory's timeline fields
                 conn.execute("""
-                    UPDATE memories SET estimated_year = ?
+                    UPDATE memories SET estimated_year = ?, owner_age = ?, year_confidence = ?
                     WHERE story_id = ? AND estimated_year IS NULL
-                """, (estimated_year, story_id))
+                """, (estimated_year, owner_age, year_confidence, story_id))
+            elif year_confidence == "none":
+                # Still set confidence even if no year found
+                conn.execute("""
+                    UPDATE memories SET year_confidence = ?
+                    WHERE story_id = ? AND year_confidence IS NULL
+                """, ("none", story_id))
 
             conn.commit()
         finally:
@@ -1923,6 +1966,53 @@ class PollyDB:
             if re.search(pattern, text_lower):
                 return birth_year + age_offset
         return None
+
+    @staticmethod
+    def _refine_year_with_anchors(conn, text_lower: str, estimated_year: int,
+                                   tenant_id: int) -> int:
+        """Refine estimated year using life event anchors (deceased_year, etc.)."""
+        import re
+
+        # Check "before [person] died/passed" → clamp to before deceased_year
+        before_death = re.search(
+            r'\bbefore\s+(\w+)\s+(?:died|passed|passed away)\b', text_lower
+        )
+        if before_death:
+            person_name = before_death.group(1)
+            row = conn.execute(
+                "SELECT deceased_year FROM family_members WHERE tenant_id = ? AND deceased_year IS NOT NULL AND LOWER(name) LIKE ?",
+                (tenant_id, f"%{person_name}%")
+            ).fetchone()
+            if row and row[0] and estimated_year >= row[0]:
+                estimated_year = row[0] - 2  # ~2 years before
+
+        # Check "after [person] died/passed" → clamp to after deceased_year
+        after_death = re.search(
+            r'\bafter\s+(\w+)\s+(?:died|passed|passed away)\b', text_lower
+        )
+        if after_death:
+            person_name = after_death.group(1)
+            row = conn.execute(
+                "SELECT deceased_year FROM family_members WHERE tenant_id = ? AND deceased_year IS NOT NULL AND LOWER(name) LIKE ?",
+                (tenant_id, f"%{person_name}%")
+            ).fetchone()
+            if row and row[0] and estimated_year <= row[0]:
+                estimated_year = row[0] + 1  # ~1 year after
+
+        # Check "when [person] was alive/still here" → must be before deceased_year
+        while_alive = re.search(
+            r'\bwhen\s+(\w+)\s+was\s+(?:alive|still (?:here|around|with us))\b', text_lower
+        )
+        if while_alive:
+            person_name = while_alive.group(1)
+            row = conn.execute(
+                "SELECT deceased_year FROM family_members WHERE tenant_id = ? AND deceased_year IS NOT NULL AND LOWER(name) LIKE ?",
+                (tenant_id, f"%{person_name}%")
+            ).fetchone()
+            if row and row[0] and estimated_year >= row[0]:
+                estimated_year = row[0] - 3
+
+        return estimated_year
 
     # ── Structured memories ──
 
@@ -2045,6 +2135,52 @@ class PollyDB:
             """, (chapter_number, title, bucket, life_phase, memory_ids, content, tenant_id))
             conn.commit()
             return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_chapter_summary(self, draft_id: int, summary: str):
+        """Save a 2-sentence summary for chapter continuity."""
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE chapter_drafts SET summary = ? WHERE id = ?",
+                (summary, draft_id)
+            )
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def flag_chapters_for_refresh(self, bucket: str, life_phase: str,
+                                   tenant_id: int = None):
+        """Mark matching chapter drafts as needing refresh (new memory added)."""
+        conn = self._get_connection()
+        try:
+            if tenant_id:
+                conn.execute("""
+                    UPDATE chapter_drafts SET needs_refresh = 1
+                    WHERE bucket = ? AND life_phase = ? AND tenant_id = ?
+                """, (bucket, life_phase, tenant_id))
+            else:
+                conn.execute("""
+                    UPDATE chapter_drafts SET needs_refresh = 1
+                    WHERE bucket = ? AND life_phase = ?
+                """, (bucket, life_phase))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def clear_chapter_refresh(self, draft_id: int):
+        """Clear needs_refresh flag after regenerating a chapter."""
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE chapter_drafts SET needs_refresh = 0 WHERE id = ?",
+                (draft_id,)
+            )
+            conn.commit()
         finally:
             if not self._conn:
                 conn.close()
