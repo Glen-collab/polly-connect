@@ -584,6 +584,22 @@ class PollyDB:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_nostalgia_tenant ON nostalgia_snippets(tenant_id)")
 
+            # Add original_text to nostalgia_snippets for tracking edits
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(nostalgia_snippets)").fetchall()}
+            if "original_text" not in cols:
+                conn.execute("ALTER TABLE nostalgia_snippets ADD COLUMN original_text TEXT")
+
+            # Deleted nostalgia snippets log (so GPT avoids these topics)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS nostalgia_deleted (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    category TEXT,
+                    text TEXT NOT NULL,
+                    deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # Add family_name and role columns to web_sessions
             cols = {row[1] for row in conn.execute("PRAGMA table_info(web_sessions)").fetchall()}
             if "family_name" not in cols:
@@ -1792,16 +1808,30 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def save_nostalgia_snippets(self, tenant_id: int, snippets: list):
-        """Bulk save snippets (replaces all existing for tenant)."""
+    def save_nostalgia_snippets(self, tenant_id: int, snippets: list, append: bool = False):
+        """Save snippets. If append=True, adds to existing. Otherwise replaces all."""
         conn = self._get_connection()
         try:
-            conn.execute("DELETE FROM nostalgia_snippets WHERE tenant_id = ?", (tenant_id,))
+            if not append:
+                conn.execute("DELETE FROM nostalgia_snippets WHERE tenant_id = ?", (tenant_id,))
+            # Get max variation per category for appending
+            max_vars = {}
+            if append:
+                rows = conn.execute(
+                    "SELECT category, MAX(variation_number) as mv FROM nostalgia_snippets WHERE tenant_id = ? GROUP BY category",
+                    (tenant_id,)
+                ).fetchall()
+                for r in rows:
+                    max_vars[r[0]] = r[1]
             for s in snippets:
+                cat = s["category"]
+                var = s["variation"]
+                if append:
+                    var = max_vars.get(cat, 0) + s["variation"]
                 conn.execute("""
-                    INSERT INTO nostalgia_snippets (tenant_id, category, variation_number, text)
-                    VALUES (?, ?, ?, ?)
-                """, (tenant_id, s["category"], s["variation"], s["text"]))
+                    INSERT INTO nostalgia_snippets (tenant_id, category, variation_number, text, original_text)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (tenant_id, cat, var, s["text"], s["text"]))
             conn.commit()
         finally:
             if not self._conn:
@@ -1810,6 +1840,10 @@ class PollyDB:
     def update_nostalgia_snippet(self, snippet_id: int, text: str):
         conn = self._get_connection()
         try:
+            # Save original_text on first edit if not set
+            row = conn.execute("SELECT original_text, text FROM nostalgia_snippets WHERE id = ?", (snippet_id,)).fetchone()
+            if row and not row[0]:
+                conn.execute("UPDATE nostalgia_snippets SET original_text = ? WHERE id = ?", (row[1], snippet_id))
             conn.execute("UPDATE nostalgia_snippets SET text = ? WHERE id = ?", (text, snippet_id))
             conn.commit()
         finally:
@@ -1819,8 +1853,28 @@ class PollyDB:
     def delete_nostalgia_snippet(self, snippet_id: int):
         conn = self._get_connection()
         try:
+            # Log the deletion so GPT can avoid similar topics
+            row = conn.execute("SELECT tenant_id, category, text FROM nostalgia_snippets WHERE id = ?", (snippet_id,)).fetchone()
+            if row:
+                conn.execute(
+                    "INSERT INTO nostalgia_deleted (tenant_id, category, text) VALUES (?, ?, ?)",
+                    (row[0], row[1], row[2])
+                )
             conn.execute("DELETE FROM nostalgia_snippets WHERE id = ?", (snippet_id,))
             conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_nostalgia_deleted(self, tenant_id: int) -> list:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM nostalgia_deleted WHERE tenant_id = ? ORDER BY deleted_at DESC",
+                (tenant_id,)
+            ).fetchall()
+            return [dict(r) for r in rows]
         finally:
             if not self._conn:
                 conn.close()

@@ -6,10 +6,9 @@
 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6 mt-1">
     <h1 class="text-xl sm:text-2xl font-bold">Nostalgia Snippets</h1>
     {% if user.hometown and user.birth_year %}
-    <form method="POST" action="/web/nostalgia/generate"
-          onsubmit="return confirm('This will regenerate all snippets using AI based on the profile below. Any edits you made will be lost. Continue?');">
+    <form method="POST" action="/web/nostalgia/generate">
         <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700">
-            {% if snippets %}Regenerate All{% else %}Generate Snippets{% endif %}
+            {% if snippets %}Generate More{% else %}Generate Snippets{% endif %}
         </button>
     </form>
     {% endif %}
@@ -127,7 +126,7 @@
         <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
             Save Profile
         </button>
-        <span class="text-xs text-gray-400 ml-2">Save first, then hit "{% if snippets %}Regenerate All{% else %}Generate Snippets{% endif %}" above</span>
+        <span class="text-xs text-gray-400 ml-2">Save first, then hit "{% if snippets %}Generate More{% else %}Generate Snippets{% endif %}" above</span>
     </form>
 </div>
 
@@ -135,7 +134,8 @@
 <p class="text-sm text-gray-500 mb-4">
     {{ snippets|length }} snippets for {{ user.familiar_name or user.name }} &middot;
     {{ user.hometown }}, born {{ user.birth_year }} &middot;
-    Polly plays these via voice command ("take me back") or randomly during chatter (20% chance)
+    Polly plays these via voice command ("take me back") or randomly during chatter (20% chance)<br>
+    <span class="text-xs text-gray-400">Edit snippets to correct facts — GPT learns from your edits. Delete bad ones — GPT avoids those topics. Hit "Generate More" to grow the collection.</span>
 </p>
 
 {% set categories = {
@@ -169,11 +169,16 @@
                     </form>
                 </div>
             </div>
-            {% if s.last_used %}
-            <p class="text-xs text-gray-400 mt-1">Last played: {{ s.last_used }}</p>
-            {% else %}
-            <p class="text-xs text-gray-400 mt-1">Not played yet</p>
-            {% endif %}
+            <div class="flex items-center gap-2 mt-1">
+                {% if s.original_text and s.original_text != s.text %}
+                <span class="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Edited</span>
+                {% endif %}
+                {% if s.last_used %}
+                <span class="text-xs text-gray-400">Last played: {{ s.last_used }}</span>
+                {% else %}
+                <span class="text-xs text-gray-400">Not played yet</span>
+                {% endif %}
+            </div>
         </div>
         {% endfor %}
     </div>

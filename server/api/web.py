@@ -2346,20 +2346,57 @@ async def nostalgia_generate(request: Request):
 
     categories_text = "\n".join(categories)
 
+    # Build learning context from existing + deleted snippets
+    existing_snippets = db.get_nostalgia_snippets(tid)
+    deleted_snippets = db.get_nostalgia_deleted(tid)
+    is_first_gen = len(existing_snippets) == 0
+
+    confirmed_lines = []
+    kept_lines = []
+    for s in existing_snippets:
+        if s.get("original_text") and s["original_text"] != s["text"]:
+            # User edited this — it's a confirmed correction
+            confirmed_lines.append(f'- [{s["category"]}] CORRECTED from "{s["original_text"]}" TO "{s["text"]}"')
+        else:
+            kept_lines.append(f'- [{s["category"]}] {s["text"]}')
+
+    deleted_lines = [f'- [{d["category"]}] {d["text"]}' for d in deleted_snippets[:30]]
+
+    learning_section = ""
+    if confirmed_lines or kept_lines or deleted_lines:
+        learning_section = "\n\nLEARNING FROM USER FEEDBACK:"
+        if confirmed_lines:
+            learning_section += f"\n\nUSER-CORRECTED FACTS (treat these as GROUND TRUTH — use these names, places, and details in new snippets):\n" + "\n".join(confirmed_lines)
+        if kept_lines:
+            learning_section += f"\n\nKEPT SNIPPETS (user liked these — generate more in similar themes, but don't repeat them):\n" + "\n".join(kept_lines[:20])
+        if deleted_lines:
+            learning_section += f"\n\nDELETED SNIPPETS (user rejected these — AVOID similar topics, names, or tones):\n" + "\n".join(deleted_lines)
+
+    if is_first_gen:
+        snippets_per_cat = 3 if cat_count >= 7 else 5
+    else:
+        snippets_per_cat = 2  # Fewer per batch when adding more
+
+    total_snippets = cat_count * snippets_per_cat
+
     prompt = f"""You are creating nostalgic conversation snippets for an elderly person named {familiar_name}.
 They were born in {birth_year} and grew up in {hometown}.
 Their teen years were roughly {teen_start}-{teen_end}.
 
 PERSONAL BACKGROUND:
 {background_section}
+{learning_section}
 
-Generate exactly {total_snippets} short nostalgia snippets (2-3 sentences each, 20-40 words).
+Generate exactly {total_snippets} NEW short nostalgia snippets (2-3 sentences each, 20-40 words).
 {snippets_per_cat} snippets per category:
 
 {categories_text}
 
 IMPORTANT RULES:
 - Use the personal background above to make snippets SPECIFIC to this person — reference their actual hangouts, restaurants, cars, sports, school by name when provided
+- If the user corrected a name or detail (see CORRECTED FACTS above), ALWAYS use the corrected version — never the original
+- Do NOT repeat any kept snippets — generate completely new ones on different specific details
+- Do NOT generate anything similar to deleted snippets — the user doesn't want those topics
 - Search your knowledge for real historical details: actual restaurants that existed in {hometown}, real street names, real local events, newspaper-worthy moments from that era
 - Be warm and conversational, as if a friendly parrot companion is reminiscing with them
 - Start with phrases like "Hey {familiar_name}, remember when...", "Did you know...", "Back in the day..."
@@ -2389,8 +2426,8 @@ All {total_snippets} objects, nothing else."""
             raw = raw.strip()
         snippets = json.loads(raw)
         if isinstance(snippets, list) and len(snippets) > 0:
-            db.save_nostalgia_snippets(tid, snippets)
-            logger.info(f"Generated {len(snippets)} nostalgia snippets for tenant {tid}")
+            db.save_nostalgia_snippets(tid, snippets, append=not is_first_gen)
+            logger.info(f"Generated {len(snippets)} nostalgia snippets for tenant {tid} (append={not is_first_gen})")
     except Exception as e:
         logger.error(f"Nostalgia generation failed: {e}")
 
