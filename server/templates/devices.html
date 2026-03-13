@@ -17,22 +17,20 @@
 </div>
 {% endif %}
 
-{% if new_api_key %}
+{% if new_claim_code %}
 <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-6">
     <h3 class="font-bold text-yellow-800 mb-2">New Device Created</h3>
-    <p class="text-sm text-yellow-700 mb-2">API Key (shown once — copy it and flash to ESP32):</p>
-    <div class="flex items-center gap-2 mb-3">
-        <code id="api-key-display" class="bg-white border px-3 py-2 rounded text-sm font-mono flex-1 break-all select-all">{{ new_api_key }}</code>
-        <button onclick="copyKey()" class="bg-yellow-600 text-white px-3 py-2 rounded text-sm hover:bg-yellow-700">Copy</button>
-    </div>
-    <p class="text-xs text-yellow-600">Device ID: <code>{{ new_device_id }}</code></p>
-    {% if new_claim_code %}
-    <div class="mt-3 bg-white border-2 border-yellow-400 rounded-lg p-3 text-center">
-        <p class="text-sm text-yellow-800 font-medium mb-1">Claim Code (write this on a sticker):</p>
+    <div class="bg-white border-2 border-yellow-400 rounded-lg p-3 text-center">
+        <p class="text-sm text-yellow-800 font-medium mb-1">Claim Code</p>
         <p class="text-3xl font-bold font-mono tracking-widest text-yellow-900">{{ new_claim_code }}</p>
-        <p class="text-xs text-yellow-600 mt-1">Customer enters this code to link the device to their account</p>
+        <p class="text-xs text-yellow-600 mt-1">Customer enters this code during setup to link the device</p>
     </div>
-    {% endif %}
+    <div class="mt-3 text-center">
+        <a href="/web/devices/{{ new_device_id }}/setup-card" target="_blank"
+           class="inline-block bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700 font-medium">
+            Print Setup Card
+        </a>
+    </div>
 </div>
 {% endif %}
 
@@ -102,6 +100,8 @@
                 <td class="px-4 py-3">
                     {% if device.claim_code %}
                     <span class="font-mono text-sm font-bold text-yellow-700 bg-yellow-50 px-2 py-1 rounded">{{ device.claim_code }}</span>
+                    <a href="/web/devices/{{ device.device_id }}/setup-card" target="_blank"
+                       class="ml-2 text-emerald-600 hover:text-emerald-800 text-xs font-medium">Print</a>
                     {% elif device.claimed_at %}
                     <span class="text-xs text-gray-400">Claimed</span>
                     {% else %}
@@ -111,7 +111,7 @@
                 {% endif %}
                 <td class="px-4 py-3 text-right">
                     <form method="POST" action="/web/devices/{{ device.device_id }}/delete"
-                          onsubmit="return confirm('Delete this device?')">
+                          onsubmit="return confirmDeleteDevice('{{ device.name or device.device_id }}')">
                         <button type="submit" class="text-red-500 hover:text-red-700 text-xs">Delete</button>
                     </form>
                 </td>
@@ -129,12 +129,16 @@
 
 {% block scripts %}
 <script>
-function copyKey() {
-    var keyEl = document.getElementById('api-key-display');
-    if (keyEl) {
-        navigator.clipboard.writeText(keyEl.textContent.trim());
-        alert('API key copied to clipboard!');
+function confirmDeleteDevice(name) {
+    if (!confirm('Are you sure you want to delete "' + name + '"? The device will stop working immediately and cannot reconnect until re-provisioned.')) {
+        return false;
     }
+    var typed = prompt('Type the device name "' + name + '" to confirm deletion:');
+    if (typed === null || typed.trim() !== name.trim()) {
+        alert('Device name did not match. Deletion cancelled.');
+        return false;
+    }
+    return true;
 }
 </script>
 {% endblock %}

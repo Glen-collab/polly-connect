@@ -2300,7 +2300,6 @@ async def devices_page(request: Request):
     devices = db.get_devices_by_tenant(tid)
 
     # Check for flash messages
-    new_api_key = request.query_params.get("new_key")
     new_device_id = request.query_params.get("new_device_id")
     new_claim_code = request.query_params.get("new_claim_code")
     claim_error = request.query_params.get("claim_error")
@@ -2310,7 +2309,6 @@ async def devices_page(request: Request):
         "request": request,
         "session": session,
         "devices": devices,
-        "new_api_key": new_api_key,
         "new_device_id": new_device_id,
         "new_claim_code": new_claim_code,
         "claim_error": claim_error,
@@ -2339,10 +2337,43 @@ async def device_add(request: Request, device_name: str = Form(...)):
     if session.get("is_admin"):
         claim_code = db.generate_claim_code(device_id, tid)
 
-    redirect_url = f"/web/devices?new_key={api_key}&new_device_id={device_id}"
+    redirect_url = f"/web/devices?new_device_id={device_id}"
     if claim_code:
         redirect_url += f"&new_claim_code={claim_code}"
     return RedirectResponse(redirect_url, status_code=303)
+
+
+@router.get("/devices/setup-card-preview", response_class=HTMLResponse)
+async def device_setup_card_preview(request: Request):
+    """Preview setup card with sample data (admin only)."""
+    session = await get_web_session(request)
+    redirect = require_admin(session)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse("setup_card.html", {
+        "request": request,
+        "device_name": "Grandma's Polly",
+        "claim_code": "324238",
+    })
+
+
+@router.get("/devices/{device_id}/setup-card", response_class=HTMLResponse)
+async def device_setup_card(request: Request, device_id: str):
+    session = await get_web_session(request)
+    redirect = require_admin(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    device = db.get_device(device_id)
+    if not device or not device.get("claim_code"):
+        return RedirectResponse("/web/devices", status_code=303)
+
+    return templates.TemplateResponse("setup_card.html", {
+        "request": request,
+        "device_name": device.get("name") or device_id,
+        "claim_code": device["claim_code"],
+    })
 
 
 @router.post("/devices/{device_id}/delete")

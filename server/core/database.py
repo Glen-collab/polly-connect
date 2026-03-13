@@ -914,6 +914,18 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def get_device(self, device_id: str) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM devices WHERE device_id = ?", (device_id,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
     def get_device_by_api_key_hash(self, api_key_hash: str) -> Optional[Dict]:
         conn = self._get_connection()
         try:

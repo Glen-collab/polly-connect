@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polly Setup Card — {{ device_name }}</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 0.75in;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            color: #1a1a1a;
+            background: white;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .card {
+            max-width: 600px;
+            width: 100%;
+            border: 3px solid #059669;
+            border-radius: 16px;
+            padding: 48px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 8px;
+            background: linear-gradient(90deg, #059669, #10b981, #34d399);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .polly-icon {
+            font-size: 48px;
+            margin-bottom: 8px;
+        }
+        .brand {
+            font-size: 32px;
+            font-weight: bold;
+            color: #059669;
+            letter-spacing: 1px;
+        }
+        .tagline {
+            font-size: 14px;
+            color: #6b7280;
+            font-style: italic;
+            margin-top: 4px;
+        }
+        .device-name {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        .claim-box {
+            text-align: center;
+            background: #fefce8;
+            border: 2px dashed #ca8a04;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+        .claim-label {
+            font-size: 14px;
+            color: #92400e;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .claim-code {
+            font-family: 'Courier New', monospace;
+            font-size: 48px;
+            font-weight: bold;
+            color: #92400e;
+            letter-spacing: 12px;
+        }
+        .divider {
+            border: none;
+            border-top: 1px solid #d1d5db;
+            margin: 28px 0;
+        }
+        .steps-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #059669;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .steps {
+            list-style: none;
+            counter-reset: step;
+        }
+        .steps li {
+            counter-increment: step;
+            position: relative;
+            padding-left: 44px;
+            margin-bottom: 16px;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #374151;
+        }
+        .steps li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 28px;
+            height: 28px;
+            background: #059669;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-weight: bold;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+        }
+        .steps li strong {
+            color: #1f2937;
+        }
+        .footer-msg {
+            text-align: center;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #d1d5db;
+        }
+        .footer-msg p {
+            font-size: 16px;
+            color: #059669;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .footer-msg .sub {
+            font-size: 13px;
+            color: #9ca3af;
+            font-weight: normal;
+            font-style: italic;
+        }
+        .website {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .website strong {
+            color: #059669;
+        }
+
+        /* Print button - hidden when printing */
+        .print-btn {
+            display: block;
+            margin: 24px auto 0;
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: Arial, sans-serif;
+        }
+        .print-btn:hover { background: #047857; }
+
+        @media print {
+            body { padding: 0; }
+            .print-btn { display: none !important; }
+            .card { border: 3px solid #059669; }
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <div class="card">
+            <div class="header">
+                <div class="polly-icon">🦜</div>
+                <div class="brand">Polly Connect</div>
+                <div class="tagline">Capturing memories, one story at a time</div>
+            </div>
+
+            <div class="device-name">{{ device_name }}</div>
+
+            <div class="claim-box">
+                <div class="claim-label">Your Claim Code</div>
+                <div class="claim-code">{{ claim_code }}</div>
+            </div>
+
+            <hr class="divider">
+
+            <div class="steps-title">Getting Started</div>
+            <ol class="steps">
+                <li>Go to <strong>polly-connect.com</strong> and click <strong>Register</strong> to create your account</li>
+                <li>Plug in Polly and connect to the <strong>"Polly-Setup"</strong> WiFi network on your phone</li>
+                <li>Enter the <strong>6-digit claim code</strong> above along with your <strong>home WiFi credentials</strong>, then hit <strong>Connect</strong></li>
+                <li>On the website, go to <strong>Settings &rarr; Devices</strong> and enter the same <strong>claim code</strong></li>
+                <li><strong>Done!</strong> Polly is yours &mdash; start sharing stories and memories</li>
+            </ol>
+
+            <div class="footer-msg">
+                <p>Every family has a story worth keeping.</p>
+                <p class="sub">Polly listens, remembers, and reads them back with love.</p>
+            </div>
+
+            <div class="website">
+                <strong>polly-connect.com</strong> &middot; Questions? Reach out to your Polly provider
+            </div>
+        </div>
+
+        <button class="print-btn" onclick="window.print()">Print Setup Card</button>
+    </div>
+</body>
+</html>
