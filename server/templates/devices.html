@@ -74,6 +74,9 @@
         <thead class="bg-gray-50">
             <tr>
                 <th class="text-left px-4 py-3 font-medium text-gray-600">Name</th>
+                {% if session.is_admin %}
+                <th class="text-left px-4 py-3 font-medium text-gray-600">Owner</th>
+                {% endif %}
                 <th class="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Device ID</th>
                 <th class="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Last Seen</th>
                 <th class="text-left px-4 py-3 font-medium text-gray-600">Status</th>
@@ -87,6 +90,15 @@
             {% for device in devices %}
             <tr class="border-t">
                 <td class="px-4 py-3 font-medium">{{ device.name or 'Unnamed' }}</td>
+                {% if session.is_admin %}
+                <td class="px-4 py-3 text-sm">
+                    {% if device.tenant_id %}
+                    <span class="text-gray-700">{{ device.tenant_name or 'Unknown' }}</span>
+                    {% else %}
+                    <span class="text-orange-500 font-medium">Unclaimed</span>
+                    {% endif %}
+                </td>
+                {% endif %}
                 <td class="px-4 py-3 text-gray-500 font-mono text-xs hidden sm:table-cell">{{ device.device_id }}</td>
                 <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ device.last_seen or 'Never' }}</td>
                 <td class="px-4 py-3">
@@ -118,7 +130,7 @@
             {% endfor %}
             {% if not devices %}
             <tr class="border-t">
-                <td colspan="{% if session.is_admin %}6{% else %}5{% endif %}" class="px-4 py-8 text-center text-gray-400">No devices registered yet</td>
+                <td colspan="{% if session.is_admin %}7{% else %}5{% endif %}" class="px-4 py-8 text-center text-gray-400">No devices registered yet</td>
             </tr>
             {% endif %}
         </tbody>

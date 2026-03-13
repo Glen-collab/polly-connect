@@ -926,6 +926,21 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def get_all_devices(self) -> List[Dict]:
+        """All devices regardless of tenant (for admin view)."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                """SELECT d.*, t.name AS tenant_name
+                   FROM devices d LEFT JOIN tenants t ON d.tenant_id = t.id
+                   ORDER BY d.registered_at DESC"""
+            ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
     def get_device_by_api_key_hash(self, api_key_hash: str) -> Optional[Dict]:
         conn = self._get_connection()
         try:
@@ -963,20 +978,25 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def delete_device(self, device_id: str, tenant_id: int) -> bool:
+    def delete_device(self, device_id: str, tenant_id: int = None, is_admin: bool = False) -> bool:
         conn = self._get_connection()
         try:
-            cursor = conn.execute(
-                "DELETE FROM devices WHERE device_id = ? AND tenant_id = ?",
-                (device_id, tenant_id)
-            )
+            if is_admin:
+                cursor = conn.execute(
+                    "DELETE FROM devices WHERE device_id = ?", (device_id,)
+                )
+            else:
+                cursor = conn.execute(
+                    "DELETE FROM devices WHERE device_id = ? AND tenant_id = ?",
+                    (device_id, tenant_id)
+                )
             conn.commit()
             return cursor.rowcount > 0
         finally:
             if not self._conn:
                 conn.close()
 
-    def generate_claim_code(self, device_id: str, tenant_id: int) -> str:
+    def generate_claim_code(self, device_id: str, tenant_id: int = None) -> str:
         """Generate a unique 6-digit claim code for a device."""
         import random
         conn = self._get_connection()
@@ -994,8 +1014,8 @@ class PollyDB:
                 ).fetchone()
                 if not t_clash and not m_clash and not d_clash:
                     conn.execute(
-                        "UPDATE devices SET claim_code = ? WHERE device_id = ? AND tenant_id = ?",
-                        (code, device_id, tenant_id)
+                        "UPDATE devices SET claim_code = ? WHERE device_id = ?",
+                        (code, device_id)
                     )
                     conn.commit()
                     return code
@@ -2851,7 +2871,7 @@ class PollyDB:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("""
                 SELECT d.device_id, d.name, d.last_seen, d.fw_version, d.fw_variant,
-                       d.tenant_id, t.name AS tenant_name,
+                       d.tenant_id, COALESCE(t.name, 'Unclaimed') AS tenant_name,
                        (SELECT COUNT(*) FROM device_events e
                         WHERE e.device_id = d.device_id AND e.event_type = 'command'
                         AND e.created_at > datetime('now', '-1 day')) AS commands_today,
@@ -2859,7 +2879,7 @@ class PollyDB:
                         WHERE e.device_id = d.device_id AND e.event_type = 'error'
                         AND e.created_at > datetime('now', '-1 day')) AS errors_today,
                        (SELECT COUNT(*) FROM stories s
-                        WHERE s.tenant_id = d.tenant_id) AS stories_total,
+                        WHERE d.tenant_id IS NOT NULL AND s.tenant_id = d.tenant_id) AS stories_total,
                        (SELECT e.created_at FROM device_events e
                         WHERE e.device_id = d.device_id AND e.event_type = 'command'
                         ORDER BY e.created_at DESC LIMIT 1) AS last_command

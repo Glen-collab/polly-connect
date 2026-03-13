@@ -2297,7 +2297,10 @@ async def devices_page(request: Request):
 
     db = request.app.state.db
     tid = session["tenant_id"]
-    devices = db.get_devices_by_tenant(tid)
+    if session.get("is_admin"):
+        devices = db.get_all_devices()
+    else:
+        devices = db.get_devices_by_tenant(tid)
 
     # Check for flash messages
     new_device_id = request.query_params.get("new_device_id")
@@ -2330,12 +2333,13 @@ async def device_add(request: Request, device_name: str = Form(...)):
     device_id = f"polly-{uuid.uuid4().hex[:8]}"
     api_key = generate_api_key()
 
-    db.register_device(device_id, tid, name=device_name, api_key=api_key)
-
-    # Admin devices automatically get a claim code
-    claim_code = None
     if session.get("is_admin"):
-        claim_code = db.generate_claim_code(device_id, tid)
+        # Admin-created devices are unassigned until customer claims
+        db.register_device(device_id, None, name=device_name, api_key=api_key)
+        claim_code = db.generate_claim_code(device_id)
+    else:
+        db.register_device(device_id, tid, name=device_name, api_key=api_key)
+        claim_code = None
 
     redirect_url = f"/web/devices?new_device_id={device_id}"
     if claim_code:
@@ -2384,7 +2388,7 @@ async def device_delete(request: Request, device_id: str):
         return redirect
 
     db = request.app.state.db
-    db.delete_device(device_id, session["tenant_id"])
+    db.delete_device(device_id, session["tenant_id"], is_admin=session.get("is_admin", False))
     return RedirectResponse("/web/devices", status_code=303)
 
 
