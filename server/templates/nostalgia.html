@@ -7,7 +7,7 @@
     <h1 class="text-xl sm:text-2xl font-bold">Nostalgia Snippets</h1>
     {% if user.hometown and user.birth_year %}
     <form method="POST" action="/web/nostalgia/generate"
-          onsubmit="return confirm('This will regenerate all 25 snippets using AI. Any edits you made will be lost. Continue?');">
+          onsubmit="return confirm('This will regenerate all snippets using AI based on the profile below. Any edits you made will be lost. Continue?');">
         <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700">
             {% if snippets %}Regenerate All{% else %}Generate Snippets{% endif %}
         </button>
@@ -26,14 +26,112 @@
     <p class="text-gray-500 text-base mb-2">Set up hometown and birth year first</p>
     <p class="text-gray-400 text-sm mb-4">Go to <a href="/web/settings" class="text-emerald-600 hover:underline">Settings</a> and fill in the hometown and birth year fields. Then come back here to generate nostalgic snippets.</p>
 </div>
-{% elif not snippets %}
-<div class="bg-white rounded-lg shadow p-6 text-center">
-    <p class="text-gray-500 text-base mb-2">No nostalgia snippets yet</p>
-    <p class="text-gray-400 text-sm mb-4">Click "Generate Snippets" above to create 25 personalized nostalgia snippets for {{ user.familiar_name or user.name or 'the owner' }}.</p>
-    <p class="text-gray-400 text-xs">Based on: {{ user.hometown }}, born {{ user.birth_year }}</p>
-</div>
 {% else %}
 
+<!-- Nostalgia Profile -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4">
+    <h2 class="text-base font-semibold mb-1">Nostalgia Profile</h2>
+    <p class="text-xs text-gray-400 mb-3">Tell us about {{ user.familiar_name or user.name or 'the owner' }}'s life so GPT can generate deeply personal snippets. The more detail, the better!</p>
+    <form method="POST" action="/web/nostalgia/profile">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">What type of kid were they?</label>
+                <select name="kid_type" class="w-full border rounded px-3 py-2 text-sm">
+                    <option value="">-- Select --</option>
+                    {% for val, label in [
+                        ("jock", "Jock / Sports kid"),
+                        ("nerd", "Book worm / Nerd"),
+                        ("burnout", "Burnout / Rebel"),
+                        ("country", "Country kid / Farm life"),
+                        ("church", "Church kid / Choir"),
+                        ("gearhead", "Gearhead / Car enthusiast"),
+                        ("band", "Band kid / Musician"),
+                        ("hunter", "Hunter / Outdoorsman"),
+                        ("worker", "Working kid / Had a job early"),
+                        ("troublemaker", "Troublemaker / Class clown"),
+                        ("social", "Social butterfly / Popular"),
+                        ("quiet", "Quiet / Kept to themselves"),
+                        ("creative", "Creative / Artist / Writer"),
+                        ("military_brat", "Military brat / Moved around")
+                    ] %}
+                    <option value="{{ val }}" {% if profile.kid_type == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Military / Draft service?</label>
+                <select name="military" class="w-full border rounded px-3 py-2 text-sm">
+                    <option value="">-- None --</option>
+                    {% for val, label in [
+                        ("army", "Army"),
+                        ("navy", "Navy"),
+                        ("marines", "Marines"),
+                        ("air_force", "Air Force"),
+                        ("coast_guard", "Coast Guard"),
+                        ("national_guard", "National Guard"),
+                        ("drafted", "Drafted (Vietnam era)"),
+                        ("reserves", "Reserves")
+                    ] %}
+                    <option value="{{ val }}" {% if profile.military == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Sports they played or followed</label>
+                <input type="text" name="sports" class="w-full border rounded px-3 py-2 text-sm"
+                       placeholder="e.g. football, hockey, baseball, wrestling"
+                       value="{{ profile.sports or '' }}">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">High school name</label>
+                <input type="text" name="high_school" class="w-full border rounded px-3 py-2 text-sm"
+                       placeholder="e.g. Lincoln High School"
+                       value="{{ profile.high_school or '' }}">
+            </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Favorite hangout spots / landmarks</label>
+                <input type="text" name="hangouts" class="w-full border rounded px-3 py-2 text-sm"
+                       placeholder="e.g. the drive-in, Miller Park, the railroad tracks"
+                       value="{{ profile.hangouts or '' }}">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Favorite restaurants / diners</label>
+                <input type="text" name="restaurants" class="w-full border rounded px-3 py-2 text-sm"
+                       placeholder="e.g. A&W, the diner on Main St, Tastee Freez"
+                       value="{{ profile.restaurants or '' }}">
+            </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Cars they drove or loved</label>
+                <input type="text" name="cars" class="w-full border rounded px-3 py-2 text-sm"
+                       placeholder="e.g. 57 Chevy, Ford pickup, GTO"
+                       value="{{ profile.cars or '' }}">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">First job / what they did for work</label>
+                <input type="text" name="jobs" class="w-full border rounded px-3 py-2 text-sm"
+                       placeholder="e.g. paper route, gas station, factory"
+                       value="{{ profile.jobs or '' }}">
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="block text-sm text-gray-600 mb-1">Anything else GPT should know</label>
+            <textarea name="extra_notes" rows="2" class="w-full border rounded px-3 py-2 text-sm"
+                      placeholder="e.g. They were a huge Packers fan, used to sneak out to go fishing, rode horses, played in a garage band, went to county fairs...">{{ profile.extra_notes or '' }}</textarea>
+        </div>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
+            Save Profile
+        </button>
+        <span class="text-xs text-gray-400 ml-2">Save first, then hit "{% if snippets %}Regenerate All{% else %}Generate Snippets{% endif %}" above</span>
+    </form>
+</div>
+
+{% if snippets %}
 <p class="text-sm text-gray-500 mb-4">
     {{ snippets|length }} snippets for {{ user.familiar_name or user.name }} &middot;
     {{ user.hometown }}, born {{ user.birth_year }} &middot;
@@ -41,11 +139,15 @@
 </p>
 
 {% set categories = {
-    'hometown': 'Hometown & Roads',
-    'music': 'Music',
+    'hometown': 'Hometown & Landmarks',
+    'sports': 'Sports & School',
+    'cars': 'Cars & Cruising',
+    'music': 'Music & Radio',
     'food': 'Food & Restaurants',
     'culture': 'Movies, TV & Culture',
-    'childhood': 'Childhood Activities'
+    'childhood': 'Childhood & Daily Life',
+    'military': 'Service & Draft',
+    'work': 'Work & Hustle'
 } %}
 
 {% for cat_key, cat_label in categories.items() %}
@@ -78,6 +180,7 @@
 </div>
 {% endif %}
 {% endfor %}
+{% endif %}
 
 {% endif %}
 

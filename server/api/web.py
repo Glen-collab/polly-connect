@@ -1994,13 +1994,64 @@ async def nostalgia_page(request: Request):
     snippets = db.get_nostalgia_snippets(tid)
     generating = request.query_params.get("generated") == "1"
 
+    # Parse nostalgia profile JSON
+    import json
+    profile = {}
+    if user.get("nostalgia_profile"):
+        try:
+            profile = json.loads(user["nostalgia_profile"])
+        except Exception:
+            pass
+
     return templates.TemplateResponse("nostalgia.html", {
         "request": request,
         "session": session,
         "user": user,
         "snippets": snippets,
         "generating": generating,
+        "profile": profile,
     })
+
+
+@router.post("/nostalgia/profile")
+async def nostalgia_profile_save(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    import json
+    form = await request.form()
+    profile = {
+        "kid_type": form.get("kid_type", "").strip(),
+        "military": form.get("military", "").strip(),
+        "sports": form.get("sports", "").strip(),
+        "high_school": form.get("high_school", "").strip(),
+        "hangouts": form.get("hangouts", "").strip(),
+        "restaurants": form.get("restaurants", "").strip(),
+        "cars": form.get("cars", "").strip(),
+        "jobs": form.get("jobs", "").strip(),
+        "extra_notes": form.get("extra_notes", "").strip(),
+    }
+    # Remove empty values
+    profile = {k: v for k, v in profile.items() if v}
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "UPDATE user_profiles SET nostalgia_profile = ? WHERE id = ?",
+            (json.dumps(profile), user["id"])
+        )
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return RedirectResponse("/web/nostalgia", status_code=303)
 
 
 @router.post("/nostalgia/generate")
@@ -2025,35 +2076,106 @@ async def nostalgia_generate(request: Request):
     teen_start = birth_year + 13
     teen_end = birth_year + 19
 
+    # Load nostalgia profile
+    import json as _json
+    profile = {}
+    if user.get("nostalgia_profile"):
+        try:
+            profile = _json.loads(user["nostalgia_profile"])
+        except Exception:
+            pass
+
+    # Build personality/background context
+    background_lines = []
+    kid_type_labels = {
+        "jock": "a jock / sports kid", "nerd": "a bookworm / nerd", "burnout": "a burnout / rebel",
+        "country": "a country kid / farm life", "church": "a church kid", "gearhead": "a gearhead / car enthusiast",
+        "band": "a band kid / musician", "hunter": "a hunter / outdoorsman", "worker": "a working kid who had jobs early",
+        "troublemaker": "a troublemaker / class clown", "social": "a social butterfly / popular kid",
+        "quiet": "a quiet kid who kept to themselves", "creative": "a creative / artistic kid",
+        "military_brat": "a military brat who moved around",
+    }
+    if profile.get("kid_type"):
+        background_lines.append(f"They were {kid_type_labels.get(profile['kid_type'], profile['kid_type'])} growing up.")
+    if profile.get("military"):
+        mil_labels = {"army": "the Army", "navy": "the Navy", "marines": "the Marines", "air_force": "the Air Force",
+                      "coast_guard": "the Coast Guard", "national_guard": "the National Guard",
+                      "drafted": "the draft (Vietnam era)", "reserves": "the Reserves"}
+        background_lines.append(f"They served in {mil_labels.get(profile['military'], profile['military'])}.")
+    if profile.get("sports"):
+        background_lines.append(f"Sports: {profile['sports']}.")
+    if profile.get("high_school"):
+        background_lines.append(f"High school: {profile['high_school']}.")
+    if profile.get("hangouts"):
+        background_lines.append(f"Hangout spots: {profile['hangouts']}.")
+    if profile.get("restaurants"):
+        background_lines.append(f"Restaurants/diners they loved: {profile['restaurants']}.")
+    if profile.get("cars"):
+        background_lines.append(f"Cars they drove or loved: {profile['cars']}.")
+    if profile.get("jobs"):
+        background_lines.append(f"Jobs/work: {profile['jobs']}.")
+    if profile.get("extra_notes"):
+        background_lines.append(f"Other details: {profile['extra_notes']}.")
+
+    background_section = "\n".join(background_lines) if background_lines else "No additional background provided."
+
+    # Build category list dynamically based on profile
+    categories = []
+    categories.append(f'1. "hometown" - Roads, landmarks, parks, and places specific to {hometown}. Reference actual streets, neighborhoods, and geography.')
+    if profile.get("sports") or profile.get("high_school"):
+        categories.append(f'2. "sports" - Sports they played or watched, high school games, rivalries, coaches, Friday night lights, state tournaments.')
+    else:
+        categories.append(f'2. "sports" - Popular sports and local teams from {hometown} in the {teen_start//10*10}s-{teen_end//10*10}s era.')
+    if profile.get("cars"):
+        categories.append(f'3. "cars" - Cruising, drag racing, car shows, fixing up cars, drive-ins, the cars of the {teen_start//10*10}s-{teen_end//10*10}s.')
+    else:
+        categories.append(f'3. "cars" - Iconic cars of the {teen_start//10*10}s-{teen_end//10*10}s, cruising culture, gas stations, drive-ins.')
+    categories.append(f'4. "music" - Songs, artists, bands, jukeboxes, and radio from the {teen_start//10*10}s-{teen_end//10*10}s.')
+    categories.append(f'5. "food" - Foods, recipes, restaurants, diners, snacks, and kitchen memories from that era and {hometown}.')
+    categories.append(f'6. "culture" - Movies, TV shows, world events, fashion, and fads from their youth.')
+    categories.append(f'7. "childhood" - Games, outdoor adventures, neighborhood life, school, and daily routines for kids in that era.')
+    if profile.get("military"):
+        categories.append(f'8. "military" - Military service memories, boot camp, the draft, coming home, veteran life, buddies from service.')
+    if profile.get("jobs"):
+        categories.append(f'9. "work" - First jobs, work ethic, paychecks, bosses, coworkers, the hustle of making a living back then.')
+
+    cat_count = len(categories)
+    snippets_per_cat = 3 if cat_count >= 7 else 5
+    total_snippets = cat_count * snippets_per_cat
+
+    categories_text = "\n".join(categories)
+
     prompt = f"""You are creating nostalgic conversation snippets for an elderly person named {familiar_name}.
 They were born in {birth_year} and grew up in {hometown}.
 Their teen years were roughly {teen_start}-{teen_end}.
 
-Generate exactly 25 short nostalgia snippets (2-3 sentences each, 20-40 words).
-5 snippets per category:
+PERSONAL BACKGROUND:
+{background_section}
 
-1. "hometown" - Roads, cruising, local landmarks, and places specific to {hometown}
-2. "music" - Songs, artists, bands, and radio from the {teen_start//10*10}s-{teen_end//10*10}s
-3. "food" - Foods, recipes, restaurants, snacks, and kitchen memories from that era
-4. "culture" - Movies, TV shows, world events, and fads from their youth
-5. "childhood" - Games, outdoor activities, and daily life for kids in that era and location
+Generate exactly {total_snippets} short nostalgia snippets (2-3 sentences each, 20-40 words).
+{snippets_per_cat} snippets per category:
 
-Each snippet MUST:
-- Be warm and conversational, as if a friendly parrot companion is reminiscing
+{categories_text}
+
+IMPORTANT RULES:
+- Use the personal background above to make snippets SPECIFIC to this person — reference their actual hangouts, restaurants, cars, sports, school by name when provided
+- Search your knowledge for real historical details: actual restaurants that existed in {hometown}, real street names, real local events, newspaper-worthy moments from that era
+- Be warm and conversational, as if a friendly parrot companion is reminiscing with them
 - Start with phrases like "Hey {familiar_name}, remember when...", "Did you know...", "Back in the day..."
 - Be historically accurate for the time period and location
 - Be TTS-friendly: no abbreviations, no special characters, spell out numbers
-- Each variation must cover DIFFERENT specific details — no repetition across the 5
+- Each variation must cover DIFFERENT specific details — no repetition
+- If they had a specific car, mention it. If they hung out at a specific place, reference it. Make it PERSONAL.
 
 Return ONLY a JSON array of objects: [{{"category": "hometown", "variation": 1, "text": "..."}}, ...]
-All 25 objects, nothing else."""
+All {total_snippets} objects, nothing else."""
 
     try:
         followup_gen = request.app.state.followup_gen
         response = followup_gen._client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=3000,
+            max_tokens=4000,
             temperature=0.9,
         )
         import json
