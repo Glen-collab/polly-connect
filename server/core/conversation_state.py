@@ -61,6 +61,8 @@ class ConversationState:
         self.user_id: Optional[int] = None
         # Client IP for location-based services (weather)
         self.client_ip: Optional[str] = None
+        # Voice volume (10-100%, persists across reset)
+        self.voice_volume: int = 100
 
     def reset(self):
         self.mode = ConversationMode.COMMAND

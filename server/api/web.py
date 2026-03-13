@@ -961,6 +961,7 @@ async def settings_save(request: Request, name: str = Form(...),
                         quiet_hours_start: int = Form(21),
                         quiet_hours_end: int = Form(7),
                         squawk_volume: int = Form(30),
+                        voice_volume: int = Form(100),
                         rms_threshold: int = Form(200)):
     session = await get_web_session(request)
     redirect = require_owner(session)
@@ -976,6 +977,7 @@ async def settings_save(request: Request, name: str = Form(...),
     quiet_hours_start = max(0, min(23, quiet_hours_start))
     quiet_hours_end = max(0, min(23, quiet_hours_end))
     squawk_volume = max(0, min(100, squawk_volume))          # 0-100%
+    voice_volume = max(10, min(100, voice_volume))           # 10-100%
     rms_threshold = max(50, min(2000, rms_threshold))        # 50-2000
 
     # Geocode location if changed
@@ -1010,7 +1012,7 @@ async def settings_save(request: Request, name: str = Form(...),
             memory_care_mode = ?, squawk_interval = ?, chatter_interval = ?,
             quiet_hours_start = ?, quiet_hours_end = ?,
             location_city = ?, location_lat = ?, location_lon = ?,
-            squawk_volume = ?, rms_threshold = ?,
+            squawk_volume = ?, voice_volume = ?, rms_threshold = ?,
             hometown = ?, birth_year = ?,
             updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -1019,7 +1021,7 @@ async def settings_save(request: Request, name: str = Form(...),
               squawk_interval, chatter_interval,
               quiet_hours_start, quiet_hours_end,
               location_city, location_lat, location_lon,
-              squawk_volume, rms_threshold,
+              squawk_volume, voice_volume, rms_threshold,
               hometown.strip() or None, birth_year_int,
               user["id"]))
         conn.commit()
@@ -1042,6 +1044,15 @@ async def settings_save(request: Request, name: str = Form(...),
         if isinstance(detector, VADWakeWordDetector):
             detector.rms_threshold = rms_threshold
             logger.info(f"RMS threshold updated to {rms_threshold} from settings")
+
+    # Update live voice volume on connected devices
+    cmd = getattr(request.app.state, "cmd", None)
+    if cmd:
+        for dev_id in list(getattr(cmd, "_states", {}).keys()):
+            state = cmd._get_state(dev_id)
+            if getattr(state, "tenant_id", None) == session["tenant_id"]:
+                state.voice_volume = voice_volume
+                logger.info(f"Voice volume updated to {voice_volume}% for device {dev_id}")
 
     return RedirectResponse("/web/settings?saved=1", status_code=303)
 

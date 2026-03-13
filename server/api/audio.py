@@ -167,6 +167,13 @@ async def continuous_stream(websocket: WebSocket):
                             db.update_device_firmware_info(db_device_id, fw_version, fw_variant)
                             logger.info(f"Device {device_id} firmware: v{fw_version} ({fw_variant})")
                         logger.info(f"Continuous stream device: {device_id} (tenant={device_info['tenant_id']})")
+                        # Load voice volume from user profile
+                        try:
+                            user_profile = db.get_or_create_user(tenant_id=tenant_id)
+                            conv_state.voice_volume = user_profile.get("voice_volume") or 100
+                            logger.info(f"Voice volume: {conv_state.voice_volume}%")
+                        except Exception:
+                            conv_state.voice_volume = 100
                     elif not verify_websocket_key(msg_data):
                         logger.warning(f"Continuous stream auth failed: {device_id}")
                         await websocket.send_json({"event": "error", "message": "Authentication failed"})
@@ -921,6 +928,22 @@ async def _send_tts(websocket: WebSocket, tts, text: str, squawk_mgr=None,
         tts_audio = tts.synthesize(text)
         if not tts_audio:
             return 0.0
+
+        # Apply voice volume scaling from device's conversation state
+        try:
+            cmd = getattr(websocket.app.state, "cmd", None)
+            if cmd and device_id:
+                conv_state = cmd._get_state(device_id)
+                vol = getattr(conv_state, "voice_volume", 100)
+                if vol < 100:
+                    import numpy as np
+                    factor = vol / 100.0
+                    samples = np.frombuffer(tts_audio, dtype=np.int16).astype(np.float32)
+                    samples = samples * factor
+                    samples = np.clip(samples, -32768, 32767).astype(np.int16)
+                    tts_audio = samples.tobytes()
+        except Exception:
+            pass  # If anything fails, send at full volume
 
         # Estimate playback duration: 16kHz, 16-bit mono = 32000 bytes/sec
         audio_duration = len(tts_audio) / 32000.0

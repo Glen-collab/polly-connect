@@ -171,6 +171,17 @@
         </div>
         <p class="text-xs text-gray-400 mt-1">How loud Polly's squawks and chatter are (default 30%)</p>
     </div>
+    <div class="mt-3 sm:mt-4">
+        <label class="block text-sm text-gray-600 mb-1">Voice Volume</label>
+        <div class="flex items-center gap-3">
+            <input type="range" name="voice_volume" form="settings-form" min="10" max="100" step="5"
+                   value="{{ user.voice_volume if user.voice_volume is not none else 100 }}"
+                   class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                   oninput="document.getElementById('voice-vol-label').textContent = this.value + '%'">
+            <span id="voice-vol-label" class="text-sm font-medium text-gray-700 w-10 text-right">{{ user.voice_volume if user.voice_volume is not none else 100 }}%</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">How loud Polly speaks (default 100%)</p>
+    </div>
     <div class="mt-4">
         <label class="block text-sm text-gray-700 font-medium mb-2">Quiet Hours (no bird sounds)</label>
         <p class="text-xs text-gray-500 mb-2">Polly goes to sleep and wakes up automatically each day. She'll still respond if you talk to her.</p>

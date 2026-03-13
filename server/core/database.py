@@ -414,6 +414,7 @@ class PollyDB:
                 "location_lon": "ALTER TABLE user_profiles ADD COLUMN location_lon REAL",
                 "squawk_volume": "ALTER TABLE user_profiles ADD COLUMN squawk_volume INTEGER DEFAULT 30",
                 "rms_threshold": "ALTER TABLE user_profiles ADD COLUMN rms_threshold INTEGER DEFAULT 200",
+                "voice_volume": "ALTER TABLE user_profiles ADD COLUMN voice_volume INTEGER DEFAULT 100",
                 "hometown": "ALTER TABLE user_profiles ADD COLUMN hometown TEXT",
                 "birth_year": "ALTER TABLE user_profiles ADD COLUMN birth_year INTEGER",
             }
