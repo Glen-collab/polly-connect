@@ -1360,12 +1360,18 @@ async def photos_page(request: Request):
     photos = db.get_photos(limit=100, tenant_id=tid)
     stories = db.get_stories(limit=200, tenant_id=tid)
 
-    # Parse tags JSON for template display
+    # Parse tags JSON + enrich with photo_in_book from linked story
     for photo in photos:
         try:
             photo["tag_list"] = json.loads(photo.get("tags") or "[]")
         except (json.JSONDecodeError, TypeError):
             photo["tag_list"] = []
+        # Look up photo_in_book from linked story
+        photo["photo_in_book"] = True  # default
+        if photo.get("story_id"):
+            story = db.get_story_by_id(photo["story_id"])
+            if story:
+                photo["photo_in_book"] = bool(story.get("photo_in_book", 1))
 
     return templates.TemplateResponse("photos.html", {
         "request": request,
@@ -1447,6 +1453,36 @@ async def photo_delete(request: Request, photo_id: int):
         if os.path.exists(filepath):
             os.remove(filepath)
         db.delete_photo(photo_id)
+    return RedirectResponse("/web/photos", status_code=303)
+
+
+@router.post("/photos/{photo_id}/toggle-book")
+async def photo_toggle_book(request: Request, photo_id: int):
+    """Toggle whether a photo appears in the legacy book."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    photo = db.get_photo_by_id(photo_id)
+    if not photo or photo.get("tenant_id") != tid:
+        return RedirectResponse("/web/photos", status_code=303)
+
+    if photo.get("story_id"):
+        story = db.get_story_by_id(photo["story_id"])
+        if story:
+            new_val = 0 if story.get("photo_in_book", 1) else 1
+            conn = db._get_connection()
+            try:
+                conn.execute("UPDATE stories SET photo_in_book = ? WHERE id = ?",
+                             (new_val, story["id"]))
+                conn.commit()
+            finally:
+                if not db._conn:
+                    conn.close()
+
     return RedirectResponse("/web/photos", status_code=303)
 
 
