@@ -203,9 +203,7 @@ async def welcome_page(request: Request):
         return redirect
     db = request.app.state.db
     user = db.get_or_create_user(tenant_id=session["tenant_id"])
-    # If already set up, skip to dashboard
-    if user.get("setup_complete"):
-        return RedirectResponse("/web/dashboard", status_code=302)
+    # Allow preview even if setup_complete (skip auto-redirect)
     return templates.TemplateResponse("welcome.html", {
         "request": request,
         "session": session,
