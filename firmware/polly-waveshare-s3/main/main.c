@@ -73,9 +73,13 @@ static const char *TAG = "POLLY-WS";
 #define SERVER_PORT     8000
 #define WS_URI          "ws://" SERVER_HOST ":8000/api/audio/continuous"
 
-// Device identity & API key (change per-device)
-#define DEVICE_ID       "polly-waveshare"
-#define DEVICE_API_KEY  "qtde_XgbmZ2jExSBRH0jtsKIgjMkcEwl-BoabvVj7GE"
+// Device identity — loaded from NVS at boot (set during claim code provisioning)
+// Fallback defines used only if NVS has no credentials (legacy/dev devices)
+#define DEVICE_ID_FALLBACK       "polly-waveshare"
+#define DEVICE_API_KEY_FALLBACK  "qtde_XgbmZ2jExSBRH0jtsKIgjMkcEwl-BoabvVj7GE"
+
+static char g_device_id[64] = {0};
+static char g_api_key[64] = {0};
 
 // I2C bus (controls ES8311, ES7210, TCA9555)
 #define I2C_SDA         GPIO_NUM_11
@@ -574,6 +578,63 @@ static esp_err_t wifi_nvs_clear(void)
     return ESP_OK;
 }
 
+// --- Device credential NVS helpers ---
+
+static bool device_nvs_load(char *device_id, size_t id_size, char *api_key, size_t key_size)
+{
+    nvs_handle_t h;
+    if (nvs_open("dev_cfg", NVS_READONLY, &h) != ESP_OK) return false;
+    esp_err_t r1 = nvs_get_str(h, "dev_id", device_id, &id_size);
+    esp_err_t r2 = nvs_get_str(h, "api_key", api_key, &key_size);
+    nvs_close(h);
+    if (r1 == ESP_OK && r2 == ESP_OK && strlen(device_id) > 0 && strlen(api_key) > 0) {
+        ESP_LOGI(TAG, "Device credentials loaded from NVS: %s", device_id);
+        return true;
+    }
+    return false;
+}
+
+static esp_err_t device_nvs_save(const char *device_id, const char *api_key)
+{
+    nvs_handle_t h;
+    ESP_ERROR_CHECK(nvs_open("dev_cfg", NVS_READWRITE, &h));
+    nvs_set_str(h, "dev_id", device_id);
+    nvs_set_str(h, "api_key", api_key);
+    nvs_commit(h);
+    nvs_close(h);
+    ESP_LOGI(TAG, "Device credentials saved to NVS: %s", device_id);
+    return ESP_OK;
+}
+
+static esp_err_t device_nvs_save_claim_code(const char *claim_code)
+{
+    nvs_handle_t h;
+    ESP_ERROR_CHECK(nvs_open("dev_cfg", NVS_READWRITE, &h));
+    nvs_set_str(h, "claim", claim_code);
+    nvs_commit(h);
+    nvs_close(h);
+    ESP_LOGI(TAG, "Claim code saved to NVS");
+    return ESP_OK;
+}
+
+static bool device_nvs_load_claim_code(char *claim_code, size_t size)
+{
+    nvs_handle_t h;
+    if (nvs_open("dev_cfg", NVS_READONLY, &h) != ESP_OK) return false;
+    esp_err_t r = nvs_get_str(h, "claim", claim_code, &size);
+    nvs_close(h);
+    return (r == ESP_OK && strlen(claim_code) > 0);
+}
+
+static void device_nvs_clear_claim_code(void)
+{
+    nvs_handle_t h;
+    if (nvs_open("dev_cfg", NVS_READWRITE, &h) != ESP_OK) return;
+    nvs_erase_key(h, "claim");
+    nvs_commit(h);
+    nvs_close(h);
+}
+
 // --- STA connection ---
 
 static esp_event_handler_instance_t sta_any_id_handle, sta_got_ip_handle;
@@ -741,7 +802,9 @@ static void url_decode(char *dst, const char *src, size_t dst_size)
 
 // --- Captive portal HTML ---
 
-static const char CAPTIVE_PORTAL_HTML[] =
+static bool device_provisioned = false;  // Set before portal starts
+
+static const char CAPTIVE_PORTAL_HTML_WIFI_ONLY[] =
 "<!DOCTYPE html><html><head>"
 "<meta name='viewport' content='width=device-width,initial-scale=1'>"
 "<title>Polly WiFi Setup</title>"
@@ -788,6 +851,66 @@ static const char CAPTIVE_PORTAL_HTML[] =
 "document.getElementById('status').innerText='Saving... Polly will reboot!';"
 "fetch('/connect',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},"
 "body:'ssid='+encodeURIComponent(s)+'&password='+encodeURIComponent(p)"
+"}).then(r=>r.text()).then(t=>{"
+"document.getElementById('status').innerText='Saved! Polly is rebooting...';"
+"}).catch(e=>{document.getElementById('status').innerText='Error: '+e;});"
+"}"
+"scan();"
+"</script></body></html>";
+
+static const char CAPTIVE_PORTAL_HTML_WITH_CLAIM[] =
+"<!DOCTYPE html><html><head>"
+"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+"<title>Polly WiFi Setup</title>"
+"<style>"
+"body{font-family:sans-serif;background:#1a1a2e;color:#e0e0e0;margin:0;padding:20px;}"
+"h1{color:#4fc3f7;text-align:center;font-size:24px;}"
+"h2{color:#81d4fa;font-size:18px;margin-top:20px;}"
+".net{background:#16213e;padding:12px;margin:6px 0;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}"
+".net:active{background:#0f3460;}"
+".bars{color:#4fc3f7;font-size:16px;}"
+"input{width:100%;padding:12px;margin:8px 0;border:1px solid #333;border-radius:8px;background:#16213e;color:#e0e0e0;font-size:16px;box-sizing:border-box;}"
+".claim-input{font-size:24px;text-align:center;letter-spacing:8px;font-weight:bold;}"
+"button{width:100%;padding:14px;margin:8px 0;border:none;border-radius:8px;font-size:18px;cursor:pointer;}"
+".scan-btn{background:#0f3460;color:#4fc3f7;}"
+".connect-btn{background:#4fc3f7;color:#1a1a2e;font-weight:bold;}"
+".status{text-align:center;padding:10px;color:#81d4fa;}"
+".parrot{text-align:center;font-size:48px;margin:10px 0;}"
+".hint{font-size:12px;color:#81d4fa;text-align:center;margin-top:4px;}"
+"</style></head><body>"
+"<div class='parrot'>&#x1F99C;</div>"
+"<h1>Polly WiFi Setup</h1>"
+"<h2>Claim Code</h2>"
+"<p class='hint'>Enter the 6-digit code from your Polly card</p>"
+"<input id='code' class='claim-input' placeholder='000000' maxlength='6' inputmode='numeric' pattern='[0-9]*'>"
+"<button class='scan-btn' onclick='scan()'>Scan for Networks</button>"
+"<div id='nets'></div>"
+"<h2>WiFi Network</h2>"
+"<input id='ssid' placeholder='Network name (SSID)'>"
+"<input id='pass' type='password' placeholder='Password'>"
+"<button class='connect-btn' onclick='save()'>Connect</button>"
+"<div id='status' class='status'></div>"
+"<script>"
+"function scan(){"
+"document.getElementById('status').innerText='Scanning...';"
+"fetch('/scan').then(r=>r.json()).then(d=>{"
+"let h='';"
+"d.forEach(n=>{"
+"let b=n.rssi>-50?'\\u2589\\u2589\\u2589\\u2589':n.rssi>-65?'\\u2589\\u2589\\u2589':n.rssi>-75?'\\u2589\\u2589':'\\u2589';"
+"h+='<div class=\"net\" onclick=\"document.getElementById(\\'ssid\\').value=\\''+n.ssid.replace(/'/g,'\\\\\\'')+'\\'\">';"
+"h+='<span>'+n.ssid+'</span><span class=\"bars\">'+b+'</span></div>';"
+"});"
+"document.getElementById('nets').innerHTML=h;"
+"document.getElementById('status').innerText=d.length+' networks found';"
+"}).catch(e=>{document.getElementById('status').innerText='Scan failed';});"
+"}"
+"function save(){"
+"let s=document.getElementById('ssid').value,p=document.getElementById('pass').value,c=document.getElementById('code').value;"
+"if(!s){document.getElementById('status').innerText='Enter a network name';return;}"
+"if(!c||c.length!==6){document.getElementById('status').innerText='Enter your 6-digit claim code';return;}"
+"document.getElementById('status').innerText='Saving... Polly will reboot!';"
+"fetch('/connect',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},"
+"body:'ssid='+encodeURIComponent(s)+'&password='+encodeURIComponent(p)+'&claim_code='+encodeURIComponent(c)"
 "}).then(r=>r.text()).then(t=>{"
 "document.getElementById('status').innerText='Saved! Polly is rebooting...';"
 "}).catch(e=>{document.getElementById('status').innerText='Error: '+e;});"
@@ -921,15 +1044,19 @@ static esp_err_t portal_get_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // All other GETs: serve captive portal HTML
+    // All other GETs: serve captive portal HTML (with or without claim code field)
     httpd_resp_set_type(req, "text/html");
-    httpd_resp_send(req, CAPTIVE_PORTAL_HTML, sizeof(CAPTIVE_PORTAL_HTML) - 1);
+    if (device_provisioned) {
+        httpd_resp_send(req, CAPTIVE_PORTAL_HTML_WIFI_ONLY, sizeof(CAPTIVE_PORTAL_HTML_WIFI_ONLY) - 1);
+    } else {
+        httpd_resp_send(req, CAPTIVE_PORTAL_HTML_WITH_CLAIM, sizeof(CAPTIVE_PORTAL_HTML_WITH_CLAIM) - 1);
+    }
     return ESP_OK;
 }
 
 static esp_err_t portal_post_handler(httpd_req_t *req)
 {
-    char body[256] = {0};
+    char body[320] = {0};
     int len = httpd_req_recv(req, body, sizeof(body) - 1);
     if (len <= 0) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data");
@@ -937,10 +1064,11 @@ static esp_err_t portal_post_handler(httpd_req_t *req)
     }
     body[len] = '\0';
 
-    // Parse ssid=...&password=...
-    char raw_ssid[65] = {0}, raw_pass[65] = {0};
+    // Parse ssid=...&password=...&claim_code=...
+    char raw_ssid[65] = {0}, raw_pass[65] = {0}, raw_claim[8] = {0};
     char *ssid_start = strstr(body, "ssid=");
     char *pass_start = strstr(body, "password=");
+    char *claim_start = strstr(body, "claim_code=");
 
     if (ssid_start) {
         ssid_start += 5;
@@ -954,6 +1082,13 @@ static esp_err_t portal_post_handler(httpd_req_t *req)
         char *end = strchr(pass_start, '&');
         if (end) *end = '\0';
         url_decode(raw_pass, pass_start, sizeof(raw_pass));
+        if (end) *end = '&';
+    }
+    if (claim_start) {
+        claim_start += 11;
+        char *end = strchr(claim_start, '&');
+        if (end) *end = '\0';
+        url_decode(raw_claim, claim_start, sizeof(raw_claim));
     }
 
     if (strlen(raw_ssid) == 0) {
@@ -963,6 +1098,12 @@ static esp_err_t portal_post_handler(httpd_req_t *req)
 
     ESP_LOGI(TAG, "Portal: saving WiFi '%s'", raw_ssid);
     wifi_nvs_save(raw_ssid, raw_pass);
+
+    // Save claim code to NVS if provided (will be used after WiFi connects)
+    if (strlen(raw_claim) > 0) {
+        ESP_LOGI(TAG, "Portal: saving claim code to NVS");
+        device_nvs_save_claim_code(raw_claim);
+    }
 
     const char *resp = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<style>body{font-family:sans-serif;background:#1a1a2e;color:#e0e0e0;text-align:center;padding:40px;}"
@@ -1053,10 +1194,141 @@ static void captive_portal_start(void)
     esp_restart();
 }
 
+// --- Device provisioning via server (claim code → credentials) ---
+
+static bool device_provision_from_server(void)
+{
+    char claim_code[8] = {0};
+    if (!device_nvs_load_claim_code(claim_code, sizeof(claim_code))) {
+        ESP_LOGI(TAG, "No claim code in NVS — skipping server provisioning");
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Provisioning device with claim code: %s", claim_code);
+
+    // Build JSON body
+    char post_body[64];
+    snprintf(post_body, sizeof(post_body), "{\"claim_code\":\"%s\"}", claim_code);
+
+    // Build URL
+    char url[128];
+    snprintf(url, sizeof(url), "http://%s:%d/api/devices/provision", SERVER_HOST, SERVER_PORT);
+
+    esp_http_client_config_t cfg = {
+        .url = url,
+        .timeout_ms = 10000,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&cfg);
+    esp_http_client_set_method(client, HTTP_METHOD_POST);
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_post_field(client, post_body, strlen(post_body));
+
+    esp_err_t err = esp_http_client_perform(client);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Provisioning HTTP request failed: %s", esp_err_to_name(err));
+        esp_http_client_cleanup(client);
+        return false;
+    }
+
+    int status = esp_http_client_get_status_code(client);
+    int content_len = esp_http_client_get_content_length(client);
+    ESP_LOGI(TAG, "Provisioning response: status=%d, len=%d", status, content_len);
+
+    if (status != 200 || content_len <= 0 || content_len > 512) {
+        ESP_LOGE(TAG, "Provisioning failed — invalid claim code or server error");
+        esp_http_client_cleanup(client);
+        return false;
+    }
+
+    // Read response body — need to re-request with open/read pattern
+    esp_http_client_cleanup(client);
+
+    // Re-do with open/read to get body
+    client = esp_http_client_init(&cfg);
+    esp_http_client_set_method(client, HTTP_METHOD_POST);
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+
+    err = esp_http_client_open(client, strlen(post_body));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Provisioning open failed");
+        esp_http_client_cleanup(client);
+        return false;
+    }
+    esp_http_client_write(client, post_body, strlen(post_body));
+    content_len = esp_http_client_fetch_headers(client);
+    status = esp_http_client_get_status_code(client);
+
+    if (status != 200 || content_len <= 0) {
+        ESP_LOGE(TAG, "Provisioning failed: status=%d", status);
+        esp_http_client_cleanup(client);
+        return false;
+    }
+
+    char *resp = calloc(1, content_len + 1);
+    if (!resp) {
+        esp_http_client_cleanup(client);
+        return false;
+    }
+    esp_http_client_read(client, resp, content_len);
+    esp_http_client_cleanup(client);
+
+    // Simple JSON parse for device_id and api_key
+    char new_device_id[64] = {0}, new_api_key[64] = {0};
+    char *did_start = strstr(resp, "\"device_id\"");
+    char *key_start = strstr(resp, "\"api_key\"");
+
+    if (did_start) {
+        did_start = strchr(did_start + 11, '"');
+        if (did_start) {
+            did_start++;
+            char *end = strchr(did_start, '"');
+            if (end && (end - did_start) < (int)sizeof(new_device_id)) {
+                memcpy(new_device_id, did_start, end - did_start);
+            }
+        }
+    }
+    if (key_start) {
+        key_start = strchr(key_start + 9, '"');
+        if (key_start) {
+            key_start++;
+            char *end = strchr(key_start, '"');
+            if (end && (end - key_start) < (int)sizeof(new_api_key)) {
+                memcpy(new_api_key, key_start, end - key_start);
+            }
+        }
+    }
+    free(resp);
+
+    if (strlen(new_device_id) == 0 || strlen(new_api_key) == 0) {
+        ESP_LOGE(TAG, "Provisioning: failed to parse device_id/api_key from response");
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Provisioning success! device_id=%s", new_device_id);
+    device_nvs_save(new_device_id, new_api_key);
+    device_nvs_clear_claim_code();
+
+    // Load into globals
+    strncpy(g_device_id, new_device_id, sizeof(g_device_id) - 1);
+    strncpy(g_api_key, new_api_key, sizeof(g_api_key) - 1);
+
+    return true;
+}
+
 // --- Main provisioning init (replaces wifi_init) ---
 
 static void wifi_provision_init(void)
 {
+    // Load device credentials from NVS (or use fallback defines)
+    device_provisioned = device_nvs_load(g_device_id, sizeof(g_device_id),
+                                          g_api_key, sizeof(g_api_key));
+    if (!device_provisioned) {
+        // Use compiled-in fallback for legacy/dev devices
+        strncpy(g_device_id, DEVICE_ID_FALLBACK, sizeof(g_device_id) - 1);
+        strncpy(g_api_key, DEVICE_API_KEY_FALLBACK, sizeof(g_api_key) - 1);
+        ESP_LOGI(TAG, "No device credentials in NVS — using fallback: %s", g_device_id);
+    }
+
     // Check if GPIO0 (BOOT button) is held at startup = force provisioning
     gpio_config_t btn_check = {
         .pin_bit_mask = (1ULL << GPIO_NUM_0),
@@ -1101,6 +1373,16 @@ static void wifi_provision_init(void)
             if (strcmp((char *)current.sta.ssid, WIFI_SSID) == 0) {
                 wifi_nvs_save(WIFI_SSID, WIFI_PASSWORD);
             }
+
+            // WiFi connected — provision device if needed
+            if (!device_provisioned) {
+                if (device_provision_from_server()) {
+                    device_provisioned = true;
+                    ESP_LOGI(TAG, "Device provisioned via server: %s", g_device_id);
+                } else {
+                    ESP_LOGW(TAG, "Device provisioning failed — using fallback credentials");
+                }
+            }
             return;  // Connected!
         }
 
@@ -1108,6 +1390,15 @@ static void wifi_provision_init(void)
         ESP_LOGI(TAG, "Scan didn't match, trying saved networks directly...");
         for (int i = 0; i < count; i++) {
             if (wifi_try_connect(creds[i].ssid, creds[i].pass)) {
+                // WiFi connected — provision device if needed
+                if (!device_provisioned) {
+                    if (device_provision_from_server()) {
+                        device_provisioned = true;
+                        ESP_LOGI(TAG, "Device provisioned via server: %s", g_device_id);
+                    } else {
+                        ESP_LOGW(TAG, "Device provisioning failed — using fallback credentials");
+                    }
+                }
                 return;  // Connected!
             }
         }
@@ -1248,7 +1539,7 @@ static void ws_event_handler(void *arg, esp_event_base_t event_base,
                 snprintf(connect_msg, sizeof(connect_msg),
                     "{\"event\":\"connect\",\"device_id\":\"%s\",\"api_key\":\"%s\","
                     "\"fw_version\":\"%s\",\"fw_variant\":\"%s\"}",
-                    DEVICE_ID, DEVICE_API_KEY, FW_VERSION, FW_VARIANT);
+                    g_device_id, g_api_key, FW_VERSION, FW_VARIANT);
                 esp_websocket_client_send_text(ws_client, connect_msg,
                                                 strlen(connect_msg), pdMS_TO_TICKS(1000));
             }
@@ -1516,7 +1807,7 @@ static void ota_check_task(void *arg)
         char url[256];
         snprintf(url, sizeof(url),
             "http://%s:%d/api/firmware/check?device_id=%s&variant=%s&current_version=%s",
-            SERVER_HOST, SERVER_PORT, DEVICE_ID, FW_VARIANT, FW_VERSION);
+            SERVER_HOST, SERVER_PORT, g_device_id, FW_VARIANT, FW_VERSION);
 
         esp_http_client_config_t check_cfg = {
             .url = url,
@@ -1614,7 +1905,7 @@ static void ota_check_task(void *arg)
             .timeout_ms = 30000,
         };
         esp_http_client_handle_t dl_client = esp_http_client_init(&dl_cfg);
-        esp_http_client_set_header(dl_client, "X-API-Key", DEVICE_API_KEY);
+        esp_http_client_set_header(dl_client, "X-API-Key", g_api_key);
         esp_http_client_open(dl_client, 0);
         int total_len = esp_http_client_fetch_headers(dl_client);
         if (total_len <= 0) {

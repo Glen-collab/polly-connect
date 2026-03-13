@@ -1002,14 +1002,42 @@ class PollyDB:
             if not device:
                 return None
             conn.execute("""
-                UPDATE devices SET tenant_id = ?, claim_code = NULL,
-                claimed_at = CURRENT_TIMESTAMP WHERE device_id = ?
+                UPDATE devices SET tenant_id = ?, claimed_at = CURRENT_TIMESTAMP
+                WHERE device_id = ?
             """, (new_tenant_id, device["device_id"]))
             conn.commit()
             result = conn.execute(
                 "SELECT * FROM devices WHERE device_id = ?", (device["device_id"],)
             ).fetchone()
             return dict(result)
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def provision_device_by_claim_code(self, claim_code: str) -> Optional[Dict]:
+        """Device calls this with claim code to get its device_id + fresh api_key."""
+        from core.auth import generate_api_key
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            device = conn.execute(
+                "SELECT * FROM devices WHERE claim_code = ?",
+                (claim_code,)
+            ).fetchone()
+            if not device:
+                return None
+            # Generate fresh API key
+            raw_key = generate_api_key()
+            key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+            conn.execute(
+                "UPDATE devices SET api_key_hash = ? WHERE device_id = ?",
+                (key_hash, device["device_id"])
+            )
+            conn.commit()
+            return {
+                "device_id": device["device_id"],
+                "api_key": raw_key,
+            }
         finally:
             if not self._conn:
                 conn.close()

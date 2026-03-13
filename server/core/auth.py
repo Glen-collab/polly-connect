@@ -20,7 +20,7 @@ API_KEY = os.getenv("POLLY_API_KEY", "")
 
 # Paths that don't require API key auth
 # Web portal uses its own cookie-based session auth
-PUBLIC_PATHS = {"/", "/health", "/docs", "/openapi.json", "/redoc"}
+PUBLIC_PATHS = {"/", "/health", "/docs", "/openapi.json", "/redoc", "/api/devices/provision"}
 PUBLIC_PREFIXES = ["/web/", "/static/", "/api/firmware/"]
 
 
