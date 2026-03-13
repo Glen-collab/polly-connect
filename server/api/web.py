@@ -1475,6 +1475,77 @@ def _build_wav(pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1, sa
     return buf.getvalue()
 
 
+@router.post("/stories/record")
+async def web_record_story(request: Request):
+    """Record a memory directly from the phone — audio is always kept even without transcription."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    form = await request.form()
+    audio = form.get("audio")
+    speaker_name = form.get("speaker_name", "")
+
+    audio_data = await audio.read()
+    if len(audio_data) > MAX_AUDIO_SIZE:
+        return JSONResponse({"error": "Audio too large (max 5 minutes)"}, status_code=413)
+    if len(audio_data) < 1000:
+        return JSONResponse({"error": "Audio too short"}, status_code=400)
+
+    content_type = audio.content_type or ""
+    if "octet-stream" in content_type or "raw" in content_type:
+        wav_bytes = _build_wav(audio_data, sample_rate=16000)
+    elif "wav" in content_type:
+        wav_bytes = audio_data
+    else:
+        wav_bytes = audio_data if audio_data[:4] == b'RIFF' else _build_wav(audio_data)
+
+    # Save WAV file
+    recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+    os.makedirs(recordings_dir, exist_ok=True)
+    wav_filename = f"web_{uuid.uuid4().hex[:8]}.wav"
+    wav_path = os.path.join(recordings_dir, wav_filename)
+    with open(wav_path, "wb") as f:
+        f.write(wav_bytes)
+
+    # Try to transcribe, but keep audio regardless
+    transcriber = request.app.state.transcriber
+    transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+    if not transcription or len(transcription.strip()) < 5:
+        transcription = "[Audio memory]"
+
+    # Save as story
+    user = db.get_or_create_user(tenant_id=tid)
+    story_id = db.save_story(
+        transcript=transcription,
+        audio_s3_key=wav_filename,
+        speaker_name=speaker_name or None,
+        source="web_recording",
+        user_id=user["id"],
+        tenant_id=tid,
+    )
+
+    # Extract memory if transcription is real
+    if transcription != "[Audio memory]":
+        memory_extractor = getattr(request.app.state, "memory_extractor", None)
+        if memory_extractor:
+            try:
+                await asyncio.to_thread(
+                    memory_extractor.extract_and_save_memories,
+                    db, transcription, user["id"], tid,
+                    speaker_name=speaker_name or None,
+                    question_text=None,
+                )
+            except Exception as e:
+                logger.error(f"Memory extraction failed for web recording: {e}")
+
+    return JSONResponse({"transcript": transcription, "story_id": story_id})
+
+
 @router.post("/photos/{photo_id}/record-story")
 async def photo_record_story(request: Request, photo_id: int,
                               audio: UploadFile = File(...),
@@ -1522,8 +1593,7 @@ async def photo_record_story(request: Request, photo_id: int,
     transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
 
     if not transcription or len(transcription.strip()) < 5:
-        os.remove(wav_path)
-        return JSONResponse({"error": "Could not understand the audio. Try speaking louder or closer to the mic."}, status_code=422)
+        transcription = "[Audio memory]"
 
     # Build question context from photo caption + tags
     caption = photo.get("caption") or "this photo"
