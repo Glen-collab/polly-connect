@@ -184,13 +184,87 @@ async def register_submit(request: Request, name: str = Form(...),
     )
     db.update_account_login(account_id)
 
-    response = RedirectResponse("/web/dashboard", status_code=302)
+    response = RedirectResponse("/web/welcome", status_code=302)
     response.set_cookie(
         "polly_session", session_id,
         max_age=settings.SESSION_DURATION_HOURS * 3600,
         httponly=True, samesite="lax",
     )
     return response
+
+
+# ── Welcome / Onboarding (first login) ──
+
+@router.get("/welcome", response_class=HTMLResponse)
+async def welcome_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    user = db.get_or_create_user(tenant_id=session["tenant_id"])
+    # If already set up, skip to dashboard
+    if user.get("setup_complete"):
+        return RedirectResponse("/web/dashboard", status_code=302)
+    return templates.TemplateResponse("welcome.html", {
+        "request": request,
+        "session": session,
+        "user": user,
+    })
+
+
+@router.post("/welcome")
+async def welcome_save(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    form = await request.form()
+    db = request.app.state.db
+    user = db.get_or_create_user(tenant_id=session["tenant_id"])
+
+    name = form.get("name", "").strip()
+    familiar_name = form.get("familiar_name", "").strip()
+    hometown = form.get("hometown", "").strip()
+    birth_year = form.get("birth_year", "").strip()
+    location_city = form.get("location_city", "").strip()
+
+    # Parse birth year
+    birth_year_int = None
+    if birth_year:
+        try:
+            birth_year_int = int(birth_year)
+            birth_year_int = max(1900, min(2010, birth_year_int))
+        except ValueError:
+            pass
+
+    # Geocode location
+    location_lat = None
+    location_lon = None
+    if location_city:
+        coords = _geocode_city(location_city)
+        if coords:
+            location_lat, location_lon = coords
+
+    conn = db._get_connection()
+    try:
+        conn.execute("""
+            UPDATE user_profiles SET name = ?, familiar_name = ?,
+            hometown = ?, birth_year = ?,
+            location_city = ?, location_lat = ?, location_lon = ?,
+            setup_complete = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (name or user.get("name"), familiar_name or None,
+              hometown or None, birth_year_int,
+              location_city or None, location_lat, location_lon,
+              user["id"]))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return RedirectResponse("/web/dashboard", status_code=303)
 
 
 # ── Family access routes ──
@@ -258,6 +332,12 @@ async def dashboard(request: Request):
 
     db = request.app.state.db
     tid = session["tenant_id"]
+
+    # Redirect owners to welcome page if they haven't completed first-time setup
+    if session.get("role") == "owner" and not session.get("is_admin"):
+        user = db.get_or_create_user(tenant_id=tid)
+        if not user.get("setup_complete"):
+            return RedirectResponse("/web/welcome", status_code=302)
 
     stories = db.get_stories(limit=5, tenant_id=tid)
     medications = db.get_medications(tenant_id=tid)
@@ -948,21 +1028,7 @@ async def settings_page(request: Request):
 
 
 @router.post("/settings")
-async def settings_save(request: Request, name: str = Form(...),
-                        familiar_name: str = Form(""),
-                        bible_topic_preference: str = Form(""),
-                        music_genre_preference: str = Form(""),
-                        memory_care_mode: str = Form(""),
-                        location_city: str = Form(""),
-                        hometown: str = Form(""),
-                        birth_year: str = Form(""),
-                        squawk_interval: int = Form(10),
-                        chatter_interval: int = Form(45),
-                        quiet_hours_start: int = Form(21),
-                        quiet_hours_end: int = Form(7),
-                        squawk_volume: int = Form(30),
-                        voice_volume: int = Form(100),
-                        rms_threshold: int = Form(200)):
+async def settings_save(request: Request):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -971,21 +1037,50 @@ async def settings_save(request: Request, name: str = Form(...),
     db = request.app.state.db
     user = db.get_or_create_user(tenant_id=session["tenant_id"])
 
+    # Parse form data — each section only sends its own fields
+    form = await request.form()
+
+    # Start with current DB values as defaults
+    name = form.get("name", user.get("name") or "")
+    familiar_name = form.get("familiar_name", user.get("familiar_name") or "")
+    hometown = form.get("hometown", user.get("hometown") or "")
+    birth_year = form.get("birth_year", str(user.get("birth_year") or ""))
+    bible_topic_preference = form.get("bible_topic_preference", user.get("bible_topic_preference") or "")
+    music_genre_preference = form.get("music_genre_preference", user.get("music_genre_preference") or "")
+    location_city = form.get("location_city", user.get("location_city") or "")
+    # Checkbox: only present in form if checked AND this is the prefs section
+    section = form.get("_section", "")
+    if section == "prefs":
+        memory_care_mode = form.get("memory_care_mode", "")
+    else:
+        memory_care_mode = "1" if user.get("memory_care_mode") else ""
+    squawk_interval = int(form.get("squawk_interval", user.get("squawk_interval") or 10))
+    chatter_interval = int(form.get("chatter_interval", user.get("chatter_interval") or 45))
+    quiet_hours_start = int(form.get("quiet_hours_start",
+                            user.get("quiet_hours_start") if user.get("quiet_hours_start") is not None else 21))
+    quiet_hours_end = int(form.get("quiet_hours_end",
+                          user.get("quiet_hours_end") if user.get("quiet_hours_end") is not None else 7))
+    squawk_volume = int(form.get("squawk_volume",
+                        user.get("squawk_volume") if user.get("squawk_volume") is not None else 30))
+    voice_volume = int(form.get("voice_volume",
+                       user.get("voice_volume") if user.get("voice_volume") is not None else 100))
+    rms_threshold = int(form.get("rms_threshold",
+                        user.get("rms_threshold") if user.get("rms_threshold") is not None else 200))
+
     # Clamp intervals to reasonable bounds
-    squawk_interval = max(0, min(60, squawk_interval))       # 0 = off
-    chatter_interval = max(0, min(240, chatter_interval))    # 0 = off
+    squawk_interval = max(0, min(60, squawk_interval))
+    chatter_interval = max(0, min(240, chatter_interval))
     quiet_hours_start = max(0, min(23, quiet_hours_start))
     quiet_hours_end = max(0, min(23, quiet_hours_end))
-    squawk_volume = max(0, min(100, squawk_volume))          # 0-100%
-    voice_volume = max(10, min(100, voice_volume))           # 10-100%
-    rms_threshold = max(50, min(2000, rms_threshold))        # 50-2000
+    squawk_volume = max(0, min(100, squawk_volume))
+    voice_volume = max(10, min(100, voice_volume))
+    rms_threshold = max(50, min(2000, rms_threshold))
 
     # Geocode location if changed
     location_lat = user.get("location_lat")
     location_lon = user.get("location_lon")
     if location_city and location_city.strip():
         location_city = location_city.strip()
-        # Only re-geocode if city changed
         if location_city != (user.get("location_city") or ""):
             coords = _geocode_city(location_city)
             if coords:

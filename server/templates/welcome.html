@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Welcome - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto mt-4 sm:mt-8">
+    <div class="text-center mb-6">
+        <div class="text-5xl mb-2">🦜</div>
+        <h1 class="text-2xl font-bold text-emerald-700">Welcome to Polly Connect!</h1>
+        <p class="text-gray-500 text-sm mt-2">Let's get to know who Polly is for so we can personalize the experience.</p>
+    </div>
+
+    <form method="POST" action="/web/welcome" class="bg-white rounded-lg shadow p-5 sm:p-6">
+        <h2 class="text-lg font-semibold mb-1">Who is Polly for?</h2>
+        <p class="text-xs text-gray-400 mb-4">This is the person Polly will talk to — the owner. You (the caretaker) are setting this up for them.</p>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Their Full Name</label>
+                <input type="text" name="name" value="{{ user.name or '' }}" required
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                       placeholder="e.g. Evelyn Rogers">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">What should Polly call them?</label>
+                <input type="text" name="familiar_name" value="{{ user.familiar_name or '' }}"
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                       placeholder="e.g. Grandma, Nana, Mom, Evelyn">
+                <p class="text-xs text-gray-400 mt-1">Polly will use this name when talking to them</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Where did they grow up?</label>
+                <input type="text" name="hometown" value="{{ user.hometown or '' }}"
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                       placeholder="e.g. Mauston, Wisconsin">
+                <p class="text-xs text-gray-400 mt-1">Used for nostalgia snippets and personalized stories</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">What year were they born?</label>
+                <input type="number" name="birth_year" value="{{ user.birth_year or '' }}"
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                       placeholder="e.g. 1932" min="1900" max="2010">
+                <p class="text-xs text-gray-400 mt-1">Helps Polly reference the right era for memories</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Their location (for weather)</label>
+                <input type="text" name="location_city" value="{{ user.location_city or '' }}"
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                       placeholder="e.g. Hartland, WI">
+                <p class="text-xs text-gray-400 mt-1">So Polly can give accurate weather reports</p>
+            </div>
+        </div>
+
+        <button type="submit"
+                class="w-full mt-6 bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 font-medium text-base">
+            Get Started
+        </button>
+        <p class="text-center text-xs text-gray-400 mt-3">You can update all of this later in Settings</p>
+    </form>
+</div>
+{% endblock %}

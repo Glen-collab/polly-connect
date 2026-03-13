@@ -11,228 +11,280 @@
 </div>
 {% endif %}
 
-<form id="settings-form" method="POST" action="/web/settings">
-    <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
-        <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">User Profile</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div>
-                <label class="block text-sm text-gray-600 mb-1">Name</label>
-                <input type="text" name="name" value="{{ user.name }}"
+<!-- User Profile -->
+<div class="bg-white rounded-lg shadow mb-4">
+    <button type="button" onclick="toggleSection('profile')"
+            class="w-full flex items-center justify-between p-4 sm:p-5 text-left">
+        <h2 class="text-base sm:text-lg font-semibold">User Profile</h2>
+        <svg id="profile-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div id="profile-body" class="hidden border-t px-4 sm:px-5 pb-4 sm:pb-5 pt-3">
+        <form method="POST" action="/web/settings">
+            <input type="hidden" name="_section" value="profile">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Name</label>
+                    <input type="text" name="name" value="{{ user.name }}"
+                           class="w-full border rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Familiar Name (what Polly calls them)</label>
+                    <input type="text" name="familiar_name" value="{{ user.familiar_name or '' }}"
+                           class="w-full border rounded px-3 py-2 text-sm" placeholder="Grandma">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Hometown (where they grew up)</label>
+                    <input type="text" name="hometown" value="{{ user.hometown or '' }}"
+                           class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Mauston, Wisconsin">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
+                    <input type="number" name="birth_year" value="{{ user.birth_year or '' }}"
+                           class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1979"
+                           min="1900" max="2010">
+                </div>
+            </div>
+            <button type="submit" class="mt-4 bg-emerald-600 text-white px-5 py-2 rounded hover:bg-emerald-700 text-sm font-medium">
+                Save Profile
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Preferences -->
+<div class="bg-white rounded-lg shadow mb-4">
+    <button type="button" onclick="toggleSection('prefs')"
+            class="w-full flex items-center justify-between p-4 sm:p-5 text-left">
+        <h2 class="text-base sm:text-lg font-semibold">Preferences</h2>
+        <svg id="prefs-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div id="prefs-body" class="hidden border-t px-4 sm:px-5 pb-4 sm:pb-5 pt-3">
+        <form method="POST" action="/web/settings">
+            <input type="hidden" name="_section" value="prefs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Bible Verse Topic</label>
+                    <select name="bible_topic_preference" class="w-full border rounded px-3 py-2 text-sm">
+                        <option value="">Any topic</option>
+                        <option value="comfort" {% if user.bible_topic_preference == 'comfort' %}selected{% endif %}>Comfort</option>
+                        <option value="strength" {% if user.bible_topic_preference == 'strength' %}selected{% endif %}>Strength</option>
+                        <option value="peace" {% if user.bible_topic_preference == 'peace' %}selected{% endif %}>Peace</option>
+                        <option value="love" {% if user.bible_topic_preference == 'love' %}selected{% endif %}>Love</option>
+                        <option value="faith" {% if user.bible_topic_preference == 'faith' %}selected{% endif %}>Faith</option>
+                        <option value="hope" {% if user.bible_topic_preference == 'hope' %}selected{% endif %}>Hope</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Music Genre</label>
+                    <select name="music_genre_preference" class="w-full border rounded px-3 py-2 text-sm">
+                        <option value="">Any genre</option>
+                        <option value="country" {% if user.music_genre_preference == 'country' %}selected{% endif %}>Country</option>
+                        <option value="gospel" {% if user.music_genre_preference == 'gospel' %}selected{% endif %}>Gospel</option>
+                        <option value="folk" {% if user.music_genre_preference == 'folk' %}selected{% endif %}>Folk</option>
+                        <option value="classical" {% if user.music_genre_preference == 'classical' %}selected{% endif %}>Classical</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mt-3">
+                <label class="block text-sm text-gray-600 mb-1">Location (for weather)</label>
+                <input type="text" name="location_city" value="{{ user.location_city or '' }}"
+                       placeholder="e.g. Hartland, WI"
+                       class="w-full sm:w-1/2 border rounded px-3 py-2 text-sm">
+                <p class="text-xs text-gray-400 mt-1">City and state for accurate weather reports</p>
+            </div>
+            <div class="mt-4">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="memory_care_mode" value="1"
+                           {% if user.memory_care_mode %}checked{% endif %} class="w-5 h-5">
+                    <span class="text-sm text-gray-700">Memory Care Mode (extra patience, gentle redirects)</span>
+                </label>
+            </div>
+            <button type="submit" class="mt-4 bg-emerald-600 text-white px-5 py-2 rounded hover:bg-emerald-700 text-sm font-medium">
+                Save Preferences
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Polly Sounds -->
+<div class="bg-white rounded-lg shadow mb-4">
+    <button type="button" onclick="toggleSection('sounds')"
+            class="w-full flex items-center justify-between p-4 sm:p-5 text-left">
+        <h2 class="text-base sm:text-lg font-semibold">Polly Sounds</h2>
+        <svg id="sounds-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div id="sounds-body" class="hidden border-t px-4 sm:px-5 pb-4 sm:pb-5 pt-3">
+        <form method="POST" action="/web/settings">
+            <input type="hidden" name="_section" value="sounds">
+            <p class="text-xs text-gray-500 mb-3">Control how often Polly makes bird sounds. Short squawks are quick chirps. Chatter is longer parakeet conversations.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Short Squawks (every N minutes)</label>
+                    <select name="squawk_interval" class="w-full border rounded px-3 py-2 text-sm">
+                        {% for val, label in [(0, "Off"), (5, "Every 5 min (frequent)"), (10, "Every 10 min (default)"), (15, "Every 15 min"), (30, "Every 30 min"), (60, "Every 60 min (rare)")] %}
+                        <option value="{{ val }}" {% if (user.squawk_interval or 10) == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Long Chatter (every N minutes)</label>
+                    <select name="chatter_interval" class="w-full border rounded px-3 py-2 text-sm">
+                        {% for val, label in [(0, "Off"), (15, "Every 15 min"), (30, "Every 30 min"), (45, "Every 45 min (default)"), (60, "Every hour"), (120, "Every 2 hours"), (240, "Every 4 hours (rare)")] %}
+                        <option value="{{ val }}" {% if (user.chatter_interval or 45) == val %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="mt-3 sm:mt-4">
+                <label class="block text-sm text-gray-600 mb-1">Bird Sound Volume</label>
+                <div class="flex items-center gap-3">
+                    <input type="range" name="squawk_volume" min="0" max="100" step="5"
+                           value="{{ user.squawk_volume if user.squawk_volume is not none else 30 }}"
+                           class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                           oninput="document.getElementById('vol-label').textContent = this.value + '%'">
+                    <span id="vol-label" class="text-sm font-medium text-gray-700 w-10 text-right">{{ user.squawk_volume if user.squawk_volume is not none else 30 }}%</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">How loud Polly's squawks and chatter are (default 30%)</p>
+            </div>
+            <div class="mt-3 sm:mt-4">
+                <label class="block text-sm text-gray-600 mb-1">Voice Volume</label>
+                <div class="flex items-center gap-3">
+                    <input type="range" name="voice_volume" min="10" max="100" step="5"
+                           value="{{ user.voice_volume if user.voice_volume is not none else 100 }}"
+                           class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                           oninput="document.getElementById('voice-vol-label').textContent = this.value + '%'">
+                    <span id="voice-vol-label" class="text-sm font-medium text-gray-700 w-10 text-right">{{ user.voice_volume if user.voice_volume is not none else 100 }}%</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">How loud Polly speaks (default 100%)</p>
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm text-gray-700 font-medium mb-2">Quiet Hours (no bird sounds)</label>
+                <p class="text-xs text-gray-500 mb-2">Polly goes to sleep and wakes up automatically each day. She'll still respond if you talk to her.</p>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-sm text-gray-600">Bedtime:</span>
+                    <select name="quiet_hours_start" class="border rounded px-2 py-1 text-sm">
+                        {% for h in range(24) %}
+                        <option value="{{ h }}" {% if (user.quiet_hours_start if user.quiet_hours_start is not none else 21) == h %}selected{% endif %}>
+                            {{ "12" if h == 0 or h == 12 else (h if h < 12 else h - 12) }}:00 {{ "AM" if h < 12 else "PM" }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <span class="text-sm text-gray-600">Wake up:</span>
+                    <select name="quiet_hours_end" class="border rounded px-2 py-1 text-sm">
+                        {% for h in range(24) %}
+                        <option value="{{ h }}" {% if (user.quiet_hours_end if user.quiet_hours_end is not none else 7) == h %}selected{% endif %}>
+                            {{ "12" if h == 0 or h == 12 else (h if h < 12 else h - 12) }}:00 {{ "AM" if h < 12 else "PM" }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="mt-4 bg-emerald-600 text-white px-5 py-2 rounded hover:bg-emerald-700 text-sm font-medium">
+                Save Sounds
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Pronunciation Guide & Voice Sensitivity -->
+<div class="bg-white rounded-lg shadow mb-4">
+    <button type="button" onclick="toggleSection('voice')"
+            class="w-full flex items-center justify-between p-4 sm:p-5 text-left">
+        <h2 class="text-base sm:text-lg font-semibold">Pronunciation & Voice Sensitivity</h2>
+        <svg id="voice-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div id="voice-body" class="hidden border-t px-4 sm:px-5 pb-4 sm:pb-5 pt-3">
+        <!-- Pronunciation Guide -->
+        <h3 class="text-sm font-semibold text-gray-700 mb-2">Pronunciation Guide</h3>
+        <p class="text-xs text-gray-500 mb-3">
+            Teach Polly how to say names correctly. Type the word as it's spelled, then how it sounds.
+            For example: <strong>Nawrott</strong> &rarr; <strong>Nore-Rott</strong>
+        </p>
+
+        {% if pronunciations %}
+        <div class="mb-4">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600 text-left">
+                    <tr>
+                        <th class="px-3 py-2 font-medium">Spelled</th>
+                        <th class="px-3 py-2 font-medium">Says It As</th>
+                        <th class="px-3 py-2 font-medium w-16"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for p in pronunciations %}
+                    <tr>
+                        <td class="px-3 py-2 font-medium text-gray-800">{{ p.word }}</td>
+                        <td class="px-3 py-2 text-emerald-700 italic">{{ p.phonetic }}</td>
+                        <td class="px-3 py-2">
+                            <form method="POST" action="/web/settings/pronunciation/delete" class="inline"
+                                  onsubmit="return confirm('Remove this pronunciation?');">
+                                <input type="hidden" name="pronunciation_id" value="{{ p.id }}">
+                                <button type="submit" class="text-red-400 hover:text-red-600 text-lg" title="Delete">&times;</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/web/settings/pronunciation/add" class="flex flex-col sm:flex-row gap-2 items-end mb-6">
+            <div class="flex-1">
+                <label class="block text-xs text-gray-500 mb-1">Word (as spelled)</label>
+                <input type="text" name="word" placeholder="Nawrott"
+                       class="w-full border rounded px-3 py-2 text-sm">
+            </div>
+            <div class="flex-1">
+                <label class="block text-xs text-gray-500 mb-1">How to say it</label>
+                <input type="text" name="phonetic" placeholder="Nore-Rott"
                        class="w-full border rounded px-3 py-2 text-sm">
             </div>
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Familiar Name (what Polly calls them)</label>
-                <input type="text" name="familiar_name" value="{{ user.familiar_name or '' }}"
-                       class="w-full border rounded px-3 py-2 text-sm" placeholder="Grandma">
+                <button type="submit"
+                        class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm whitespace-nowrap">
+                    Add
+                </button>
             </div>
-            <div>
-                <label class="block text-sm text-gray-600 mb-1">Hometown (where they grew up)</label>
-                <input type="text" name="hometown" value="{{ user.hometown or '' }}"
-                       class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Mauston, Wisconsin">
-            </div>
-            <div>
-                <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
-                <input type="number" name="birth_year" value="{{ user.birth_year or '' }}"
-                       class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1979"
-                       min="1900" max="2010">
-            </div>
-        </div>
-    </div>
+        </form>
 
-    <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
-        <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Preferences</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        <!-- Voice Sensitivity -->
+        <h3 class="text-sm font-semibold text-gray-700 mb-2 border-t pt-4">Voice Sensitivity</h3>
+        <p class="text-xs text-gray-500 mb-3">Controls how loud someone needs to speak before Polly starts listening. Lower = more sensitive. Higher = less sensitive.</p>
+        <form method="POST" action="/web/settings">
+            <input type="hidden" name="_section" value="voice">
             <div>
-                <label class="block text-sm text-gray-600 mb-1">Bible Verse Topic</label>
-                <select name="bible_topic_preference" class="w-full border rounded px-3 py-2 text-sm">
-                    <option value="">Any topic</option>
-                    <option value="comfort" {% if user.bible_topic_preference == 'comfort' %}selected{% endif %}>Comfort</option>
-                    <option value="strength" {% if user.bible_topic_preference == 'strength' %}selected{% endif %}>Strength</option>
-                    <option value="peace" {% if user.bible_topic_preference == 'peace' %}selected{% endif %}>Peace</option>
-                    <option value="love" {% if user.bible_topic_preference == 'love' %}selected{% endif %}>Love</option>
-                    <option value="faith" {% if user.bible_topic_preference == 'faith' %}selected{% endif %}>Faith</option>
-                    <option value="hope" {% if user.bible_topic_preference == 'hope' %}selected{% endif %}>Hope</option>
-                </select>
+                <label class="block text-sm text-gray-600 mb-1">RMS Threshold</label>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs text-gray-400">Sensitive</span>
+                    <input type="range" name="rms_threshold" min="50" max="2000" step="25"
+                           value="{{ user.rms_threshold if user.rms_threshold is not none else 200 }}"
+                           class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                           oninput="document.getElementById('rms-label').textContent = this.value">
+                    <span class="text-xs text-gray-400">Loud only</span>
+                    <span id="rms-label" class="text-sm font-medium text-gray-700 w-12 text-right">{{ user.rms_threshold if user.rms_threshold is not none else 200 }}</span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Default: 200. Quiet home: 100-200. Noisy room: 300-500.</p>
             </div>
-            <div>
-                <label class="block text-sm text-gray-600 mb-1">Music Genre</label>
-                <select name="music_genre_preference" class="w-full border rounded px-3 py-2 text-sm">
-                    <option value="">Any genre</option>
-                    <option value="country" {% if user.music_genre_preference == 'country' %}selected{% endif %}>Country</option>
-                    <option value="gospel" {% if user.music_genre_preference == 'gospel' %}selected{% endif %}>Gospel</option>
-                    <option value="folk" {% if user.music_genre_preference == 'folk' %}selected{% endif %}>Folk</option>
-                    <option value="classical" {% if user.music_genre_preference == 'classical' %}selected{% endif %}>Classical</option>
-                </select>
-            </div>
-        </div>
-        <div class="mt-3">
-            <label class="block text-sm text-gray-600 mb-1">Location (for weather)</label>
-            <input type="text" name="location_city" value="{{ user.location_city or '' }}"
-                   placeholder="e.g. Hartland, WI"
-                   class="w-full sm:w-1/2 border rounded px-3 py-2 text-sm">
-            <p class="text-xs text-gray-400 mt-1">City and state for accurate weather reports</p>
-        </div>
-        <div class="mt-4">
-            <label class="flex items-center gap-2">
-                <input type="checkbox" name="memory_care_mode" value="1"
-                       {% if user.memory_care_mode %}checked{% endif %} class="w-5 h-5">
-                <span class="text-sm text-gray-700">Memory Care Mode (extra patience, gentle redirects)</span>
-            </label>
-        </div>
-    </div>
-</form>
-
-<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6" id="pronunciation">
-    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Pronunciation Guide</h2>
-    <p class="text-xs text-gray-500 mb-3">
-        Teach Polly how to say names correctly. Type the word as it's spelled, then how it sounds.
-        For example: <strong>Nawrott</strong> → <strong>Nore-Rott</strong>
-    </p>
-
-    {% if pronunciations %}
-    <div class="mb-4">
-        <table class="w-full text-sm">
-            <thead class="bg-gray-50 text-gray-600 text-left">
-                <tr>
-                    <th class="px-3 py-2 font-medium">Spelled</th>
-                    <th class="px-3 py-2 font-medium">Says It As</th>
-                    <th class="px-3 py-2 font-medium w-16"></th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                {% for p in pronunciations %}
-                <tr>
-                    <td class="px-3 py-2 font-medium text-gray-800">{{ p.word }}</td>
-                    <td class="px-3 py-2 text-emerald-700 italic">{{ p.phonetic }}</td>
-                    <td class="px-3 py-2">
-                        <form method="POST" action="/web/settings/pronunciation/delete" class="inline"
-                              onsubmit="return confirm('Remove this pronunciation?');">
-                            <input type="hidden" name="pronunciation_id" value="{{ p.id }}">
-                            <button type="submit" class="text-red-400 hover:text-red-600 text-lg" title="Delete">&times;</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% endif %}
-
-    <div class="flex flex-col sm:flex-row gap-2 items-end">
-        <div class="flex-1">
-            <label class="block text-xs text-gray-500 mb-1">Word (as spelled)</label>
-            <input type="text" form="pron-form" name="word" placeholder="Nawrott"
-                   class="w-full border rounded px-3 py-2 text-sm">
-        </div>
-        <div class="flex-1">
-            <label class="block text-xs text-gray-500 mb-1">How to say it</label>
-            <input type="text" form="pron-form" name="phonetic" placeholder="Nore-Rott"
-                   class="w-full border rounded px-3 py-2 text-sm">
-        </div>
-        <div>
-            <button type="submit" form="pron-form"
-                    class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm whitespace-nowrap">
-                Add
+            <button type="submit" class="mt-4 bg-emerald-600 text-white px-5 py-2 rounded hover:bg-emerald-700 text-sm font-medium">
+                Save Sensitivity
             </button>
-        </div>
-    </div>
-    <form id="pron-form" method="POST" action="/web/settings/pronunciation/add"></form>
-</div>
-
-<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
-    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Polly Sounds</h2>
-    <p class="text-xs text-gray-500 mb-3">Control how often Polly makes bird sounds. Short squawks are quick chirps. Chatter is longer parakeet conversations.</p>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">Short Squawks (every N minutes)</label>
-            <select name="squawk_interval" form="settings-form" class="w-full border rounded px-3 py-2 text-sm">
-                {% for val, label in [(0, "Off"), (5, "Every 5 min (frequent)"), (10, "Every 10 min (default)"), (15, "Every 15 min"), (30, "Every 30 min"), (60, "Every 60 min (rare)")] %}
-                <option value="{{ val }}" {% if (user.squawk_interval or 10) == val %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label class="block text-sm text-gray-600 mb-1">Long Chatter (every N minutes)</label>
-            <select name="chatter_interval" form="settings-form" class="w-full border rounded px-3 py-2 text-sm">
-                {% for val, label in [(0, "Off"), (15, "Every 15 min"), (30, "Every 30 min"), (45, "Every 45 min (default)"), (60, "Every hour"), (120, "Every 2 hours"), (240, "Every 4 hours (rare)")] %}
-                <option value="{{ val }}" {% if (user.chatter_interval or 45) == val %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-    </div>
-    <div class="mt-3 sm:mt-4">
-        <label class="block text-sm text-gray-600 mb-1">Bird Sound Volume</label>
-        <div class="flex items-center gap-3">
-            <input type="range" name="squawk_volume" form="settings-form" min="0" max="100" step="5"
-                   value="{{ user.squawk_volume if user.squawk_volume is not none else 30 }}"
-                   class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                   oninput="document.getElementById('vol-label').textContent = this.value + '%'">
-            <span id="vol-label" class="text-sm font-medium text-gray-700 w-10 text-right">{{ user.squawk_volume if user.squawk_volume is not none else 30 }}%</span>
-        </div>
-        <p class="text-xs text-gray-400 mt-1">How loud Polly's squawks and chatter are (default 30%)</p>
-    </div>
-    <div class="mt-3 sm:mt-4">
-        <label class="block text-sm text-gray-600 mb-1">Voice Volume</label>
-        <div class="flex items-center gap-3">
-            <input type="range" name="voice_volume" form="settings-form" min="10" max="100" step="5"
-                   value="{{ user.voice_volume if user.voice_volume is not none else 100 }}"
-                   class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                   oninput="document.getElementById('voice-vol-label').textContent = this.value + '%'">
-            <span id="voice-vol-label" class="text-sm font-medium text-gray-700 w-10 text-right">{{ user.voice_volume if user.voice_volume is not none else 100 }}%</span>
-        </div>
-        <p class="text-xs text-gray-400 mt-1">How loud Polly speaks (default 100%)</p>
-    </div>
-    <div class="mt-4">
-        <label class="block text-sm text-gray-700 font-medium mb-2">Quiet Hours (no bird sounds)</label>
-        <p class="text-xs text-gray-500 mb-2">Polly goes to sleep and wakes up automatically each day. She'll still respond if you talk to her.</p>
-        <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-sm text-gray-600">Bedtime:</span>
-            <select name="quiet_hours_start" form="settings-form" class="border rounded px-2 py-1 text-sm">
-                {% for h in range(24) %}
-                {% set ampm = "AM" if h < 12 else "PM" %}
-                {% set h12 = h if h == 0 or h == 12 %}
-                <option value="{{ h }}" {% if (user.quiet_hours_start if user.quiet_hours_start is not none else 21) == h %}selected{% endif %}>
-                    {{ "12" if h == 0 or h == 12 else (h if h < 12 else h - 12) }}:00 {{ "AM" if h < 12 else "PM" }}
-                </option>
-                {% endfor %}
-            </select>
-            <span class="text-sm text-gray-600">Wake up:</span>
-            <select name="quiet_hours_end" form="settings-form" class="border rounded px-2 py-1 text-sm">
-                {% for h in range(24) %}
-                <option value="{{ h }}" {% if (user.quiet_hours_end if user.quiet_hours_end is not none else 7) == h %}selected{% endif %}>
-                    {{ "12" if h == 0 or h == 12 else (h if h < 12 else h - 12) }}:00 {{ "AM" if h < 12 else "PM" }}
-                </option>
-                {% endfor %}
-            </select>
-        </div>
+        </form>
     </div>
 </div>
 
-<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
-    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Voice Sensitivity</h2>
-    <p class="text-xs text-gray-500 mb-3">Controls how loud someone needs to speak before Polly starts listening. Lower = more sensitive (picks up quiet speech but may false-trigger in noisy rooms). Higher = less sensitive (ignores background noise but needs louder speech).</p>
-    <div>
-        <label class="block text-sm text-gray-600 mb-1">RMS Threshold</label>
-        <div class="flex items-center gap-3">
-            <span class="text-xs text-gray-400">Sensitive</span>
-            <input type="range" name="rms_threshold" form="settings-form" min="50" max="2000" step="25"
-                   value="{{ user.rms_threshold if user.rms_threshold is not none else 200 }}"
-                   class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                   oninput="document.getElementById('rms-label').textContent = this.value">
-            <span class="text-xs text-gray-400">Loud only</span>
-            <span id="rms-label" class="text-sm font-medium text-gray-700 w-12 text-right">{{ user.rms_threshold if user.rms_threshold is not none else 200 }}</span>
-        </div>
-        <p class="text-xs text-gray-400 mt-1">Default: 200. Quiet home: 100-200. Noisy room: 300-500. Very loud environment: 500+</p>
-    </div>
-</div>
-
-<button type="submit" form="settings-form" class="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-emerald-700 text-sm mb-4">
-    Save Settings
-</button>
-
-<!-- Snooze Polly -->
-<div class="bg-white rounded-lg shadow p-4 sm:p-6 mt-4 sm:mt-6">
-    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Snooze Polly</h2>
+<!-- Snooze Polly (always open) -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-5 mb-4">
+    <h2 class="text-base sm:text-lg font-semibold mb-3">Snooze Polly</h2>
     <p class="text-xs sm:text-sm text-gray-500 mb-3">
         Temporarily quiet all bird sounds — great for nap time. Polly will still respond to voice commands.
     </p>
@@ -249,35 +301,27 @@
     <div class="flex flex-wrap gap-2">
         <form method="POST" action="/web/settings/squawk-snooze">
             <input type="hidden" name="duration" value="30">
-            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">
-                Snooze 30 min
-            </button>
+            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 30 min</button>
         </form>
         <form method="POST" action="/web/settings/squawk-snooze">
             <input type="hidden" name="duration" value="60">
-            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">
-                Snooze 1 hour
-            </button>
+            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 1 hour</button>
         </form>
         <form method="POST" action="/web/settings/squawk-snooze">
             <input type="hidden" name="duration" value="120">
-            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">
-                Snooze 2 hours
-            </button>
+            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 2 hours</button>
         </form>
         <form method="POST" action="/web/settings/squawk-snooze">
             <input type="hidden" name="duration" value="480">
-            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">
-                Snooze 8 hours
-            </button>
+            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 8 hours</button>
         </form>
     </div>
     {% endif %}
 </div>
 
-<!-- Family Access Code -->
-<div class="bg-white rounded-lg shadow p-4 sm:p-6 mt-4 sm:mt-6">
-    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Family Access Code</h2>
+<!-- Family Access Code (always open) -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-5 mb-4">
+    <h2 class="text-base sm:text-lg font-semibold mb-3">Family Access Code</h2>
     <p class="text-xs sm:text-sm text-gray-500 mb-4">
         Share this code with family members so they can view stories, photos, medications, and verify transcriptions.
         Family members <strong>cannot</strong> change settings, delete items, or manage devices.
@@ -312,4 +356,20 @@
     </form>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleSection(id) {
+    var body = document.getElementById(id + '-body');
+    var arrow = document.getElementById(id + '-arrow');
+    if (body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        arrow.style.transform = 'rotate(180deg)';
+    } else {
+        body.classList.add('hidden');
+        arrow.style.transform = '';
+    }
+}
+</script>
 {% endblock %}
