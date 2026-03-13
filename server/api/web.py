@@ -97,7 +97,14 @@ async def login_submit(request: Request, email: str = Form(...),
     )
     db.update_account_login(account["id"])
 
-    response = RedirectResponse("/web/dashboard", status_code=302)
+    # Check if owner needs onboarding
+    dest = "/web/dashboard"
+    if account.get("role") == "owner" and not account.get("is_admin"):
+        user = db.get_or_create_user(tenant_id=account["tenant_id"])
+        if not user.get("setup_complete"):
+            dest = "/web/welcome"
+
+    response = RedirectResponse(dest, status_code=302)
     response.set_cookie(
         "polly_session", session_id,
         max_age=settings.SESSION_DURATION_HOURS * 3600,
