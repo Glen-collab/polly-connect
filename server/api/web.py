@@ -1360,18 +1360,12 @@ async def photos_page(request: Request):
     photos = db.get_photos(limit=100, tenant_id=tid)
     stories = db.get_stories(limit=200, tenant_id=tid)
 
-    # Parse tags JSON + enrich with photo_in_book from linked story
+    # Parse tags JSON for template display
     for photo in photos:
         try:
             photo["tag_list"] = json.loads(photo.get("tags") or "[]")
         except (json.JSONDecodeError, TypeError):
             photo["tag_list"] = []
-        # Look up photo_in_book from linked story
-        photo["photo_in_book"] = True  # default
-        if photo.get("story_id"):
-            story = db.get_story_by_id(photo["story_id"])
-            if story:
-                photo["photo_in_book"] = bool(story.get("photo_in_book", 1))
 
     return templates.TemplateResponse("photos.html", {
         "request": request,
@@ -1470,18 +1464,19 @@ async def photo_toggle_book(request: Request, photo_id: int):
     if not photo or photo.get("tenant_id") != tid:
         return RedirectResponse("/web/photos", status_code=303)
 
-    if photo.get("story_id"):
-        story = db.get_story_by_id(photo["story_id"])
-        if story:
-            new_val = 0 if story.get("photo_in_book", 1) else 1
-            conn = db._get_connection()
-            try:
-                conn.execute("UPDATE stories SET photo_in_book = ? WHERE id = ?",
-                             (new_val, story["id"]))
-                conn.commit()
-            finally:
-                if not db._conn:
-                    conn.close()
+    conn = db._get_connection()
+    try:
+        # Toggle on photos table
+        new_val = 0 if photo.get("in_book", 1) else 1
+        conn.execute("UPDATE photos SET in_book = ? WHERE id = ?", (new_val, photo_id))
+        # Also sync to linked story if exists
+        if photo.get("story_id"):
+            conn.execute("UPDATE stories SET photo_in_book = ? WHERE id = ?",
+                         (new_val, photo["story_id"]))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
 
     return RedirectResponse("/web/photos", status_code=303)
 

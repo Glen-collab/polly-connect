@@ -77,22 +77,24 @@
             </div>
             {% endif %}
 
-            <!-- Linked story preview + book toggle -->
+            <!-- Book toggle (all photos) -->
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-gray-500">In Legacy Book</span>
+                <form method="POST" action="/web/photos/{{ photo.id }}/toggle-book"
+                      onsubmit="{% if photo.in_book is none or photo.in_book %}return confirm('This will remove the photo from the legacy book. The story will still be included.');{% endif %}">
+                    <button type="submit" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none
+                        {% if photo.in_book is none or photo.in_book %}bg-emerald-500{% else %}bg-gray-300{% endif %}">
+                        <span class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition-transform
+                            {% if photo.in_book is none or photo.in_book %}translate-x-4{% else %}translate-x-1{% endif %}"></span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Linked story preview -->
             {% if photo.story_id %}
             <div class="bg-blue-50 rounded p-2 mb-2">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-xs text-blue-600 font-medium mb-0.5">Linked Story #{{ photo.story_id }}</p>
-                        <a href="/web/stories/{{ photo.story_id }}/edit" class="text-xs text-blue-500 hover:underline">View story</a>
-                    </div>
-                    <form method="POST" action="/web/photos/{{ photo.id }}/toggle-book"
-                          onsubmit="{% if photo.photo_in_book %}return confirm('This will remove the photo from the legacy book. The story will still be included.');{% endif %}">
-                        <button type="submit" class="text-xs px-2 py-1 rounded font-medium
-                            {% if photo.photo_in_book %}bg-emerald-100 text-emerald-700 hover:bg-emerald-200{% else %}bg-gray-100 text-gray-500 hover:bg-gray-200{% endif %}">
-                            {% if photo.photo_in_book %}In Book{% else %}Not in Book{% endif %}
-                        </button>
-                    </form>
-                </div>
+                <p class="text-xs text-blue-600 font-medium mb-0.5">Linked Story #{{ photo.story_id }}</p>
+                <a href="/web/stories/{{ photo.story_id }}/edit" class="text-xs text-blue-500 hover:underline">View story</a>
             </div>
             {% endif %}
 

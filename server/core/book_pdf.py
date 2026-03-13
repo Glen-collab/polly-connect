@@ -526,7 +526,7 @@ class LegacyBookPDF:
                         continue
                     seen_ids.add(pid)
                     photo = self.db.get_photo_by_id(pid)
-                    if photo and photo.get("filename"):
+                    if photo and photo.get("filename") and photo.get("in_book", 1):
                         # Try multiple possible upload directories
                         for base in [UPLOADS_DIR,
                                      os.path.join(os.path.dirname(__file__), "..", "static", "uploads"),
@@ -592,7 +592,7 @@ class LegacyBookPDF:
             if (photo_id and photo_id not in global_used_photos
                     and story.get("photo_in_book", 1)):
                 photo = self.db.get_photo_by_id(photo_id)
-                if photo and photo.get("filename"):
+                if photo and photo.get("filename") and photo.get("in_book", 1):
                     for base in [UPLOADS_DIR,
                                  os.path.join(os.path.dirname(__file__), "..", "static", "uploads"),
                                  "server/static/uploads"]:

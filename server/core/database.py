@@ -451,6 +451,11 @@ class PollyDB:
                 if "tenant_id" not in cols:
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN tenant_id INTEGER")
 
+            # Add in_book to photos
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(photos)").fetchall()}
+            if "in_book" not in cols:
+                conn.execute("ALTER TABLE photos ADD COLUMN in_book INTEGER DEFAULT 1")
+
             # Add is_admin to accounts
             cols = {row[1] for row in conn.execute("PRAGMA table_info(accounts)").fetchall()}
             if "is_admin" not in cols:
