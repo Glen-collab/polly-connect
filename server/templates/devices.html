@@ -100,10 +100,9 @@
                 <td class="px-4 py-3">
                     {% if device.claim_code %}
                     <span class="font-mono text-sm font-bold text-yellow-700 bg-yellow-50 px-2 py-1 rounded">{{ device.claim_code }}</span>
+                    {% if device.claimed_at %}<span class="text-xs text-gray-400 ml-1">Claimed</span>{% endif %}
                     <a href="/web/devices/{{ device.device_id }}/setup-card" target="_blank"
                        class="ml-2 text-emerald-600 hover:text-emerald-800 text-xs font-medium">Print</a>
-                    {% elif device.claimed_at %}
-                    <span class="text-xs text-gray-400">Claimed</span>
                     {% else %}
                     <span class="text-xs text-gray-400">—</span>
                     {% endif %}
