@@ -753,8 +753,38 @@ NARRATIVE:"""
             return "We haven't started collecting stories yet. Ready when you are."
         return f"You've shared {count} memories so far."
 
+    # Common nicknames/terms mapped to relationship values in the family tree
+    RELATION_ALIASES = {
+        # Parents
+        "mom": ["mother"], "momma": ["mother"], "mama": ["mother"], "ma": ["mother"],
+        "mommy": ["mother"], "mum": ["mother"], "mummy": ["mother"],
+        "dad": ["father"], "daddy": ["father"], "papa": ["father"], "pa": ["father"],
+        "pops": ["father"], "pop": ["father"],
+        # Grandparents
+        "grandma": ["grandmother", "great-grandmother"], "granny": ["grandmother", "great-grandmother"],
+        "nana": ["grandmother", "great-grandmother"], "nanna": ["grandmother", "great-grandmother"],
+        "memaw": ["grandmother", "great-grandmother"], "me maw": ["grandmother", "great-grandmother"],
+        "meemaw": ["grandmother", "great-grandmother"], "mimi": ["grandmother", "great-grandmother"],
+        "gram": ["grandmother", "great-grandmother"], "grammy": ["grandmother", "great-grandmother"],
+        "grandpa": ["grandfather", "great-grandfather"], "gramps": ["grandfather", "great-grandfather"],
+        "grampa": ["grandfather", "great-grandfather"],
+        "papaw": ["grandfather", "great-grandfather"], "pawpaw": ["grandfather", "great-grandfather"],
+        "pepaw": ["grandfather", "great-grandfather"],
+        # Spouse
+        "hubby": ["husband"], "wifey": ["wife"],
+        # Children
+        "my son": ["son"], "my daughter": ["daughter"],
+        "my boy": ["son"], "my girl": ["daughter"],
+        # Siblings
+        "bro": ["brother"], "sis": ["sister"],
+        # In-laws
+        "mother in law": ["mother-in-law"], "father in law": ["father-in-law"],
+        "son in law": ["son-in-law"], "daughter in law": ["daughter-in-law"],
+        "brother in law": ["brother-in-law"], "sister in law": ["sister-in-law"],
+    }
+
     async def _handle_who_is(self, name: str, device_id: str) -> str:
-        """Look up a person in the family tree by name."""
+        """Look up a person in the family tree by name or relationship."""
         state = self._get_state(device_id)
         tid = state.tenant_id
 
@@ -774,7 +804,41 @@ NARRATIVE:"""
             member = rows[0]
             member_name = member["name"]
             relation = member["relation_to_owner"] or "a family member"
-            resp = f"{member_name} is {relation}."
+            resp = f"{member_name} is your {relation}."
+            self._last_response[device_id] = resp
+            return resp
+
+        # Check if the name is a relationship alias (mom, dad, grandma, etc.)
+        name_lower = name.lower().strip()
+        alias_relations = self.RELATION_ALIASES.get(name_lower)
+        if not alias_relations:
+            # Also try the raw relationship value (e.g., "mother", "father")
+            alias_relations = [name_lower]
+
+        conn = self.db._get_connection()
+        try:
+            conn.row_factory = __import__('sqlite3').Row
+            placeholders = ",".join("?" for _ in alias_relations)
+            rows = conn.execute(
+                f"SELECT name, relation_to_owner FROM family_members WHERE LOWER(relation_to_owner) IN ({placeholders}) AND (tenant_id = ? OR tenant_id IS NULL)",
+                (*alias_relations, tid)
+            ).fetchall()
+        finally:
+            if not self.db._conn:
+                conn.close()
+
+        if rows:
+            if len(rows) == 1:
+                member = rows[0]
+                member_name = member["name"]
+                relation = member["relation_to_owner"] or "a family member"
+                resp = f"{member_name} is your {relation}."
+            else:
+                # Multiple matches (e.g., "who is grandma" with two grandmothers)
+                parts = []
+                for member in rows:
+                    parts.append(f"{member['name']} ({member['relation_to_owner']})")
+                resp = f"You have {len(rows)}: {', '.join(parts)}."
             self._last_response[device_id] = resp
             return resp
 
