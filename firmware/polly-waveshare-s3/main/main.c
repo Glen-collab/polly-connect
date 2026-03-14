@@ -1681,6 +1681,8 @@ static void mic_stream_task(void *arg)
     uint32_t rms_debug_counter = 0;
     uint32_t disconnect_counter = 0;       // Watchdog: counts ticks while disconnected
     const uint32_t WATCHDOG_REBOOT_MS = 60000;  // Reboot after 60s disconnected
+    uint32_t paused_counter = 0;           // Watchdog: counts ticks while stuck in paused state
+    const uint32_t PAUSED_REBOOT_MS = 45000;  // Reboot after 45s stuck paused (no response_complete)
 
     while (1) {
         // Handle wake word detection — just LED, keep streaming
@@ -1751,11 +1753,26 @@ static void mic_stream_task(void *arg)
                     esp_restart();
                 }
             }
+
+            // Watchdog: if stuck in paused state too long (waiting for response_complete
+            // that never arrives), force reboot. This catches the case where ws_connected
+            // is true but the device is frozen mid-response.
+            if (ws_connected && streaming_paused && !ota_in_progress && !story_recording) {
+                paused_counter += 10;
+                if (paused_counter >= PAUSED_REBOOT_MS) {
+                    ESP_LOGE(TAG, "Stuck in paused state for %lus — rebooting!", PAUSED_REBOOT_MS / 1000);
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    esp_restart();
+                }
+            }
         }
 
-        // Reset watchdog when connected
+        // Reset watchdogs when connected and streaming normally
         if (ws_connected) {
             disconnect_counter = 0;
+        }
+        if (!streaming_paused) {
+            paused_counter = 0;
         }
 
         // Story button (K1/+) toggle — send start/stop to server

@@ -952,16 +952,30 @@ async def _send_tts(websocket: WebSocket, tts, text: str, squawk_mgr=None,
         lock = squawk_mgr.get_send_lock(device_id) if squawk_mgr and device_id else None
 
         async def _do_send():
-            chunk_size = 8000
-            for i in range(0, len(tts_audio), chunk_size):
+            # Smaller chunks + longer delays for large audio to avoid
+            # overwhelming ESP32's WebSocket receive buffer / TCP stack.
+            # ESP32 buffers all chunks before playback, so we need to
+            # pace the sends to avoid TCP buffer overflow → freeze.
+            total_len = len(tts_audio)
+            if total_len > 128000:  # ~4s of audio — large response
+                chunk_size = 4000
+                chunk_delay = 0.08
+            elif total_len > 64000:  # ~2s of audio — medium response
+                chunk_size = 6000
+                chunk_delay = 0.06
+            else:
+                chunk_size = 8000
+                chunk_delay = 0.05
+
+            for i in range(0, total_len, chunk_size):
                 chunk = tts_audio[i:i + chunk_size]
                 chunk_b64 = base64.b64encode(chunk).decode()
                 await websocket.send_json({
                     "event": "audio_chunk",
                     "audio": chunk_b64,
-                    "final": (i + chunk_size >= len(tts_audio)),
+                    "final": (i + chunk_size >= total_len),
                 })
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(chunk_delay)
 
         if lock:
             async with lock:
