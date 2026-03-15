@@ -110,6 +110,11 @@ class BookBuilder:
             offset = assigned.get(key, 0)
             remaining = group_memories[offset:]
 
+            # Only create a second chapter for the same bucket/phase if
+            # there are enough surplus memories to justify it
+            if offset > 0 and len(remaining) < 5:
+                continue
+
             if len(remaining) < 2:
                 continue
 
@@ -223,6 +228,51 @@ class BookBuilder:
                     note += " [approximate]"
                 timeline_notes.append(note)
 
+        # Collect available photos for this chapter (with timeline data)
+        available_photos = []
+        photo_lookup = {}  # story_id -> photo info
+        for mem in memories:
+            story_id = mem.get("story_id")
+            if not story_id:
+                continue
+            story = self.db.get_story_by_id(story_id)
+            if not story or not story.get("photo_id"):
+                continue
+            if not story.get("photo_in_book", 1):
+                continue
+            photo = self.db.get_photo_by_id(story["photo_id"])
+            if not photo:
+                continue
+            # Build date context from photo, memory, and family data
+            photo_year = None
+            if photo.get("date_taken"):
+                import re
+                yr_match = re.search(r'(19\d{2}|20\d{2})', str(photo["date_taken"]))
+                if yr_match:
+                    photo_year = int(yr_match.group(1))
+            if not photo_year:
+                photo_year = mem.get("estimated_year")
+
+            # Parse people from photo tags
+            people_in_photo = []
+            if photo.get("tags"):
+                import json as _json
+                try:
+                    tags = _json.loads(photo["tags"]) if isinstance(photo["tags"], str) else photo["tags"]
+                    people_in_photo = [t for t in tags if isinstance(t, str)]
+                except (ValueError, TypeError):
+                    pass
+
+            info = {
+                "story_id": story_id,
+                "caption": photo.get("caption", ""),
+                "date_taken": photo.get("date_taken", ""),
+                "photo_year": photo_year,
+                "people": people_in_photo,
+            }
+            available_photos.append(info)
+            photo_lookup[story_id] = info
+
         # Build memory entries for prompt
         memory_texts = []
         for i, mem in enumerate(memories, 1):
@@ -248,20 +298,19 @@ class BookBuilder:
             if emotions:
                 entry += f" [emotions: {emotions}]"
 
-            # Check if this memory came from a photo
+            # Note if this memory has a photo available
             story_id = mem.get("story_id")
-            if story_id:
-                story = self.db.get_story_by_id(story_id)
-                if story and story.get("photo_id"):
-                    photo = self.db.get_photo_by_id(story["photo_id"])
-                    if photo:
-                        photo_note = f" [prompted by a photo"
-                        if photo.get("caption"):
-                            photo_note += f": {photo['caption']}"
-                        if photo.get("date_taken"):
-                            photo_note += f", {photo['date_taken']}"
-                        photo_note += "]"
-                        entry += photo_note
+            if story_id and story_id in photo_lookup:
+                p = photo_lookup[story_id]
+                photo_note = f" [HAS PHOTO story_id={story_id}"
+                if p["caption"]:
+                    photo_note += f", caption: {p['caption']}"
+                if p["date_taken"]:
+                    photo_note += f", taken: {p['date_taken']}"
+                if p["people"]:
+                    photo_note += f", people: {', '.join(p['people'])}"
+                photo_note += "]"
+                entry += photo_note
             memory_texts.append(entry)
 
         # Build continuity block from previous chapters
@@ -281,15 +330,61 @@ Timeline context:
 
 """
 
+        # Build photo placement instructions
+        photo_block = ""
+        if available_photos:
+            photo_lines = []
+            for p in available_photos:
+                line = f"  - [PHOTO:{p['story_id']}]"
+                if p["caption"]:
+                    line += f" — {p['caption']}"
+                if p["photo_year"]:
+                    line += f" (~{p['photo_year']})"
+                if p["people"]:
+                    line += f" — people: {', '.join(p['people'])}"
+                photo_lines.append(line)
+            photo_block = f"""
+
+Available photos for this chapter:
+{chr(10).join(photo_lines)}
+
+PHOTO PLACEMENT RULES:
+- Place each photo marker on its OWN line, right AFTER the paragraph that discusses that time period, person, or event
+- Format: [PHOTO:story_id] on a line by itself between paragraphs
+- Match photos to content by year, people mentioned, and caption context
+- Use family birth years to calculate when events happened (e.g. if a child was born in 2018 and the story mentions their first steps, that photo belongs around 2019)
+- Every available photo MUST be placed exactly once
+- Reference the photo naturally in the paragraph above it (e.g. "In the photo from that day..." or "captured in a snapshot from that summer...")
+"""
+
+        # Build family context for date calculation
+        family_block = ""
+        if tenant_id:
+            conn = self.db._get_connection()
+            try:
+                fam = conn.execute(
+                    "SELECT name, relationship, birth_year, deceased_year FROM family_members WHERE tenant_id = ? AND birth_year IS NOT NULL",
+                    (tenant_id,)
+                ).fetchall()
+                if fam:
+                    fam_lines = [f"  - {f[0]} ({f[1]}): born {f[2]}" + (f", passed {f[3]}" if f[3] else "") for f in fam]
+                    family_block = f"""
+
+Family timeline (use these to calculate when events happened):
+{chr(10).join(fam_lines)}
+"""
+            finally:
+                pass
+
         prompt = f"""You are writing a chapter of a family legacy book.
 Chapter {chapter.get('chapter_number', '?')}: "{chapter['title']}"
 Theme: {chapter['bucket'].replace('_', ' ')}
 Life phase: {chapter['life_phase']}
-{timeline_block}{continuity_block}
+{timeline_block}{family_block}{continuity_block}
 Here are the memories to weave into this chapter (sorted chronologically):
 
 {chr(10).join(memory_texts)}
-
+{photo_block}
 Write a warm, narrative chapter (7-10 paragraphs) that:
 - Weaves these memories into a cohesive story in chronological order
 - Preserves the speaker's voice and emotional tone
@@ -298,10 +393,11 @@ Write a warm, narrative chapter (7-10 paragraphs) that:
 - Closes with a reflective paragraph
 - Uses second person sparingly, mostly third person narrative
 - Keeps a blue-collar, honest, heartfelt tone
-- If a memory was prompted by a photo, reference it naturally (e.g. "In the photo, you can still see...")
 - When timeline dates are available, ground the narrative in specific years or decades (e.g. "It was the summer of '58..." instead of "Back then...")
 - When owner age is given, use it to anchor the perspective (e.g. "At nine years old, the world still felt enormous...")
+- Use family birth years to anchor events (e.g. if Brooklyn was born in 2018 and the story mentions her gymnastics, that's ~2024-2026)
 - Do NOT repeat stories or themes already covered in previous chapters
+- If photos are available, place [PHOTO:story_id] markers on their own line right after the relevant paragraph
 
 Write the chapter now:"""
 

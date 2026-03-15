@@ -382,19 +382,62 @@ class LegacyBookPDF:
                 subhead = " — ".join(filter(None, [bucket_label, phase_label]))
                 story.append(Paragraph(subhead, self.styles['ChapterSubhead']))
 
+            # Build media lookup for inline photo placement
+            media_by_story = self._get_chapter_media_by_story(
+                ch, global_used_photos, global_used_audio
+            )
+            placed_stories = set()
+
             # Chapter body
             draft = ch.get("draft")
             if draft and draft.get("content"):
-                # AI-generated chapter draft
+                # AI-generated chapter draft — parse [PHOTO:story_id] markers
+                import re
                 paragraphs = draft["content"].split("\n\n")
-                for i, para in enumerate(paragraphs):
+                body_para_idx = 0
+                for para in paragraphs:
                     para = para.strip()
                     if not para:
                         continue
-                    # Escape HTML entities
-                    para = para.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                    style = self.styles['BodyFirst'] if i == 0 else self.styles['BodyText']
-                    story.append(Paragraph(para, style))
+
+                    # Check for inline photo marker: [PHOTO:123]
+                    photo_match = re.match(r'^\[PHOTO:(\d+)\]$', para)
+                    if photo_match:
+                        sid = int(photo_match.group(1))
+                        if sid in media_by_story:
+                            self._render_media_item(
+                                story, media_by_story[sid],
+                                include_qr_codes, placed_stories
+                            )
+                        continue
+
+                    # Check if paragraph contains embedded markers mixed with text
+                    # Split on markers and render text + photos in order
+                    parts = re.split(r'\[PHOTO:(\d+)\]', para)
+                    if len(parts) > 1:
+                        for j, part in enumerate(parts):
+                            if j % 2 == 0:
+                                # Text part
+                                text = part.strip()
+                                if text:
+                                    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                                    style = self.styles['BodyFirst'] if body_para_idx == 0 else self.styles['BodyText']
+                                    story.append(Paragraph(text, style))
+                                    body_para_idx += 1
+                            else:
+                                # Story ID part
+                                sid = int(part)
+                                if sid in media_by_story:
+                                    self._render_media_item(
+                                        story, media_by_story[sid],
+                                        include_qr_codes, placed_stories
+                                    )
+                    else:
+                        # Normal paragraph — no markers
+                        para = para.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                        style = self.styles['BodyFirst'] if body_para_idx == 0 else self.styles['BodyText']
+                        story.append(Paragraph(para, style))
+                        body_para_idx += 1
             else:
                 # No draft — use raw memory texts
                 memories = []
@@ -415,45 +458,32 @@ class LegacyBookPDF:
                         style = self.styles['BodyFirst'] if i == 0 else self.styles['BodyText']
                         story.append(Paragraph(text, style))
                         story.append(Spacer(1, 4))
+
+                        # Inline photo for this memory (by story_id)
+                        sid = mem.get("story_id")
+                        if sid and sid in media_by_story:
+                            self._render_media_item(
+                                story, media_by_story[sid],
+                                include_qr_codes, placed_stories
+                            )
                 else:
                     story.append(Paragraph(
                         "<i>This chapter is still being written...</i>",
                         self.styles['BodyFirst'],
                     ))
 
-            # Photos and QR codes — deduplicated globally, paired together
-            media_items = self._get_chapter_media(ch, global_used_photos, global_used_audio)
-            if media_items:
+            # Render any remaining photos that weren't placed inline
+            # (fallback for photos GPT didn't place or old drafts without markers)
+            unplaced = [
+                v for sid, v in media_by_story.items()
+                if sid not in placed_stories
+            ]
+            if unplaced:
                 story.append(Spacer(1, 18))
-                for item in media_items:
-                    # Photo (if present)
-                    photo_path = item.get("photo_path")
-                    if photo_path and os.path.exists(photo_path):
-                        try:
-                            img = Image(photo_path)
-                            iw, ih = img.drawWidth, img.drawHeight
-                            if iw > 0 and ih > 0:
-                                scale = min(PHOTO_MAX_WIDTH / iw, PHOTO_MAX_HEIGHT / ih, 1.0)
-                                img.drawWidth = iw * scale
-                                img.drawHeight = ih * scale
-                            img.hAlign = 'CENTER'
-                            story.append(img)
-                            cap = item.get("photo_caption", "")
-                            if cap:
-                                story.append(Paragraph(cap, self.styles['QRCaption']))
-                        except Exception as e:
-                            logger.warning(f"Failed to embed photo: {e}")
-                    # QR code (if present, paired under the photo)
-                    if include_qr_codes and item.get("audio_key"):
-                        audio_url = f"{AUDIO_BASE_URL}/{item['audio_key']}"
-                        qr_buf = _generate_qr_image(audio_url)
-                        if qr_buf:
-                            story.append(Spacer(1, 6))
-                            img = Image(qr_buf, width=QR_SIZE, height=QR_SIZE)
-                            story.append(img)
-                            qr_caption = f"Hear {item['speaker']}'s voice" if item.get('speaker') else "Scan to hear the original voice recording"
-                            story.append(Paragraph(qr_caption, self.styles['QRCaption']))
-                    story.append(Spacer(1, 12))
+                for item in unplaced:
+                    self._render_media_item(
+                        story, item, include_qr_codes, placed_stories
+                    )
 
             story.append(PageBreak())
 
@@ -558,6 +588,106 @@ class LegacyBookPDF:
                         "speaker": story.get("speaker_name", ""),
                     })
         return entries
+
+    def _render_media_item(self, story: list, item: dict,
+                           include_qr_codes: bool,
+                           placed_stories: set):
+        """Render a single photo+QR media item into the PDF story flow."""
+        story_id = item.get("story_id")
+        if story_id in placed_stories:
+            return
+        placed_stories.add(story_id)
+
+        story.append(Spacer(1, 10))
+        photo_path = item.get("photo_path")
+        if photo_path and os.path.exists(photo_path):
+            try:
+                img = Image(photo_path)
+                iw, ih = img.drawWidth, img.drawHeight
+                if iw > 0 and ih > 0:
+                    scale = min(PHOTO_MAX_WIDTH / iw, PHOTO_MAX_HEIGHT / ih, 1.0)
+                    img.drawWidth = iw * scale
+                    img.drawHeight = ih * scale
+                img.hAlign = 'CENTER'
+                story.append(img)
+                cap = item.get("photo_caption", "")
+                if cap:
+                    story.append(Paragraph(cap, self.styles['QRCaption']))
+            except Exception as e:
+                logger.warning(f"Failed to embed photo: {e}")
+
+        if include_qr_codes and item.get("audio_key"):
+            audio_url = f"{AUDIO_BASE_URL}/{item['audio_key']}"
+            qr_buf = _generate_qr_image(audio_url)
+            if qr_buf:
+                story.append(Spacer(1, 6))
+                img = Image(qr_buf, width=QR_SIZE, height=QR_SIZE)
+                story.append(img)
+                qr_caption = (
+                    f"Hear {item['speaker']}'s voice"
+                    if item.get('speaker')
+                    else "Scan to hear the original voice recording"
+                )
+                story.append(Paragraph(qr_caption, self.styles['QRCaption']))
+        story.append(Spacer(1, 10))
+
+    def _get_chapter_media_by_story(self, chapter: dict,
+                                     global_used_photos: set,
+                                     global_used_audio: set) -> dict:
+        """Get media items keyed by story_id for inline placement.
+
+        Returns dict of story_id -> media item (photo_path, caption, audio_key, etc.)
+        Each photo/QR appears only once across the entire book (globally deduplicated).
+        """
+        items = {}
+        seen_stories = set()
+
+        for mid in chapter.get("memory_ids", []):
+            mem = self.db.get_memory_by_id(mid)
+            if not mem or not mem.get("story_id"):
+                continue
+            story_id = mem["story_id"]
+            if story_id in seen_stories:
+                continue
+            seen_stories.add(story_id)
+
+            story = self.db.get_story_by_id(story_id)
+            if not story:
+                continue
+
+            item = {"story_id": story_id}
+            has_content = False
+
+            # Check photo
+            photo_id = story.get("photo_id")
+            if (photo_id and photo_id not in global_used_photos
+                    and story.get("photo_in_book", 1)):
+                photo = self.db.get_photo_by_id(photo_id)
+                if photo and photo.get("filename"):
+                    for base in [UPLOADS_DIR,
+                                 os.path.join(os.path.dirname(__file__), "..", "static", "uploads"),
+                                 "server/static/uploads"]:
+                        path = os.path.join(base, photo["filename"])
+                        if os.path.exists(path):
+                            item["photo_path"] = path
+                            item["photo_caption"] = photo.get("caption", "")
+                            global_used_photos.add(photo_id)
+                            has_content = True
+                            break
+
+            # Check audio/QR
+            audio_key = story.get("audio_s3_key")
+            if (audio_key and audio_key not in global_used_audio
+                    and story.get("qr_in_book", 1)):
+                item["audio_key"] = audio_key
+                item["speaker"] = story.get("speaker", "")
+                global_used_audio.add(audio_key)
+                has_content = True
+
+            if has_content:
+                items[story_id] = item
+
+        return items
 
     def _get_chapter_media(self, chapter: dict,
                            global_used_photos: set,

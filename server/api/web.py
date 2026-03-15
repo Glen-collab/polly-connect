@@ -2863,10 +2863,21 @@ async def book_chapter_generate(request: Request, chapter_num: int):
     if not chapter:
         return RedirectResponse("/web/book/chapters", status_code=302)
 
-    # Generate AI draft
-    content = await book_builder.generate_chapter_draft(chapter, tenant_id=tid)
+    # Gather previous chapter summaries for continuity
+    existing_drafts = db.get_chapter_drafts(tenant_id=tid)
+    previous_summaries = []
+    for d in sorted(existing_drafts, key=lambda x: x.get("chapter_number", 0)):
+        if d.get("chapter_number", 0) < chapter_num and d.get("summary"):
+            previous_summaries.append(d["summary"])
+
+    # Generate AI draft with timeline + photo placement
+    content = await book_builder.generate_chapter_draft(
+        chapter, tenant_id=tid,
+        previous_summaries=previous_summaries if previous_summaries else None,
+    )
 
     if content:
+        import json as _json
         book_builder.save_chapter_draft(
             chapter_number=chapter_num,
             title=chapter["title"],
@@ -2874,7 +2885,17 @@ async def book_chapter_generate(request: Request, chapter_num: int):
             life_phase=chapter["life_phase"],
             memory_ids=chapter.get("memory_ids", []),
             content=content,
+            tenant_id=tid,
         )
+
+        # Generate and save summary for continuity with later chapters
+        summary = await book_builder.generate_chapter_summary(content)
+        if summary:
+            drafts_after = db.get_chapter_drafts(tenant_id=tid)
+            for d in drafts_after:
+                if d.get("chapter_number") == chapter_num:
+                    db.update_chapter_summary(d["id"], summary)
+                    break
         msg = "Draft generated successfully!"
     else:
         msg = "Could not generate draft. Make sure OPENAI_API_KEY is set."
