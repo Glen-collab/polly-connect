@@ -59,6 +59,34 @@ class BookBuilder:
         self._ai_available = (followup_generator is not None
                               and followup_generator.available)
 
+    def _guess_wedding_year(self, tenant_id: int) -> Optional[int]:
+        """Try to find wedding year from family data or photos."""
+        conn = self.db._get_connection()
+        # Check photos with "wedding" in caption
+        photos = conn.execute(
+            "SELECT date_taken FROM photos WHERE tenant_id = ? AND LOWER(caption) LIKE '%wedding%'",
+            (tenant_id,)
+        ).fetchall()
+        for p in photos:
+            if p[0]:
+                import re
+                m = re.search(r'(19\d{2}|20\d{2})', str(p[0]))
+                if m:
+                    return int(m.group(1))
+        return None
+
+    def _guess_birth_year_from_text(self, text: str, tenant_id: int) -> Optional[int]:
+        """Try to figure out which child's birth is mentioned and return their birth year."""
+        conn = self.db._get_connection()
+        members = conn.execute(
+            "SELECT name, birth_year FROM family_members WHERE tenant_id = ? AND birth_year IS NOT NULL AND relationship IN ('daughter', 'son')",
+            (tenant_id,)
+        ).fetchall()
+        for name, by in members:
+            if name.lower() in text:
+                return by
+        return None
+
     def generate_chapter_outline(self, speaker: str = None,
                                   verified_only: bool = False,
                                   tenant_id: int = None) -> List[Dict]:
@@ -77,6 +105,79 @@ class BookBuilder:
 
         if not memories:
             return []
+
+        # Auto-date undated memories from linked story/photo data
+        owner_birth_year = None
+        if tenant_id:
+            conn = self.db._get_connection()
+            owner = conn.execute(
+                "SELECT birth_year FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                (tenant_id,)
+            ).fetchone()
+            if owner and owner[0]:
+                owner_birth_year = owner[0]
+
+        for mem in memories:
+            if mem.get("estimated_year"):
+                continue
+            story_id = mem.get("story_id")
+            if not story_id:
+                continue
+            story = self.db.get_story_by_id(story_id)
+            if not story:
+                continue
+            # Try to extract year from photo date_taken
+            est_year = None
+            if story.get("photo_id"):
+                photo = self.db.get_photo_by_id(story["photo_id"])
+                if photo and photo.get("date_taken"):
+                    import re
+                    yr_match = re.search(r'(19\d{2}|20\d{2})', str(photo["date_taken"]))
+                    if yr_match:
+                        est_year = int(yr_match.group(1))
+            # Try transcript text
+            if not est_year:
+                import re
+                text = story.get("corrected_transcript") or story.get("transcript") or ""
+                yr_match = re.search(r'(19\d{2}|20\d{2})', text)
+                if yr_match:
+                    est_year = int(yr_match.group(1))
+            # Try keyword clues
+            if not est_year:
+                text = (story.get("corrected_transcript") or story.get("transcript") or "").lower()
+                if "wedding" in text:
+                    # Look up spouse marriage date from family_members
+                    est_year = self._guess_wedding_year(tenant_id)
+                elif "birth of" in text or "newborn" in text or "baby" in text:
+                    est_year = self._guess_birth_year_from_text(text, tenant_id)
+
+            if est_year:
+                mem["estimated_year"] = est_year
+                # Assign bucket/life_phase based on age
+                if owner_birth_year:
+                    age = est_year - owner_birth_year
+                    if age <= 12:
+                        mem["bucket"] = "ordinary_world"
+                        mem["life_phase"] = "childhood"
+                    elif age <= 18:
+                        mem["bucket"] = "call_to_adventure"
+                        mem["life_phase"] = "adolescence"
+                    elif age <= 30:
+                        mem["bucket"] = "crossing_threshold"
+                        mem["life_phase"] = "young_adult"
+                    elif age <= 50:
+                        mem["bucket"] = "trials_allies_enemies"
+                        mem["life_phase"] = "adult"
+                    else:
+                        mem["bucket"] = "return_with_knowledge"
+                        mem["life_phase"] = "reflection"
+                    mem["owner_age"] = age
+                # Persist to DB so we don't recalculate each time
+                self.db._get_connection().execute(
+                    "UPDATE memories SET estimated_year = ?, bucket = ?, life_phase = ? WHERE id = ?",
+                    (est_year, mem.get("bucket"), mem.get("life_phase"), mem["id"])
+                )
+                self.db._get_connection().commit()
 
         # Group memories by bucket + life_phase
         grouped = {}

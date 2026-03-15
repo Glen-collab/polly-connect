@@ -2878,6 +2878,14 @@ async def book_chapter_generate(request: Request, chapter_num: int):
 
     if content:
         import json as _json
+        # Delete any existing draft for this chapter so we don't pile up stale copies
+        conn = db._get_connection()
+        conn.execute(
+            "DELETE FROM chapter_drafts WHERE chapter_number = ? AND tenant_id = ?",
+            (chapter_num, tid)
+        )
+        conn.commit()
+
         db.save_chapter_draft(
             chapter_number=chapter_num,
             title=chapter["title"],
