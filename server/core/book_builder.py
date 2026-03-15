@@ -173,11 +173,15 @@ class BookBuilder:
                         mem["life_phase"] = "reflection"
                     mem["owner_age"] = age
                 # Persist to DB so we don't recalculate each time
-                self.db._get_connection().execute(
-                    "UPDATE memories SET estimated_year = ?, bucket = ?, life_phase = ? WHERE id = ?",
-                    (est_year, mem.get("bucket"), mem.get("life_phase"), mem["id"])
-                )
-                self.db._get_connection().commit()
+                try:
+                    conn = self.db._get_connection()
+                    conn.execute(
+                        "UPDATE memories SET estimated_year = ?, bucket = ?, life_phase = ? WHERE id = ?",
+                        (est_year, mem.get("bucket"), mem.get("life_phase"), mem["id"])
+                    )
+                    conn.commit()
+                except Exception as e:
+                    logger.warning(f"Could not persist auto-dated memory {mem['id']}: {e}")
 
         # Group memories by bucket + life_phase
         grouped = {}
