@@ -3016,6 +3016,39 @@ async def book_export_pdf(request: Request):
     )
 
 
+# ── Owner's Guide ──
+
+@router.get("/guide", response_class=HTMLResponse)
+async def owners_guide(request: Request):
+    """Owner's Guide PDF viewer with back button."""
+    return HTMLResponse("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner's Guide - Polly Connect</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; }
+        .toolbar { background: #059669; color: white; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .toolbar a { color: white; text-decoration: none; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+        .toolbar h1 { font-size: 16px; font-weight: 600; }
+        .toolbar .dl { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 6px; font-size: 13px; }
+        .toolbar .dl:hover { background: rgba(255,255,255,0.3); }
+        iframe { flex: 1; border: none; width: 100%; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <a href="/web/dashboard">&larr; Back</a>
+        <h1>Owner's Guide</h1>
+        <a href="/static/Polly_User_Guide.pdf" download class="dl">Download</a>
+    </div>
+    <iframe src="/static/Polly_User_Guide.pdf"></iframe>
+</body>
+</html>""")
+
+
 # ── Audio Listen & Download ──
 
 @router.get("/listen/{audio_key}", response_class=HTMLResponse)
