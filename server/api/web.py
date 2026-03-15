@@ -3018,35 +3018,21 @@ async def book_export_pdf(request: Request):
 
 # ── Owner's Guide ──
 
-@router.get("/guide", response_class=HTMLResponse)
+@router.get("/guide")
 async def owners_guide(request: Request):
-    """Owner's Guide PDF viewer with back button."""
-    return HTMLResponse("""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Owner's Guide - Polly Connect</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; }
-        .toolbar { background: #059669; color: white; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-        .toolbar a { color: white; text-decoration: none; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 6px; }
-        .toolbar h1 { font-size: 16px; font-weight: 600; }
-        .toolbar .dl { background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 6px; font-size: 13px; }
-        .toolbar .dl:hover { background: rgba(255,255,255,0.3); }
-        iframe { flex: 1; border: none; width: 100%; }
-    </style>
-</head>
-<body>
-    <div class="toolbar">
-        <a href="/web/dashboard">&larr; Back</a>
-        <h1>Owner's Guide</h1>
-        <a href="/static/Polly_User_Guide.pdf" download class="dl">Download</a>
-    </div>
-    <iframe src="/static/Polly_User_Guide.pdf"></iframe>
-</body>
-</html>""")
+    """Owner's Guide — opens PDF in browser's native viewer with back support."""
+    from fastapi.responses import FileResponse
+    import os
+
+    pdf_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "static", "Polly_User_Guide.pdf"
+    )
+    # Serve inline so the browser's own PDF viewer handles it (scrollable, zoomable)
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline; filename=Polly_User_Guide.pdf"},
+    )
 
 
 # ── Audio Listen & Download ──
