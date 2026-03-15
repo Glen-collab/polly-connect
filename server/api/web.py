@@ -2878,12 +2878,12 @@ async def book_chapter_generate(request: Request, chapter_num: int):
 
     if content:
         import json as _json
-        book_builder.save_chapter_draft(
+        db.save_chapter_draft(
             chapter_number=chapter_num,
             title=chapter["title"],
             bucket=chapter["bucket"],
             life_phase=chapter["life_phase"],
-            memory_ids=chapter.get("memory_ids", []),
+            memory_ids=_json.dumps(chapter.get("memory_ids", [])),
             content=content,
             tenant_id=tid,
         )

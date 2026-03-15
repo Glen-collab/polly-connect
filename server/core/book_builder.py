@@ -277,7 +277,17 @@ class BookBuilder:
         memory_texts = []
         for i, mem in enumerate(memories, 1):
             speaker_name = mem.get("speaker", "someone")
+            # Prefer corrected transcript over stale memory text
             text = mem.get("text", mem.get("text_summary", ""))
+            story_id = mem.get("story_id")
+            if story_id:
+                story = self.db.get_story_by_id(story_id)
+                if story:
+                    corrected = story.get("corrected_transcript")
+                    if corrected and corrected.strip():
+                        text = corrected
+                    elif story.get("transcript"):
+                        text = story["transcript"]
             raw_emotions = mem.get("emotions", "")
             if isinstance(raw_emotions, list):
                 emotions = ", ".join(raw_emotions)
