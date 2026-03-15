@@ -349,8 +349,16 @@ async def dashboard(request: Request):
     items = db.list_all(tenant_id=tid)
     stats = db.get_stats(tenant_id=tid)
 
-    # Count question sessions
+    # Get real story count (not limited to 5)
     conn = db._get_connection()
+    try:
+        real_story_count = conn.execute(
+            "SELECT COUNT(*) FROM stories WHERE tenant_id = ?", (tid,)
+        ).fetchone()[0]
+    except Exception:
+        real_story_count = len(stories)
+
+    # Count question sessions
     try:
         q_count = conn.execute(
             "SELECT COUNT(*) FROM question_sessions WHERE answered = 1 AND tenant_id = ?",
@@ -371,7 +379,7 @@ async def dashboard(request: Request):
         "session": session,
         "stories": stories,
         "medications": medications,
-        "story_count": len(stories),
+        "story_count": real_story_count,
         "question_count": q_count,
         "item_count": stats.get("total_items", 0),
         "book_progress": book_progress,
@@ -3005,6 +3013,37 @@ async def book_export_pdf(request: Request):
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+# ── Audio Download ──
+
+@router.get("/audio/download/{audio_key}")
+async def download_audio(request: Request, audio_key: str):
+    """Download a voice recording WAV file (from QR code or story page)."""
+    from fastapi.responses import FileResponse
+    import os
+
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    # Sanitize filename to prevent path traversal
+    safe_key = os.path.basename(audio_key)
+    recordings_dir = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "static", "recordings"
+    )
+    file_path = os.path.join(recordings_dir, safe_key)
+
+    if not os.path.exists(file_path):
+        return RedirectResponse("/web/dashboard?msg=Recording not found", status_code=302)
+
+    return FileResponse(
+        path=file_path,
+        media_type="audio/wav",
+        filename=safe_key,
+        headers={"Content-Disposition": f"attachment; filename={safe_key}"},
     )
 
 
