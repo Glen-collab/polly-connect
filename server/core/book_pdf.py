@@ -49,7 +49,7 @@ TEXT_HEIGHT = PAGE_HEIGHT - TOP - BOTTOM
 QR_SIZE = 0.8 * INCH
 PHOTO_MAX_WIDTH = TEXT_WIDTH - 0.5 * INCH  # leave some margin
 PHOTO_MAX_HEIGHT = 3.5 * INCH              # max height for inline photos
-AUDIO_BASE_URL = "https://polly-connect.com/static/recordings"
+AUDIO_BASE_URL = "https://polly-connect.com/web/listen"
 UPLOADS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "server", "static", "uploads")
 
 BUCKET_LABELS = {

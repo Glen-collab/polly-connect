@@ -3016,7 +3016,95 @@ async def book_export_pdf(request: Request):
     )
 
 
-# ── Audio Download ──
+# ── Audio Listen & Download ──
+
+@router.get("/listen/{audio_key}", response_class=HTMLResponse)
+async def listen_page(request: Request, audio_key: str):
+    """Public landing page for QR code scans — plays audio + download button."""
+    import os
+
+    safe_key = os.path.basename(audio_key)
+    recordings_dir = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "static", "recordings"
+    )
+    file_path = os.path.join(recordings_dir, safe_key)
+
+    if not os.path.exists(file_path):
+        return HTMLResponse("<h2>Recording not found</h2>", status_code=404)
+
+    # Look up who told this story
+    db = request.app.state.db
+    conn = db._get_connection()
+    try:
+        story = conn.execute(
+            "SELECT id, question_text, recorded_at FROM stories WHERE audio_s3_key = ?",
+            (safe_key,)
+        ).fetchone()
+        # Get memory speaker
+        speaker = ""
+        story_question = ""
+        if story:
+            story_question = story[1] or ""
+            mem = conn.execute(
+                "SELECT speaker FROM memories WHERE story_id = ?", (story[0],)
+            ).fetchone()
+            if mem:
+                speaker = mem[0] or ""
+    except Exception:
+        speaker = ""
+        story_question = ""
+    finally:
+        if not db._conn:
+            conn.close()
+
+    title = f"{speaker}'s Voice" if speaker else "A Family Voice"
+
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} - Polly Connect</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+               margin: 0; padding: 20px; min-height: 100vh;
+               display: flex; align-items: center; justify-content: center; }}
+        .card {{ background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+                 padding: 32px; max-width: 400px; width: 100%; text-align: center; }}
+        .logo {{ font-size: 48px; margin-bottom: 8px; }}
+        h1 {{ font-size: 22px; color: #1a1a1a; margin: 0 0 4px; }}
+        .subtitle {{ font-size: 14px; color: #666; margin-bottom: 24px; }}
+        audio {{ width: 100%; margin-bottom: 20px; }}
+        .download {{ display: inline-flex; align-items: center; gap: 8px;
+                     background: #059669; color: white; padding: 12px 24px;
+                     border-radius: 8px; text-decoration: none; font-weight: 600;
+                     font-size: 16px; transition: background 0.2s; }}
+        .download:hover {{ background: #047857; }}
+        .footer {{ margin-top: 24px; font-size: 12px; color: #999; }}
+        .footer a {{ color: #059669; text-decoration: none; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="logo">🦜</div>
+        <h1>{title}</h1>
+        <p class="subtitle">{"" if not story_question else story_question}</p>
+        <audio controls autoplay preload="auto">
+            <source src="/static/recordings/{safe_key}" type="audio/wav">
+            Your browser does not support audio playback.
+        </audio>
+        <a href="/web/audio/download/{safe_key}" class="download">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Save to Phone
+        </a>
+        <p class="footer">Captured with <a href="https://polly-connect.com">Polly Connect</a></p>
+    </div>
+</body>
+</html>""")
+
 
 @router.get("/audio/download/{audio_key}")
 async def download_audio(request: Request, audio_key: str):
@@ -3024,10 +3112,7 @@ async def download_audio(request: Request, audio_key: str):
     from fastapi.responses import FileResponse
     import os
 
-    session = await get_web_session(request)
-    redirect = require_login(session)
-    if redirect:
-        return redirect
+    # No login required — QR codes are public links from printed books
 
     # Sanitize filename to prevent path traversal
     safe_key = os.path.basename(audio_key)
