@@ -397,7 +397,7 @@ Write a warm, narrative chapter (7-10 paragraphs) that:
 - When owner age is given, use it to anchor the perspective (e.g. "At nine years old, the world still felt enormous...")
 - Use family birth years to anchor events (e.g. if Brooklyn was born in 2018 and the story mentions her gymnastics, that's ~2024-2026)
 - Do NOT repeat stories or themes already covered in previous chapters
-- If photos are available, place [PHOTO:story_id] markers on their own line right after the relevant paragraph
+- ONLY place [PHOTO:story_id] markers if photos are listed above as "Available photos for this chapter". Do NOT invent photo markers. If no photos are available, do not include any [PHOTO:...] markers at all.
 
 Write the chapter now:"""
 

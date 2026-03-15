@@ -411,14 +411,19 @@ class LegacyBookPDF:
                             )
                         continue
 
+                    # Strip any rogue photo markers GPT invented
+                    # (e.g. [PHOTO: Memory 1], [PHOTO: 5], etc.)
+                    if re.match(r'^\[PHOTO[:\s].*\]$', para, re.IGNORECASE):
+                        continue
+
                     # Check if paragraph contains embedded markers mixed with text
-                    # Split on markers and render text + photos in order
+                    # Split on valid markers and render text + photos in order
                     parts = re.split(r'\[PHOTO:(\d+)\]', para)
                     if len(parts) > 1:
                         for j, part in enumerate(parts):
                             if j % 2 == 0:
-                                # Text part
-                                text = part.strip()
+                                # Text part — also strip rogue markers
+                                text = re.sub(r'\[PHOTO[:\s][^\]]*\]', '', part).strip()
                                 if text:
                                     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                                     style = self.styles['BodyFirst'] if body_para_idx == 0 else self.styles['BodyText']
@@ -433,7 +438,10 @@ class LegacyBookPDF:
                                         include_qr_codes, placed_stories
                                     )
                     else:
-                        # Normal paragraph — no markers
+                        # Normal paragraph — strip rogue markers, then render
+                        para = re.sub(r'\[PHOTO[:\s][^\]]*\]', '', para).strip()
+                        if not para:
+                            continue
                         para = para.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                         style = self.styles['BodyFirst'] if body_para_idx == 0 else self.styles['BodyText']
                         story.append(Paragraph(para, style))
