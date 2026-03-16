@@ -99,24 +99,24 @@
         "week": 9,
         "theme": "love_and_marriage",
         "questions": [
-            { "id": "q_w9_01", "type": "who", "question": "Who was your first love?" },
-            { "id": "q_w9_02", "type": "where", "question": "Where did you meet the love of your life?" },
-            { "id": "q_w9_03", "type": "what", "question": "What did you love most about them?" },
-            { "id": "q_w9_04", "type": "when", "question": "When did you know they were the one?" },
+            { "id": "q_w9_01", "type": "who", "question": "Who was your first love or your first big crush?" },
+            { "id": "q_w9_02", "type": "where", "question": "Where did you meet the person who means the most to you?" },
+            { "id": "q_w9_03", "type": "what", "question": "What do you love most about them?" },
+            { "id": "q_w9_04", "type": "when", "question": "When did you know they were someone special?" },
             { "id": "q_w9_05", "type": "why", "question": "Why did you fall in love with them?" },
-            { "id": "q_w9_06", "type": "how", "question": "How did you propose or get proposed to?" }
+            { "id": "q_w9_06", "type": "how", "question": "How did your love story begin?" }
         ]
     },
     {
         "week": 10,
         "theme": "parenting",
         "questions": [
-            { "id": "q_w10_01", "type": "what", "question": "What was the best part of being a parent?" },
-            { "id": "q_w10_02", "type": "who", "question": "Who helped you the most when raising your children?" },
-            { "id": "q_w10_03", "type": "where", "question": "Where did you raise your family?" },
-            { "id": "q_w10_04", "type": "when", "question": "When did you feel most proud of your children?" },
-            { "id": "q_w10_05", "type": "why", "question": "Why do you think you were a good parent?" },
-            { "id": "q_w10_06", "type": "how", "question": "How did you handle the challenges of parenting?" }
+            { "id": "q_w10_01", "type": "what", "question": "What is the best part of being a parent?" },
+            { "id": "q_w10_02", "type": "who", "question": "Who has helped you the most with raising your children?" },
+            { "id": "q_w10_03", "type": "where", "question": "Where are you raising your family, or where did you raise them?" },
+            { "id": "q_w10_04", "type": "when", "question": "When have you felt the most proud of your children?" },
+            { "id": "q_w10_05", "type": "why", "question": "Why do you think being a good parent matters so much to you?" },
+            { "id": "q_w10_06", "type": "how", "question": "How do you handle the challenges of parenting?" }
         ]
     },
     {
@@ -219,12 +219,12 @@
         "week": 19,
         "theme": "technology_changes",
         "questions": [
-            { "id": "q_w19_01", "type": "what", "question": "What new invention amazed you the most?" },
-            { "id": "q_w19_02", "type": "who", "question": "Who showed you how to use new technology?" },
-            { "id": "q_w19_03", "type": "where", "question": "Where did you first see a television?" },
-            { "id": "q_w19_04", "type": "when", "question": "When did your family get their first phone?" },
-            { "id": "q_w19_05", "type": "why", "question": "Why did that invention change your life?" },
-            { "id": "q_w19_06", "type": "how", "question": "How different was life before computers?" }
+            { "id": "q_w19_01", "type": "what", "question": "What piece of technology has changed your life the most?" },
+            { "id": "q_w19_02", "type": "who", "question": "Who showed you how to use something new for the first time?" },
+            { "id": "q_w19_03", "type": "where", "question": "Where did you first experience something that blew your mind with technology?" },
+            { "id": "q_w19_04", "type": "when", "question": "When did you realize the world was really changing because of technology?" },
+            { "id": "q_w19_05", "type": "why", "question": "Why do you think that technology made such a big difference?" },
+            { "id": "q_w19_06", "type": "how", "question": "How do you think technology has changed the way families connect?" }
         ]
     },
     {
@@ -421,14 +421,14 @@
     },
     {
         "week": 36,
-        "theme": "retirement",
+        "theme": "retirement_and_free_time",
         "questions": [
-            { "id": "q_w36_01", "type": "what", "question": "What did you enjoy most about retirement?" },
-            { "id": "q_w36_02", "type": "who", "question": "Who did you spend your retirement with?" },
-            { "id": "q_w36_03", "type": "where", "question": "Where did you go after you retired?" },
-            { "id": "q_w36_04", "type": "when", "question": "When did you retire?" },
-            { "id": "q_w36_05", "type": "why", "question": "Why was retirement special to you?" },
-            { "id": "q_w36_06", "type": "how", "question": "How did you spend your free time?" }
+            { "id": "q_w36_01", "type": "what", "question": "If you're retired, what do you enjoy most about it? If not, what do you picture retirement looking like for you?" },
+            { "id": "q_w36_02", "type": "who", "question": "Who do you hope to spend the most time with as you get older?" },
+            { "id": "q_w36_03", "type": "where", "question": "Where would you go if you had all the free time in the world?" },
+            { "id": "q_w36_04", "type": "when", "question": "When do you feel the most at peace and relaxed?" },
+            { "id": "q_w36_05", "type": "why", "question": "Why is having time for yourself important to you?" },
+            { "id": "q_w36_06", "type": "how", "question": "How do you like to spend your free time when you get it?" }
         ]
     },
     {
@@ -495,12 +495,12 @@
         "week": 42,
         "theme": "anniversary_memories",
         "questions": [
-            { "id": "q_w42_01", "type": "what", "question": "What was your most special anniversary?" },
-            { "id": "q_w42_02", "type": "who", "question": "Who helped make it special?" },
-            { "id": "q_w42_03", "type": "where", "question": "Where did you celebrate?" },
-            { "id": "q_w42_04", "type": "when", "question": "When was your wedding anniversary?" },
-            { "id": "q_w42_05", "type": "why", "question": "Why was that anniversary so meaningful?" },
-            { "id": "q_w42_06", "type": "how", "question": "How did you celebrate anniversaries over the years?" }
+            { "id": "q_w42_01", "type": "what", "question": "What is a milestone or special date that means a lot to you?" },
+            { "id": "q_w42_02", "type": "who", "question": "Who do you celebrate special milestones with?" },
+            { "id": "q_w42_03", "type": "where", "question": "Where do you like to celebrate special occasions?" },
+            { "id": "q_w42_04", "type": "when", "question": "When was a time you celebrated something that really meant a lot?" },
+            { "id": "q_w42_05", "type": "why", "question": "Why was that celebration so meaningful to you?" },
+            { "id": "q_w42_06", "type": "how", "question": "How do you like to mark the important moments in your life?" }
         ]
     },
     {

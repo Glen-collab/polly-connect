@@ -4,7 +4,7 @@
     "jungian_stage": "ordinary_world",
     "life_phase": "childhood",
     "questions": [
-      {"id": "fk01", "question": "What's something your mama used to cook that nobody else could get right?"},
+      {"id": "fk01", "question": "What's something someone in your family used to cook that nobody else could get right?"},
       {"id": "fk02", "question": "Was there a dish that always showed up at holidays, no matter what?"},
       {"id": "fk03", "question": "Did anybody in your family have a secret recipe they wouldn't share?"},
       {"id": "fk04", "question": "What's the best meal you remember eating as a kid?"},
@@ -47,7 +47,7 @@
     "life_phase": "adolescence",
     "questions": [
       {"id": "gw01", "question": "What was your first real job?"},
-      {"id": "gw02", "question": "What's the one thing your dad always said?"},
+      {"id": "gw02", "question": "What's something a parent or someone who raised you always used to say?"},
       {"id": "gw03", "question": "Did you have chores growing up? What was the worst one?"},
       {"id": "gw04", "question": "What did you want to be when you grew up?"},
       {"id": "gw05", "question": "Was there a teacher who really made a difference in your life?"},
