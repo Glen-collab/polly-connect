@@ -695,12 +695,21 @@ async def _process_command(
     if detector and isinstance(detector, VADWakeWordDetector) and not skip_wake_check:
         is_wake, cleaned = detector.check_transcription(transcription)
         if not is_wake:
-            logger.info(f"VAD: no wake phrase in transcription, ignoring: {transcription}")
-            # Tell ESP32 to resume streaming (no command to process)
-            await websocket.send_json({"event": "no_wake_word", "text": transcription})
-            return 0.0
-        logger.info(f"VAD: wake phrase found, command: {cleaned}")
-        transcription = cleaned
+            # Allow "repeat" / "say that again" / "slower" without wake word
+            text_check = transcription.lower().strip()
+            repeat_phrases = ["repeat", "say that again", "say it again", "what did you say",
+                              "can you repeat", "repeat that", "one more time", "slower"]
+            if any(p in text_check for p in repeat_phrases):
+                logger.info(f"VAD: no wake phrase but repeat command detected: {transcription}")
+                transcription = text_check
+            else:
+                logger.info(f"VAD: no wake phrase in transcription, ignoring: {transcription}")
+                # Tell ESP32 to resume streaming (no command to process)
+                await websocket.send_json({"event": "no_wake_word", "text": transcription})
+                return 0.0
+        else:
+            logger.info(f"VAD: wake phrase found, command: {cleaned}")
+            transcription = cleaned
 
     # Check if user is telling the parrot to be quiet
     text_lower = transcription.lower().strip()
