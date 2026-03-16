@@ -205,6 +205,38 @@ async def health():
     return {"status": "healthy"}
 
 
+@app.post("/api/stripe/webhook")
+async def stripe_webhook(request: Request):
+    """Stripe webhook endpoint for subscription events."""
+    from fastapi.responses import JSONResponse
+    import os
+
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+    try:
+        import stripe
+        stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+
+        if webhook_secret:
+            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+        else:
+            # No webhook secret configured — parse event directly (dev/test mode)
+            import json
+            event = json.loads(payload)
+
+        from core.subscription import handle_webhook_event
+        db = request.app.state.db
+        handled = handle_webhook_event(db, event)
+        logger.info(f"Stripe webhook: {event.get('type', '?')} handled={handled}")
+
+        return JSONResponse({"status": "ok"})
+    except Exception as e:
+        logger.error(f"Stripe webhook error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG,

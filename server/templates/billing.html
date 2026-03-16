@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Billing - Polly Connect{% endblock %}
+
+{% block content %}
+<a href="/web/hub/settings" class="text-emerald-600 hover:underline text-sm">&larr; Settings</a>
+<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 mt-1">Billing & Subscription</h1>
+
+{% if message %}
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4 text-sm text-emerald-800 font-medium">
+    {{ message }}
+</div>
+{% endif %}
+
+<!-- Current Plan -->
+<div class="bg-white rounded-lg shadow p-5 mb-4">
+    <h2 class="text-base font-semibold mb-3">Current Plan</h2>
+    <div class="flex items-center gap-3 mb-3">
+        <span class="text-2xl font-bold
+            {% if subscription.tier == 'legacy' %}text-emerald-700
+            {% elif subscription.tier == 'basic' %}text-gray-800
+            {% else %}text-blue-600{% endif %}">
+            {% if subscription.tier == 'legacy' %}Polly Legacy
+            {% elif subscription.tier == 'basic' %}Polly Basic
+            {% else %}Free Trial{% endif %}
+        </span>
+        {% if subscription.status == 'active' %}
+        <span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded-full">Active</span>
+        {% elif subscription.status == 'past_due' %}
+        <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full">Past Due</span>
+        {% elif subscription.status == 'expired' %}
+        <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full">Expired</span>
+        {% elif subscription.status == 'canceled' %}
+        <span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded-full">Canceled</span>
+        {% endif %}
+    </div>
+
+    {% if subscription.tier == 'trial' and subscription.trial_days_left is not none %}
+    <p class="text-sm text-gray-500">{{ subscription.trial_days_left }} days remaining in your free trial.</p>
+    {% endif %}
+
+    {% if subscription.status == 'expired' %}
+    <p class="text-sm text-red-600 mb-3">Your trial has ended. Your stories are safe — subscribe to keep adding more.</p>
+    {% endif %}
+
+    {% if subscription.status == 'past_due' %}
+    <p class="text-sm text-red-600 mb-3">Your payment failed. Please update your payment method to keep your subscription active.</p>
+    {% endif %}
+</div>
+
+<!-- Actions -->
+<div class="space-y-3">
+    {% if subscription.tier == 'trial' or subscription.status in ('expired', 'canceled') %}
+    <a href="/web/pricing"
+       class="block bg-emerald-600 text-white text-center py-3 rounded-lg font-bold hover:bg-emerald-700 transition text-sm">
+        {% if subscription.status == 'expired' %}Reactivate — Choose a Plan{% else %}Upgrade Your Plan{% endif %}
+    </a>
+    {% elif subscription.tier in ('basic', 'legacy') and subscription.status == 'active' %}
+    <a href="/web/pricing"
+       class="block bg-gray-100 text-gray-700 text-center py-3 rounded-lg font-medium hover:bg-gray-200 transition text-sm">
+        Change Plan
+    </a>
+    {% endif %}
+
+    {% if subscription.stripe_customer_id %}
+    <form method="POST" action="/web/billing/portal">
+        <button type="submit"
+                class="w-full bg-white border border-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-50 transition text-sm">
+            Manage Payment Method & Invoices
+        </button>
+    </form>
+    {% endif %}
+</div>
+
+<!-- Usage -->
+<div class="bg-white rounded-lg shadow p-5 mt-6">
+    <h2 class="text-base font-semibold mb-3">Your Usage</h2>
+    <div class="grid grid-cols-2 gap-3 text-sm">
+        <div>
+            <span class="text-gray-500">Stories</span>
+            <p class="font-bold text-gray-800">{{ usage.stories }}</p>
+        </div>
+        <div>
+            <span class="text-gray-500">Photos</span>
+            <p class="font-bold text-gray-800">{{ usage.photos }}</p>
+        </div>
+        <div>
+            <span class="text-gray-500">Items</span>
+            <p class="font-bold text-gray-800">{{ usage.items }}</p>
+        </div>
+        <div>
+            <span class="text-gray-500">Family Members</span>
+            <p class="font-bold text-gray-800">{{ usage.family }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

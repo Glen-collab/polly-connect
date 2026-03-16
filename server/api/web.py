@@ -374,6 +374,10 @@ async def dashboard(request: Request):
     book_builder = getattr(request.app.state, "book_builder", None)
     book_progress = book_builder.get_book_progress(tenant_id=session["tenant_id"]) if book_builder else None
 
+    # Subscription status
+    from core.subscription import get_subscription
+    subscription = get_subscription(db, tid)
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "session": session,
@@ -383,6 +387,7 @@ async def dashboard(request: Request):
         "question_count": q_count,
         "item_count": stats.get("total_items", 0),
         "book_progress": book_progress,
+        "subscription": subscription,
     })
 
 
@@ -3148,6 +3153,115 @@ async def download_audio(request: Request, audio_key: str):
         media_type="audio/wav",
         filename=safe_key,
         headers={"Content-Disposition": f"attachment; filename={safe_key}"},
+    )
+
+
+# ── Subscription & Billing ──
+
+@router.get("/pricing", response_class=HTMLResponse)
+async def pricing_page(request: Request):
+    """Pricing page — shows plans and current subscription status."""
+    session = await get_web_session(request)
+    subscription = None
+    if session:
+        from core.subscription import get_subscription
+        db = request.app.state.db
+        subscription = get_subscription(db, session["tenant_id"])
+
+    message = request.query_params.get("msg")
+    return templates.TemplateResponse("pricing.html", {
+        "request": request,
+        "session": session,
+        "subscription": subscription,
+        "message": message,
+    })
+
+
+@router.post("/subscribe")
+async def subscribe(request: Request, tier: str = Form("basic"),
+                     interval: str = Form("month")):
+    """Start Stripe Checkout for a subscription."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    from core.subscription import create_checkout_session
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    checkout_url = create_checkout_session(
+        db, tid, tier, interval,
+        success_url="https://polly-connect.com/web/billing?success=1",
+        cancel_url="https://polly-connect.com/web/pricing?msg=Checkout canceled",
+    )
+
+    if checkout_url:
+        return RedirectResponse(checkout_url, status_code=303)
+
+    return RedirectResponse(
+        "/web/pricing?msg=Could not start checkout. Please try again.",
+        status_code=303,
+    )
+
+
+@router.get("/billing", response_class=HTMLResponse)
+async def billing_page(request: Request):
+    """Billing management page."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    from core.subscription import get_subscription
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    subscription = get_subscription(db, tid)
+
+    # Get usage counts
+    conn = db._get_connection()
+    try:
+        stories = conn.execute("SELECT COUNT(*) FROM stories WHERE tenant_id=?", (tid,)).fetchone()[0]
+        photos = conn.execute("SELECT COUNT(*) FROM photos WHERE tenant_id=?", (tid,)).fetchone()[0]
+        items = conn.execute("SELECT COUNT(*) FROM items WHERE tenant_id=?", (tid,)).fetchone()[0]
+        family = conn.execute("SELECT COUNT(*) FROM family_members WHERE tenant_id=?", (tid,)).fetchone()[0]
+    except Exception:
+        stories = photos = items = family = 0
+    finally:
+        if not db._conn:
+            conn.close()
+
+    message = None
+    if request.query_params.get("success"):
+        message = "Subscription activated! Welcome to Polly."
+
+    return templates.TemplateResponse("billing.html", {
+        "request": request,
+        "session": session,
+        "subscription": subscription,
+        "usage": {"stories": stories, "photos": photos, "items": items, "family": family},
+        "message": message,
+    })
+
+
+@router.post("/billing/portal")
+async def billing_portal(request: Request):
+    """Redirect to Stripe Customer Portal for payment management."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    from core.subscription import create_billing_portal_session
+    db = request.app.state.db
+    portal_url = create_billing_portal_session(db, session["tenant_id"])
+
+    if portal_url:
+        return RedirectResponse(portal_url, status_code=303)
+
+    return RedirectResponse(
+        "/web/billing?msg=Could not open billing portal.",
+        status_code=303,
     )
 
 

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Pricing - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="mb-6 text-center">
+    {% if session %}
+    <a href="/web/dashboard" class="text-emerald-600 hover:underline text-sm">&larr; Home</a>
+    {% endif %}
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-2">Choose Your Plan</h1>
+    <p class="text-sm text-gray-500 mt-1">Every voice deserves to be heard. Every story deserves to be saved.</p>
+</div>
+
+{% if message %}
+<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-800 font-medium max-w-2xl mx-auto">
+    {{ message }}
+</div>
+{% endif %}
+
+<!-- Trial Banner -->
+{% if subscription and subscription.tier == 'trial' and subscription.status == 'active' %}
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-6 text-sm text-emerald-800 font-medium text-center max-w-2xl mx-auto">
+    You're on your <strong>free trial</strong> &mdash; {{ subscription.trial_days_left }} days remaining.
+</div>
+{% elif subscription and subscription.status == 'expired' %}
+<div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-6 text-sm text-red-800 font-medium text-center max-w-2xl mx-auto">
+    Your free trial has ended. Subscribe to keep building your family legacy. Your stories are safe &mdash; they're waiting for you.
+</div>
+{% endif %}
+
+<!-- Toggle Monthly/Annual -->
+<div class="flex justify-center mb-6">
+    <div class="bg-gray-100 rounded-full p-1 flex text-sm font-medium">
+        <button id="btn-monthly" onclick="toggleBilling('month')"
+                class="px-4 py-2 rounded-full bg-white shadow text-gray-800 transition">Monthly</button>
+        <button id="btn-annual" onclick="toggleBilling('year')"
+                class="px-4 py-2 rounded-full text-gray-500 transition">Annual (Save 17%)</button>
+    </div>
+</div>
+
+<!-- Pricing Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+
+    <!-- Basic -->
+    <div class="bg-white rounded-2xl shadow-lg border-2 border-gray-200 p-6 flex flex-col">
+        <h2 class="text-xl font-bold text-gray-800">Polly Basic</h2>
+        <div class="mt-2">
+            <span class="text-3xl font-bold text-gray-900" id="price-basic">$9.99</span>
+            <span class="text-gray-500 text-sm" id="interval-basic">/month</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1" id="annual-note-basic" style="display:none;">Billed annually at $99/yr</p>
+        <ul class="mt-4 space-y-2 text-sm text-gray-600 flex-1">
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Unlimited stories & recordings</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Unlimited photos & items</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Phone recording</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> AI prayers & nostalgia</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Family tree & message board</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> 3 family access codes</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Book preview (2 chapters)</li>
+            <li class="flex items-start gap-2"><span class="text-gray-300 font-bold">&#10007;</span> <span class="text-gray-400">Legacy Book PDF export</span></li>
+            <li class="flex items-start gap-2"><span class="text-gray-300 font-bold">&#10007;</span> <span class="text-gray-400">QR voice codes in book</span></li>
+        </ul>
+        <form method="POST" action="/web/subscribe" class="mt-6">
+            <input type="hidden" name="tier" value="basic">
+            <input type="hidden" name="interval" id="interval-input-basic" value="month">
+            <button type="submit"
+                    class="w-full bg-gray-800 text-white py-3 rounded-lg font-bold hover:bg-gray-700 transition text-sm">
+                {% if subscription and subscription.tier == 'basic' and subscription.status == 'active' %}
+                    Current Plan
+                {% else %}
+                    Get Basic
+                {% endif %}
+            </button>
+        </form>
+    </div>
+
+    <!-- Legacy -->
+    <div class="bg-white rounded-2xl shadow-lg border-2 border-emerald-500 p-6 flex flex-col relative">
+        <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+            MOST POPULAR
+        </div>
+        <h2 class="text-xl font-bold text-gray-800">Polly Legacy</h2>
+        <div class="mt-2">
+            <span class="text-3xl font-bold text-emerald-700" id="price-legacy">$19.99</span>
+            <span class="text-gray-500 text-sm" id="interval-legacy">/month</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1" id="annual-note-legacy" style="display:none;">Billed annually at $199/yr</p>
+        <ul class="mt-4 space-y-2 text-sm text-gray-600 flex-1">
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Everything in Basic, plus:</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> <strong>Full Legacy Book generation</strong></li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> <strong>Print-ready PDF export (6x9)</strong></li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> <strong>QR voice codes in book</strong></li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Unlimited family access codes</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Up to 3 Polly devices</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Unlimited chapter generation</li>
+        </ul>
+        <form method="POST" action="/web/subscribe" class="mt-6">
+            <input type="hidden" name="tier" value="legacy">
+            <input type="hidden" name="interval" id="interval-input-legacy" value="month">
+            <button type="submit"
+                    class="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition text-sm">
+                {% if subscription and subscription.tier == 'legacy' and subscription.status == 'active' %}
+                    Current Plan
+                {% else %}
+                    Get Legacy
+                {% endif %}
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Free Trial Note -->
+<div class="text-center mt-6 text-xs text-gray-400 max-w-2xl mx-auto">
+    All plans include a 30-day free trial. Cancel anytime. Your stories are always yours.
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var billing = 'month';
+function toggleBilling(b) {
+    billing = b;
+    var monthly = b === 'month';
+    document.getElementById('btn-monthly').className = monthly
+        ? 'px-4 py-2 rounded-full bg-white shadow text-gray-800 transition'
+        : 'px-4 py-2 rounded-full text-gray-500 transition';
+    document.getElementById('btn-annual').className = monthly
+        ? 'px-4 py-2 rounded-full text-gray-500 transition'
+        : 'px-4 py-2 rounded-full bg-white shadow text-gray-800 transition';
+    document.getElementById('price-basic').textContent = monthly ? '$9.99' : '$99';
+    document.getElementById('price-legacy').textContent = monthly ? '$19.99' : '$199';
+    document.getElementById('interval-basic').textContent = monthly ? '/month' : '/year';
+    document.getElementById('interval-legacy').textContent = monthly ? '/month' : '/year';
+    document.getElementById('annual-note-basic').style.display = monthly ? 'none' : 'block';
+    document.getElementById('annual-note-legacy').style.display = monthly ? 'none' : 'block';
+    document.getElementById('interval-input-basic').value = b;
+    document.getElementById('interval-input-legacy').value = b;
+}
+</script>
+{% endblock %}

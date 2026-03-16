@@ -607,6 +607,31 @@ class PollyDB:
             if "role" not in cols:
                 conn.execute("ALTER TABLE web_sessions ADD COLUMN role TEXT")
 
+            # ── Subscription / Stripe migrations ──
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(tenants)").fetchall()}
+            sub_migrations = {
+                "subscription_tier": "ALTER TABLE tenants ADD COLUMN subscription_tier TEXT DEFAULT 'trial'",
+                "subscription_status": "ALTER TABLE tenants ADD COLUMN subscription_status TEXT DEFAULT 'active'",
+                "stripe_customer_id": "ALTER TABLE tenants ADD COLUMN stripe_customer_id TEXT",
+                "stripe_subscription_id": "ALTER TABLE tenants ADD COLUMN stripe_subscription_id TEXT",
+                "trial_ends_at": "ALTER TABLE tenants ADD COLUMN trial_ends_at TIMESTAMP",
+            }
+            for col, sql in sub_migrations.items():
+                if col not in cols:
+                    conn.execute(sql)
+
+            # Set trial_ends_at for existing tenants that don't have it yet
+            # (30 days from now for existing users, generous grace period)
+            conn.execute("""
+                UPDATE tenants SET trial_ends_at = datetime('now', '+30 days')
+                WHERE trial_ends_at IS NULL AND subscription_tier IS NULL AND id > 1
+            """)
+            # Tenant 1 (admin) gets legacy tier
+            conn.execute("""
+                UPDATE tenants SET subscription_tier = 'legacy', subscription_status = 'active'
+                WHERE id = 1 AND (subscription_tier IS NULL OR subscription_tier = 'trial')
+            """)
+
             conn.commit()
         finally:
             if not self._conn:

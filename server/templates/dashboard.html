@@ -8,6 +8,23 @@
     <p class="text-sm text-gray-500 mt-1">What would you like to do?</p>
 </div>
 
+<!-- Subscription Banner -->
+{% if subscription and subscription.tier == 'trial' and subscription.trial_days_left is not none %}
+<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 max-w-lg mx-auto text-center">
+    <p class="text-sm text-blue-800 font-medium">Free trial &mdash; {{ subscription.trial_days_left }} days left</p>
+    <a href="/web/pricing" class="text-xs text-blue-600 hover:underline">View plans</a>
+</div>
+{% elif subscription and subscription.status == 'expired' %}
+<div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 max-w-lg mx-auto text-center">
+    <p class="text-sm text-red-800 font-medium">Your free trial has ended. Your stories are safe.</p>
+    <a href="/web/pricing" class="text-sm text-red-600 font-bold hover:underline">Subscribe to keep building your legacy &rarr;</a>
+</div>
+{% elif subscription and subscription.status == 'past_due' %}
+<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 max-w-lg mx-auto text-center">
+    <p class="text-sm text-amber-800 font-medium">Payment failed. Please <a href="/web/billing" class="underline font-bold">update your payment method</a>.</p>
+</div>
+{% endif %}
+
 <!-- Big Button Grid -->
 <div class="grid grid-cols-2 gap-5 sm:gap-8 mb-8 max-w-lg mx-auto">
     <a href="/web/hub/stories" class="bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl p-8 sm:p-12 text-center shadow-lg transition active:scale-95">

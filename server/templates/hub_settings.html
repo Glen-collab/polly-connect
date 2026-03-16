@@ -30,6 +30,13 @@
         <span class="text-lg sm:text-xl font-bold">Devices</span>
         <p class="text-xs text-gray-300 mt-1">View connected Polly devices and their status.</p>
     </a>
+    <a href="/web/billing" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
+        <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+        </svg>
+        <span class="text-lg sm:text-xl font-bold">Billing</span>
+        <p class="text-xs text-emerald-200 mt-1">Subscription plan, payment, and usage.</p>
+    </a>
     {% if session.role == 'admin' %}
     <a href="/web/firmware" class="bg-gray-500 hover:bg-gray-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
         <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
