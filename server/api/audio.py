@@ -734,9 +734,15 @@ async def _process_command(
         dur = await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr, device_id=device_id)
         return dur
 
-    # Intent parse
-    intent_result = intent_parser.parse(transcription)
-    logger.info(f"Intent: {intent_result}")
+    # Skip intent parsing in conversational mode — the answer is a story, not a command.
+    # Only parse intent if we're in COMMAND mode.
+    conv_state = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+    if conv_state and conv_state.is_conversational:
+        intent_result = {"intent": "story_answer", "confidence": 1.0}
+        logger.info(f"Intent: story_answer (conversational mode, skipped intent parse)")
+    else:
+        intent_result = intent_parser.parse(transcription)
+        logger.info(f"Intent: {intent_result}")
 
     # Log command event for admin dashboard
     try:
@@ -1086,8 +1092,13 @@ async def audio_stream(websocket: WebSocket):
                         logger.info(f"Transcription: {transcription}")
 
                         if transcription:
-                            intent_result = intent_parser.parse(transcription)
-                            logger.info(f"Intent: {intent_result}")
+                            _cs = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+                            if _cs and _cs.is_conversational:
+                                intent_result = {"intent": "story_answer", "confidence": 1.0}
+                                logger.info(f"Intent: story_answer (conversational mode)")
+                            else:
+                                intent_result = intent_parser.parse(transcription)
+                                logger.info(f"Intent: {intent_result}")
 
                             if hasattr(cmd, 'process_in_context'):
                                 response_text, new_mode = await cmd.process_in_context(
@@ -1144,8 +1155,13 @@ async def audio_stream(websocket: WebSocket):
                     session.clear()
                     continue
 
-                intent_result = intent_parser.parse(transcription)
-                logger.info(f"Intent: {intent_result}")
+                _cs = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+                if _cs and _cs.is_conversational:
+                    intent_result = {"intent": "story_answer", "confidence": 1.0}
+                    logger.info(f"Intent: story_answer (conversational mode)")
+                else:
+                    intent_result = intent_parser.parse(transcription)
+                    logger.info(f"Intent: {intent_result}")
 
                 if hasattr(cmd, 'process_in_context'):
                     response_text, new_mode = await cmd.process_in_context(
