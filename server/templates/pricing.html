@@ -37,7 +37,34 @@
     </div>
 </div>
 
-<!-- Pricing Cards -->
+<!-- Free Tier -->
+<div class="max-w-2xl mx-auto mb-6">
+    <div class="bg-gray-50 rounded-2xl border border-gray-200 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h2 class="text-lg font-bold text-gray-700">Free Trial <span class="text-sm font-normal text-gray-400">(30 days)</span></h2>
+            <p class="text-sm text-gray-500 mt-1">Try Polly free. After 30 days, your stories stay safe — you just can't add new ones until you subscribe.</p>
+            <ul class="mt-2 text-xs text-gray-500 space-y-1">
+                <li>&#10003; Up to 10 stories &amp; 5 photos</li>
+                <li>&#10003; Voice commands, prayers, jokes, weather</li>
+                <li>&#10003; 1 family access code</li>
+                <li>&#10003; Book preview (2 chapters)</li>
+                <li>&#10007; No book export or QR codes</li>
+            </ul>
+        </div>
+        {% if subscription and subscription.tier == 'trial' and subscription.status == 'active' %}
+        <div class="text-center shrink-0">
+            <span class="text-sm font-bold text-blue-600">{{ subscription.trial_days_left }} days left</span>
+        </div>
+        {% elif not session %}
+        <a href="/web/register"
+           class="shrink-0 bg-gray-800 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-gray-700 transition">
+            Start Free Trial
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Paid Plans -->
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
 
     <!-- Basic -->
