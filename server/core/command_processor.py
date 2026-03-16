@@ -921,6 +921,12 @@ NARRATIVE:"""
 
         # Check for explicit stop/exit commands even in conversational mode
         intent = intent_result.get("intent", "unknown")
+
+        # Also catch "I'm done" / "that's enough" directly from text
+        # (intent parser may misclassify these)
+        if intent not in ("stop", "goodbye") and self._ends_with_termination(raw_text):
+            intent = "goodbye"
+
         if intent in ("stop", "goodbye"):
             # Only exit if the termination phrase is at the END of what they said.
             # "I'm done working at the factory" → NOT a stop, it's part of the story.
@@ -1121,34 +1127,16 @@ NARRATIVE:"""
             if not state.current_life_phase:
                 state.current_life_phase = mem_data["life_phase"]
 
-        state.followup_count += 1
-        state.critical_thinking_step = min(state.critical_thinking_step + 1, 6)
-
-        # Check if we've reached max follow-ups
-        if state.followup_count >= state.max_followups:
-            if self.echo_engine:
-                closing = self.echo_engine.generate_closing(state.speaker_name)
-            else:
-                name_part = f", {state.speaker_name}" if state.speaker_name else ""
-                closing = f"That was a wonderful story. Thank you for sharing{name_part}."
-            state.reset()
-            return (closing, ConversationMode.COMMAND)
-
-        # Generate ECHO-BRIDGE-INVITE follow-up (now arc-aware)
+        # Story saved — thank the user and return to command mode.
+        # No follow-up loop. If they want another question, they say "ask me a question" again.
         if self.echo_engine:
-            question = state.current_question or ""
-            followup = await self.echo_engine.generate_followup(
-                question, answer_text, state.followup_count,
-                bucket=state.current_bucket,
-                critical_thinking_step=state.critical_thinking_step,
-            )
-            state.current_question = followup
-            state.mode = ConversationMode.FOLLOWUP_WAIT
-            return (followup, ConversationMode.FOLLOWUP_WAIT)
-
-        # No echo engine — just thank them and return to command mode
+            closing = self.echo_engine.generate_closing(state.speaker_name)
+        else:
+            name_part = f", {state.speaker_name}" if state.speaker_name else ""
+            closing = f"That was a wonderful story. Thank you for sharing{name_part}."
+        closing += " Say 'ask me a question' if you'd like another one."
         state.reset()
-        return ("Thank you for sharing that.", ConversationMode.COMMAND)
+        return (closing, ConversationMode.COMMAND)
 
     async def _process_story_listen(self, transcript: str,
                                     device_id: str) -> Tuple[str, ConversationMode]:
