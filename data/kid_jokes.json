@@ -57,7 +57,7 @@
   {"id": "kj_056", "setup": "What do unicorns poop?", "punchline": "Rainbow soft-serve!"},
   {"id": "kj_057", "setup": "What do you call a booger you can't get off your finger?", "punchline": "A sticky situation!"},
   {"id": "kj_058", "setup": "Why did the kid bring toilet paper to the party?", "punchline": "Because he was a party pooper!"},
-  {"id": "kj_059", "setup": "What do you call a fish with no eyes?", "punchline": "A fsh!"},
+  {"id": "kj_059", "setup": "What do you call a fish with no eyes?", "punchline": "A <phoneme alphabet=\"ipa\" ph=\"fʃ\">fsh</phoneme>!"},
   {"id": "kj_060", "setup": "What did the dinosaur say after eating a poop sandwich?", "punchline": "That tasted like crap-taceous!"},
   {"id": "kj_061", "setup": "Why do unicorns never get sick?", "punchline": "Because they live in a germ-free sparkle bubble!"},
   {"id": "kj_062", "setup": "What do you call a fart in space?", "punchline": "A blast off!"},
