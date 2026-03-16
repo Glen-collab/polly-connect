@@ -3233,6 +3233,26 @@ async def billing_page(request: Request):
 
     message = None
     if request.query_params.get("success"):
+        # Sync subscription from Stripe in case webhook hasn't fired yet
+        try:
+            from core.subscription import _get_stripe
+            stripe = _get_stripe()
+            if stripe and subscription.get("stripe_customer_id"):
+                subs = stripe.Subscription.list(
+                    customer=subscription["stripe_customer_id"], limit=1
+                )
+                if subs.data:
+                    sub = subs.data[0]
+                    tier = "legacy" if sub.plan.amount >= 1999 else "basic"
+                    conn = db._get_connection()
+                    conn.execute(
+                        "UPDATE tenants SET subscription_tier=?, subscription_status=?, stripe_subscription_id=?, trial_ends_at=NULL WHERE id=?",
+                        (tier, sub.status, sub.id, tid)
+                    )
+                    conn.commit()
+                    subscription = get_subscription(db, tid)
+        except Exception as e:
+            logger.warning(f"Stripe sync on success failed: {e}")
         message = "Subscription activated! Welcome to Polly."
 
     return templates.TemplateResponse("billing.html", {
