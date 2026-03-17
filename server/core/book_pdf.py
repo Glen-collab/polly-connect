@@ -495,6 +495,66 @@ class LegacyBookPDF:
 
             story.append(PageBreak())
 
+        # ── Audio Index — orphaned QR codes (no inline photo) ──
+        if include_qr_codes:
+            orphan_qrs = self._get_orphan_audio(
+                printable, global_used_audio, global_used_photos
+            )
+            if orphan_qrs:
+                story.append(Paragraph("Voice Recordings", self.styles['TOCTitle']))
+                story.append(Paragraph(
+                    "Scan any code below to hear the original voice recording.",
+                    ParagraphStyle(
+                        name='IndexIntro',
+                        fontName='Times-Italic',
+                        fontSize=10,
+                        leading=14,
+                        alignment=TA_CENTER,
+                        spaceAfter=18,
+                        textColor=HexColor('#777777'),
+                    ),
+                ))
+
+                # Render QR codes in a grid-like layout, 2 per row
+                row_items = []
+                for oq in orphan_qrs:
+                    audio_url = f"{AUDIO_BASE_URL}/{oq['audio_key']}"
+                    qr_buf = _generate_qr_image(audio_url)
+                    if not qr_buf:
+                        continue
+
+                    # Build a mini block: QR + label
+                    qr_img = Image(qr_buf, width=QR_SIZE, height=QR_SIZE)
+                    label = oq.get("label", "Voice Recording")
+                    # Escape for ReportLab
+                    label = label.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+                    row_items.append((qr_img, label))
+
+                # Render 2 per row using a table
+                for i in range(0, len(row_items), 2):
+                    pair = row_items[i:i+2]
+                    if len(pair) == 2:
+                        table_data = [[pair[0][0], pair[1][0]],
+                                      [Paragraph(pair[0][1], self.styles['QRCaption']),
+                                       Paragraph(pair[1][1], self.styles['QRCaption'])]]
+                    else:
+                        table_data = [[pair[0][0], ""],
+                                      [Paragraph(pair[0][1], self.styles['QRCaption']), ""]]
+
+                    col_w = TEXT_WIDTH / 2
+                    t = Table(table_data, colWidths=[col_w, col_w])
+                    t.setStyle(TableStyle([
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                        ('TOPPADDING', (0, 1), (-1, 1), 2),
+                        ('BOTTOMPADDING', (0, 1), (-1, 1), 14),
+                    ]))
+                    story.append(t)
+
+                story.append(PageBreak())
+
         # ── Back matter ──
         story.append(Spacer(1, 120))
         story.append(Paragraph(
@@ -696,6 +756,87 @@ class LegacyBookPDF:
                 items[story_id] = item
 
         return items
+
+    def _get_orphan_audio(self, chapters: list,
+                          global_used_audio: set,
+                          global_used_photos: set) -> list:
+        """Get audio recordings not already placed inline with photos.
+
+        These are QR codes for stories that either:
+        - Have no photo attached
+        - Have their photo toggled off (photo_in_book=0)
+        - Were not placed inline by GPT
+
+        Returns list of dicts with audio_key, speaker, label (story description).
+        """
+        orphans = []
+        seen_audio = set(global_used_audio)  # copy — don't mutate the original
+
+        # Walk ALL memories across all chapters
+        all_memory_ids = set()
+        for ch in chapters:
+            for mid in ch.get("memory_ids", []):
+                all_memory_ids.add(mid)
+
+        # Also get ALL stories for this tenant that have audio
+        # (some stories may not be in any chapter yet)
+        conn = self.db._get_connection()
+        try:
+            import sqlite3
+            conn.row_factory = sqlite3.Row
+            all_stories = conn.execute(
+                "SELECT s.id, s.audio_s3_key, s.qr_in_book, s.photo_id, s.photo_in_book, "
+                "s.question_text, COALESCE(s.corrected_transcript, s.transcript) as transcript "
+                "FROM stories s WHERE s.tenant_id = ? AND s.audio_s3_key IS NOT NULL",
+                (self.tenant_id,)
+            ).fetchall()
+        finally:
+            if not self.db._conn:
+                conn.close()
+
+        for s in all_stories:
+            s = dict(s)
+            audio_key = s.get("audio_s3_key")
+            if not audio_key or audio_key in seen_audio:
+                continue
+            if not s.get("qr_in_book", 1):
+                continue
+
+            # Get speaker from memory
+            mem = None
+            conn = self.db._get_connection()
+            try:
+                mem = conn.execute(
+                    "SELECT speaker FROM memories WHERE story_id = ? LIMIT 1",
+                    (s["id"],)
+                ).fetchone()
+            finally:
+                if not self.db._conn:
+                    conn.close()
+
+            speaker = mem[0] if mem else ""
+
+            # Build a label: speaker + question or first 50 chars of transcript
+            question = s.get("question_text", "")
+            transcript = s.get("transcript", "")
+            if question:
+                label = f"{speaker}: {question}" if speaker else question
+            elif transcript:
+                snippet = transcript[:60].strip()
+                if len(transcript) > 60:
+                    snippet += "..."
+                label = f"{speaker}: {snippet}" if speaker else snippet
+            else:
+                label = f"{speaker}'s recording" if speaker else "Voice recording"
+
+            seen_audio.add(audio_key)
+            orphans.append({
+                "audio_key": audio_key,
+                "speaker": speaker,
+                "label": label,
+            })
+
+        return orphans
 
     def _get_chapter_media(self, chapter: dict,
                            global_used_photos: set,
