@@ -58,6 +58,9 @@ class CommandProcessor:
         tid = state.tenant_id
 
         if intent == "store":
+            from core.subscription import check_feature
+            if not check_feature(self.db, tid, "add_item"):
+                return "Your plan limit has been reached for stored items. Visit the Polly website to upgrade."
             item = intent_result.get("item")
             location = intent_result.get("location")
             context = intent_result.get("context")
@@ -1081,6 +1084,14 @@ NARRATIVE:"""
 
         if not answer_text or not answer_text.strip():
             return ("Take your time. I'm listening.", state.mode)
+
+        # Check subscription limits before saving
+        from core.subscription import check_feature
+        if not check_feature(self.db, tid, "add_story"):
+            state.reset()
+            return ("I'd love to save that story, but your plan limit has been reached. "
+                    "Visit the Polly website to upgrade and keep recording.",
+                    ConversationMode.COMMAND)
 
         # Save the answer as a story part
         state.story_parts.append(answer_text)

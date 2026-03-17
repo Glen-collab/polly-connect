@@ -17,7 +17,28 @@ from fastapi.templating import Jinja2Templates
 from core.web_auth import get_web_session, require_login, require_owner, require_admin, hash_password, verify_password
 from core.auth import generate_api_key
 from core.medications import format_time_12hr, _get_local_now
+from core.subscription import check_feature, get_subscription
 from config import settings
+
+
+def _gate_feature(db, session, feature: str, upgrade_msg: str = None):
+    """Check if tenant can use a feature. Returns RedirectResponse if blocked, None if allowed."""
+    tid = session.get("tenant_id")
+    if not tid:
+        return None
+    if check_feature(db, tid, feature):
+        return None
+    # Blocked — redirect with upgrade message
+    sub = get_subscription(db, tid)
+    if sub.get("status") == "expired":
+        msg = "Your free trial has ended. Subscribe to keep adding new content."
+    elif feature == "book_export":
+        msg = "Upgrade to Polly Legacy to export your book as a print-ready PDF."
+    elif upgrade_msg:
+        msg = upgrade_msg
+    else:
+        msg = "You've reached your plan limit. Upgrade to add more."
+    return RedirectResponse(f"/web/pricing?msg={msg}", status_code=303)
 
 import re
 import urllib.request
@@ -890,6 +911,9 @@ async def memory_add(request: Request, item: str = Form(...), location: str = Fo
         return redirect
 
     db = request.app.state.db
+    gate = _gate_feature(db, session, "add_item")
+    if gate:
+        return gate
     db.store_item(item, location, tenant_id=session["tenant_id"])
     return RedirectResponse("/web/memory", status_code=303)
 
@@ -1402,6 +1426,9 @@ async def photo_upload(request: Request,
         return redirect
 
     db = request.app.state.db
+    gate = _gate_feature(db, session, "add_photo")
+    if gate:
+        return gate
     tid = session["tenant_id"]
 
     # Validate file extension
@@ -1530,6 +1557,9 @@ async def web_record_story(request: Request):
     db = request.app.state.db
     tid = session["tenant_id"]
 
+    if not check_feature(db, tid, "add_story"):
+        return JSONResponse({"error": "Plan limit reached. Upgrade to keep recording."}, status_code=403)
+
     form = await request.form()
     audio = form.get("audio")
     speaker_name = form.get("speaker_name", "")
@@ -1601,6 +1631,9 @@ async def photo_record_story(request: Request, photo_id: int,
 
     db = request.app.state.db
     tid = session["tenant_id"]
+
+    if not check_feature(db, tid, "add_photo_story"):
+        return JSONResponse({"error": "Plan limit reached. Upgrade to keep recording."}, status_code=403)
 
     # Verify photo belongs to this tenant
     photo = db.get_photo_by_id(photo_id)
@@ -2864,6 +2897,16 @@ async def book_chapter_generate(request: Request, chapter_num: int):
 
     db = request.app.state.db
     tid = session["tenant_id"]
+
+    # Check chapter limit (trial/basic get 2 preview chapters)
+    from core.subscription import get_tier_limits, get_subscription
+    sub = get_subscription(db, tid)
+    limits = get_tier_limits(sub["tier"])
+    if sub["status"] in ("expired", "canceled"):
+        return RedirectResponse("/web/pricing?msg=Subscribe to generate chapters.", status_code=303)
+    if chapter_num > limits["book_preview_chapters"]:
+        return RedirectResponse("/web/pricing?msg=Upgrade to Polly Legacy to generate all chapters.", status_code=303)
+
     book_builder = request.app.state.book_builder
 
     chapters = book_builder.generate_chapter_outline(tenant_id=tid)
@@ -2980,6 +3023,10 @@ async def book_export_pdf(request: Request):
         return redirect
 
     db = request.app.state.db
+    gate = _gate_feature(db, session, "book_export",
+                         "Upgrade to Polly Legacy to export your book as a print-ready PDF.")
+    if gate:
+        return gate
     tid = session["tenant_id"]
     book_builder = request.app.state.book_builder
 
