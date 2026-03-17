@@ -3143,7 +3143,7 @@ async def listen_page(request: Request, audio_key: str):
                display: flex; align-items: center; justify-content: center; }}
         .card {{ background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1);
                  padding: 32px; max-width: 400px; width: 100%; text-align: center; }}
-        .logo {{ font-size: 48px; margin-bottom: 8px; }}
+        .logo {{ width: 80px; height: 80px; margin-bottom: 8px; }}
         h1 {{ font-size: 22px; color: #1a1a1a; margin: 0 0 4px; }}
         .subtitle {{ font-size: 14px; color: #666; margin-bottom: 24px; }}
         audio {{ width: 100%; margin-bottom: 20px; }}
@@ -3158,7 +3158,7 @@ async def listen_page(request: Request, audio_key: str):
 </head>
 <body>
     <div class="card">
-        <div class="logo">🦜</div>
+        <img src="/static/polly_logo.png" alt="Polly" class="logo">
         <h1>{title}</h1>
         <p class="subtitle">{"" if not story_question else story_question}</p>
         <audio controls autoplay preload="auto">
