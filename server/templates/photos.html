@@ -91,10 +91,19 @@
             </div>
 
             <!-- Linked story preview -->
-            {% if photo.story_id %}
-            <div class="bg-blue-50 rounded p-2 mb-2">
-                <p class="text-xs text-blue-600 font-medium mb-0.5">Linked Story #{{ photo.story_id }}</p>
-                <a href="/web/stories/{{ photo.story_id }}/edit" class="text-xs text-blue-500 hover:underline">View story</a>
+            {% if photo.stories %}
+            <div class="space-y-1 mb-2">
+                {% for ps in photo.stories %}
+                <div class="bg-blue-50 rounded p-2">
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs text-blue-700 font-medium">{{ ps.speaker_name or 'Someone' }}</p>
+                        {% if ps.audio_s3_key %}
+                        <a href="/web/listen/{{ ps.audio_s3_key }}" target="_blank" class="text-xs text-blue-500 hover:underline">Listen</a>
+                        {% endif %}
+                    </div>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ (ps.transcript or '')[:80] }}{% if (ps.transcript or '')|length > 80 %}...{% endif %}</p>
+                </div>
+                {% endfor %}
             </div>
             {% endif %}
 
@@ -104,7 +113,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
                 </svg>
-                Tell me about this photo
+                {% if photo.stories %}Add another story{% else %}Tell me about this photo{% endif %}
             </button>
 
             <div class="flex justify-between items-center mt-2">

@@ -1400,12 +1400,22 @@ async def photos_page(request: Request):
     photos = db.get_photos(limit=100, tenant_id=tid)
     stories = db.get_stories(limit=200, tenant_id=tid)
 
-    # Parse tags JSON for template display
+    # Parse tags JSON and attach all stories for each photo
+    conn = db._get_connection()
+    import sqlite3 as _sqlite3
+    conn.row_factory = _sqlite3.Row
     for photo in photos:
         try:
             photo["tag_list"] = json.loads(photo.get("tags") or "[]")
         except (json.JSONDecodeError, TypeError):
             photo["tag_list"] = []
+        # Get all stories linked to this photo
+        photo_stories = conn.execute(
+            "SELECT id, COALESCE(corrected_transcript, transcript) as transcript, speaker_name, audio_s3_key "
+            "FROM stories WHERE photo_id = ? AND tenant_id = ? ORDER BY id",
+            (photo["id"], tid)
+        ).fetchall()
+        photo["stories"] = [dict(s) for s in photo_stories]
 
     return templates.TemplateResponse("photos.html", {
         "request": request,
