@@ -251,7 +251,8 @@ class CommandProcessor:
             return "I don't have any kid jokes right now!"
 
         elif intent == "ask_question":
-            question = self.data.get_question()
+            owner_age = self._get_owner_age(tid)
+            question = self.data.get_question(owner_age=owner_age)
             if question:
                 resp = question["question"]
                 self._last_response[device_id] = resp
@@ -714,6 +715,23 @@ NARRATIVE:"""
                 truncated = truncated[:last_period + 1]
             narrative = truncated
         return narrative, used_ids
+
+    def _get_owner_age(self, tenant_id: int) -> Optional[int]:
+        """Calculate owner's current age from birth_year in user_profiles."""
+        if not tenant_id:
+            return None
+        try:
+            conn = self.db._get_connection()
+            row = conn.execute(
+                "SELECT birth_year FROM user_profiles WHERE tenant_id = ? AND birth_year IS NOT NULL LIMIT 1",
+                (tenant_id,)
+            ).fetchone()
+            if row and row[0]:
+                from datetime import datetime
+                return datetime.now().year - row[0]
+        except Exception:
+            pass
+        return None
 
     async def _handle_family_question(self, device_id: str) -> str:
         state = self._get_state(device_id)

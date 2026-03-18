@@ -27,10 +27,16 @@ class DataLoader:
         self._standalone_questions: List[Dict] = []  # only context-free questions (first per week)
         self._all_family_questions: List[Dict] = []
 
+        # Age-aware question banks
+        self._questions_kids: List[Dict] = []
+        self._questions_adolescent: List[Dict] = []
+        self._questions_adult: List[Dict] = []
+
         self._load_jokes()
         self._load_kid_jokes()
         self._load_questions()
         self._load_family_questions()
+        self._load_age_questions()
         self._load_config()
 
     def _load_jokes(self):
@@ -90,6 +96,28 @@ class DataLoader:
                 self._all_family_questions.append(q)
         logger.info(f"Loaded {len(self._all_family_questions)} family questions")
 
+    def _load_age_questions(self):
+        """Load age-specific question banks."""
+        for filename, target in [
+            ("questions_kids.json", "_questions_kids"),
+            ("questions_adolescent.json", "_questions_adolescent"),
+            ("questions_adult.json", "_questions_adult"),
+        ]:
+            path = os.path.join(self.data_dir, filename)
+            if not os.path.exists(path):
+                logger.warning(f"Age questions file not found: {path}")
+                continue
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            flat = []
+            for week_block in data:
+                for q in week_block.get("questions", []):
+                    q["theme"] = week_block.get("theme", "general")
+                    q["age_group"] = week_block.get("age_group", "")
+                    flat.append(q)
+            setattr(self, target, flat)
+            logger.info(f"Loaded {len(flat)} {filename.replace('.json', '')} questions")
+
     def _load_config(self):
         path = os.path.join(self.data_dir, "polly-config.json")
         if not os.path.exists(path):
@@ -111,8 +139,31 @@ class DataLoader:
             return None
         return random.choice(self._all_kid_jokes)
 
-    def get_question(self) -> Optional[Dict]:
-        """Return a random standalone question (context-free, works cold)."""
+    def get_question(self, owner_age: int = None) -> Optional[Dict]:
+        """Return a random question, age-appropriate if owner_age is provided.
+
+        Age groups:
+          under 13 → kids questions
+          13-24 → adolescent questions
+          25-50 → adult questions
+          50+ → original legacy questions (default)
+          None → original legacy questions (default)
+
+        Falls back to the main question bank if age-specific bank is empty.
+        """
+        age_bank = None
+        if owner_age is not None:
+            if owner_age < 13:
+                age_bank = self._questions_kids
+            elif owner_age <= 24:
+                age_bank = self._questions_adolescent
+            elif owner_age <= 50:
+                age_bank = self._questions_adult
+
+        if age_bank:
+            return random.choice(age_bank)
+
+        # Default: original question bank (50+ / no age specified)
         if not self._standalone_questions:
             if not self._all_questions:
                 return None
