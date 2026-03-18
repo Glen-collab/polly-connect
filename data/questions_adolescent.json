@@ -1,0 +1,552 @@
+[
+    {
+        "week": 1, "theme": "identity", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w1_01", "question": "How would you describe yourself to someone who has never met you?" },
+            { "id": "a_w1_02", "question": "What is something about you that most people do not know?" },
+            { "id": "a_w1_03", "question": "What are three words your friends would use to describe you?" },
+            { "id": "a_w1_04", "question": "What makes you different from everyone else you know?" },
+            { "id": "a_w1_05", "question": "What part of your personality are you most proud of?" },
+            { "id": "a_w1_06", "question": "How have you changed in the last year?" }
+        ]
+    },
+    {
+        "week": 2, "theme": "friendships", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w2_01", "question": "What does a real friendship look like to you?" },
+            { "id": "a_w2_02", "question": "Who is someone you can completely be yourself around?" },
+            { "id": "a_w2_03", "question": "Have you ever lost a friend? What happened?" },
+            { "id": "a_w2_04", "question": "What is the best thing a friend has ever done for you?" },
+            { "id": "a_w2_05", "question": "How do you know when someone is a true friend versus just being nice?" },
+            { "id": "a_w2_06", "question": "What do you bring to a friendship that is unique?" }
+        ]
+    },
+    {
+        "week": 3, "theme": "school_life", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w3_01", "question": "What is the best thing about your school experience right now?" },
+            { "id": "a_w3_02", "question": "Has a teacher ever changed the way you think about something?" },
+            { "id": "a_w3_03", "question": "What class or subject lights you up inside?" },
+            { "id": "a_w3_04", "question": "What is the most stressful part of school for you?" },
+            { "id": "a_w3_05", "question": "If you could redesign school, what would you change?" },
+            { "id": "a_w3_06", "question": "What is something you learned in school that actually stuck with you?" }
+        ]
+    },
+    {
+        "week": 4, "theme": "dreams_and_ambitions", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w4_01", "question": "What do you dream about doing with your life?" },
+            { "id": "a_w4_02", "question": "If money was not an issue, what would you spend your life doing?" },
+            { "id": "a_w4_03", "question": "What kind of life do you want to build for yourself?" },
+            { "id": "a_w4_04", "question": "Who is someone you look up to and why?" },
+            { "id": "a_w4_05", "question": "What is something you are working toward right now?" },
+            { "id": "a_w4_06", "question": "Where do you see yourself in five years?" }
+        ]
+    },
+    {
+        "week": 5, "theme": "family_dynamics", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w5_01", "question": "What is your relationship like with your parents right now?" },
+            { "id": "a_w5_02", "question": "What is the best advice someone in your family ever gave you?" },
+            { "id": "a_w5_03", "question": "What do you wish your family understood about you?" },
+            { "id": "a_w5_04", "question": "Who in your family do you feel the closest to?" },
+            { "id": "a_w5_05", "question": "How are you similar to your parents, and how are you different?" },
+            { "id": "a_w5_06", "question": "What family tradition means the most to you?" }
+        ]
+    },
+    {
+        "week": 6, "theme": "pressure_and_stress", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w6_01", "question": "What puts the most pressure on you right now?" },
+            { "id": "a_w6_02", "question": "How do you handle stress when everything feels like too much?" },
+            { "id": "a_w6_03", "question": "Do you feel like people expect too much from you sometimes?" },
+            { "id": "a_w6_04", "question": "What is something you do to decompress and just be yourself?" },
+            { "id": "a_w6_05", "question": "Have you ever felt burned out? What did you do about it?" },
+            { "id": "a_w6_06", "question": "Who do you talk to when things feel heavy?" }
+        ]
+    },
+    {
+        "week": 7, "theme": "social_media_and_technology", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w7_01", "question": "How does social media make you feel about yourself, honestly?" },
+            { "id": "a_w7_02", "question": "Do you think people are more real or more fake online?" },
+            { "id": "a_w7_03", "question": "Has the internet ever changed your mind about something important?" },
+            { "id": "a_w7_04", "question": "What would your life look like without your phone for a week?" },
+            { "id": "a_w7_05", "question": "Do you compare yourself to people online? How do you deal with that?" },
+            { "id": "a_w7_06", "question": "What is the best thing technology has given your generation?" }
+        ]
+    },
+    {
+        "week": 8, "theme": "values_and_beliefs", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w8_01", "question": "What do you believe in more than anything?" },
+            { "id": "a_w8_02", "question": "Where do your values come from — family, friends, or your own experience?" },
+            { "id": "a_w8_03", "question": "Is there something you stand for that not everyone agrees with?" },
+            { "id": "a_w8_04", "question": "What does being a good person mean to you?" },
+            { "id": "a_w8_05", "question": "Has your belief system changed as you have gotten older?" },
+            { "id": "a_w8_06", "question": "What is a line you would never cross, no matter what?" }
+        ]
+    },
+    {
+        "week": 9, "theme": "failures_and_growth", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w9_01", "question": "What is the biggest mistake you have learned from?" },
+            { "id": "a_w9_02", "question": "Have you ever failed at something that really mattered to you?" },
+            { "id": "a_w9_03", "question": "How do you deal with failure — do you shut down or push through?" },
+            { "id": "a_w9_04", "question": "What is something you tried and it did not work out, but you are glad you tried?" },
+            { "id": "a_w9_05", "question": "What did your hardest moment teach you about yourself?" },
+            { "id": "a_w9_06", "question": "Do you think failure is necessary for growth?" }
+        ]
+    },
+    {
+        "week": 10, "theme": "relationships", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w10_01", "question": "What does a healthy relationship look like to you?" },
+            { "id": "a_w10_02", "question": "Have you ever had your heart broken? How did you get through it?" },
+            { "id": "a_w10_03", "question": "What do you think is the most important quality in a partner?" },
+            { "id": "a_w10_04", "question": "How do you know the difference between love and infatuation?" },
+            { "id": "a_w10_05", "question": "What relationship advice would you give to your younger self?" },
+            { "id": "a_w10_06", "question": "What have your relationships taught you about yourself?" }
+        ]
+    },
+    {
+        "week": 11, "theme": "mental_health", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w11_01", "question": "What does a good mental health day look like for you?" },
+            { "id": "a_w11_02", "question": "Do you think your generation talks about mental health enough?" },
+            { "id": "a_w11_03", "question": "What is something that helps your mental health that might surprise people?" },
+            { "id": "a_w11_04", "question": "When was the last time you felt truly at peace?" },
+            { "id": "a_w11_05", "question": "How do you tell the difference between a bad day and something deeper?" },
+            { "id": "a_w11_06", "question": "What would you want someone to say to you on your worst day?" }
+        ]
+    },
+    {
+        "week": 12, "theme": "passions", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w12_01", "question": "What is something you could talk about for hours?" },
+            { "id": "a_w12_02", "question": "When do you feel the most alive?" },
+            { "id": "a_w12_03", "question": "What hobby or interest do you wish you had more time for?" },
+            { "id": "a_w12_04", "question": "Is there something you love that other people think is weird?" },
+            { "id": "a_w12_05", "question": "How did you discover the thing you are most passionate about?" },
+            { "id": "a_w12_06", "question": "If you could turn any passion into a career, what would it be?" }
+        ]
+    },
+    {
+        "week": 13, "theme": "independence", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w13_01", "question": "What is the most grown-up decision you have had to make?" },
+            { "id": "a_w13_02", "question": "When did you first feel like you were becoming your own person?" },
+            { "id": "a_w13_03", "question": "What is something you figured out completely on your own?" },
+            { "id": "a_w13_04", "question": "Are you excited or nervous about being more independent?" },
+            { "id": "a_w13_05", "question": "What is the first big thing you want to do on your own?" },
+            { "id": "a_w13_06", "question": "What does freedom mean to you at this point in your life?" }
+        ]
+    },
+    {
+        "week": 14, "theme": "peer_pressure", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w14_01", "question": "Have you ever done something just because everyone else was doing it?" },
+            { "id": "a_w14_02", "question": "How do you say no when you really do not want to do something?" },
+            { "id": "a_w14_03", "question": "What is the bravest thing you have done by going against the crowd?" },
+            { "id": "a_w14_04", "question": "Do you think it is harder to fit in or stand out?" },
+            { "id": "a_w14_05", "question": "How do you decide what is right when everyone around you disagrees?" },
+            { "id": "a_w14_06", "question": "What would you tell someone who feels pressured to be someone they are not?" }
+        ]
+    },
+    {
+        "week": 15, "theme": "music_and_culture", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w15_01", "question": "What song or album has changed your life?" },
+            { "id": "a_w15_02", "question": "What kind of music do you listen to when you are alone?" },
+            { "id": "a_w15_03", "question": "Has a movie, show, or book ever made you see the world differently?" },
+            { "id": "a_w15_04", "question": "What does your generation's culture look like to you?" },
+            { "id": "a_w15_05", "question": "Is there an artist or creator who speaks to exactly how you feel?" },
+            { "id": "a_w15_06", "question": "What would be on the soundtrack of your life right now?" }
+        ]
+    },
+    {
+        "week": 16, "theme": "money_and_work", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w16_01", "question": "What was your first job or how do you earn money?" },
+            { "id": "a_w16_02", "question": "What have you learned about money that nobody taught you in school?" },
+            { "id": "a_w16_03", "question": "Do you think your generation will have it harder or easier financially?" },
+            { "id": "a_w16_04", "question": "Would you rather have a job you love that pays less or a job you hate that pays a lot?" },
+            { "id": "a_w16_05", "question": "What is the smartest thing you have done with money so far?" },
+            { "id": "a_w16_06", "question": "What does success look like to you — is it money, happiness, or something else?" }
+        ]
+    },
+    {
+        "week": 17, "theme": "body_and_health", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w17_01", "question": "What does taking care of yourself mean to you?" },
+            { "id": "a_w17_02", "question": "How do you feel about your body right now — honestly?" },
+            { "id": "a_w17_03", "question": "What is one healthy habit you are proud of?" },
+            { "id": "a_w17_04", "question": "Do you think society puts too much pressure on how people look?" },
+            { "id": "a_w17_05", "question": "What makes you feel strong, physically or mentally?" },
+            { "id": "a_w17_06", "question": "What is something you do for your health that actually makes you feel good?" }
+        ]
+    },
+    {
+        "week": 18, "theme": "creativity_and_expression", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w18_01", "question": "How do you express yourself — through words, music, art, sports, or something else?" },
+            { "id": "a_w18_02", "question": "When do you feel most creative?" },
+            { "id": "a_w18_03", "question": "Is there something you have created that you are really proud of?" },
+            { "id": "a_w18_04", "question": "Do you journal, write, or keep any kind of record of your thoughts?" },
+            { "id": "a_w18_05", "question": "What would you create if you knew nobody would judge you?" },
+            { "id": "a_w18_06", "question": "How does creating something make you feel?" }
+        ]
+    },
+    {
+        "week": 19, "theme": "world_and_society", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w19_01", "question": "What is one thing about the world right now that frustrates you?" },
+            { "id": "a_w19_02", "question": "What gives you hope for the future?" },
+            { "id": "a_w19_03", "question": "Do you think your generation will change the world? How?" },
+            { "id": "a_w19_04", "question": "What issue do you care most deeply about?" },
+            { "id": "a_w19_05", "question": "If you could sit down with any world leader, what would you say?" },
+            { "id": "a_w19_06", "question": "What does justice mean to you?" }
+        ]
+    },
+    {
+        "week": 20, "theme": "nostalgia", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w20_01", "question": "What do you miss most about being a little kid?" },
+            { "id": "a_w20_02", "question": "Is there a memory from childhood that still makes you smile?" },
+            { "id": "a_w20_03", "question": "What toy, game, or show from when you were little do you still think about?" },
+            { "id": "a_w20_04", "question": "When did you first realize you were not a little kid anymore?" },
+            { "id": "a_w20_05", "question": "What is something from your childhood you wish still existed?" },
+            { "id": "a_w20_06", "question": "If you could go back and tell your 8-year-old self one thing, what would it be?" }
+        ]
+    },
+    {
+        "week": 21, "theme": "trust_and_loyalty", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w21_01", "question": "What does trust mean to you?" },
+            { "id": "a_w21_02", "question": "Has anyone ever broken your trust? How did you handle it?" },
+            { "id": "a_w21_03", "question": "How do you earn someone's trust?" },
+            { "id": "a_w21_04", "question": "Who is the most trustworthy person in your life?" },
+            { "id": "a_w21_05", "question": "Do you forgive easily or does it take time?" },
+            { "id": "a_w21_06", "question": "What is the difference between loyalty and being a pushover?" }
+        ]
+    },
+    {
+        "week": 22, "theme": "loneliness_and_belonging", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w22_01", "question": "Have you ever felt really alone even in a room full of people?" },
+            { "id": "a_w22_02", "question": "Where do you feel like you truly belong?" },
+            { "id": "a_w22_03", "question": "What does it feel like when you find your people?" },
+            { "id": "a_w22_04", "question": "How do you deal with loneliness?" },
+            { "id": "a_w22_05", "question": "Do you think being alone and being lonely are different things?" },
+            { "id": "a_w22_06", "question": "What group, place, or person makes you feel like you are home?" }
+        ]
+    },
+    {
+        "week": 23, "theme": "gratitude", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w23_01", "question": "What are you most grateful for right now?" },
+            { "id": "a_w23_02", "question": "Who is someone you have never properly thanked?" },
+            { "id": "a_w23_03", "question": "What is a small thing that makes your day better?" },
+            { "id": "a_w23_04", "question": "What is something you take for granted that you probably should not?" },
+            { "id": "a_w23_05", "question": "When was the last time something really good happened to you?" },
+            { "id": "a_w23_06", "question": "What would you miss most if it was suddenly gone?" }
+        ]
+    },
+    {
+        "week": 24, "theme": "courage_and_risk", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w24_01", "question": "What is the scariest thing you have ever done on purpose?" },
+            { "id": "a_w24_02", "question": "What risk are you glad you took?" },
+            { "id": "a_w24_03", "question": "What is something you want to do but are afraid to try?" },
+            { "id": "a_w24_04", "question": "When was a time you stood up for yourself?" },
+            { "id": "a_w24_05", "question": "Do you think courage is the absence of fear or doing something despite fear?" },
+            { "id": "a_w24_06", "question": "What would you do if you were guaranteed not to fail?" }
+        ]
+    },
+    {
+        "week": 25, "theme": "purpose", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w25_01", "question": "Do you feel like you have a purpose? What is it?" },
+            { "id": "a_w25_02", "question": "What makes you feel like what you do matters?" },
+            { "id": "a_w25_03", "question": "How do you think you will make a difference in the world?" },
+            { "id": "a_w25_04", "question": "What is something bigger than yourself that you care about?" },
+            { "id": "a_w25_05", "question": "When do you feel most useful or needed?" },
+            { "id": "a_w25_06", "question": "What would you want your legacy to be?" }
+        ]
+    },
+    {
+        "week": 26, "theme": "change", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w26_01", "question": "What is the biggest change you have gone through?" },
+            { "id": "a_w26_02", "question": "How do you handle change — do you fight it or go with it?" },
+            { "id": "a_w26_03", "question": "What is something that changed you as a person?" },
+            { "id": "a_w26_04", "question": "Is there a version of yourself from the past that you barely recognize?" },
+            { "id": "a_w26_05", "question": "What change are you going through right now?" },
+            { "id": "a_w26_06", "question": "What is one thing you would never want to change about your life?" }
+        ]
+    },
+    {
+        "week": 27, "theme": "home_and_roots", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w27_01", "question": "What does home feel like to you?" },
+            { "id": "a_w27_02", "question": "Where did you grow up and what was it like?" },
+            { "id": "a_w27_03", "question": "Do you want to stay close to home or get as far away as possible?" },
+            { "id": "a_w27_04", "question": "What is your favorite memory of your hometown?" },
+            { "id": "a_w27_05", "question": "Is home a place, a person, or a feeling for you?" },
+            { "id": "a_w27_06", "question": "What will you take with you from where you grew up, no matter where you go?" }
+        ]
+    },
+    {
+        "week": 28, "theme": "dating_and_love", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w28_01", "question": "What do you think love actually is?" },
+            { "id": "a_w28_02", "question": "What is the most important thing in a romantic relationship?" },
+            { "id": "a_w28_03", "question": "How do you know when someone genuinely cares about you?" },
+            { "id": "a_w28_04", "question": "What is one red flag you will never ignore?" },
+            { "id": "a_w28_05", "question": "What is the best relationship advice you have ever received?" },
+            { "id": "a_w28_06", "question": "Do you believe in soulmates or do you think love is something you build?" }
+        ]
+    },
+    {
+        "week": 29, "theme": "confidence", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w29_01", "question": "When do you feel the most confident?" },
+            { "id": "a_w29_02", "question": "What is something you are insecure about that you wish you were not?" },
+            { "id": "a_w29_03", "question": "How do you build yourself back up after being knocked down?" },
+            { "id": "a_w29_04", "question": "Who makes you feel like the best version of yourself?" },
+            { "id": "a_w29_05", "question": "What is one thing you have learned to accept about yourself?" },
+            { "id": "a_w29_06", "question": "What does real confidence look like to you — not cockiness, real confidence?" }
+        ]
+    },
+    {
+        "week": 30, "theme": "legacy_and_impact", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w30_01", "question": "What do you want people to say about you when you are not in the room?" },
+            { "id": "a_w30_02", "question": "If you could leave one message for the world, what would it be?" },
+            { "id": "a_w30_03", "question": "What is the most important thing you have learned so far in life?" },
+            { "id": "a_w30_04", "question": "Who has had the biggest impact on who you are today?" },
+            { "id": "a_w30_05", "question": "What do you want your life to stand for?" },
+            { "id": "a_w30_06", "question": "If someone listened to all your stories 50 years from now, what would they learn about you?" }
+        ]
+    },
+    {
+        "week": 31, "theme": "race_and_culture", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w31_01", "question": "What does your cultural background mean to you?" },
+            { "id": "a_w31_02", "question": "Have you ever felt like you did not fit in because of where you come from?" },
+            { "id": "a_w31_03", "question": "What tradition from your culture do you want to keep alive?" },
+            { "id": "a_w31_04", "question": "What have you learned from someone whose background is different from yours?" },
+            { "id": "a_w31_05", "question": "How does your heritage shape who you are?" },
+            { "id": "a_w31_06", "question": "What do you wish people understood about your culture?" }
+        ]
+    },
+    {
+        "week": 32, "theme": "nature_and_solitude", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w32_01", "question": "Where do you go when you need to be alone?" },
+            { "id": "a_w32_02", "question": "Do you enjoy being in nature? What does it do for you?" },
+            { "id": "a_w32_03", "question": "What is the most beautiful place you have ever been?" },
+            { "id": "a_w32_04", "question": "Do you need alone time to recharge or do you get energy from people?" },
+            { "id": "a_w32_05", "question": "What sounds make you feel calm?" },
+            { "id": "a_w32_06", "question": "When was the last time you felt completely at peace with everything?" }
+        ]
+    },
+    {
+        "week": 33, "theme": "anger_and_conflict", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w33_01", "question": "What makes you really angry?" },
+            { "id": "a_w33_02", "question": "How do you handle conflict — do you confront it or avoid it?" },
+            { "id": "a_w33_03", "question": "Have you ever said something in anger you wish you could take back?" },
+            { "id": "a_w33_04", "question": "What is the best way someone has resolved a fight with you?" },
+            { "id": "a_w33_05", "question": "Do you think anger is always bad or can it be useful?" },
+            { "id": "a_w33_06", "question": "What have arguments taught you about yourself?" }
+        ]
+    },
+    {
+        "week": 34, "theme": "spirituality", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w34_01", "question": "Do you consider yourself a spiritual person?" },
+            { "id": "a_w34_02", "question": "What do you think happens when we die?" },
+            { "id": "a_w34_03", "question": "Is there something bigger than us out there?" },
+            { "id": "a_w34_04", "question": "What gives your life meaning?" },
+            { "id": "a_w34_05", "question": "Have you ever had a moment that felt bigger than you can explain?" },
+            { "id": "a_w34_06", "question": "Where do you find peace when life gets chaotic?" }
+        ]
+    },
+    {
+        "week": 35, "theme": "college_and_next_steps", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w35_01", "question": "What are you most excited about for your next chapter?" },
+            { "id": "a_w35_02", "question": "What scares you about the future?" },
+            { "id": "a_w35_03", "question": "Do you think college is necessary or are there other paths?" },
+            { "id": "a_w35_04", "question": "What would you study if grades and expectations did not matter?" },
+            { "id": "a_w35_05", "question": "What is the biggest decision you are facing right now?" },
+            { "id": "a_w35_06", "question": "How do you make big decisions — gut feeling, logic, or asking for advice?" }
+        ]
+    },
+    {
+        "week": 36, "theme": "humor_and_joy", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w36_01", "question": "What makes you laugh harder than anything?" },
+            { "id": "a_w36_02", "question": "Who is the funniest person you know?" },
+            { "id": "a_w36_03", "question": "What is the most embarrassing thing that happened to you that you can laugh about now?" },
+            { "id": "a_w36_04", "question": "What is your go-to thing when you need to feel happy?" },
+            { "id": "a_w36_05", "question": "Do you use humor to cope with things? How?" },
+            { "id": "a_w36_06", "question": "What is the funniest memory you have?" }
+        ]
+    },
+    {
+        "week": 37, "theme": "habits_and_routines", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w37_01", "question": "What does your morning routine look like?" },
+            { "id": "a_w37_02", "question": "What is one habit you wish you could start?" },
+            { "id": "a_w37_03", "question": "What is one habit you wish you could break?" },
+            { "id": "a_w37_04", "question": "Are you a night owl or an early bird?" },
+            { "id": "a_w37_05", "question": "What is something small you do every day that makes your life better?" },
+            { "id": "a_w37_06", "question": "How do you spend your time when nobody is watching?" }
+        ]
+    },
+    {
+        "week": 38, "theme": "mentors_and_influences", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w38_01", "question": "Who has influenced you the most outside of your family?" },
+            { "id": "a_w38_02", "question": "Is there a teacher, coach, or mentor who believed in you when you needed it?" },
+            { "id": "a_w38_03", "question": "What is the most important thing someone older taught you?" },
+            { "id": "a_w38_04", "question": "Have you ever been a mentor to someone younger?" },
+            { "id": "a_w38_05", "question": "What kind of role model do you want to be?" },
+            { "id": "a_w38_06", "question": "If you could apprentice under anyone in the world, who would it be?" }
+        ]
+    },
+    {
+        "week": 39, "theme": "regrets_and_forgiveness", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w39_01", "question": "Do you have any regrets?" },
+            { "id": "a_w39_02", "question": "Is there something you wish you had said to someone but never did?" },
+            { "id": "a_w39_03", "question": "What does forgiveness mean to you — is it for them or for you?" },
+            { "id": "a_w39_04", "question": "Have you ever had to forgive yourself for something?" },
+            { "id": "a_w39_05", "question": "What is something you would do differently if you could go back?" },
+            { "id": "a_w39_06", "question": "Do you believe people can truly change?" }
+        ]
+    },
+    {
+        "week": 40, "theme": "travel_and_exploration", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w40_01", "question": "Where is the most interesting place you have ever been?" },
+            { "id": "a_w40_02", "question": "Where in the world do you most want to go?" },
+            { "id": "a_w40_03", "question": "Do you prefer adventures or relaxing vacations?" },
+            { "id": "a_w40_04", "question": "What is the best trip you have ever taken?" },
+            { "id": "a_w40_05", "question": "Would you rather travel the world or build a life in one place?" },
+            { "id": "a_w40_06", "question": "What did traveling teach you that staying home never could?" }
+        ]
+    },
+    {
+        "week": 41, "theme": "authenticity", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w41_01", "question": "When are you most yourself?" },
+            { "id": "a_w41_02", "question": "Do you ever feel like you are wearing a mask around certain people?" },
+            { "id": "a_w41_03", "question": "What is something about the real you that you hide from most people?" },
+            { "id": "a_w41_04", "question": "When did you stop caring what everyone thinks?" },
+            { "id": "a_w41_05", "question": "What does being authentic actually mean to you?" },
+            { "id": "a_w41_06", "question": "Who sees the real you — the unfiltered version?" }
+        ]
+    },
+    {
+        "week": 42, "theme": "competition_and_ambition", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w42_01", "question": "Are you competitive? About what?" },
+            { "id": "a_w42_02", "question": "How do you handle losing?" },
+            { "id": "a_w42_03", "question": "What drives you more — wanting to win or being afraid to fail?" },
+            { "id": "a_w42_04", "question": "Do you compare yourself to other people? How do you deal with that?" },
+            { "id": "a_w42_05", "question": "What is your biggest personal victory so far?" },
+            { "id": "a_w42_06", "question": "Is ambition a good thing or can it go too far?" }
+        ]
+    },
+    {
+        "week": 43, "theme": "lessons_from_life", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w43_01", "question": "What is the most important thing you have learned so far?" },
+            { "id": "a_w43_02", "question": "What is something you know now that you wish you knew two years ago?" },
+            { "id": "a_w43_03", "question": "What has life taught you about people?" },
+            { "id": "a_w43_04", "question": "What is the hardest truth you have had to accept?" },
+            { "id": "a_w43_05", "question": "If you could write a life rule for yourself, what would it be?" },
+            { "id": "a_w43_06", "question": "What is a lesson you had to learn the hard way?" }
+        ]
+    },
+    {
+        "week": 44, "theme": "your_generation", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w44_01", "question": "What makes your generation different from your parents' generation?" },
+            { "id": "a_w44_02", "question": "What do older people get wrong about your age group?" },
+            { "id": "a_w44_03", "question": "What is the best thing about growing up right now?" },
+            { "id": "a_w44_04", "question": "What is the hardest thing about being your age in this era?" },
+            { "id": "a_w44_05", "question": "What do you think history will say about your generation?" },
+            { "id": "a_w44_06", "question": "What do you want to fix that the older generations could not?" }
+        ]
+    },
+    {
+        "week": 45, "theme": "vulnerability", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w45_01", "question": "What is the hardest thing you have ever had to tell someone?" },
+            { "id": "a_w45_02", "question": "Do you find it easy or hard to be vulnerable?" },
+            { "id": "a_w45_03", "question": "When was the last time you cried and why?" },
+            { "id": "a_w45_04", "question": "What is something you need but have a hard time asking for?" },
+            { "id": "a_w45_05", "question": "Do you think being vulnerable is a strength or a weakness?" },
+            { "id": "a_w45_06", "question": "What would change if you let people see the real you more often?" }
+        ]
+    },
+    {
+        "week": 46, "theme": "celebration", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w46_01", "question": "What is something you have accomplished that you are really proud of?" },
+            { "id": "a_w46_02", "question": "Do you celebrate your wins or just move on to the next thing?" },
+            { "id": "a_w46_03", "question": "What is the best compliment anyone has ever given you?" },
+            { "id": "a_w46_04", "question": "When was the last time you felt truly proud of yourself?" },
+            { "id": "a_w46_05", "question": "What is something good happening in your life right now?" },
+            { "id": "a_w46_06", "question": "If you could brag about one thing without being judged, what would it be?" }
+        ]
+    },
+    {
+        "week": 47, "theme": "the_future", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w47_01", "question": "What does your dream life look like 10 years from now?" },
+            { "id": "a_w47_02", "question": "What are you most looking forward to in the next few years?" },
+            { "id": "a_w47_03", "question": "What kind of person do you want to become?" },
+            { "id": "a_w47_04", "question": "What is one thing you promise yourself you will never stop doing?" },
+            { "id": "a_w47_05", "question": "If future you could see you right now, what would they think?" },
+            { "id": "a_w47_06", "question": "What do you want to be remembered for when your story is told?" }
+        ]
+    },
+    {
+        "week": 48, "theme": "food_and_comfort", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w48_01", "question": "What is your comfort food?" },
+            { "id": "a_w48_02", "question": "Can you cook? What is your signature dish?" },
+            { "id": "a_w48_03", "question": "What meal reminds you of home?" },
+            { "id": "a_w48_04", "question": "If you could have dinner with anyone, dead or alive, who and what would you eat?" },
+            { "id": "a_w48_05", "question": "What food from your childhood do you still crave?" },
+            { "id": "a_w48_06", "question": "Do you eat to live or live to eat?" }
+        ]
+    },
+    {
+        "week": 49, "theme": "time", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w49_01", "question": "Do you feel like time is moving fast or slow right now?" },
+            { "id": "a_w49_02", "question": "What moment in your life do you wish you could freeze?" },
+            { "id": "a_w49_03", "question": "If you had an extra hour every day, how would you spend it?" },
+            { "id": "a_w49_04", "question": "What is something you wish you had started earlier?" },
+            { "id": "a_w49_05", "question": "Do you think about the past more or the future more?" },
+            { "id": "a_w49_06", "question": "What would you do today if you knew tomorrow was not guaranteed?" }
+        ]
+    },
+    {
+        "week": 50, "theme": "letter_to_self", "age_group": "adolescent",
+        "questions": [
+            { "id": "a_w50_01", "question": "If you could write a letter to your future self, what would you say?" },
+            { "id": "a_w50_02", "question": "What do you want to remember about who you are right now?" },
+            { "id": "a_w50_03", "question": "What are you struggling with that you hope gets easier?" },
+            { "id": "a_w50_04", "question": "What is something you are proud of about the person you are becoming?" },
+            { "id": "a_w50_05", "question": "If someone found a recording of you 30 years from now, what would you want them to hear?" },
+            { "id": "a_w50_06", "question": "Say something right now that you want your future kids or grandkids to hear someday." }
+        ]
+    }
+]

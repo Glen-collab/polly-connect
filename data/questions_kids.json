@@ -1,0 +1,652 @@
+[
+    {
+        "week": 1,
+        "theme": "big_questions",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w1_01", "question": "How do you think the universe was formed?" },
+            { "id": "k_w1_02", "question": "What do you think happened to the dinosaurs?" },
+            { "id": "k_w1_03", "question": "If you could visit any planet, which one would you pick and why?" },
+            { "id": "k_w1_04", "question": "Do you think there are other living things out in space somewhere?" },
+            { "id": "k_w1_05", "question": "What do you think the Earth looked like a million years ago?" },
+            { "id": "k_w1_06", "question": "If animals could talk, which animal would have the best stories?" }
+        ]
+    },
+    {
+        "week": 2,
+        "theme": "imagination",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w2_01", "question": "If you could have any superpower, what would it be?" },
+            { "id": "k_w2_02", "question": "If you could build anything in the whole world, what would you build?" },
+            { "id": "k_w2_03", "question": "If you woke up tomorrow and were invisible, what would you do first?" },
+            { "id": "k_w2_04", "question": "If you could live inside any book or movie, which one would it be?" },
+            { "id": "k_w2_05", "question": "What would you do if you found a treasure map in your backyard?" },
+            { "id": "k_w2_06", "question": "If you could invent something that doesn't exist yet, what would it be?" }
+        ]
+    },
+    {
+        "week": 3,
+        "theme": "favorites",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w3_01", "question": "What is your absolute favorite thing to do after school?" },
+            { "id": "k_w3_02", "question": "What is your favorite food and who makes it the best?" },
+            { "id": "k_w3_03", "question": "What is your favorite song right now?" },
+            { "id": "k_w3_04", "question": "What is your favorite thing about your best friend?" },
+            { "id": "k_w3_05", "question": "What is your favorite place to go?" },
+            { "id": "k_w3_06", "question": "What is the best day you have ever had?" }
+        ]
+    },
+    {
+        "week": 4,
+        "theme": "family",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w4_01", "question": "What is the funniest thing someone in your family ever did?" },
+            { "id": "k_w4_02", "question": "What do you like doing with your family on weekends?" },
+            { "id": "k_w4_03", "question": "Who in your family makes you laugh the most?" },
+            { "id": "k_w4_04", "question": "What is your favorite family tradition?" },
+            { "id": "k_w4_05", "question": "If your family went on the perfect vacation, where would you go?" },
+            { "id": "k_w4_06", "question": "What is the best thing about being in your family?" }
+        ]
+    },
+    {
+        "week": 5,
+        "theme": "school",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w5_01", "question": "What is your favorite thing about school?" },
+            { "id": "k_w5_02", "question": "Who is the nicest person in your class?" },
+            { "id": "k_w5_03", "question": "What is the coolest thing you learned this year?" },
+            { "id": "k_w5_04", "question": "If you were the teacher for a day, what would you do?" },
+            { "id": "k_w5_05", "question": "What is the hardest thing about school?" },
+            { "id": "k_w5_06", "question": "What do you wish they taught in school that they don't?" }
+        ]
+    },
+    {
+        "week": 6,
+        "theme": "animals",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w6_01", "question": "If you could have any animal as a pet, even a wild one, what would it be?" },
+            { "id": "k_w6_02", "question": "What is the coolest animal you have ever seen in real life?" },
+            { "id": "k_w6_03", "question": "If you could turn into an animal for a day, which one would you pick?" },
+            { "id": "k_w6_04", "question": "Do you think dogs or cats are better, and why?" },
+            { "id": "k_w6_05", "question": "What animal do you think is the bravest?" },
+            { "id": "k_w6_06", "question": "If you could talk to one animal, which one would you choose?" }
+        ]
+    },
+    {
+        "week": 7,
+        "theme": "adventures",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w7_01", "question": "What is the most adventurous thing you have ever done?" },
+            { "id": "k_w7_02", "question": "If you could explore anywhere on Earth, where would you go?" },
+            { "id": "k_w7_03", "question": "Have you ever been really scared but did something brave anyway?" },
+            { "id": "k_w7_04", "question": "What is the best trip you have ever been on?" },
+            { "id": "k_w7_05", "question": "If you could fly anywhere right now, where would you go?" },
+            { "id": "k_w7_06", "question": "What is something you want to try that you have never done before?" }
+        ]
+    },
+    {
+        "week": 8,
+        "theme": "feelings",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w8_01", "question": "What makes you really, really happy?" },
+            { "id": "k_w8_02", "question": "When you feel sad, what helps you feel better?" },
+            { "id": "k_w8_03", "question": "What are you most proud of?" },
+            { "id": "k_w8_04", "question": "What is something that made you laugh so hard you cried?" },
+            { "id": "k_w8_05", "question": "What is something you worry about sometimes?" },
+            { "id": "k_w8_06", "question": "Who do you go to when you need a hug?" }
+        ]
+    },
+    {
+        "week": 9,
+        "theme": "dreams_and_future",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w9_01", "question": "What do you want to be when you grow up?" },
+            { "id": "k_w9_02", "question": "If you could be famous for something, what would it be?" },
+            { "id": "k_w9_03", "question": "What do you think your life will be like when you are a grown up?" },
+            { "id": "k_w9_04", "question": "What is a goal you are working on right now?" },
+            { "id": "k_w9_05", "question": "If you could change one thing about the world, what would it be?" },
+            { "id": "k_w9_06", "question": "What kind of house do you want to live in when you grow up?" }
+        ]
+    },
+    {
+        "week": 10,
+        "theme": "friends",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w10_01", "question": "What makes someone a really good friend?" },
+            { "id": "k_w10_02", "question": "What is the most fun thing you and your best friend have done together?" },
+            { "id": "k_w10_03", "question": "Have you ever had a friend who was very different from you? What was that like?" },
+            { "id": "k_w10_04", "question": "What do you and your friends like to talk about?" },
+            { "id": "k_w10_05", "question": "If you could plan the perfect day with your friends, what would you do?" },
+            { "id": "k_w10_06", "question": "What is the nicest thing a friend ever did for you?" }
+        ]
+    },
+    {
+        "week": 11,
+        "theme": "food_and_cooking",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w11_01", "question": "If you could only eat one food for the rest of your life, what would it be?" },
+            { "id": "k_w11_02", "question": "What is the grossest food you have ever tried?" },
+            { "id": "k_w11_03", "question": "Do you like to help cook? What is your specialty?" },
+            { "id": "k_w11_04", "question": "What is your favorite snack?" },
+            { "id": "k_w11_05", "question": "If you could invent a brand new food, what would it taste like?" },
+            { "id": "k_w11_06", "question": "What does your family eat for special occasions?" }
+        ]
+    },
+    {
+        "week": 12,
+        "theme": "nature_and_outdoors",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w12_01", "question": "What is your favorite thing to do outside?" },
+            { "id": "k_w12_02", "question": "Have you ever found something cool in nature, like a cool rock or a feather?" },
+            { "id": "k_w12_03", "question": "What is your favorite season and why?" },
+            { "id": "k_w12_04", "question": "Do you like thunderstorms or do they scare you?" },
+            { "id": "k_w12_05", "question": "If you could live in the mountains, the beach, or the forest, which would you pick?" },
+            { "id": "k_w12_06", "question": "What is the most beautiful thing you have ever seen outside?" }
+        ]
+    },
+    {
+        "week": 13,
+        "theme": "games_and_play",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w13_01", "question": "What is your favorite game to play?" },
+            { "id": "k_w13_02", "question": "Do you like board games or video games better?" },
+            { "id": "k_w13_03", "question": "What game do you always win at?" },
+            { "id": "k_w13_04", "question": "If you could make up a brand new game, what would the rules be?" },
+            { "id": "k_w13_05", "question": "What do you do when it is raining and you are stuck inside?" },
+            { "id": "k_w13_06", "question": "Who is the most fun person to play with?" }
+        ]
+    },
+    {
+        "week": 14,
+        "theme": "silly_and_fun",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w14_01", "question": "What is the silliest thing you have ever done?" },
+            { "id": "k_w14_02", "question": "Tell me your best joke." },
+            { "id": "k_w14_03", "question": "What is the weirdest dream you have ever had?" },
+            { "id": "k_w14_04", "question": "If you could prank anyone in the world, who would it be and what would you do?" },
+            { "id": "k_w14_05", "question": "What is the funniest word you know?" },
+            { "id": "k_w14_06", "question": "Have you ever laughed so hard that milk came out of your nose?" }
+        ]
+    },
+    {
+        "week": 15,
+        "theme": "heroes",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w15_01", "question": "Who is your hero and why?" },
+            { "id": "k_w15_02", "question": "What makes someone a hero?" },
+            { "id": "k_w15_03", "question": "If you could meet anyone in history, who would it be?" },
+            { "id": "k_w15_04", "question": "Have you ever done something heroic, even something small?" },
+            { "id": "k_w15_05", "question": "What is the bravest thing you have ever seen someone do?" },
+            { "id": "k_w15_06", "question": "If you were a superhero, what would your name be?" }
+        ]
+    },
+    {
+        "week": 16,
+        "theme": "holidays_and_birthdays",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w16_01", "question": "What is your favorite holiday?" },
+            { "id": "k_w16_02", "question": "What was the best birthday you ever had?" },
+            { "id": "k_w16_03", "question": "What is the best present you ever got?" },
+            { "id": "k_w16_04", "question": "What do you love most about your birthday?" },
+            { "id": "k_w16_05", "question": "If you could create a brand new holiday, what would it celebrate?" },
+            { "id": "k_w16_06", "question": "What is your favorite holiday tradition?" }
+        ]
+    },
+    {
+        "week": 17,
+        "theme": "sports_and_activities",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w17_01", "question": "Do you play any sports? What do you like about it?" },
+            { "id": "k_w17_02", "question": "What is your favorite thing to do that makes you move around?" },
+            { "id": "k_w17_03", "question": "Have you ever won a trophy or a medal? What was it for?" },
+            { "id": "k_w17_04", "question": "Who is your favorite athlete or sports team?" },
+            { "id": "k_w17_05", "question": "What sport would you love to try that you have never played?" },
+            { "id": "k_w17_06", "question": "Do you like being on a team or doing things by yourself better?" }
+        ]
+    },
+    {
+        "week": 18,
+        "theme": "creativity",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w18_01", "question": "Do you like to draw, paint, or make things?" },
+            { "id": "k_w18_02", "question": "What is the coolest thing you have ever made with your hands?" },
+            { "id": "k_w18_03", "question": "If you could write a book, what would it be about?" },
+            { "id": "k_w18_04", "question": "Do you like music? Can you play any instruments?" },
+            { "id": "k_w18_05", "question": "If you made a movie, what would happen in it?" },
+            { "id": "k_w18_06", "question": "What is something creative you are really good at?" }
+        ]
+    },
+    {
+        "week": 19,
+        "theme": "science_and_wonder",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w19_01", "question": "What is the most amazing thing about the human body?" },
+            { "id": "k_w19_02", "question": "If you could discover something nobody has ever found, what would it be?" },
+            { "id": "k_w19_03", "question": "Do you think robots will be everywhere when you grow up?" },
+            { "id": "k_w19_04", "question": "What is the most interesting science fact you know?" },
+            { "id": "k_w19_05", "question": "If you could go back in time, where and when would you go?" },
+            { "id": "k_w19_06", "question": "What question do you have that nobody has been able to answer?" }
+        ]
+    },
+    {
+        "week": 20,
+        "theme": "kindness",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w20_01", "question": "What is the nicest thing you have ever done for someone?" },
+            { "id": "k_w20_02", "question": "What is the nicest thing someone ever did for you?" },
+            { "id": "k_w20_03", "question": "How do you make someone feel better when they are sad?" },
+            { "id": "k_w20_04", "question": "What does it mean to be a good person?" },
+            { "id": "k_w20_05", "question": "Have you ever stood up for someone? What happened?" },
+            { "id": "k_w20_06", "question": "If you could help fix one problem in the world, what would it be?" }
+        ]
+    },
+    {
+        "week": 21,
+        "theme": "bedtime_and_mornings",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w21_01", "question": "What is your bedtime routine?" },
+            { "id": "k_w21_02", "question": "Do you have a stuffed animal or blanket that is special to you?" },
+            { "id": "k_w21_03", "question": "What do you think about right before you fall asleep?" },
+            { "id": "k_w21_04", "question": "Are you a morning person or do you like to sleep in?" },
+            { "id": "k_w21_05", "question": "What is the first thing you do when you wake up?" },
+            { "id": "k_w21_06", "question": "Do you ever have cool dreams? Tell me about one." }
+        ]
+    },
+    {
+        "week": 22,
+        "theme": "learning",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w22_01", "question": "What is something you are really good at?" },
+            { "id": "k_w22_02", "question": "What is something you are trying to get better at?" },
+            { "id": "k_w22_03", "question": "Who teaches you the most important things?" },
+            { "id": "k_w22_04", "question": "What is the hardest thing you ever had to learn?" },
+            { "id": "k_w22_05", "question": "Do you like reading? What is the best book you have read?" },
+            { "id": "k_w22_06", "question": "If you could learn anything instantly, like a superpower, what would it be?" }
+        ]
+    },
+    {
+        "week": 23,
+        "theme": "home",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w23_01", "question": "What is your favorite room in your house?" },
+            { "id": "k_w23_02", "question": "What does your room look like?" },
+            { "id": "k_w23_03", "question": "Where is your favorite hiding spot?" },
+            { "id": "k_w23_04", "question": "What do you love most about your home?" },
+            { "id": "k_w23_05", "question": "If you could redesign your room any way you wanted, what would you change?" },
+            { "id": "k_w23_06", "question": "What smells remind you of home?" }
+        ]
+    },
+    {
+        "week": 24,
+        "theme": "memories",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w24_01", "question": "What is your earliest memory?" },
+            { "id": "k_w24_02", "question": "What is a memory that always makes you smile?" },
+            { "id": "k_w24_03", "question": "Is there a special place your family goes that you will always remember?" },
+            { "id": "k_w24_04", "question": "What is something you did with a grandparent that you will never forget?" },
+            { "id": "k_w24_05", "question": "What is a memory from when you were really little?" },
+            { "id": "k_w24_06", "question": "If you could relive one day from your life, which day would it be?" }
+        ]
+    },
+    {
+        "week": 25,
+        "theme": "technology",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w25_01", "question": "What is your favorite thing to do on a tablet or computer?" },
+            { "id": "k_w25_02", "question": "Do you think kids should have phones? Why or why not?" },
+            { "id": "k_w25_03", "question": "What is the coolest piece of technology you have ever used?" },
+            { "id": "k_w25_04", "question": "If you could invent an app, what would it do?" },
+            { "id": "k_w25_05", "question": "Do you think robots will ever be as smart as people?" },
+            { "id": "k_w25_06", "question": "What do you think the world will look like in 50 years?" }
+        ]
+    },
+    {
+        "week": 26,
+        "theme": "challenges",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w26_01", "question": "What is the hardest thing you have ever done?" },
+            { "id": "k_w26_02", "question": "Have you ever failed at something and then tried again?" },
+            { "id": "k_w26_03", "question": "What do you do when something feels really hard?" },
+            { "id": "k_w26_04", "question": "Who helps you when things get tough?" },
+            { "id": "k_w26_05", "question": "What is something you used to be afraid of but are not anymore?" },
+            { "id": "k_w26_06", "question": "What does being brave mean to you?" }
+        ]
+    },
+    {
+        "week": 27,
+        "theme": "the_world",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w27_01", "question": "What country would you most like to visit?" },
+            { "id": "k_w27_02", "question": "What language would you love to learn?" },
+            { "id": "k_w27_03", "question": "What do you think kids in other countries do for fun?" },
+            { "id": "k_w27_04", "question": "If you were president for a day, what would you do?" },
+            { "id": "k_w27_05", "question": "What do you think is the most important thing in the world?" },
+            { "id": "k_w27_06", "question": "What makes you feel grateful?" }
+        ]
+    },
+    {
+        "week": 28,
+        "theme": "growing_up",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w28_01", "question": "What is the best thing about being your age?" },
+            { "id": "k_w28_02", "question": "What do you think is hard about growing up?" },
+            { "id": "k_w28_03", "question": "What are you most excited about for the future?" },
+            { "id": "k_w28_04", "question": "What do you want to always remember about being a kid?" },
+            { "id": "k_w28_05", "question": "If you could give advice to a younger kid, what would you say?" },
+            { "id": "k_w28_06", "question": "What is something about you that will never change, no matter how old you get?" }
+        ]
+    },
+    {
+        "week": 29,
+        "theme": "movies_and_shows",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w29_01", "question": "What is your all-time favorite movie?" },
+            { "id": "k_w29_02", "question": "What cartoon character do you wish was real?" },
+            { "id": "k_w29_03", "question": "If you could be in any movie, which one would you pick?" },
+            { "id": "k_w29_04", "question": "Who is your favorite character from a show or movie?" },
+            { "id": "k_w29_05", "question": "What movie can you watch over and over and never get tired of?" },
+            { "id": "k_w29_06", "question": "If you made a cartoon, what would it be about?" }
+        ]
+    },
+    {
+        "week": 30,
+        "theme": "siblings_and_cousins",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w30_01", "question": "Do you have brothers or sisters? What is the best thing about them?" },
+            { "id": "k_w30_02", "question": "What is the funniest thing your sibling or cousin ever did?" },
+            { "id": "k_w30_03", "question": "Do you ever fight with your siblings? What about?" },
+            { "id": "k_w30_04", "question": "Who do you have the most fun with in your family?" },
+            { "id": "k_w30_05", "question": "What is something you and your brother or sister agree on?" },
+            { "id": "k_w30_06", "question": "If you could have any sibling in the world, what would they be like?" }
+        ]
+    },
+    {
+        "week": 31,
+        "theme": "fears_and_courage",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w31_01", "question": "What is something that used to scare you?" },
+            { "id": "k_w31_02", "question": "What helps you feel brave when you are scared?" },
+            { "id": "k_w31_03", "question": "Are you afraid of the dark? Why or why not?" },
+            { "id": "k_w31_04", "question": "What is the bravest thing you have ever done?" },
+            { "id": "k_w31_05", "question": "If you could not fail, what would you try?" },
+            { "id": "k_w31_06", "question": "Who in your life is the bravest person you know?" }
+        ]
+    },
+    {
+        "week": 32,
+        "theme": "music_and_dance",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w32_01", "question": "What is your favorite song right now?" },
+            { "id": "k_w32_02", "question": "Do you like to dance? What is your best move?" },
+            { "id": "k_w32_03", "question": "If you could play any instrument, what would you pick?" },
+            { "id": "k_w32_04", "question": "What kind of music does your family listen to?" },
+            { "id": "k_w32_05", "question": "If you wrote a song, what would it be about?" },
+            { "id": "k_w32_06", "question": "What song makes you want to get up and dance?" }
+        ]
+    },
+    {
+        "week": 33,
+        "theme": "random_fun",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w33_01", "question": "If you had a million dollars, what would you do with it?" },
+            { "id": "k_w33_02", "question": "Would you rather be able to fly or be able to breathe underwater?" },
+            { "id": "k_w33_03", "question": "If you could eat dessert for every meal, would you?" },
+            { "id": "k_w33_04", "question": "What is the strangest thing you have ever seen?" },
+            { "id": "k_w33_05", "question": "If your stuffed animals came alive at night, what do you think they would do?" },
+            { "id": "k_w33_06", "question": "If you could switch lives with anyone for a day, who would it be?" }
+        ]
+    },
+    {
+        "week": 34,
+        "theme": "grandparents",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w34_01", "question": "What do you love most about your grandparents?" },
+            { "id": "k_w34_02", "question": "What is the best thing you have done with a grandparent?" },
+            { "id": "k_w34_03", "question": "What does your grandma or grandpa always say?" },
+            { "id": "k_w34_04", "question": "Does your grandparent tell you stories? What is your favorite one?" },
+            { "id": "k_w34_05", "question": "What is something your grandparent taught you?" },
+            { "id": "k_w34_06", "question": "If you could ask your grandparent anything about when they were little, what would you ask?" }
+        ]
+    },
+    {
+        "week": 35,
+        "theme": "clothes_and_style",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w35_01", "question": "What is your favorite outfit?" },
+            { "id": "k_w35_02", "question": "If you could wear anything to school, what would you wear?" },
+            { "id": "k_w35_03", "question": "Do you like picking out your own clothes?" },
+            { "id": "k_w35_04", "question": "What is the funniest thing you have ever worn?" },
+            { "id": "k_w35_05", "question": "What costume would you wear every day if you could?" },
+            { "id": "k_w35_06", "question": "Do you have a lucky shirt or pair of socks?" }
+        ]
+    },
+    {
+        "week": 36,
+        "theme": "books_and_stories",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w36_01", "question": "What is the best book you have ever read or had read to you?" },
+            { "id": "k_w36_02", "question": "Who is your favorite book character?" },
+            { "id": "k_w36_03", "question": "Do you like scary stories or funny stories better?" },
+            { "id": "k_w36_04", "question": "If you could jump into any story, which one would it be?" },
+            { "id": "k_w36_05", "question": "Do you like someone reading to you or reading by yourself?" },
+            { "id": "k_w36_06", "question": "If you wrote a story, who would be the main character?" }
+        ]
+    },
+    {
+        "week": 37,
+        "theme": "summer",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w37_01", "question": "What is the best thing about summer?" },
+            { "id": "k_w37_02", "question": "What was the best summer you ever had?" },
+            { "id": "k_w37_03", "question": "Do you like swimming? Where is your favorite place to swim?" },
+            { "id": "k_w37_04", "question": "What do you do on a hot day?" },
+            { "id": "k_w37_05", "question": "Have you ever caught fireflies?" },
+            { "id": "k_w37_06", "question": "What is your favorite thing about staying up late in the summer?" }
+        ]
+    },
+    {
+        "week": 38,
+        "theme": "winter",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w38_01", "question": "Do you like snow? What is your favorite thing to do in the snow?" },
+            { "id": "k_w38_02", "question": "Have you ever built a snowman? Tell me about it." },
+            { "id": "k_w38_03", "question": "What is your favorite thing about winter?" },
+            { "id": "k_w38_04", "question": "Do you like hot chocolate? What do you put in it?" },
+            { "id": "k_w38_05", "question": "What do you do on a cold day when you are stuck inside?" },
+            { "id": "k_w38_06", "question": "Have you ever had a snow day from school? What did you do?" }
+        ]
+    },
+    {
+        "week": 39,
+        "theme": "helping",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w39_01", "question": "Do you have chores? What is your easiest one?" },
+            { "id": "k_w39_02", "question": "Have you ever helped someone who really needed it?" },
+            { "id": "k_w39_03", "question": "What is the hardest job in your house?" },
+            { "id": "k_w39_04", "question": "Do you like helping in the kitchen?" },
+            { "id": "k_w39_05", "question": "What is something you can do all by yourself that you are proud of?" },
+            { "id": "k_w39_06", "question": "If you could help anyone in the world, who would it be?" }
+        ]
+    },
+    {
+        "week": 40,
+        "theme": "cars_and_travel",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w40_01", "question": "Do you like car rides? Where is the farthest you have been in a car?" },
+            { "id": "k_w40_02", "question": "What do you do on long car rides?" },
+            { "id": "k_w40_03", "question": "Have you ever been on an airplane? What was it like?" },
+            { "id": "k_w40_04", "question": "If you could drive any car, what would it be?" },
+            { "id": "k_w40_05", "question": "What is the coolest place you have ever visited?" },
+            { "id": "k_w40_06", "question": "Where do you want to go that you have never been?" }
+        ]
+    },
+    {
+        "week": 41,
+        "theme": "wishes",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w41_01", "question": "If you had three wishes, what would they be?" },
+            { "id": "k_w41_02", "question": "If you could have dinner with anyone, alive or not, who would it be?" },
+            { "id": "k_w41_03", "question": "What is something you really really want?" },
+            { "id": "k_w41_04", "question": "If you found a genie in a bottle, what would you wish for?" },
+            { "id": "k_w41_05", "question": "What do you wish grown-ups understood about being a kid?" },
+            { "id": "k_w41_06", "question": "If you could make one rule that everyone in the world had to follow, what would it be?" }
+        ]
+    },
+    {
+        "week": 42,
+        "theme": "being_you",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w42_01", "question": "What is the best thing about being you?" },
+            { "id": "k_w42_02", "question": "What makes you different from everyone else?" },
+            { "id": "k_w42_03", "question": "What is something not many people know about you?" },
+            { "id": "k_w42_04", "question": "If you could describe yourself in three words, what would they be?" },
+            { "id": "k_w42_05", "question": "What do your friends like about you?" },
+            { "id": "k_w42_06", "question": "What is one thing you want people to know about you?" }
+        ]
+    },
+    {
+        "week": 43,
+        "theme": "space",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w43_01", "question": "Would you want to go to space? Why or why not?" },
+            { "id": "k_w43_02", "question": "Do you think people will live on Mars someday?" },
+            { "id": "k_w43_03", "question": "What do you think it would feel like to float in space?" },
+            { "id": "k_w43_04", "question": "If you discovered a new planet, what would you name it?" },
+            { "id": "k_w43_05", "question": "What do you think aliens would look like?" },
+            { "id": "k_w43_06", "question": "What would you bring with you if you moved to another planet?" }
+        ]
+    },
+    {
+        "week": 44,
+        "theme": "ocean",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w44_01", "question": "What do you think is at the very bottom of the ocean?" },
+            { "id": "k_w44_02", "question": "What is the coolest sea creature you know about?" },
+            { "id": "k_w44_03", "question": "Would you rather swim with dolphins or ride a whale?" },
+            { "id": "k_w44_04", "question": "If you found a message in a bottle on the beach, what do you think it would say?" },
+            { "id": "k_w44_05", "question": "Have you ever been to the ocean? What did you think?" },
+            { "id": "k_w44_06", "question": "If you could breathe underwater, where would you go explore?" }
+        ]
+    },
+    {
+        "week": 45,
+        "theme": "time_travel",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w45_01", "question": "If you could go back in time, when would you visit?" },
+            { "id": "k_w45_02", "question": "If you could see the future, would you want to? Why or why not?" },
+            { "id": "k_w45_03", "question": "What do you think life was like 100 years ago?" },
+            { "id": "k_w45_04", "question": "What do you think life will be like in 100 years?" },
+            { "id": "k_w45_05", "question": "If you could bring one thing from the past to now, what would it be?" },
+            { "id": "k_w45_06", "question": "Would you rather live in the past or the future?" }
+        ]
+    },
+    {
+        "week": 46,
+        "theme": "collections",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w46_01", "question": "Do you collect anything? What is it?" },
+            { "id": "k_w46_02", "question": "What is the coolest thing you own?" },
+            { "id": "k_w46_03", "question": "If you could collect anything in the world, what would it be?" },
+            { "id": "k_w46_04", "question": "What is something you have that is really special to you?" },
+            { "id": "k_w46_05", "question": "Have you ever found something really cool?" },
+            { "id": "k_w46_06", "question": "What would you put in a time capsule to open in 20 years?" }
+        ]
+    },
+    {
+        "week": 47,
+        "theme": "pets_and_animals",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w47_01", "question": "Do you have a pet? Tell me about them." },
+            { "id": "k_w47_02", "question": "What is the funniest thing a pet has ever done?" },
+            { "id": "k_w47_03", "question": "If your pet could talk, what do you think they would say?" },
+            { "id": "k_w47_04", "question": "What would you name a baby elephant?" },
+            { "id": "k_w47_05", "question": "Would you rather have a pet dragon or a pet unicorn?" },
+            { "id": "k_w47_06", "question": "What animal are you most like and why?" }
+        ]
+    },
+    {
+        "week": 48,
+        "theme": "manners_and_respect",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w48_01", "question": "What is the most important rule in your house?" },
+            { "id": "k_w48_02", "question": "What does respect mean to you?" },
+            { "id": "k_w48_03", "question": "Who taught you right from wrong?" },
+            { "id": "k_w48_04", "question": "What would the world be like if everyone was kind to each other?" },
+            { "id": "k_w48_05", "question": "What is a rule you think is really important?" },
+            { "id": "k_w48_06", "question": "Have you ever had to apologize? What happened?" }
+        ]
+    },
+    {
+        "week": 49,
+        "theme": "surprises",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w49_01", "question": "Do you like surprises?" },
+            { "id": "k_w49_02", "question": "What is the best surprise you ever got?" },
+            { "id": "k_w49_03", "question": "Have you ever surprised someone else? What did you do?" },
+            { "id": "k_w49_04", "question": "What would be the best surprise party ever?" },
+            { "id": "k_w49_05", "question": "If you came home and there was a mystery box on your bed, what would you hope was inside?" },
+            { "id": "k_w49_06", "question": "What is something that happened that you never expected?" }
+        ]
+    },
+    {
+        "week": 50,
+        "theme": "the_future_you",
+        "age_group": "kids",
+        "questions": [
+            { "id": "k_w50_01", "question": "What do you think you will be like when you are 20?" },
+            { "id": "k_w50_02", "question": "What kind of job do you think you will have?" },
+            { "id": "k_w50_03", "question": "Do you think you will have kids someday?" },
+            { "id": "k_w50_04", "question": "What do you hope never changes about you?" },
+            { "id": "k_w50_05", "question": "What advice would you give to your future self?" },
+            { "id": "k_w50_06", "question": "What do you want your future self to remember about right now?" }
+        ]
+    }
+]

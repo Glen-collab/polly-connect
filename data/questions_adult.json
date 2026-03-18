@@ -1,0 +1,552 @@
+[
+    {
+        "week": 1, "theme": "self_reflection", "age_group": "adult",
+        "questions": [
+            { "id": "d_w1_01", "question": "Who are you when nobody is watching?" },
+            { "id": "d_w1_02", "question": "What is the story you tell yourself about your own life?" },
+            { "id": "d_w1_03", "question": "If someone made a documentary about you, what would the title be?" },
+            { "id": "d_w1_04", "question": "What part of yourself are you still discovering?" },
+            { "id": "d_w1_05", "question": "How would the 18-year-old version of you feel about where you are now?" },
+            { "id": "d_w1_06", "question": "What is one thing about yourself you have finally accepted?" }
+        ]
+    },
+    {
+        "week": 2, "theme": "career_and_purpose", "age_group": "adult",
+        "questions": [
+            { "id": "d_w2_01", "question": "Do you feel like your work reflects who you really are?" },
+            { "id": "d_w2_02", "question": "What would you do for free because you love it that much?" },
+            { "id": "d_w2_03", "question": "When did you realize what you were meant to do, or are you still figuring it out?" },
+            { "id": "d_w2_04", "question": "What is the biggest professional risk you have ever taken?" },
+            { "id": "d_w2_05", "question": "How do you define success for yourself, not how others define it?" },
+            { "id": "d_w2_06", "question": "If you could start over in any career, what would you choose?" }
+        ]
+    },
+    {
+        "week": 3, "theme": "marriage_and_partnership", "age_group": "adult",
+        "questions": [
+            { "id": "d_w3_01", "question": "What has your most important relationship taught you about yourself?" },
+            { "id": "d_w3_02", "question": "What do you think makes a relationship last?" },
+            { "id": "d_w3_03", "question": "What is the hardest conversation you have ever had with someone you love?" },
+            { "id": "d_w3_04", "question": "How do you show love, and how do you need to receive it?" },
+            { "id": "d_w3_05", "question": "What is something your partner does that you never want them to stop?" },
+            { "id": "d_w3_06", "question": "How have you grown because of your relationship?" }
+        ]
+    },
+    {
+        "week": 4, "theme": "parenting", "age_group": "adult",
+        "questions": [
+            { "id": "d_w4_01", "question": "What kind of parent did you want to be, and how close are you to that?" },
+            { "id": "d_w4_02", "question": "What is the hardest part of raising kids that nobody warned you about?" },
+            { "id": "d_w4_03", "question": "What moment with your kids made you realize everything was worth it?" },
+            { "id": "d_w4_04", "question": "What are you trying to teach your kids that your parents did not teach you?" },
+            { "id": "d_w4_05", "question": "How do you handle the guilt that comes with parenting?" },
+            { "id": "d_w4_06", "question": "What do you hope your kids say about you when they are adults?" }
+        ]
+    },
+    {
+        "week": 5, "theme": "health_and_body", "age_group": "adult",
+        "questions": [
+            { "id": "d_w5_01", "question": "How has your relationship with your body changed over the years?" },
+            { "id": "d_w5_02", "question": "What does taking care of yourself actually look like in your life?" },
+            { "id": "d_w5_03", "question": "What health scare or wake-up call changed how you live?" },
+            { "id": "d_w5_04", "question": "What do you do for yourself that keeps you sane?" },
+            { "id": "d_w5_05", "question": "How do you deal with getting older physically?" },
+            { "id": "d_w5_06", "question": "What is one thing you wish you had started doing sooner for your health?" }
+        ]
+    },
+    {
+        "week": 6, "theme": "money_and_security", "age_group": "adult",
+        "questions": [
+            { "id": "d_w6_01", "question": "What is your relationship with money — does it stress you out or empower you?" },
+            { "id": "d_w6_02", "question": "What is the smartest financial decision you have made?" },
+            { "id": "d_w6_03", "question": "What did your parents teach you about money, intentionally or not?" },
+            { "id": "d_w6_04", "question": "What does financial security actually mean to you?" },
+            { "id": "d_w6_05", "question": "What would you do differently with money if you could start over?" },
+            { "id": "d_w6_06", "question": "How much is enough?" }
+        ]
+    },
+    {
+        "week": 7, "theme": "friendships", "age_group": "adult",
+        "questions": [
+            { "id": "d_w7_01", "question": "How have your friendships changed since your 20s?" },
+            { "id": "d_w7_02", "question": "Who is the friend you can call at 2 in the morning?" },
+            { "id": "d_w7_03", "question": "Have you ever outgrown a friendship? What happened?" },
+            { "id": "d_w7_04", "question": "What do you need from a friendship at this stage of your life?" },
+            { "id": "d_w7_05", "question": "Do you find it hard to make new friends as an adult?" },
+            { "id": "d_w7_06", "question": "What is the longest friendship you have and what makes it work?" }
+        ]
+    },
+    {
+        "week": 8, "theme": "stress_and_coping", "age_group": "adult",
+        "questions": [
+            { "id": "d_w8_01", "question": "What keeps you up at night?" },
+            { "id": "d_w8_02", "question": "How do you deal with stress when it all piles up?" },
+            { "id": "d_w8_03", "question": "What is the most stressful period of your life you have survived?" },
+            { "id": "d_w8_04", "question": "Do you take care of everyone else before yourself?" },
+            { "id": "d_w8_05", "question": "What would your life look like if you had less stress?" },
+            { "id": "d_w8_06", "question": "What has stress taught you about your limits?" }
+        ]
+    },
+    {
+        "week": 9, "theme": "parents_and_childhood", "age_group": "adult",
+        "questions": [
+            { "id": "d_w9_01", "question": "How has your view of your parents changed now that you are older?" },
+            { "id": "d_w9_02", "question": "What did your childhood teach you that still affects you today?" },
+            { "id": "d_w9_03", "question": "Is there something from your childhood you are still healing from?" },
+            { "id": "d_w9_04", "question": "What do you wish your parents had done differently?" },
+            { "id": "d_w9_05", "question": "What did your parents get right?" },
+            { "id": "d_w9_06", "question": "When did you finally understand why your parents did what they did?" }
+        ]
+    },
+    {
+        "week": 10, "theme": "regret_and_forgiveness", "age_group": "adult",
+        "questions": [
+            { "id": "d_w10_01", "question": "What is your biggest regret, and what did it teach you?" },
+            { "id": "d_w10_02", "question": "Is there someone you need to forgive but have not been able to?" },
+            { "id": "d_w10_03", "question": "Have you forgiven yourself for the mistakes you have made?" },
+            { "id": "d_w10_04", "question": "What would you say to someone you hurt if you had the chance?" },
+            { "id": "d_w10_05", "question": "Do you believe in second chances?" },
+            { "id": "d_w10_06", "question": "What is something you have let go of that used to weigh you down?" }
+        ]
+    },
+    {
+        "week": 11, "theme": "loss_and_grief", "age_group": "adult",
+        "questions": [
+            { "id": "d_w11_01", "question": "Who is someone you have lost that still affects you?" },
+            { "id": "d_w11_02", "question": "How do you carry the people you have lost with you?" },
+            { "id": "d_w11_03", "question": "What did grief teach you about love?" },
+            { "id": "d_w11_04", "question": "Is there something you wish you had said before someone passed?" },
+            { "id": "d_w11_05", "question": "How has loss changed your perspective on life?" },
+            { "id": "d_w11_06", "question": "What is a memory of someone you lost that still makes you smile?" }
+        ]
+    },
+    {
+        "week": 12, "theme": "identity_in_adulthood", "age_group": "adult",
+        "questions": [
+            { "id": "d_w12_01", "question": "Do you feel like the same person you were 10 years ago?" },
+            { "id": "d_w12_02", "question": "What roles do you play — parent, spouse, worker — and which one feels most like you?" },
+            { "id": "d_w12_03", "question": "Have you ever had an identity crisis? What triggered it?" },
+            { "id": "d_w12_04", "question": "What did you give up about yourself to become who you are now?" },
+            { "id": "d_w12_05", "question": "Is there a part of yourself you miss?" },
+            { "id": "d_w12_06", "question": "When do you feel most like yourself?" }
+        ]
+    },
+    {
+        "week": 13, "theme": "faith_and_meaning", "age_group": "adult",
+        "questions": [
+            { "id": "d_w13_01", "question": "What gives your life meaning?" },
+            { "id": "d_w13_02", "question": "Has your faith or belief system changed over the years?" },
+            { "id": "d_w13_03", "question": "What do you turn to when life does not make sense?" },
+            { "id": "d_w13_04", "question": "Do you believe things happen for a reason?" },
+            { "id": "d_w13_05", "question": "What is something you believe deeply that you cannot prove?" },
+            { "id": "d_w13_06", "question": "How do you find hope when everything feels dark?" }
+        ]
+    },
+    {
+        "week": 14, "theme": "community_and_belonging", "age_group": "adult",
+        "questions": [
+            { "id": "d_w14_01", "question": "Where do you feel like you belong?" },
+            { "id": "d_w14_02", "question": "What community or group has shaped who you are?" },
+            { "id": "d_w14_03", "question": "How do you give back to the people around you?" },
+            { "id": "d_w14_04", "question": "What does home mean to you at this point in your life?" },
+            { "id": "d_w14_05", "question": "Have you ever felt like an outsider? How did you handle it?" },
+            { "id": "d_w14_06", "question": "What would your ideal community look like?" }
+        ]
+    },
+    {
+        "week": 15, "theme": "marriage_challenges", "age_group": "adult",
+        "questions": [
+            { "id": "d_w15_01", "question": "What is the hardest season your relationship has been through?" },
+            { "id": "d_w15_02", "question": "How do you keep a relationship strong when life gets in the way?" },
+            { "id": "d_w15_03", "question": "What do you argue about most, and is it really about that or something deeper?" },
+            { "id": "d_w15_04", "question": "When did you feel the most connected to your partner?" },
+            { "id": "d_w15_05", "question": "What compromise has been the hardest for you?" },
+            { "id": "d_w15_06", "question": "What would you tell someone about to get married?" }
+        ]
+    },
+    {
+        "week": 16, "theme": "work_life_balance", "age_group": "adult",
+        "questions": [
+            { "id": "d_w16_01", "question": "Do you feel like you have a good balance between work and life?" },
+            { "id": "d_w16_02", "question": "What do you sacrifice for your career that you wish you did not have to?" },
+            { "id": "d_w16_03", "question": "How do you switch off from work mode?" },
+            { "id": "d_w16_04", "question": "What does a perfect day look like for you?" },
+            { "id": "d_w16_05", "question": "Are you living to work or working to live?" },
+            { "id": "d_w16_06", "question": "What would you change about how you spend your time?" }
+        ]
+    },
+    {
+        "week": 17, "theme": "legacy_building", "age_group": "adult",
+        "questions": [
+            { "id": "d_w17_01", "question": "What do you want to leave behind for the people you love?" },
+            { "id": "d_w17_02", "question": "What values are you passing on to the next generation?" },
+            { "id": "d_w17_03", "question": "How do you want to be remembered?" },
+            { "id": "d_w17_04", "question": "What is the most important thing you are building right now?" },
+            { "id": "d_w17_05", "question": "If your grandchildren read your story, what would you want them to know?" },
+            { "id": "d_w17_06", "question": "What is one lesson from your life that you want to make sure is not forgotten?" }
+        ]
+    },
+    {
+        "week": 18, "theme": "turning_points", "age_group": "adult",
+        "questions": [
+            { "id": "d_w18_01", "question": "What was the moment that changed everything for you?" },
+            { "id": "d_w18_02", "question": "When did you take a different path than everyone expected?" },
+            { "id": "d_w18_03", "question": "What decision are you most grateful you made?" },
+            { "id": "d_w18_04", "question": "Was there a crossroads where you almost chose differently? What would have happened?" },
+            { "id": "d_w18_05", "question": "What event divided your life into before and after?" },
+            { "id": "d_w18_06", "question": "Looking back, was that turning point luck, hard work, or something else?" }
+        ]
+    },
+    {
+        "week": 19, "theme": "vulnerability_and_strength", "age_group": "adult",
+        "questions": [
+            { "id": "d_w19_01", "question": "What is the hardest thing you have ever been through?" },
+            { "id": "d_w19_02", "question": "What did your darkest moment teach you about your strength?" },
+            { "id": "d_w19_03", "question": "Who showed up for you when you needed it most?" },
+            { "id": "d_w19_04", "question": "What is something hard you are going through right now?" },
+            { "id": "d_w19_05", "question": "How do you let people in when you are struggling?" },
+            { "id": "d_w19_06", "question": "What does strength actually look like — is it holding it together or letting it out?" }
+        ]
+    },
+    {
+        "week": 20, "theme": "dreams_revisited", "age_group": "adult",
+        "questions": [
+            { "id": "d_w20_01", "question": "What dream did you let go of, and do you still think about it?" },
+            { "id": "d_w20_02", "question": "Is it too late to chase something you always wanted?" },
+            { "id": "d_w20_03", "question": "What would you attempt if you knew you could not fail?" },
+            { "id": "d_w20_04", "question": "Have your dreams changed, or have you changed?" },
+            { "id": "d_w20_05", "question": "What is something you still want to accomplish?" },
+            { "id": "d_w20_06", "question": "What keeps you from going after what you really want?" }
+        ]
+    },
+    {
+        "week": 21, "theme": "gratitude_and_contentment", "age_group": "adult",
+        "questions": [
+            { "id": "d_w21_01", "question": "What are you most grateful for in your life right now?" },
+            { "id": "d_w21_02", "question": "When was the last time you felt truly content?" },
+            { "id": "d_w21_03", "question": "What is something small that brings you joy every day?" },
+            { "id": "d_w21_04", "question": "Do you appreciate what you have or are you always chasing more?" },
+            { "id": "d_w21_05", "question": "What would you miss most if it was suddenly gone?" },
+            { "id": "d_w21_06", "question": "What does enough look like for you?" }
+        ]
+    },
+    {
+        "week": 22, "theme": "mentoring_others", "age_group": "adult",
+        "questions": [
+            { "id": "d_w22_01", "question": "Have you ever mentored someone? What was that like?" },
+            { "id": "d_w22_02", "question": "What is the best piece of wisdom you can pass along?" },
+            { "id": "d_w22_03", "question": "Who needs to hear your story?" },
+            { "id": "d_w22_04", "question": "What mistake do you see younger people making that you wish you could warn them about?" },
+            { "id": "d_w22_05", "question": "How do you help someone without taking over their journey?" },
+            { "id": "d_w22_06", "question": "What is something you know now that could save someone else years of struggling?" }
+        ]
+    },
+    {
+        "week": 23, "theme": "hobbies_and_passions", "age_group": "adult",
+        "questions": [
+            { "id": "d_w23_01", "question": "What do you do purely for the joy of it?" },
+            { "id": "d_w23_02", "question": "When was the last time you lost track of time doing something you love?" },
+            { "id": "d_w23_03", "question": "Is there a hobby you dropped that you want to pick back up?" },
+            { "id": "d_w23_04", "question": "What new skill or hobby have you taken up recently?" },
+            { "id": "d_w23_05", "question": "How do you make time for yourself when everyone else needs you?" },
+            { "id": "d_w23_06", "question": "What would you do more of if you had more time?" }
+        ]
+    },
+    {
+        "week": 24, "theme": "aging_and_time", "age_group": "adult",
+        "questions": [
+            { "id": "d_w24_01", "question": "How do you feel about getting older?" },
+            { "id": "d_w24_02", "question": "What gets better with age that nobody tells you about?" },
+            { "id": "d_w24_03", "question": "What is something you worried about at 20 that seems silly now?" },
+            { "id": "d_w24_04", "question": "Do you feel your age or do you feel like a different age inside?" },
+            { "id": "d_w24_05", "question": "What do you want the second half of your life to look like?" },
+            { "id": "d_w24_06", "question": "If you could freeze time at any age, which age would you choose?" }
+        ]
+    },
+    {
+        "week": 25, "theme": "home_and_sanctuary", "age_group": "adult",
+        "questions": [
+            { "id": "d_w25_01", "question": "What does your home mean to you?" },
+            { "id": "d_w25_02", "question": "What is your favorite room and why?" },
+            { "id": "d_w25_03", "question": "How have you made your home reflect who you are?" },
+            { "id": "d_w25_04", "question": "What does comfort look like at the end of a long day?" },
+            { "id": "d_w25_05", "question": "Where do you feel safest in the world?" },
+            { "id": "d_w25_06", "question": "If you could live anywhere, where would it be?" }
+        ]
+    },
+    {
+        "week": 26, "theme": "the_hard_stuff", "age_group": "adult",
+        "questions": [
+            { "id": "d_w26_01", "question": "What is the hardest truth about adult life?" },
+            { "id": "d_w26_02", "question": "What do you pretend is fine that is not?" },
+            { "id": "d_w26_03", "question": "When was the last time you were truly honest with yourself?" },
+            { "id": "d_w26_04", "question": "What is something you are afraid to admit out loud?" },
+            { "id": "d_w26_05", "question": "What keeps you going on the days you want to give up?" },
+            { "id": "d_w26_06", "question": "What is the bravest thing you do on a regular basis?" }
+        ]
+    },
+    {
+        "week": 27, "theme": "love_languages", "age_group": "adult",
+        "questions": [
+            { "id": "d_w27_01", "question": "How do you show the people you love that you care?" },
+            { "id": "d_w27_02", "question": "What is the most loving thing anyone has ever done for you?" },
+            { "id": "d_w27_03", "question": "Do you find it easier to give love or receive it?" },
+            { "id": "d_w27_04", "question": "What does love look like in your daily life, not the big moments, the small ones?" },
+            { "id": "d_w27_05", "question": "How has your understanding of love evolved over time?" },
+            { "id": "d_w27_06", "question": "What do the people closest to you need from you that you sometimes forget to give?" }
+        ]
+    },
+    {
+        "week": 28, "theme": "adventures_and_travel", "age_group": "adult",
+        "questions": [
+            { "id": "d_w28_01", "question": "What is the best trip you have ever taken?" },
+            { "id": "d_w28_02", "question": "Where in the world do you still dream of going?" },
+            { "id": "d_w28_03", "question": "What did traveling teach you that staying home could not?" },
+            { "id": "d_w28_04", "question": "What is the most spontaneous thing you have ever done?" },
+            { "id": "d_w28_05", "question": "Do you crave adventure or stability more at this point in life?" },
+            { "id": "d_w28_06", "question": "What trip changed the way you see the world?" }
+        ]
+    },
+    {
+        "week": 29, "theme": "daily_rituals", "age_group": "adult",
+        "questions": [
+            { "id": "d_w29_01", "question": "What does a typical day in your life look like?" },
+            { "id": "d_w29_02", "question": "What is a small daily ritual that grounds you?" },
+            { "id": "d_w29_03", "question": "How do you start your morning, and does it set the tone for the day?" },
+            { "id": "d_w29_04", "question": "What do you do at the end of the day to wind down?" },
+            { "id": "d_w29_05", "question": "What part of your routine would you never give up?" },
+            { "id": "d_w29_06", "question": "If you could add one thing to every single day, what would it be?" }
+        ]
+    },
+    {
+        "week": 30, "theme": "seasons_of_life", "age_group": "adult",
+        "questions": [
+            { "id": "d_w30_01", "question": "What season of life are you in right now?" },
+            { "id": "d_w30_02", "question": "What season was the hardest, and what season was the sweetest?" },
+            { "id": "d_w30_03", "question": "Are you holding on to a season that has already passed?" },
+            { "id": "d_w30_04", "question": "What season of life are you most looking forward to?" },
+            { "id": "d_w30_05", "question": "How do you navigate the transition between life stages?" },
+            { "id": "d_w30_06", "question": "If your life were a book, what chapter are you in right now?" }
+        ]
+    },
+    {
+        "week": 31, "theme": "creativity", "age_group": "adult",
+        "questions": [
+            { "id": "d_w31_01", "question": "Are you a creative person? How does that show up in your life?" },
+            { "id": "d_w31_02", "question": "What is something you have built, made, or created that you are proud of?" },
+            { "id": "d_w31_03", "question": "When was the last time you made something with your hands?" },
+            { "id": "d_w31_04", "question": "Do you think creativity is something you are born with or something you practice?" },
+            { "id": "d_w31_05", "question": "What would you create if time and money were not factors?" },
+            { "id": "d_w31_06", "question": "How do you solve problems — logic, instinct, or creativity?" }
+        ]
+    },
+    {
+        "week": 32, "theme": "boundaries", "age_group": "adult",
+        "questions": [
+            { "id": "d_w32_01", "question": "What boundary have you set that changed your life?" },
+            { "id": "d_w32_02", "question": "Do you find it hard to say no? Why?" },
+            { "id": "d_w32_03", "question": "What is a boundary you wish you had set sooner?" },
+            { "id": "d_w32_04", "question": "How do you protect your energy from people who drain it?" },
+            { "id": "d_w32_05", "question": "What is the difference between being selfish and taking care of yourself?" },
+            { "id": "d_w32_06", "question": "Who in your life respects your boundaries, and who does not?" }
+        ]
+    },
+    {
+        "week": 33, "theme": "nostalgia", "age_group": "adult",
+        "questions": [
+            { "id": "d_w33_01", "question": "What memory from your 20s still makes you smile?" },
+            { "id": "d_w33_02", "question": "Is there a song that takes you straight back to a specific moment?" },
+            { "id": "d_w33_03", "question": "What do you miss about the way life used to be?" },
+            { "id": "d_w33_04", "question": "What era of your life would you relive if you could?" },
+            { "id": "d_w33_05", "question": "What is a tradition from your past that you have carried into the present?" },
+            { "id": "d_w33_06", "question": "What smell or taste instantly takes you back to a moment in time?" }
+        ]
+    },
+    {
+        "week": 34, "theme": "hard_lessons", "age_group": "adult",
+        "questions": [
+            { "id": "d_w34_01", "question": "What is the most painful lesson you have had to learn?" },
+            { "id": "d_w34_02", "question": "What did hitting rock bottom teach you?" },
+            { "id": "d_w34_03", "question": "What is something you wish someone had told you before you went through it?" },
+            { "id": "d_w34_04", "question": "How do you handle disappointment?" },
+            { "id": "d_w34_05", "question": "What made you tougher than you thought you were?" },
+            { "id": "d_w34_06", "question": "Is there a lesson you keep having to relearn?" }
+        ]
+    },
+    {
+        "week": 35, "theme": "fun_and_play", "age_group": "adult",
+        "questions": [
+            { "id": "d_w35_01", "question": "When was the last time you had real, unfiltered fun?" },
+            { "id": "d_w35_02", "question": "Do you still know how to play, or have you forgotten?" },
+            { "id": "d_w35_03", "question": "What makes you laugh until your stomach hurts?" },
+            { "id": "d_w35_04", "question": "What is something ridiculous you have done as an adult that felt great?" },
+            { "id": "d_w35_05", "question": "Who brings out the most fun version of you?" },
+            { "id": "d_w35_06", "question": "What would your inner kid want you to do more of?" }
+        ]
+    },
+    {
+        "week": 36, "theme": "wisdom", "age_group": "adult",
+        "questions": [
+            { "id": "d_w36_01", "question": "What do you know for sure?" },
+            { "id": "d_w36_02", "question": "What advice would you give to someone 10 years younger than you?" },
+            { "id": "d_w36_03", "question": "What is the most important thing life has taught you?" },
+            { "id": "d_w36_04", "question": "What is something true that most people do not want to hear?" },
+            { "id": "d_w36_05", "question": "What would you tell your kids about life that school will never teach them?" },
+            { "id": "d_w36_06", "question": "If you could sum up everything you have learned in one sentence, what would it be?" }
+        ]
+    },
+    {
+        "week": 37, "theme": "fears", "age_group": "adult",
+        "questions": [
+            { "id": "d_w37_01", "question": "What are you most afraid of in life?" },
+            { "id": "d_w37_02", "question": "What fear have you overcome that once felt impossible?" },
+            { "id": "d_w37_03", "question": "How does fear hold you back, and how does it protect you?" },
+            { "id": "d_w37_04", "question": "What would you do if fear was not a factor?" },
+            { "id": "d_w37_05", "question": "What is a fear your parents had that you refuse to pass on?" },
+            { "id": "d_w37_06", "question": "How do you face something that terrifies you?" }
+        ]
+    },
+    {
+        "week": 38, "theme": "milestones", "age_group": "adult",
+        "questions": [
+            { "id": "d_w38_01", "question": "What milestone are you most proud of reaching?" },
+            { "id": "d_w38_02", "question": "What milestone came earlier or later than you expected?" },
+            { "id": "d_w38_03", "question": "Do you measure your life by milestones or by moments?" },
+            { "id": "d_w38_04", "question": "What is the next milestone you are working toward?" },
+            { "id": "d_w38_05", "question": "What milestone did not feel like a big deal at the time but now means everything?" },
+            { "id": "d_w38_06", "question": "What is a milestone nobody celebrated that you wish they had?" }
+        ]
+    },
+    {
+        "week": 39, "theme": "the_future", "age_group": "adult",
+        "questions": [
+            { "id": "d_w39_01", "question": "What does the rest of your life look like in your mind?" },
+            { "id": "d_w39_02", "question": "What are you building toward?" },
+            { "id": "d_w39_03", "question": "What do you want the next decade to be about?" },
+            { "id": "d_w39_04", "question": "Are you excited or anxious about the future?" },
+            { "id": "d_w39_05", "question": "What promise have you made to yourself about how you will live going forward?" },
+            { "id": "d_w39_06", "question": "If you could guarantee one thing about your future, what would it be?" }
+        ]
+    },
+    {
+        "week": 40, "theme": "unfinished_business", "age_group": "adult",
+        "questions": [
+            { "id": "d_w40_01", "question": "Is there something you started but never finished that still nags at you?" },
+            { "id": "d_w40_02", "question": "What conversation do you need to have that you have been putting off?" },
+            { "id": "d_w40_03", "question": "What relationship needs repair?" },
+            { "id": "d_w40_04", "question": "What goal have you set aside that deserves another shot?" },
+            { "id": "d_w40_05", "question": "What would it feel like to finally finish something you have been carrying?" },
+            { "id": "d_w40_06", "question": "What do you need to let go of to move forward?" }
+        ]
+    },
+    {
+        "week": 41, "theme": "simple_joys", "age_group": "adult",
+        "questions": [
+            { "id": "d_w41_01", "question": "What is a simple pleasure that never gets old?" },
+            { "id": "d_w41_02", "question": "What is the best part of an ordinary day?" },
+            { "id": "d_w41_03", "question": "What makes you feel alive in a quiet way?" },
+            { "id": "d_w41_04", "question": "What is something free that brings you more happiness than anything money can buy?" },
+            { "id": "d_w41_05", "question": "What ordinary moment do you want to remember forever?" },
+            { "id": "d_w41_06", "question": "What would your perfect lazy Sunday look like?" }
+        ]
+    },
+    {
+        "week": 42, "theme": "what_matters_most", "age_group": "adult",
+        "questions": [
+            { "id": "d_w42_01", "question": "If your house was on fire and everyone was safe, what one thing would you grab?" },
+            { "id": "d_w42_02", "question": "What matters more to you now than it did five years ago?" },
+            { "id": "d_w42_03", "question": "What used to matter to you that does not anymore?" },
+            { "id": "d_w42_04", "question": "Who are the five most important people in your life right now?" },
+            { "id": "d_w42_05", "question": "What do you want more of in your life?" },
+            { "id": "d_w42_06", "question": "If today was your last day, would you be at peace with how you spent it?" }
+        ]
+    },
+    {
+        "week": 43, "theme": "family_heritage", "age_group": "adult",
+        "questions": [
+            { "id": "d_w43_01", "question": "What do you know about your family history?" },
+            { "id": "d_w43_02", "question": "What traits did you inherit from your parents or grandparents?" },
+            { "id": "d_w43_03", "question": "Is there a family story that gets told at every gathering?" },
+            { "id": "d_w43_04", "question": "What do you want the next generation to know about where they came from?" },
+            { "id": "d_w43_05", "question": "What is a piece of your family history you wish you knew more about?" },
+            { "id": "d_w43_06", "question": "How does knowing where you come from help you know where you are going?" }
+        ]
+    },
+    {
+        "week": 44, "theme": "mental_health", "age_group": "adult",
+        "questions": [
+            { "id": "d_w44_01", "question": "How do you take care of your mental health?" },
+            { "id": "d_w44_02", "question": "What is something you have worked on emotionally that has made you better?" },
+            { "id": "d_w44_03", "question": "Do you ask for help when you need it, or do you try to handle everything alone?" },
+            { "id": "d_w44_04", "question": "What is the most important thing you have learned about your own mind?" },
+            { "id": "d_w44_05", "question": "How do you know when you are not okay?" },
+            { "id": "d_w44_06", "question": "What would you say to someone who is struggling but afraid to ask for help?" }
+        ]
+    },
+    {
+        "week": 45, "theme": "courage", "age_group": "adult",
+        "questions": [
+            { "id": "d_w45_01", "question": "What is the most courageous thing you have ever done?" },
+            { "id": "d_w45_02", "question": "When did you stand up for something even though it cost you?" },
+            { "id": "d_w45_03", "question": "What does courage look like in everyday life?" },
+            { "id": "d_w45_04", "question": "Have you ever walked away from something that was no longer right for you?" },
+            { "id": "d_w45_05", "question": "What gave you the strength to make the hardest decision of your life?" },
+            { "id": "d_w45_06", "question": "What is something you are doing right now that takes quiet courage?" }
+        ]
+    },
+    {
+        "week": 46, "theme": "relationships_with_siblings", "age_group": "adult",
+        "questions": [
+            { "id": "d_w46_01", "question": "How has your relationship with your siblings changed as adults?" },
+            { "id": "d_w46_02", "question": "What do you appreciate about your siblings now that you did not as a kid?" },
+            { "id": "d_w46_03", "question": "Is there a sibling dynamic that still plays out even though you are all grown up?" },
+            { "id": "d_w46_04", "question": "What is your favorite memory with a brother or sister?" },
+            { "id": "d_w46_05", "question": "How do you navigate family disagreements as adults?" },
+            { "id": "d_w46_06", "question": "What role do you play in your family — peacemaker, leader, or something else?" }
+        ]
+    },
+    {
+        "week": 47, "theme": "personal_growth", "age_group": "adult",
+        "questions": [
+            { "id": "d_w47_01", "question": "How are you a different person than you were five years ago?" },
+            { "id": "d_w47_02", "question": "What habit or pattern did you break that changed your life?" },
+            { "id": "d_w47_03", "question": "What book, podcast, or conversation shifted your thinking?" },
+            { "id": "d_w47_04", "question": "What are you currently working on about yourself?" },
+            { "id": "d_w47_05", "question": "Do you think personal growth ever stops, or is it lifelong?" },
+            { "id": "d_w47_06", "question": "What is the version of yourself that you are becoming?" }
+        ]
+    },
+    {
+        "week": 48, "theme": "food_and_gathering", "age_group": "adult",
+        "questions": [
+            { "id": "d_w48_01", "question": "What meal brings your family together?" },
+            { "id": "d_w48_02", "question": "What food takes you right back to your childhood?" },
+            { "id": "d_w48_03", "question": "Do you cook? What is your signature dish?" },
+            { "id": "d_w48_04", "question": "What is the most memorable meal you have ever had?" },
+            { "id": "d_w48_05", "question": "What recipe do you want to make sure gets passed down?" },
+            { "id": "d_w48_06", "question": "What does sitting around a table with the people you love mean to you?" }
+        ]
+    },
+    {
+        "week": 49, "theme": "seasons_and_nature", "age_group": "adult",
+        "questions": [
+            { "id": "d_w49_01", "question": "What season speaks to your soul?" },
+            { "id": "d_w49_02", "question": "Where in nature do you feel the most at peace?" },
+            { "id": "d_w49_03", "question": "How does the weather affect your mood?" },
+            { "id": "d_w49_04", "question": "What is the most beautiful natural thing you have ever witnessed?" },
+            { "id": "d_w49_05", "question": "Do you need nature to reset, or are you more of a city person?" },
+            { "id": "d_w49_06", "question": "What outdoor memory do you treasure the most?" }
+        ]
+    },
+    {
+        "week": 50, "theme": "the_story_of_your_life", "age_group": "adult",
+        "questions": [
+            { "id": "d_w50_01", "question": "If your life was a movie, what would the title be?" },
+            { "id": "d_w50_02", "question": "What has been the main theme of your life so far?" },
+            { "id": "d_w50_03", "question": "Who are the main characters in your story?" },
+            { "id": "d_w50_04", "question": "What chapter are you in right now, and what comes next?" },
+            { "id": "d_w50_05", "question": "What do you want the ending to look like?" },
+            { "id": "d_w50_06", "question": "Say something right now that you want preserved forever." }
+        ]
+    }
+]
