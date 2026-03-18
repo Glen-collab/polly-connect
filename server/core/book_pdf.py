@@ -523,13 +523,19 @@ class LegacyBookPDF:
                     if not qr_buf:
                         continue
 
-                    # Build a mini block: QR + label
+                    # Build a mini block: QR + label with speaker name
                     qr_img = Image(qr_buf, width=QR_SIZE, height=QR_SIZE)
+                    speaker = oq.get("speaker", "")
                     label = oq.get("label", "Voice Recording")
                     # Escape for ReportLab
                     label = label.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    speaker = speaker.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    if speaker:
+                        formatted = f"<b>{speaker}</b>: <i>{label}</i>"
+                    else:
+                        formatted = f"<i>{label}</i>"
 
-                    row_items.append((qr_img, label))
+                    row_items.append((qr_img, formatted))
 
                 # Render 2 per row using a table
                 for i in range(0, len(row_items), 2):
