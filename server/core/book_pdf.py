@@ -691,17 +691,32 @@ class LegacyBookPDF:
                 logger.warning(f"Failed to embed photo: {e}")
 
         if include_qr_codes and item.get("audio_key"):
-            audio_url = f"{AUDIO_BASE_URL}/{item['audio_key']}"
-            qr_buf = _generate_qr_image(audio_url)
+            # If this item has a photo, use photo listen page (shows all voices)
+            # Otherwise use individual audio listen page
+            photo_id = item.get("photo_id")
+            if photo_id:
+                qr_url = f"https://polly-connect.com/web/photo-listen/{photo_id}"
+            else:
+                qr_url = f"{AUDIO_BASE_URL}/{item['audio_key']}"
+            qr_buf = _generate_qr_image(qr_url)
             if qr_buf:
                 story.append(Spacer(1, 6))
                 img = Image(qr_buf, width=QR_SIZE, height=QR_SIZE)
                 story.append(img)
+                photo_id = item.get("photo_id")
                 speaker = item.get('speaker', '')
                 label = item.get('qr_label', '')
                 if label:
                     label = label.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                if speaker and label:
+                if photo_id:
+                    # Photo QR — may have multiple voices
+                    photo_caption = item.get("photo_caption", "")
+                    if photo_caption:
+                        photo_caption = photo_caption.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                        qr_caption = f"Hear the family talk about this photo"
+                    else:
+                        qr_caption = "Scan to hear family memories about this photo"
+                elif speaker and label:
                     qr_caption = f"<b>{speaker}</b>: <i>{label}</i>"
                 elif speaker:
                     qr_caption = f"Hear {speaker}'s voice"
@@ -736,7 +751,7 @@ class LegacyBookPDF:
             if not story:
                 continue
 
-            item = {"story_id": story_id}
+            item = {"story_id": story_id, "photo_id": story.get("photo_id")}
             has_content = False
 
             # Check photo

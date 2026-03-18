@@ -3100,6 +3100,95 @@ async def owners_guide(request: Request):
     )
 
 
+# ── Photo Listen Page (multi-voice) ──
+
+@router.get("/photo-listen/{photo_id}", response_class=HTMLResponse)
+async def photo_listen_page(request: Request, photo_id: int):
+    """Landing page for book QR codes — shows photo + all voice recordings."""
+    db = request.app.state.db
+
+    photo = db.get_photo_by_id(photo_id)
+    if not photo:
+        return HTMLResponse("<h2>Photo not found</h2>", status_code=404)
+
+    conn = db._get_connection()
+    try:
+        import sqlite3
+        conn.row_factory = sqlite3.Row
+        stories = conn.execute(
+            "SELECT s.id, s.audio_s3_key, s.question_text, "
+            "COALESCE(s.corrected_transcript, s.transcript) as transcript, "
+            "m.speaker FROM stories s "
+            "LEFT JOIN memories m ON m.story_id = s.id "
+            "WHERE s.photo_id = ? AND s.audio_s3_key IS NOT NULL ORDER BY s.id",
+            (photo_id,)
+        ).fetchall()
+        stories = [dict(s) for s in stories]
+    finally:
+        if not db._conn:
+            conn.close()
+
+    caption = photo.get("caption") or "Family Photo"
+    caption_safe = caption.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    filename = photo.get("filename", "")
+
+    # Build audio player blocks
+    players_html = ""
+    for s in stories:
+        speaker = s.get("speaker") or "Someone"
+        speaker_safe = speaker.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        transcript = (s.get("transcript") or "")[:120]
+        transcript_safe = transcript.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        audio_key = s.get("audio_s3_key", "")
+        players_html += f"""
+        <div style="border-top: 1px solid #eee; padding: 16px 0;">
+            <p style="font-weight: 600; font-size: 15px; color: #1a1a1a; margin: 0 0 4px;">{speaker_safe}</p>
+            <p style="font-size: 12px; color: #888; margin: 0 0 10px; font-style: italic;">{transcript_safe}{"..." if len(transcript) >= 120 else ""}</p>
+            <audio controls preload="auto" style="width: 100%;">
+                <source src="/static/recordings/{audio_key}" type="audio/wav">
+            </audio>
+            <a href="/web/audio/download/{audio_key}" style="display: inline-block; margin-top: 8px; font-size: 12px; color: #059669; text-decoration: none;">Save this recording</a>
+        </div>"""
+
+    if not players_html:
+        players_html = '<p style="color: #999; text-align: center; padding: 20px;">No recordings yet.</p>'
+
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{caption_safe} - Polly Connect</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+               margin: 0; padding: 20px; min-height: 100vh; }}
+        .card {{ background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+                 max-width: 500px; margin: 0 auto; overflow: hidden; }}
+        .photo {{ width: 100%; max-height: 300px; object-fit: cover; }}
+        .content {{ padding: 20px; }}
+        .logo {{ width: 60px; height: 60px; display: block; margin: 0 auto 12px; }}
+        h1 {{ font-size: 20px; color: #1a1a1a; margin: 0 0 4px; text-align: center; }}
+        .count {{ font-size: 13px; color: #666; text-align: center; margin-bottom: 8px; }}
+        .footer {{ text-align: center; padding: 16px; font-size: 12px; color: #999; }}
+        .footer a {{ color: #059669; text-decoration: none; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img src="/static/uploads/{filename}" alt="{caption_safe}" class="photo">
+        <div class="content">
+            <img src="/static/polly_logo.png" alt="Polly" class="logo">
+            <h1>{caption_safe}</h1>
+            <p class="count">{len(stories)} voice recording{"s" if len(stories) != 1 else ""}</p>
+            {players_html}
+        </div>
+        <div class="footer">Captured with <a href="https://polly-connect.com">Polly Connect</a></div>
+    </div>
+</body>
+</html>""")
+
+
 # ── Audio Listen & Download ──
 
 @router.get("/listen/{audio_key}", response_class=HTMLResponse)
