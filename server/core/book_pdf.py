@@ -691,11 +691,18 @@ class LegacyBookPDF:
                 story.append(Spacer(1, 6))
                 img = Image(qr_buf, width=QR_SIZE, height=QR_SIZE)
                 story.append(img)
-                qr_caption = (
-                    f"Hear {item['speaker']}'s voice"
-                    if item.get('speaker')
-                    else "Scan to hear the original voice recording"
-                )
+                speaker = item.get('speaker', '')
+                label = item.get('qr_label', '')
+                if label:
+                    label = label.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                if speaker and label:
+                    qr_caption = f"<b>{speaker}</b>: <i>{label}</i>"
+                elif speaker:
+                    qr_caption = f"Hear {speaker}'s voice"
+                elif label:
+                    qr_caption = f"<i>{label}</i>"
+                else:
+                    qr_caption = "Scan to hear the original voice recording"
                 story.append(Paragraph(qr_caption, self.styles['QRCaption']))
         story.append(Spacer(1, 10))
 
@@ -748,7 +755,25 @@ class LegacyBookPDF:
             if (audio_key and audio_key not in global_used_audio
                     and story.get("qr_in_book", 1)):
                 item["audio_key"] = audio_key
-                item["speaker"] = story.get("speaker", "")
+                # Get speaker from memory
+                speaker = ""
+                mem_row = self.db._get_connection().execute(
+                    "SELECT speaker FROM memories WHERE story_id = ? LIMIT 1",
+                    (story_id,)
+                ).fetchone()
+                if mem_row:
+                    speaker = mem_row[0] or ""
+                item["speaker"] = speaker
+                # Get story snippet for QR label
+                transcript = story.get("corrected_transcript") or story.get("transcript") or ""
+                question = story.get("question_text") or ""
+                if question:
+                    item["qr_label"] = question
+                elif transcript:
+                    snippet = transcript[:50].strip()
+                    if len(transcript) > 50:
+                        snippet += "..."
+                    item["qr_label"] = snippet
                 global_used_audio.add(audio_key)
                 has_content = True
 
