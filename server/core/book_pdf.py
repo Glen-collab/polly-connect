@@ -847,18 +847,18 @@ class LegacyBookPDF:
 
             speaker = mem[0] if mem else ""
 
-            # Build a label: speaker + question or first 50 chars of transcript
+            # Build a label (story description only — speaker is separate)
             question = s.get("question_text", "")
             transcript = s.get("transcript", "")
             if question:
-                label = f"{speaker}: {question}" if speaker else question
+                label = question
             elif transcript:
                 snippet = transcript[:60].strip()
                 if len(transcript) > 60:
                     snippet += "..."
-                label = f"{speaker}: {snippet}" if speaker else snippet
+                label = snippet
             else:
-                label = f"{speaker}'s recording" if speaker else "Voice recording"
+                label = "Voice recording"
 
             seen_audio.add(audio_key)
             orphans.append({
