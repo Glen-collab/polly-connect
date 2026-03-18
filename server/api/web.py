@@ -197,6 +197,9 @@ async def register_submit(request: Request, name: str = Form(...),
                 conn.close()
     else:
         tenant_id = db.create_tenant(household_name)
+        # Start 30-day free trial for new tenants
+        from core.subscription import start_trial
+        start_trial(db, tenant_id, days=30)
 
     # Create account
     pw_hash = hash_password(password)
