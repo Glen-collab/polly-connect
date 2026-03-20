@@ -600,6 +600,24 @@ class PollyDB:
                 )
             """)
 
+            # Song briefs table (chapter-to-song pipeline)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS song_briefs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    chapter_number INTEGER,
+                    chapter_title TEXT,
+                    song_title TEXT,
+                    genre TEXT,
+                    jungian_stage TEXT,
+                    lyrics_json TEXT,
+                    style_prompt TEXT,
+                    essence_json TEXT,
+                    audio_filename TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # Prayer recordings table (voice prayers, blessings, grace)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS prayer_recordings (
