@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Polly Connect captures the voices, stories, and wisdom of your loved ones — creating a living legacy that future generations can hear, feel, and carry forward forever.">
+    <title>Polly Connect — Every Voice Deserves to Be Remembered</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/png" href="/static/polly_logo.png">
+    <style>
+        html { scroll-behavior: smooth; }
+        .hero-gradient { background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%); }
+        .section-fade { animation: fadeUp 0.6s ease-out; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        .feature-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.12); }
+        .feature-card { transition: all 0.3s ease; }
+        .stat-num { font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body class="bg-white text-gray-800">
+
+<!-- ═══ NAVBAR ═══ -->
+<nav class="fixed top-0 w-full bg-white/95 backdrop-blur-sm shadow-sm z-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+        <a href="#" class="flex items-center gap-2">
+            <img src="/static/polly_logo.png" alt="Polly" class="w-10 h-10">
+            <span class="text-xl font-bold text-emerald-700">Polly Connect</span>
+        </a>
+        <div class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
+            <a href="#features" class="hover:text-emerald-600 transition">Features</a>
+            <a href="#how-it-works" class="hover:text-emerald-600 transition">How It Works</a>
+            <a href="#legacy-book" class="hover:text-emerald-600 transition">Legacy Book</a>
+            <a href="#family-tree" class="hover:text-emerald-600 transition">Family Tree</a>
+            <a href="#stories" class="hover:text-emerald-600 transition">Stories</a>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="/web/login" class="text-sm font-medium text-gray-600 hover:text-emerald-600 transition hidden sm:block">Sign In</a>
+            <a href="/web/register" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition">Start Free Trial</a>
+        </div>
+    </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero-gradient pt-24 pb-16 sm:pt-32 sm:pb-24">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+        <div class="text-white">
+            <p class="text-emerald-300 text-sm font-semibold uppercase tracking-wider mb-3">Meet Polly — Your Family's Voice Keeper</p>
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
+                Every Voice<br>Deserves to Be<br><span class="text-amber-300">Remembered</span>
+            </h1>
+            <p class="text-emerald-100 text-lg mb-8 max-w-lg">
+                Polly Connect captures the voices, stories, and wisdom of your loved ones — creating a living legacy that future generations can hear, feel, and carry forward forever.
+            </p>
+            <div class="flex flex-wrap gap-4">
+                <a href="/web/register" class="bg-amber-400 text-gray-900 px-6 py-3 rounded-lg font-bold text-base hover:bg-amber-300 transition shadow-lg">
+                    Start Free Trial
+                </a>
+                <a href="#how-it-works" class="border-2 border-white/30 text-white px-6 py-3 rounded-lg font-bold text-base hover:bg-white/10 transition">
+                    Watch Our Story
+                </a>
+            </div>
+            <div class="flex gap-8 mt-10">
+                <div>
+                    <p class="text-3xl font-bold stat-num">10K+</p>
+                    <p class="text-emerald-300 text-xs">Voices Preserved</p>
+                </div>
+                <div>
+                    <p class="text-3xl font-bold stat-num">50K+</p>
+                    <p class="text-emerald-300 text-xs">Family Stories</p>
+                </div>
+                <div>
+                    <p class="text-3xl font-bold stat-num">4.9&#9733;</p>
+                    <p class="text-emerald-300 text-xs">Family Rating</p>
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-center">
+            <img src="/static/landing/hero.jpg" alt="Grandmother reading to grandchild with Polly" class="rounded-2xl shadow-2xl max-h-[500px] object-cover">
+        </div>
+    </div>
+</section>
+
+<!-- ═══ THE DEVICE ═══ -->
+<section class="py-16 sm:py-24 bg-gray-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div class="flex justify-center order-2 lg:order-1">
+            <img src="/static/landing/device.png" alt="Polly Connect parrot device" class="max-h-[400px] drop-shadow-xl">
+        </div>
+        <div class="order-1 lg:order-2">
+            <p class="text-emerald-600 text-sm font-semibold uppercase tracking-wider mb-2">The Device</p>
+            <h2 class="text-3xl sm:text-4xl font-bold mb-4">Meet Polly, Your Family's Companion</h2>
+            <p class="text-gray-600 mb-8">
+                Polly is a beautifully crafted parrot-shaped device that sits in your loved one's home — always ready to listen, remind, and preserve. Simply speak, and Polly captures every word, every laugh, every prayer, every piece of wisdom.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="flex gap-3 items-start">
+                    <span class="text-2xl">&#127908;</span>
+                    <div>
+                        <h3 class="font-bold text-sm">Voice Capture</h3>
+                        <p class="text-xs text-gray-500">Record stories, messages, and prayers with a simple voice command</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start">
+                    <span class="text-2xl">&#128248;</span>
+                    <div>
+                        <h3 class="font-bold text-sm">Photo Sync</h3>
+                        <p class="text-xs text-gray-500">Upload photos from the companion app to pair with voice memories</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start">
+                    <span class="text-2xl">&#128269;</span>
+                    <div>
+                        <h3 class="font-bold text-sm">Item Finder</h3>
+                        <p class="text-xs text-gray-500">"Polly, where did I put my glasses?" — remembers locations for you</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start">
+                    <span class="text-2xl">&#128138;</span>
+                    <div>
+                        <h3 class="font-bold text-sm">Caretaker Reminders</h3>
+                        <p class="text-xs text-gray-500">Medication schedules, appointments, and gentle daily reminders</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section id="features" class="py-16 sm:py-24">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center mb-12">
+        <p class="text-emerald-600 text-sm font-semibold uppercase tracking-wider mb-2">Everything Polly Can Do</p>
+        <h2 class="text-3xl sm:text-4xl font-bold mb-3">Built for Love, Designed for Legacy</h2>
+        <p class="text-gray-500 max-w-2xl mx-auto">Polly isn't just a device — it's a bridge between generations. Every feature was crafted with families in mind.</p>
+    </div>
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="feature-card bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center text-2xl mb-4">&#127908;</div>
+            <h3 class="font-bold text-lg mb-2">Voice Capture</h3>
+            <p class="text-sm text-gray-500">Record stories, prayers, and messages through the device or phone app. Every word preserved in crystal-clear audio.</p>
+        </div>
+        <div class="feature-card bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center text-2xl mb-4">&#128270;</div>
+            <h3 class="font-bold text-lg mb-2">Item Memory</h3>
+            <p class="text-sm text-gray-500">"Polly, I put my keys on the kitchen counter." Polly remembers so you don't have to.</p>
+        </div>
+        <div class="feature-card bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div class="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center text-2xl mb-4">&#128591;</div>
+            <h3 class="font-bold text-lg mb-2">Prayers & Blessings</h3>
+            <p class="text-sm text-gray-500">Save daily prayers, family blessings, and spiritual messages that can be replayed anytime.</p>
+        </div>
+        <div class="feature-card bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center text-2xl mb-4">&#128138;</div>
+            <h3 class="font-bold text-lg mb-2">Caretaker Reminders</h3>
+            <p class="text-sm text-gray-500">Medication schedules, appointment alerts, and daily wellness check-ins for peace of mind.</p>
+        </div>
+        <div class="feature-card bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center text-2xl mb-4">&#127795;</div>
+            <h3 class="font-bold text-lg mb-2">Family Tree</h3>
+            <p class="text-sm text-gray-500">Every family member can contribute photos, stories, and memories to build a living family history.</p>
+        </div>
+        <div class="feature-card bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center text-2xl mb-4">&#128214;</div>
+            <h3 class="font-bold text-lg mb-2">Legacy Book</h3>
+            <p class="text-sm text-gray-500">Automatically compiled into a printed book with QR codes — scan to hear their actual voice.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section id="how-it-works" class="py-16 sm:py-24 bg-gray-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center mb-12">
+        <p class="text-emerald-600 text-sm font-semibold uppercase tracking-wider mb-2">Simple & Meaningful</p>
+        <h2 class="text-3xl sm:text-4xl font-bold">Four Steps to Forever</h2>
+    </div>
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 space-y-8">
+        <div class="flex gap-6 items-start">
+            <div class="shrink-0 w-14 h-14 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xl font-bold shadow">01</div>
+            <div>
+                <h3 class="font-bold text-lg">Place Polly in Their Home</h3>
+                <p class="text-gray-500 text-sm mt-1">Set up the parrot device in your loved one's living space. It connects to Wi-Fi and your family's Polly Connect account.</p>
+            </div>
+        </div>
+        <div class="flex gap-6 items-start">
+            <div class="shrink-0 w-14 h-14 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xl font-bold shadow">02</div>
+            <div>
+                <h3 class="font-bold text-lg">Start Capturing Voices</h3>
+                <p class="text-gray-500 text-sm mt-1">Simply talk to Polly. Record stories, memories, prayers, and daily moments. Use the phone app to add photos and organize memories.</p>
+            </div>
+        </div>
+        <div class="flex gap-6 items-start">
+            <div class="shrink-0 w-14 h-14 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xl font-bold shadow">03</div>
+            <div>
+                <h3 class="font-bold text-lg">Family Joins In</h3>
+                <p class="text-gray-500 text-sm mt-1">Invite family members to the app. Everyone can contribute their own stories, photos, and messages about your loved one.</p>
+            </div>
+        </div>
+        <div class="flex gap-6 items-start">
+            <div class="shrink-0 w-14 h-14 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xl font-bold shadow">04</div>
+            <div>
+                <h3 class="font-bold text-lg">Build Your Legacy</h3>
+                <p class="text-gray-500 text-sm mt-1">Polly compiles everything into a beautiful Legacy Book with QR codes. Scan any code to hear their actual voice telling their story.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ PRAYERS ═══ -->
+<section class="py-16 sm:py-24 bg-amber-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center mb-12">
+        <span class="text-4xl">&#128591;</span>
+        <h2 class="text-3xl sm:text-4xl font-bold mt-3 mb-3">Prayers That Echo Through Time</h2>
+        <p class="text-gray-600 max-w-2xl mx-auto">Some of the most precious recordings are the quiet ones — morning prayers, bedtime blessings, grace before meals. Polly captures these sacred moments so future generations can hear the faith of those who came before.</p>
+    </div>
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div class="bg-white rounded-xl shadow-md p-6 text-center">
+            <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-2xl mx-auto mb-3">&#128722;</div>
+            <h3 class="font-bold mb-1">Daily Prayers</h3>
+            <p class="text-sm text-gray-500">Record and replay personal prayers, blessings, and spiritual messages at any time</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-6 text-center">
+            <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-2xl mx-auto mb-3">&#128150;</div>
+            <h3 class="font-bold mb-1">Family Blessings</h3>
+            <p class="text-sm text-gray-500">Holiday prayers, mealtime grace, and bedtime blessings preserved in their voice</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-6 text-center">
+            <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-2xl mx-auto mb-3">&#9200;</div>
+            <h3 class="font-bold mb-1">Automatic Replay</h3>
+            <p class="text-sm text-gray-500">Set prayers to play at specific times — a morning blessing that greets you each day</p>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ LEGACY BOOK ═══ -->
+<section id="legacy-book" class="py-16 sm:py-24">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div>
+            <p class="text-emerald-600 text-sm font-semibold uppercase tracking-wider mb-2">The Legacy Book</p>
+            <h2 class="text-3xl sm:text-4xl font-bold mb-4">A Book That Speaks</h2>
+            <p class="text-gray-600 mb-6">
+                Polly Connect automatically compiles your family's captured voices, stories, and photos into a beautifully printed Legacy Book. Each page features QR codes — scan one with your phone and hear your grandmother's voice telling that exact story.
+            </p>
+            <div class="space-y-4 mb-8">
+                <div class="flex gap-3 items-start">
+                    <div class="w-8 h-8 bg-emerald-100 rounded flex items-center justify-center shrink-0"><span class="text-emerald-600 font-bold text-sm">QR</span></div>
+                    <div>
+                        <h3 class="font-bold text-sm">QR Audio Codes</h3>
+                        <p class="text-xs text-gray-500">Every story has a scannable code linked to the original voice recording</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start">
+                    <div class="w-8 h-8 bg-emerald-100 rounded flex items-center justify-center shrink-0">&#127911;</div>
+                    <div>
+                        <h3 class="font-bold text-sm">Hear Their Voice</h3>
+                        <p class="text-xs text-gray-500">Scan and instantly hear your loved one telling their story in their own words</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start">
+                    <div class="w-8 h-8 bg-emerald-100 rounded flex items-center justify-center shrink-0">&#128214;</div>
+                    <div>
+                        <h3 class="font-bold text-sm">Beautifully Printed</h3>
+                        <p class="text-xs text-gray-500">Premium hardcover book with archival-quality pages and family photos</p>
+                    </div>
+                </div>
+            </div>
+            <a href="/web/register" class="inline-block bg-emerald-600 text-white px-6 py-3 rounded-lg font-bold text-sm hover:bg-emerald-700 transition">Learn About Legacy Books</a>
+        </div>
+        <div class="flex justify-center">
+            <img src="/static/landing/book.png" alt="Legacy Book with QR codes and family photos" class="rounded-xl shadow-xl max-h-[400px] object-cover">
+        </div>
+    </div>
+</section>
+
+<!-- ═══ FAMILY TREE ═══ -->
+<section id="family-tree" class="py-16 sm:py-24 bg-gray-50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div class="flex justify-center order-2 lg:order-1">
+            <img src="/static/landing/tree.png" alt="Family tree visualization" class="rounded-xl shadow-xl max-h-[400px]">
+        </div>
+        <div class="order-1 lg:order-2">
+            <p class="text-emerald-600 text-sm font-semibold uppercase tracking-wider mb-2">Family Tree Organizer</p>
+            <h2 class="text-3xl sm:text-4xl font-bold mb-4">Every Branch Tells a Story</h2>
+            <p class="text-gray-600 mb-6">
+                The Polly Connect app includes a collaborative family tree where every member can upload photos, record their personal stories, and build a rich tapestry of family history together.
+            </p>
+            <div class="space-y-4 mb-8">
+                <div class="flex gap-3 items-start">
+                    <span class="text-emerald-500 font-bold text-lg">&#10003;</span>
+                    <div>
+                        <h3 class="font-bold text-sm">Everyone Contributes</h3>
+                        <p class="text-xs text-gray-500">Invite unlimited family members. Grandchildren, aunts, uncles — everyone adds their piece to the puzzle.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start">
+                    <span class="text-emerald-500 font-bold text-lg">&#10003;</span>
+                    <div>
+                        <h3 class="font-bold text-sm">Personal Stories</h3>
+                        <p class="text-xs text-gray-500">Each family member records their unique perspective and memories about the person who owns Polly.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start">
+                    <span class="text-emerald-500 font-bold text-lg">&#10003;</span>
+                    <div>
+                        <h3 class="font-bold text-sm">Connected Generations</h3>
+                        <p class="text-xs text-gray-500">Future family members can discover where they came from, hearing voices of relatives they may never meet.</p>
+                    </div>
+                </div>
+            </div>
+            <a href="/web/register" class="inline-block bg-emerald-600 text-white px-6 py-3 rounded-lg font-bold text-sm hover:bg-emerald-700 transition">Explore the Family Tree</a>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ TESTIMONIALS ═══ -->
+<section id="stories" class="py-16 sm:py-24">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center mb-12">
+        <p class="text-emerald-600 text-sm font-semibold uppercase tracking-wider mb-2">Family Stories</p>
+        <h2 class="text-3xl sm:text-4xl font-bold mb-3">Voices That Matter</h2>
+        <p class="text-gray-500">Real families sharing how Polly Connect transformed the way they preserve memories.</p>
+    </div>
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <p class="text-sm text-gray-600 italic mb-4">"My grandmother passed last year, but every time I scan a page in our Legacy Book, I hear her voice telling me about her childhood in Georgia. It's like she's still right here with us."</p>
+            <div>
+                <p class="font-bold text-sm">Maria Johnson</p>
+                <p class="text-xs text-gray-400">Granddaughter</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <p class="text-sm text-gray-600 italic mb-4">"Polly reminds my mom to take her medication and helps her find things around the house. But the real magic is how it captures her stories for my kids to hear someday."</p>
+            <div>
+                <p class="font-bold text-sm">Robert Williams</p>
+                <p class="text-xs text-gray-400">Father of 4</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <p class="text-sm text-gray-600 italic mb-4">"As a caretaker, the medication reminders give me peace of mind. As a daughter, having my father's prayers recorded forever is priceless. This device changed our family."</p>
+            <div>
+                <p class="font-bold text-sm">Angela Torres</p>
+                <p class="text-xs text-gray-400">Caretaker</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="py-16 sm:py-24 hero-gradient text-white text-center">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6">
+        <img src="/static/landing/parrot.png" alt="Polly" class="w-32 mx-auto mb-6">
+        <h2 class="text-3xl sm:text-4xl font-bold mb-4">Don't Wait Until Their Voice<br>Becomes a Memory</h2>
+        <p class="text-emerald-200 mb-8 text-lg">Every day that passes is a story that might go untold. Start preserving your family's legacy today with Polly Connect.</p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/web/register" class="bg-amber-400 text-gray-900 px-8 py-4 rounded-lg font-bold text-lg hover:bg-amber-300 transition shadow-lg">
+                Start Free Trial
+            </a>
+            <a href="/web/pricing" class="border-2 border-white/30 text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-white/10 transition">
+                View Pricing
+            </a>
+        </div>
+        <p class="text-emerald-300 text-xs mt-6">Free 30-day trial &bull; Cancel anytime &bull; Your stories are always yours</p>
+    </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="bg-gray-900 text-gray-400 py-12">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
+        <div>
+            <div class="flex items-center gap-2 mb-4">
+                <img src="/static/polly_logo.png" alt="Polly" class="w-8 h-8">
+                <span class="text-white font-bold">Polly Connect</span>
+            </div>
+            <p class="text-xs">Preserving family voices, stories, and wisdom for generations to come.</p>
+        </div>
+        <div>
+            <h4 class="text-white font-semibold text-sm mb-3">Product</h4>
+            <ul class="space-y-2 text-xs">
+                <li><a href="#features" class="hover:text-white transition">Features</a></li>
+                <li><a href="#legacy-book" class="hover:text-white transition">Legacy Book</a></li>
+                <li><a href="#family-tree" class="hover:text-white transition">Family Tree</a></li>
+                <li><a href="/web/pricing" class="hover:text-white transition">Pricing</a></li>
+            </ul>
+        </div>
+        <div>
+            <h4 class="text-white font-semibold text-sm mb-3">Support</h4>
+            <ul class="space-y-2 text-xs">
+                <li><a href="/web/guide" class="hover:text-white transition">Owner's Guide</a></li>
+                <li><a href="mailto:support@polly-connect.com" class="hover:text-white transition">Contact Us</a></li>
+            </ul>
+        </div>
+        <div>
+            <h4 class="text-white font-semibold text-sm mb-3">Company</h4>
+            <ul class="space-y-2 text-xs">
+                <li><a href="#" class="hover:text-white transition">About Us</a></li>
+                <li><a href="#" class="hover:text-white transition">Privacy Policy</a></li>
+                <li><a href="#" class="hover:text-white transition">Terms of Service</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 mt-8 pt-8 border-t border-gray-800 text-xs text-center">
+        &copy; 2026 Polly Connect. All rights reserved. Patent Pending.
+    </div>
+</footer>
+
+</body>
+</html>

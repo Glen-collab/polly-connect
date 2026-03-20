@@ -196,8 +196,13 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.get("/")
 async def root():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse("/web/dashboard")
+    from fastapi.responses import HTMLResponse
+    from fastapi.templating import Jinja2Templates
+    import os
+    templates_dir = os.path.join(os.path.dirname(__file__), "templates")
+    with open(os.path.join(templates_dir, "landing.html"), "r", encoding="utf-8") as f:
+        html = f.read()
+    return HTMLResponse(html)
 
 
 @app.get("/health")
