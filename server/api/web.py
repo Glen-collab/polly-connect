@@ -2888,6 +2888,24 @@ async def book_chapter_detail(request: Request, chapter_num: int):
     ai_available = getattr(request.app.state, "followup_gen", None)
     ai_available = ai_available and ai_available.available if ai_available else False
 
+    # Get generated song for this chapter
+    song = None
+    try:
+        import sqlite3 as _sq
+        conn.row_factory = _sq.Row
+        song_row = conn.execute(
+            "SELECT * FROM song_briefs WHERE tenant_id = ? AND chapter_number = ? ORDER BY id DESC LIMIT 1",
+            (tid, chapter_num)
+        ).fetchone()
+        if song_row:
+            song = dict(song_row)
+            try:
+                song["lyrics"] = json.loads(song.get("lyrics_json", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                song["lyrics"] = {}
+    except Exception:
+        pass
+
     message = request.query_params.get("msg")
 
     return templates.TemplateResponse("book_chapter_detail.html", {
@@ -2896,6 +2914,7 @@ async def book_chapter_detail(request: Request, chapter_num: int):
         "chapter": chapter,
         "memories": memories,
         "draft": draft,
+        "song": song,
         "ai_available": ai_available,
         "message": message,
     })
@@ -3079,6 +3098,187 @@ async def book_export_pdf(request: Request):
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ── Song Generation ──
+
+@router.post("/book/chapters/{chapter_num}/generate-song")
+async def generate_chapter_song(request: Request, chapter_num: int):
+    """Generate song lyrics from a chapter draft using the GPT pipeline."""
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Get the chapter draft
+    drafts = db.get_chapter_drafts(tenant_id=tid)
+    draft = None
+    for d in drafts:
+        if d.get("chapter_number") == chapter_num:
+            draft = d
+            break
+
+    if not draft or not draft.get("content"):
+        return RedirectResponse(
+            f"/web/book/chapters/{chapter_num}?msg=Generate a chapter draft first.",
+            status_code=303)
+
+    # Get speaker name
+    user = db.get_or_create_user(tenant_id=tid)
+    speaker_name = user.get("name", "Someone")
+
+    # Get pronunciation guide for phonetic lyrics
+    pronunciations = db.get_pronunciations(tid)
+
+    try:
+        from core.song_pipeline import chapter_to_song
+        import asyncio
+
+        result = await asyncio.to_thread(
+            chapter_to_song,
+            chapter_text=draft["content"],
+            chapter_title=draft.get("title", f"Chapter {chapter_num}"),
+            person_name=speaker_name,
+            genre_preference="auto",
+            generate_audio_file=False,
+        )
+
+        # Apply phonetic replacements to lyrics for audio prompt
+        lyrics_display = result["lyrics"]
+        lyrics_audio = dict(result["lyrics"])  # copy for phonetic version
+        for pron in pronunciations:
+            word = pron.get("word", "")
+            phonetic = pron.get("phonetic", "")
+            if word and phonetic:
+                for section in lyrics_audio:
+                    if isinstance(lyrics_audio[section], str):
+                        lyrics_audio[section] = lyrics_audio[section].replace(word, phonetic)
+
+        # Save to database
+        conn = db._get_connection()
+        # Delete old song for this chapter
+        conn.execute(
+            "DELETE FROM song_briefs WHERE tenant_id = ? AND chapter_number = ?",
+            (tid, chapter_num))
+        conn.execute("""
+            INSERT INTO song_briefs (tenant_id, chapter_number, chapter_title,
+                song_title, genre, jungian_stage, lyrics_json, style_prompt, essence_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (tid, chapter_num, draft.get("title", ""),
+              result["song_title"], result["genre"], result["jungian_stage"],
+              json.dumps(lyrics_display), result["style_prompt"],
+              json.dumps(result.get("song_brief", {}).get("essence", {}))))
+        conn.commit()
+
+        msg = f"Song generated: {result['song_title']} ({result['genre']})"
+    except Exception as e:
+        logger.error(f"Song generation failed: {e}")
+        msg = f"Song generation failed: {e}"
+
+    return RedirectResponse(
+        f"/web/book/chapters/{chapter_num}?msg={msg}",
+        status_code=303)
+
+
+@router.get("/book/album", response_class=HTMLResponse)
+async def book_album_page(request: Request):
+    """View all generated songs as an album."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+    speaker_name = user.get("name", "Someone")
+
+    # Get all songs for this tenant
+    conn = db._get_connection()
+    import sqlite3 as _sq
+    conn.row_factory = _sq.Row
+    songs = conn.execute(
+        "SELECT * FROM song_briefs WHERE tenant_id = ? ORDER BY chapter_number",
+        (tid,)
+    ).fetchall()
+    songs = [dict(s) for s in songs]
+
+    # Parse lyrics JSON
+    for s in songs:
+        try:
+            s["lyrics"] = json.loads(s.get("lyrics_json", "{}"))
+        except (json.JSONDecodeError, TypeError):
+            s["lyrics"] = {}
+
+    message = request.query_params.get("msg")
+
+    return templates.TemplateResponse("book_album.html", {
+        "request": request,
+        "session": session,
+        "songs": songs,
+        "speaker_name": speaker_name,
+        "message": message,
+    })
+
+
+@router.post("/book/album/generate-all")
+async def generate_all_songs(request: Request):
+    """Generate songs for all chapters at once."""
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+    speaker_name = user.get("name", "Someone")
+    book_builder = request.app.state.book_builder
+
+    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
+    drafts = {d["chapter_number"]: d for d in db.get_chapter_drafts(tenant_id=tid)}
+
+    from core.song_pipeline import chapter_to_song
+    import asyncio
+
+    generated = 0
+    for ch in chapters:
+        cn = ch["chapter_number"]
+        draft = drafts.get(cn)
+        if not draft or not draft.get("content"):
+            continue
+
+        try:
+            result = await asyncio.to_thread(
+                chapter_to_song,
+                chapter_text=draft["content"],
+                chapter_title=draft.get("title", f"Chapter {cn}"),
+                person_name=speaker_name,
+                genre_preference="auto",
+                generate_audio_file=False,
+            )
+
+            conn = db._get_connection()
+            conn.execute("DELETE FROM song_briefs WHERE tenant_id = ? AND chapter_number = ?", (tid, cn))
+            conn.execute("""
+                INSERT INTO song_briefs (tenant_id, chapter_number, chapter_title,
+                    song_title, genre, jungian_stage, lyrics_json, style_prompt, essence_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (tid, cn, draft.get("title", ""),
+                  result["song_title"], result["genre"], result["jungian_stage"],
+                  json.dumps(result["lyrics"]), result["style_prompt"],
+                  json.dumps(result.get("song_brief", {}).get("essence", {}))))
+            conn.commit()
+            generated += 1
+        except Exception as e:
+            logger.error(f"Song generation failed for ch{cn}: {e}")
+
+    return RedirectResponse(
+        f"/web/book/album?msg=Generated {generated} songs!",
+        status_code=303)
 
 
 # ── Prayer Recordings ──

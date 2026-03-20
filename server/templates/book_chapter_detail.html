@@ -22,6 +22,15 @@
             </button>
         </form>
         {% endif %}
+        {% if draft %}
+        <form method="POST" action="/web/book/chapters/{{ chapter.chapter_number }}/generate-song">
+            <button type="submit"
+                    class="text-sm bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+                    onclick="this.disabled=true; this.textContent='Writing Song...'; this.form.submit();">
+                {% if song %}Regenerate Song{% else %}Generate Song{% endif %}
+            </button>
+        </form>
+        {% endif %}
     </div>
 </div>
 
@@ -57,6 +66,40 @@
             </button>
         </div>
     </form>
+</div>
+{% endif %}
+
+<!-- Generated Song -->
+{% if song %}
+<div class="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg shadow p-4 sm:p-6 mb-6 border border-purple-200">
+    <div class="flex items-center justify-between mb-3">
+        <div>
+            <h2 class="text-base font-bold text-purple-800">{{ song.song_title }}</h2>
+            <p class="text-xs text-purple-500">{{ song.genre }} &middot; {{ song.jungian_stage | replace('_', ' ') | title }}</p>
+        </div>
+        <a href="/web/book/album" class="text-xs text-purple-600 hover:underline">View Album</a>
+    </div>
+
+    {% if song.audio_filename %}
+    <audio controls class="w-full mb-4" preload="none">
+        <source src="/static/recordings/{{ song.audio_filename }}" type="audio/mpeg">
+    </audio>
+    {% endif %}
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {% for section, label in [('verse1','Verse 1'),('chorus','Chorus'),('verse2','Verse 2'),('bridge','Bridge'),('outro','Outro')] %}
+        {% if song.lyrics.get(section) %}
+        <div class="{% if label == 'Chorus' %}sm:col-span-2 bg-purple-100/50 rounded p-3{% endif %}">
+            <p class="text-xs font-bold text-purple-600 mb-1">[{{ label }}]</p>
+            <p class="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{{ song.lyrics[section] }}</p>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <div class="mt-4 pt-3 border-t border-purple-200">
+        <p class="text-xs text-purple-400"><strong>Style prompt:</strong> {{ song.style_prompt }}</p>
+    </div>
 </div>
 {% endif %}
 

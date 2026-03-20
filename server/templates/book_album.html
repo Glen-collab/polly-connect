@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Album: The Story of {{ speaker_name }} - Polly Connect{% endblock %}
+
+{% block content %}
+<a href="/web/book/chapters" class="text-emerald-600 hover:underline text-sm">&larr; Back to Chapters</a>
+
+<div class="text-center mt-4 mb-8">
+    <p class="text-xs text-purple-500 uppercase tracking-wider font-semibold">Legacy Album</p>
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-1">The Story of {{ speaker_name }}</h1>
+    <p class="text-sm text-gray-500 mt-1">{{ songs|length }} tracks &middot; One song per chapter &middot; A soundtrack to a life</p>
+</div>
+
+{% if message %}
+<div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-4 text-sm text-purple-800 font-medium text-center max-w-2xl mx-auto">
+    {{ message }}
+</div>
+{% endif %}
+
+{% if not songs %}
+<div class="text-center py-12">
+    <span class="text-5xl">&#127925;</span>
+    <p class="text-gray-400 mt-4">No songs generated yet.</p>
+    <p class="text-sm text-gray-400 mt-1">Go to each chapter and click "Generate Song" to build your album.</p>
+    <a href="/web/book/chapters" class="inline-block mt-4 bg-purple-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-purple-700 transition">Go to Chapters</a>
+</div>
+{% else %}
+
+<!-- Album Tracklist -->
+<div class="max-w-3xl mx-auto space-y-4">
+    {% for song in songs %}
+    <div class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition">
+        <div class="flex items-stretch">
+            <!-- Track number -->
+            <div class="bg-purple-600 text-white w-16 sm:w-20 flex items-center justify-center shrink-0">
+                <span class="text-2xl font-bold">{{ song.chapter_number }}</span>
+            </div>
+            <!-- Song info -->
+            <div class="flex-1 p-4">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h2 class="font-bold text-gray-800">{{ song.song_title }}</h2>
+                        <p class="text-xs text-gray-400">{{ song.chapter_title }} &middot; {{ song.genre }} &middot; {{ song.jungian_stage | replace('_', ' ') | title }}</p>
+                    </div>
+                    <a href="/web/book/chapters/{{ song.chapter_number }}"
+                       class="text-xs text-purple-600 hover:underline shrink-0 ml-2">View Lyrics</a>
+                </div>
+
+                {% if song.audio_filename %}
+                <audio controls class="w-full mt-3" preload="none" style="height: 36px;">
+                    <source src="/static/recordings/{{ song.audio_filename }}" type="audio/mpeg">
+                </audio>
+                {% endif %}
+
+                <!-- Chorus preview -->
+                {% if song.lyrics and song.lyrics.get('chorus') %}
+                <div class="bg-purple-50 rounded p-2 mt-3">
+                    <p class="text-xs font-semibold text-purple-600 mb-0.5">[Chorus]</p>
+                    <p class="text-xs text-gray-600 italic leading-relaxed">{{ song.lyrics['chorus'] }}</p>
+                </div>
+                {% endif %}
+
+                <p class="text-xs text-gray-300 mt-2">{{ song.style_prompt }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Generate All Button -->
+<div class="text-center mt-8">
+    <form method="POST" action="/web/book/album/generate-all">
+        <button type="submit"
+                class="bg-purple-600 text-white px-8 py-3 rounded-lg font-bold text-sm hover:bg-purple-700 transition shadow-lg"
+                onclick="this.disabled=true; this.textContent='Generating all songs... this may take a few minutes'; this.form.submit();">
+            Regenerate All Songs
+        </button>
+    </form>
+    <p class="text-xs text-gray-400 mt-2">Generates fresh lyrics for every chapter. Audio generation coming soon.</p>
+</div>
+{% endif %}
+{% endblock %}
