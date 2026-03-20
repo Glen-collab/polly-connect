@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Voice Prayers & Blessings - Polly Connect{% endblock %}
+
+{% block content %}
+<a href="/web/hub/family" class="text-emerald-600 hover:underline text-sm">&larr; Family</a>
+<h1 class="text-xl sm:text-2xl font-bold mb-2 mt-1">Voice Prayers & Blessings</h1>
+<p class="text-sm text-gray-500 mb-4">Record prayers, grace, and blessings in your own voice. Set them to play automatically so your family hears your voice every day.</p>
+
+{% if message %}
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4 text-sm text-emerald-800 font-medium">
+    {{ message }}
+</div>
+{% endif %}
+
+<!-- Record New -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-5 mb-6">
+    <h2 class="text-base font-semibold mb-3">Record a Prayer or Blessing</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Your Name</label>
+            <input type="text" id="rec-speaker" placeholder="Grandpa Glen"
+                   class="w-full border rounded px-3 py-2 text-sm" value="{{ session.name or '' }}">
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Category</label>
+            <select id="rec-category" class="w-full border rounded px-3 py-2 text-sm">
+                <option value="grace">Mealtime Grace</option>
+                <option value="morning">Morning Blessing</option>
+                <option value="bedtime">Bedtime Prayer</option>
+                <option value="holiday">Holiday Prayer</option>
+                <option value="general">General Prayer</option>
+                <option value="blessing">Family Blessing</option>
+            </select>
+        </div>
+    </div>
+    <div class="mb-3">
+        <label class="block text-sm text-gray-600 mb-1">Title (optional)</label>
+        <input type="text" id="rec-title" placeholder="Sunday dinner grace"
+               class="w-full border rounded px-3 py-2 text-sm">
+    </div>
+
+    <!-- Schedule -->
+    <div class="bg-gray-50 rounded p-3 mb-3">
+        <label class="flex items-center gap-2 mb-2">
+            <input type="checkbox" id="rec-schedule-enabled" class="w-4 h-4"
+                   onchange="document.getElementById('schedule-options').classList.toggle('hidden')">
+            <span class="text-sm text-gray-700 font-medium">Play automatically at a set time</span>
+        </label>
+        <div id="schedule-options" class="hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Time</label>
+                    <input type="time" id="rec-schedule-time" value="07:00"
+                           class="w-full border rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Days</label>
+                    <div class="flex flex-wrap gap-1 mt-1">
+                        {% for d, name in [(0,'Sun'),(1,'Mon'),(2,'Tue'),(3,'Wed'),(4,'Thu'),(5,'Fri'),(6,'Sat')] %}
+                        <label class="flex items-center gap-1 bg-white border rounded px-2 py-1 text-xs cursor-pointer">
+                            <input type="checkbox" class="schedule-day" value="{{ d }}" checked> {{ name }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recording controls -->
+    <div id="rec-controls">
+        <div id="rec-idle" class="text-center">
+            <button onclick="startPrayerRecording()"
+                    class="bg-red-500 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:bg-red-600 active:scale-95 transition mx-auto">
+                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+            </button>
+            <p class="text-xs text-gray-400 mt-2">Tap to record your prayer</p>
+        </div>
+        <div id="rec-recording" class="hidden text-center">
+            <div class="flex items-center justify-center gap-2 mb-3">
+                <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                <span class="text-red-600 font-medium text-sm" id="rec-timer">Recording... 0:00</span>
+            </div>
+            <button onclick="stopPrayerRecording()"
+                    class="bg-gray-800 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:bg-gray-900 active:scale-95 transition mx-auto">
+                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="6" width="12" height="12" rx="2"/>
+                </svg>
+            </button>
+            <p class="text-xs text-gray-400 mt-2">Tap to stop</p>
+        </div>
+        <div id="rec-done" class="hidden">
+            <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-center">
+                <p class="text-sm text-emerald-700 font-medium" id="rec-result-text">Prayer saved!</p>
+                <div class="flex justify-center gap-2 mt-2">
+                    <button onclick="resetPrayerRecorder()" class="bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700">Record Another</button>
+                </div>
+            </div>
+        </div>
+        <div id="rec-error" class="hidden">
+            <div class="bg-red-50 border border-red-200 rounded p-3 text-center">
+                <p class="text-sm text-red-700" id="rec-error-text">Error</p>
+                <button onclick="resetPrayerRecorder()" class="mt-2 bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm">Try Again</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Existing Recordings -->
+{% if recordings %}
+<h2 class="text-base font-semibold mb-3">Your Recordings</h2>
+<div class="space-y-3">
+    {% for rec in recordings %}
+    <div class="bg-white rounded-lg shadow p-4">
+        <div class="flex items-start justify-between">
+            <div class="flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-sm font-bold text-gray-800">{{ rec.speaker_name or 'Someone' }}</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full
+                        {% if rec.category == 'grace' %}bg-amber-100 text-amber-700
+                        {% elif rec.category == 'morning' %}bg-blue-100 text-blue-700
+                        {% elif rec.category == 'bedtime' %}bg-purple-100 text-purple-700
+                        {% elif rec.category == 'holiday' %}bg-red-100 text-red-700
+                        {% elif rec.category == 'blessing' %}bg-emerald-100 text-emerald-700
+                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                        {{ rec.category }}
+                    </span>
+                </div>
+                {% if rec.title %}
+                <p class="text-sm text-gray-700 mb-1">{{ rec.title }}</p>
+                {% endif %}
+                {% if rec.transcript %}
+                <p class="text-xs text-gray-400 italic">{{ rec.transcript[:100] }}{% if rec.transcript|length > 100 %}...{% endif %}</p>
+                {% endif %}
+                {% if rec.schedule_time %}
+                <p class="text-xs text-emerald-600 mt-1">
+                    Plays daily at {{ rec.schedule_time }}
+                    {% if rec.play_count %} &middot; Played {{ rec.play_count }} times{% endif %}
+                </p>
+                {% endif %}
+            </div>
+            <div class="flex flex-col items-end gap-1 ml-3">
+                {% if session.role != 'family' %}
+                <form method="POST" action="/web/prayer-recordings/{{ rec.id }}/delete"
+                      onsubmit="return confirm('Delete this recording?')">
+                    <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        <audio controls preload="none" class="w-full mt-2" style="height: 36px;">
+            <source src="/static/recordings/{{ rec.audio_filename }}" type="audio/wav">
+        </audio>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-gray-400 text-sm py-8">
+    No prayers recorded yet. Record your first one above.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+var mediaRecorder = null;
+var audioChunks = [];
+var recordingStart = null;
+var timerInterval = null;
+
+function startPrayerRecording() {
+    navigator.mediaDevices.getUserMedia({audio: {sampleRate: 16000, channelCount: 1}})
+    .then(function(stream) {
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream, {mimeType: 'audio/webm'});
+        mediaRecorder.ondataavailable = function(e) { audioChunks.push(e.data); };
+        mediaRecorder.start(100);
+        recordingStart = Date.now();
+        document.getElementById('rec-idle').classList.add('hidden');
+        document.getElementById('rec-recording').classList.remove('hidden');
+        timerInterval = setInterval(function() {
+            var s = Math.floor((Date.now() - recordingStart) / 1000);
+            document.getElementById('rec-timer').textContent = 'Recording... ' + Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+        }, 1000);
+    })
+    .catch(function(err) {
+        document.getElementById('rec-error-text').textContent = 'Microphone access denied.';
+        document.getElementById('rec-idle').classList.add('hidden');
+        document.getElementById('rec-error').classList.remove('hidden');
+    });
+}
+
+function stopPrayerRecording() {
+    clearInterval(timerInterval);
+    if (!mediaRecorder) return;
+    mediaRecorder.stream.getTracks().forEach(function(t) { t.stop(); });
+    mediaRecorder.stop();
+    mediaRecorder.onstop = function() {
+        document.getElementById('rec-recording').classList.add('hidden');
+        var blob = new Blob(audioChunks, {type: 'audio/webm'});
+        var formData = new FormData();
+        formData.append('audio', blob, 'prayer.webm');
+        formData.append('speaker_name', document.getElementById('rec-speaker').value || '');
+        formData.append('category', document.getElementById('rec-category').value);
+        formData.append('title', document.getElementById('rec-title').value || '');
+
+        if (document.getElementById('rec-schedule-enabled').checked) {
+            formData.append('schedule_time', document.getElementById('rec-schedule-time').value);
+            var days = [];
+            document.querySelectorAll('.schedule-day:checked').forEach(function(cb) { days.push(cb.value); });
+            formData.append('schedule_days', days.join(','));
+        }
+
+        fetch('/web/prayer-recordings/record', {method: 'POST', body: formData})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                document.getElementById('rec-result-text').textContent = 'Prayer saved! ' + (data.transcript || '');
+                document.getElementById('rec-done').classList.remove('hidden');
+                setTimeout(function() { location.reload(); }, 2000);
+            } else {
+                document.getElementById('rec-error-text').textContent = data.error || 'Failed to save.';
+                document.getElementById('rec-error').classList.remove('hidden');
+            }
+        })
+        .catch(function() {
+            document.getElementById('rec-error-text').textContent = 'Network error.';
+            document.getElementById('rec-error').classList.remove('hidden');
+        });
+    };
+}
+
+function resetPrayerRecorder() {
+    document.getElementById('rec-idle').classList.remove('hidden');
+    document.getElementById('rec-recording').classList.add('hidden');
+    document.getElementById('rec-done').classList.add('hidden');
+    document.getElementById('rec-error').classList.add('hidden');
+}
+</script>
+{% endblock %}

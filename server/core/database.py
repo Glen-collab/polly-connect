@@ -600,6 +600,25 @@ class PollyDB:
                 )
             """)
 
+            # Prayer recordings table (voice prayers, blessings, grace)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS prayer_recordings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    speaker_name TEXT,
+                    category TEXT NOT NULL DEFAULT 'general',
+                    title TEXT,
+                    audio_filename TEXT NOT NULL,
+                    transcript TEXT,
+                    schedule_time TEXT,
+                    schedule_days TEXT DEFAULT '0,1,2,3,4,5,6',
+                    active INTEGER DEFAULT 1,
+                    play_count INTEGER DEFAULT 0,
+                    last_played TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # Add family_name and role columns to web_sessions
             cols = {row[1] for row in conn.execute("PRAGMA table_info(web_sessions)").fetchall()}
             if "family_name" not in cols:
@@ -1744,6 +1763,129 @@ class PollyDB:
         try:
             conn.execute("DELETE FROM prayer_requests WHERE id = ?", (request_id,))
             conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Prayer recordings ──
+
+    def save_prayer_recording(self, tenant_id: int, speaker_name: str,
+                               category: str, title: str,
+                               audio_filename: str, transcript: str = None,
+                               schedule_time: str = None,
+                               schedule_days: str = "0,1,2,3,4,5,6") -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO prayer_recordings
+                    (tenant_id, speaker_name, category, title, audio_filename,
+                     transcript, schedule_time, schedule_days)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (tenant_id, speaker_name, category, title, audio_filename,
+                  transcript, schedule_time, schedule_days))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_prayer_recordings(self, tenant_id: int, category: str = None,
+                               active_only: bool = True) -> list:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            if category:
+                rows = conn.execute(
+                    "SELECT * FROM prayer_recordings WHERE tenant_id = ? AND category = ?"
+                    + (" AND active = 1" if active_only else "")
+                    + " ORDER BY created_at DESC",
+                    (tenant_id, category)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM prayer_recordings WHERE tenant_id = ?"
+                    + (" AND active = 1" if active_only else "")
+                    + " ORDER BY created_at DESC",
+                    (tenant_id,)
+                ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_prayer_recording_by_id(self, recording_id: int) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM prayer_recordings WHERE id = ?", (recording_id,)
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_scheduled_prayers(self, tenant_id: int, day_of_week: int) -> list:
+        """Get prayer recordings scheduled for a specific day."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM prayer_recordings WHERE tenant_id = ? AND active = 1 "
+                "AND schedule_time IS NOT NULL AND schedule_days LIKE ?",
+                (tenant_id, f"%{day_of_week}%")
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_prayer_recording_played(self, recording_id: int):
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE prayer_recordings SET play_count = play_count + 1, "
+                "last_played = CURRENT_TIMESTAMP WHERE id = ?",
+                (recording_id,)
+            )
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_prayer_recording(self, recording_id: int):
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM prayer_recordings WHERE id = ?", (recording_id,))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_prayer_recording_schedule(self, recording_id: int,
+                                          schedule_time: str = None,
+                                          schedule_days: str = None,
+                                          active: int = None):
+        conn = self._get_connection()
+        try:
+            updates = []
+            params = []
+            if schedule_time is not None:
+                updates.append("schedule_time = ?")
+                params.append(schedule_time if schedule_time else None)
+            if schedule_days is not None:
+                updates.append("schedule_days = ?")
+                params.append(schedule_days)
+            if active is not None:
+                updates.append("active = ?")
+                params.append(active)
+            if updates:
+                params.append(recording_id)
+                conn.execute(
+                    f"UPDATE prayer_recordings SET {', '.join(updates)} WHERE id = ?",
+                    params
+                )
+                conn.commit()
         finally:
             if not self._conn:
                 conn.close()

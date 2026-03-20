@@ -229,6 +229,16 @@ class SquawkManager:
     def unregister_nostalgia_callback(self, device_id: str):
         self._nostalgia_callbacks.pop(device_id, None)
 
+    def register_prayer_callback(self, device_id: str, callback):
+        """Register an async callback for scheduled prayer playback."""
+        if not hasattr(self, '_prayer_callbacks'):
+            self._prayer_callbacks = {}
+        self._prayer_callbacks[device_id] = callback
+
+    def unregister_prayer_callback(self, device_id: str):
+        if hasattr(self, '_prayer_callbacks'):
+            self._prayer_callbacks.pop(device_id, None)
+
     def unregister_device(self, device_id: str):
         """Mark device as disconnected. Does NOT cancel schedules."""
         self._active_devices.pop(device_id, None)
@@ -342,6 +352,16 @@ class SquawkManager:
                     continue
 
                 now = time.time()
+
+                # Check scheduled prayer recordings first
+                prayer_cb = getattr(self, '_prayer_callbacks', {}).get(device_id)
+                if prayer_cb:
+                    try:
+                        played = await prayer_cb()
+                        if played:
+                            continue  # Prayer played — skip squawk/chatter this cycle
+                    except Exception as e:
+                        logger.error(f"Prayer callback error: {e}")
 
                 # Check squawk schedule
                 next_sq = self._next_squawk_time.get(device_id, 0)

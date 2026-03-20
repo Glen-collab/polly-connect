@@ -276,6 +276,65 @@ async def continuous_stream(websocket: WebSocket):
                             else:
                                 await _ns_smgr.send_chatter(_ns_dev)
                         squawk_mgr.register_nostalgia_callback(device_id, _nostalgia_chatter)
+
+                        # Register prayer recording scheduler
+                        _pr_db = db
+                        _pr_tts = tts
+                        _pr_ws = websocket
+                        _pr_smgr = squawk_mgr
+                        _pr_dev = device_id
+                        _pr_tid = tenant_id
+                        _pr_last_check = [0]  # mutable for closure
+
+                        async def _check_scheduled_prayers():
+                            """Check if any prayer recordings should play right now."""
+                            import time as _time
+                            now = _time.time()
+                            # Only check once per minute
+                            if now - _pr_last_check[0] < 60:
+                                return False
+                            _pr_last_check[0] = now
+
+                            from datetime import datetime
+                            local_now = _get_local_now()
+                            current_time = local_now.strftime("%H:%M")
+                            day_of_week = local_now.weekday()
+                            # Python weekday: Mon=0, Sun=6. Our schedule: Sun=0, Sat=6
+                            day_of_week = (day_of_week + 1) % 7
+
+                            prayers = _pr_db.get_scheduled_prayers(_pr_tid, day_of_week)
+                            for prayer in prayers:
+                                sched_time = prayer.get("schedule_time", "")
+                                if not sched_time:
+                                    continue
+                                # Check if current time matches schedule (within 1 min window)
+                                if sched_time == current_time:
+                                    audio_file = prayer.get("audio_filename")
+                                    if not audio_file:
+                                        continue
+                                    import os
+                                    recordings_dir = os.path.join(
+                                        os.path.dirname(os.path.dirname(__file__)),
+                                        "static", "recordings"
+                                    )
+                                    filepath = os.path.join(recordings_dir, audio_file)
+                                    if os.path.exists(filepath):
+                                        speaker = prayer.get("speaker_name", "")
+                                        title = prayer.get("title", "a prayer")
+                                        logger.info(f"Scheduled prayer → {_pr_dev}: {speaker}'s {title}")
+                                        # Send intro TTS then the recorded audio
+                                        intro = f"{speaker}'s {prayer.get('category', 'prayer')}."
+                                        await _send_tts(_pr_ws, _pr_tts, intro,
+                                                       squawk_mgr=_pr_smgr, device_id=_pr_dev)
+                                        # Send the recorded WAV
+                                        with open(filepath, "rb") as f:
+                                            wav_data = f.read()
+                                        await _pr_smgr._send_wav(_pr_dev, wav_data)
+                                        _pr_db.update_prayer_recording_played(prayer["id"])
+                                        return True
+                            return False
+
+                        squawk_mgr.register_prayer_callback(device_id, _check_scheduled_prayers)
                         # No startup squawk — scheduler handles timing with RECONNECT_GRACE
 
                     continue
@@ -911,6 +970,39 @@ async def _process_command(
         "transcription": transcription,
         "mode": new_mode.value,
     })
+
+    # Check for prayer recording playback marker
+    if response_text and "__PLAY_PRAYER__" in response_text:
+        import re as _re
+        match = _re.match(r"__PLAY_PRAYER__(.+?)__INTRO__(.+)", response_text)
+        if match:
+            audio_file = match.group(1)
+            intro_text = match.group(2)
+            recordings_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "static", "recordings"
+            )
+            filepath = os.path.join(recordings_dir, audio_file)
+
+            # Send the intro TTS first
+            await websocket.send_json({
+                "event": "response", "text": intro_text,
+                "intent": "prayer", "transcription": transcription,
+                "mode": new_mode.value,
+            })
+            intro_dur = await _send_tts(websocket, tts, intro_text,
+                                         squawk_mgr=squawk_mgr, device_id=device_id,
+                                         pronunciations=_pronunciations)
+
+            # Then play the recorded WAV
+            if os.path.exists(filepath) and squawk_mgr:
+                await asyncio.sleep(1.0)  # brief pause between intro and prayer
+                with open(filepath, "rb") as f:
+                    wav_data = f.read()
+                await squawk_mgr._send_wav(device_id, wav_data)
+                duration = len(wav_data) / 32000.0 + intro_dur
+            else:
+                duration = intro_dur
+            return duration
 
     # Generate and send TTS audio (with pronunciation guide)
     duration = await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr,

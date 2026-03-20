@@ -3081,6 +3081,152 @@ async def book_export_pdf(request: Request):
     )
 
 
+# ── Prayer Recordings ──
+
+@router.get("/prayer-recordings", response_class=HTMLResponse)
+async def prayer_recordings_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    recordings = db.get_prayer_recordings(tid)
+    message = request.query_params.get("msg")
+
+    return templates.TemplateResponse("prayer_recordings.html", {
+        "request": request,
+        "session": session,
+        "recordings": recordings,
+        "message": message,
+    })
+
+
+@router.post("/prayer-recordings/record")
+async def prayer_recording_save(request: Request):
+    """Record a prayer/blessing from the phone."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    form = await request.form()
+    audio = form.get("audio")
+    speaker_name = form.get("speaker_name", "")
+    category = form.get("category", "general")
+    title = form.get("title", "")
+    schedule_time = form.get("schedule_time", "")
+    schedule_days = form.get("schedule_days", "0,1,2,3,4,5,6")
+
+    if not audio:
+        return JSONResponse({"error": "No audio received"}, status_code=400)
+
+    audio_data = await audio.read()
+    if len(audio_data) < 1000:
+        return JSONResponse({"error": "Recording too short"}, status_code=400)
+
+    # Convert webm to wav if needed
+    content_type = audio.content_type or ""
+    if "webm" in content_type or "ogg" in content_type:
+        # Browser sends webm — convert via ffmpeg if available, otherwise save as-is
+        try:
+            import subprocess
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
+                tmp_in.write(audio_data)
+                tmp_in_path = tmp_in.name
+            tmp_out_path = tmp_in_path.replace(".webm", ".wav")
+            result = subprocess.run(
+                ["ffmpeg", "-i", tmp_in_path, "-ar", "16000", "-ac", "1", "-y", tmp_out_path],
+                capture_output=True, timeout=30
+            )
+            if result.returncode == 0:
+                with open(tmp_out_path, "rb") as f:
+                    wav_bytes = f.read()
+            else:
+                # ffmpeg not available — save raw webm and note it
+                wav_bytes = audio_data
+            # Cleanup
+            try:
+                os.unlink(tmp_in_path)
+                os.unlink(tmp_out_path)
+            except Exception:
+                pass
+        except Exception:
+            wav_bytes = audio_data
+    elif "octet-stream" in content_type or "raw" in content_type:
+        wav_bytes = _build_wav(audio_data, sample_rate=16000)
+    else:
+        wav_bytes = audio_data if audio_data[:4] == b'RIFF' else audio_data
+
+    # Save audio file
+    recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+    os.makedirs(recordings_dir, exist_ok=True)
+    filename = f"prayer_{tid}_{uuid.uuid4().hex[:8]}.wav"
+    filepath = os.path.join(recordings_dir, filename)
+    with open(filepath, "wb") as f:
+        f.write(wav_bytes)
+
+    # Transcribe
+    transcript = ""
+    try:
+        transcriber = request.app.state.transcriber
+        if wav_bytes[:4] == b'RIFF':
+            transcript = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+    except Exception:
+        pass
+
+    # Save to database
+    rec_id = db.save_prayer_recording(
+        tenant_id=tid,
+        speaker_name=speaker_name,
+        category=category,
+        title=title or f"{speaker_name}'s {category}",
+        audio_filename=filename,
+        transcript=transcript,
+        schedule_time=schedule_time if schedule_time else None,
+        schedule_days=schedule_days,
+    )
+
+    return JSONResponse({"success": True, "id": rec_id, "transcript": transcript or ""})
+
+
+@router.post("/prayer-recordings/{recording_id}/delete")
+async def prayer_recording_delete(request: Request, recording_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    db.delete_prayer_recording(recording_id)
+    return RedirectResponse("/web/prayer-recordings?msg=Recording deleted.", status_code=303)
+
+
+@router.post("/prayer-recordings/{recording_id}/schedule")
+async def prayer_recording_schedule(request: Request, recording_id: int,
+                                      schedule_time: str = Form(""),
+                                      schedule_days: str = Form("0,1,2,3,4,5,6"),
+                                      active: int = Form(1)):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    db.update_prayer_recording_schedule(
+        recording_id,
+        schedule_time=schedule_time if schedule_time else None,
+        schedule_days=schedule_days,
+        active=active,
+    )
+    return RedirectResponse("/web/prayer-recordings?msg=Schedule updated.", status_code=303)
+
+
 # ── Owner's Guide ──
 
 @router.get("/guide")

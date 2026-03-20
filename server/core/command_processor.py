@@ -340,10 +340,54 @@ class CommandProcessor:
         # ── Prayer ──
 
         elif intent == "prayer":
+            state = self._get_state(device_id)
+            theme = intent_result.get("theme")
+            pray_for = intent_result.get("pray_for")
+
+            # Check if user wants a recorded prayer (grace, bedtime, etc.)
+            text_lower = raw_text.lower()
+            play_recorded = any(p in text_lower for p in [
+                "play grace", "say grace", "play the grace",
+                "play bedtime prayer", "bedtime prayer", "bedtime blessing",
+                "play morning", "morning blessing", "morning prayer",
+                "play the prayer", "play a blessing", "play the blessing",
+                "family grace", "family blessing", "family prayer",
+                "play grandpa", "play grandma", "play papa", "play nana",
+            ])
+
+            if play_recorded:
+                # Try to find a matching recorded prayer
+                category = None
+                if "grace" in text_lower:
+                    category = "grace"
+                elif "bedtime" in text_lower:
+                    category = "bedtime"
+                elif "morning" in text_lower:
+                    category = "morning"
+                elif "holiday" in text_lower:
+                    category = "holiday"
+                elif "blessing" in text_lower:
+                    category = "blessing"
+
+                recordings = self.db.get_prayer_recordings(
+                    tid, category=category
+                )
+                if not recordings and category:
+                    # Try all categories
+                    recordings = self.db.get_prayer_recordings(tid)
+
+                if recordings:
+                    import random
+                    rec = random.choice(recordings)
+                    # Return special marker so audio.py knows to play the WAV file
+                    speaker = rec.get("speaker_name", "")
+                    title = rec.get("title", "a prayer")
+                    self._last_response[device_id] = f"{speaker}'s {title}"
+                    self.db.update_prayer_recording_played(rec["id"])
+                    return f"__PLAY_PRAYER__{rec['audio_filename']}__INTRO__{speaker}'s {rec.get('category', 'prayer')}."
+
+            # Fall back to AI-generated prayer
             if self.prayer:
-                theme = intent_result.get("theme")
-                pray_for = intent_result.get("pray_for")
-                state = self._get_state(device_id)
                 resp = self.prayer.get_prayer(
                     theme, tenant_id=state.tenant_id, pray_for=pray_for)
                 self._last_response[device_id] = resp
