@@ -3183,6 +3183,42 @@ async def generate_chapter_song(request: Request, chapter_num: int):
         status_code=303)
 
 
+@router.post("/book/chapters/{chapter_num}/save-song")
+async def save_chapter_song(request: Request, chapter_num: int):
+    """Save edited song lyrics."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    form = await request.form()
+    song_title = form.get("song_title", "")
+    genre = form.get("genre", "")
+    style_prompt = form.get("style_prompt", "")
+
+    lyrics = {
+        "verse1": form.get("lyrics_verse1", ""),
+        "chorus": form.get("lyrics_chorus", ""),
+        "verse2": form.get("lyrics_verse2", ""),
+        "bridge": form.get("lyrics_bridge", ""),
+        "outro": form.get("lyrics_outro", ""),
+    }
+
+    conn = db._get_connection()
+    conn.execute("""
+        UPDATE song_briefs SET song_title = ?, genre = ?, style_prompt = ?, lyrics_json = ?
+        WHERE tenant_id = ? AND chapter_number = ?
+    """, (song_title, genre, style_prompt, json.dumps(lyrics), tid, chapter_num))
+    conn.commit()
+
+    return RedirectResponse(
+        f"/web/book/chapters/{chapter_num}?msg=Song lyrics saved.",
+        status_code=303)
+
+
 @router.get("/book/album", response_class=HTMLResponse)
 async def book_album_page(request: Request):
     """View all generated songs as an album."""
