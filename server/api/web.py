@@ -2823,12 +2823,6 @@ async def book_chapters_list(request: Request):
         ch["phase_label"] = PHASE_LABELS.get(ch["life_phase"], ch["life_phase"])
         if ch["chapter_number"] in existing_drafts:
             ch["status"] = "has_draft"
-        # Fetch memory previews
-        ch["memories"] = []
-        for mid in ch.get("memory_ids", []):
-            mem = db.get_memory_by_id(mid)
-            if mem:
-                ch["memories"].append(mem)
 
     return templates.TemplateResponse("book_chapters.html", {
         "request": request,
