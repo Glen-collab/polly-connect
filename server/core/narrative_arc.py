@@ -182,20 +182,22 @@ class NarrativeArc:
     def __init__(self, db):
         self.db = db
 
-    def get_bucket_coverage(self, speaker: str = None) -> Dict[str, int]:
+    def get_bucket_coverage(self, speaker: str = None,
+                             tenant_id: int = None) -> Dict[str, int]:
         """Get count of memories in each Jungian bucket for a speaker."""
         coverage = {b.value: 0 for b in JungianBucket}
-        memories = self.db.get_memories(speaker=speaker)
+        memories = self.db.get_memories(speaker=speaker, tenant_id=tenant_id)
         for mem in memories:
             bucket = mem.get("bucket", "ordinary_world")
             if bucket in coverage:
                 coverage[bucket] += 1
         return coverage
 
-    def get_life_phase_coverage(self, speaker: str = None) -> Dict[str, int]:
+    def get_life_phase_coverage(self, speaker: str = None,
+                                tenant_id: int = None) -> Dict[str, int]:
         """Get count of memories in each life phase."""
         coverage = {p.value: 0 for p in LifePhase}
-        memories = self.db.get_memories(speaker=speaker)
+        memories = self.db.get_memories(speaker=speaker, tenant_id=tenant_id)
         for mem in memories:
             phase = mem.get("life_phase", "unknown")
             if phase in coverage:
@@ -203,20 +205,23 @@ class NarrativeArc:
         return coverage
 
     def get_undercovered_buckets(self, speaker: str = None,
-                                 min_per_bucket: int = 3) -> List[str]:
+                                 min_per_bucket: int = 3,
+                                 tenant_id: int = None) -> List[str]:
         """Find buckets that need more memories."""
-        coverage = self.get_bucket_coverage(speaker)
+        coverage = self.get_bucket_coverage(speaker, tenant_id=tenant_id)
         return [bucket for bucket, count in coverage.items() if count < min_per_bucket]
 
-    def suggest_next_bucket(self, speaker: str = None) -> JungianBucket:
+    def suggest_next_bucket(self, speaker: str = None,
+                            tenant_id: int = None) -> JungianBucket:
         """Suggest which narrative bucket to focus on next."""
-        coverage = self.get_bucket_coverage(speaker)
+        coverage = self.get_bucket_coverage(speaker, tenant_id=tenant_id)
         min_bucket = min(coverage, key=coverage.get)
         return JungianBucket(min_bucket)
 
-    def suggest_next_theme(self, speaker: str = None) -> str:
+    def suggest_next_theme(self, speaker: str = None,
+                           tenant_id: int = None) -> str:
         """Suggest a question theme that fills the least-covered bucket."""
-        target_bucket = self.suggest_next_bucket(speaker)
+        target_bucket = self.suggest_next_bucket(speaker, tenant_id=tenant_id)
         # Find themes that map to this bucket
         matching_themes = [
             theme for theme, bucket in THEME_TO_BUCKET.items()
@@ -246,9 +251,10 @@ class NarrativeArc:
         questions = STAGE_QUESTIONS.get(bucket, STAGE_QUESTIONS[JungianBucket.ORDINARY_WORLD])
         return random.choice(questions)
 
-    def get_progress_summary(self, speaker: str = None) -> str:
+    def get_progress_summary(self, speaker: str = None,
+                             tenant_id: int = None) -> str:
         """Generate a human-readable progress summary."""
-        bucket_coverage = self.get_bucket_coverage(speaker)
+        bucket_coverage = self.get_bucket_coverage(speaker, tenant_id=tenant_id)
         total = sum(bucket_coverage.values())
 
         bucket_labels = {

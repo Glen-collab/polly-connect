@@ -450,7 +450,7 @@ class LegacyBookPDF:
                 # No draft — use raw memory texts
                 memories = []
                 for mid in ch.get("memory_ids", []):
-                    mem = self.db.get_memory_by_id(mid)
+                    mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
                     if mem:
                         memories.append(mem)
 
@@ -621,15 +621,15 @@ class LegacyBookPDF:
         photos = []
         seen_ids = set()
         for mid in chapter.get("memory_ids", []):
-            mem = self.db.get_memory_by_id(mid)
+            mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
             if mem and mem.get("story_id"):
-                story = self.db.get_story_by_id(mem["story_id"])
+                story = self.db.get_story_by_id(mem["story_id"], tenant_id=self.tenant_id)
                 if story and story.get("photo_id") and story.get("photo_in_book", 1):
                     pid = story["photo_id"]
                     if pid in seen_ids:
                         continue
                     seen_ids.add(pid)
-                    photo = self.db.get_photo_by_id(pid)
+                    photo = self.db.get_photo_by_id(pid, tenant_id=self.tenant_id)
                     if photo and photo.get("filename") and photo.get("in_book", 1):
                         # Try multiple possible upload directories
                         for base in [UPLOADS_DIR,
@@ -650,9 +650,9 @@ class LegacyBookPDF:
         entries = []
         seen_keys = set()
         for mid in chapter.get("memory_ids", []):
-            mem = self.db.get_memory_by_id(mid)
+            mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
             if mem and mem.get("story_id"):
-                story = self.db.get_story_by_id(mem["story_id"])
+                story = self.db.get_story_by_id(mem["story_id"], tenant_id=self.tenant_id)
                 if (story and story.get("audio_s3_key")
                         and story.get("qr_in_book", 1)
                         and story["audio_s3_key"] not in seen_keys):
@@ -739,7 +739,7 @@ class LegacyBookPDF:
         seen_stories = set()
 
         for mid in chapter.get("memory_ids", []):
-            mem = self.db.get_memory_by_id(mid)
+            mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
             if not mem or not mem.get("story_id"):
                 continue
             story_id = mem["story_id"]
@@ -747,7 +747,7 @@ class LegacyBookPDF:
                 continue
             seen_stories.add(story_id)
 
-            story = self.db.get_story_by_id(story_id)
+            story = self.db.get_story_by_id(story_id, tenant_id=self.tenant_id)
             if not story:
                 continue
 
@@ -758,7 +758,7 @@ class LegacyBookPDF:
             photo_id = story.get("photo_id")
             if (photo_id and photo_id not in global_used_photos
                     and story.get("photo_in_book", 1)):
-                photo = self.db.get_photo_by_id(photo_id)
+                photo = self.db.get_photo_by_id(photo_id, tenant_id=self.tenant_id)
                 if photo and photo.get("filename"):
                     for base in [UPLOADS_DIR,
                                  os.path.join(os.path.dirname(__file__), "..", "static", "uploads"),
@@ -897,7 +897,7 @@ class LegacyBookPDF:
         seen_stories = set()
 
         for mid in chapter.get("memory_ids", []):
-            mem = self.db.get_memory_by_id(mid)
+            mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
             if not mem or not mem.get("story_id"):
                 continue
             story_id = mem["story_id"]
@@ -905,7 +905,7 @@ class LegacyBookPDF:
                 continue
             seen_stories.add(story_id)
 
-            story = self.db.get_story_by_id(story_id)
+            story = self.db.get_story_by_id(story_id, tenant_id=self.tenant_id)
             if not story:
                 continue
 
@@ -916,7 +916,7 @@ class LegacyBookPDF:
             photo_id = story.get("photo_id")
             if (photo_id and photo_id not in global_used_photos
                     and story.get("photo_in_book", 1)):
-                photo = self.db.get_photo_by_id(photo_id)
+                photo = self.db.get_photo_by_id(photo_id, tenant_id=self.tenant_id)
                 if photo and photo.get("filename") and photo.get("in_book", 1):
                     for base in [UPLOADS_DIR,
                                  os.path.join(os.path.dirname(__file__), "..", "static", "uploads"),

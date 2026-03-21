@@ -783,7 +783,8 @@ NARRATIVE:"""
         # Use engagement tracker for smart question selection if available
         if self.engagement:
             question_data = self.engagement.select_question(
-                self.data, speaker=state.speaker_name
+                self.data, speaker=state.speaker_name,
+                tenant_id=state.tenant_id
             )
         else:
             question_data = self.data.get_family_question()
@@ -806,12 +807,12 @@ NARRATIVE:"""
         speaker = state.speaker_name
 
         if self.engagement:
-            progress = self.engagement.get_progress_feedback(speaker)
-            gap = self.engagement.get_gap_report(speaker)
+            progress = self.engagement.get_progress_feedback(speaker, tenant_id=state.tenant_id)
+            gap = self.engagement.get_gap_report(speaker, tenant_id=state.tenant_id)
             return f"{progress} {gap}"
 
         if self.narrative_arc:
-            return self.narrative_arc.get_progress_summary(speaker)
+            return self.narrative_arc.get_progress_summary(speaker, tenant_id=state.tenant_id)
 
         count = len(self.db.get_memories(speaker=speaker, tenant_id=state.tenant_id))
         if count == 0:

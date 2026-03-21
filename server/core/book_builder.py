@@ -123,13 +123,13 @@ class BookBuilder:
             story_id = mem.get("story_id")
             if not story_id:
                 continue
-            story = self.db.get_story_by_id(story_id)
+            story = self.db.get_story_by_id(story_id, tenant_id=tenant_id)
             if not story:
                 continue
             # Try to extract year from photo date_taken
             est_year = None
             if story.get("photo_id"):
-                photo = self.db.get_photo_by_id(story["photo_id"])
+                photo = self.db.get_photo_by_id(story["photo_id"], tenant_id=tenant_id)
                 if photo and photo.get("date_taken"):
                     import re
                     yr_match = re.search(r'(19\d{2}|20\d{2})', str(photo["date_taken"]))
@@ -288,7 +288,7 @@ class BookBuilder:
         # Fetch full memory texts
         memories = []
         for mid in memory_ids:
-            mem = self.db.get_memory_by_id(mid)
+            mem = self.db.get_memory_by_id(mid, tenant_id=tenant_id)
             if mem:
                 memories.append(mem)
 
@@ -340,12 +340,12 @@ class BookBuilder:
             story_id = mem.get("story_id")
             if not story_id:
                 continue
-            story = self.db.get_story_by_id(story_id)
+            story = self.db.get_story_by_id(story_id, tenant_id=tenant_id)
             if not story or not story.get("photo_id"):
                 continue
             if not story.get("photo_in_book", 1):
                 continue
-            photo = self.db.get_photo_by_id(story["photo_id"])
+            photo = self.db.get_photo_by_id(story["photo_id"], tenant_id=tenant_id)
             if not photo:
                 continue
             # Build date context from photo, memory, and family data
@@ -386,7 +386,7 @@ class BookBuilder:
             text = mem.get("text", mem.get("text_summary", ""))
             story_id = mem.get("story_id")
             if story_id:
-                story = self.db.get_story_by_id(story_id)
+                story = self.db.get_story_by_id(story_id, tenant_id=tenant_id)
                 if story:
                     corrected = story.get("corrected_transcript")
                     if corrected and corrected.strip():

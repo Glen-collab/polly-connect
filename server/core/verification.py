@@ -23,7 +23,7 @@ class VerificationService:
 
     def verify_memory(self, memory_id: int, verifier_name: str,
                       verifier_relationship: str = None,
-                      notes: str = None) -> bool:
+                      notes: str = None, tenant_id: int = None) -> bool:
         """Mark a memory as verified by a caretaker or family member."""
         return self.db.verify_memory(
             memory_id=memory_id,
@@ -31,37 +31,45 @@ class VerificationService:
             verifier_relationship=verifier_relationship,
             status="verified",
             notes=notes,
+            tenant_id=tenant_id,
         )
 
     def dispute_memory(self, memory_id: int, verifier_name: str,
-                       notes: str = None) -> bool:
+                       notes: str = None, tenant_id: int = None) -> bool:
         """Mark a memory as disputed (factual concern)."""
         return self.db.verify_memory(
             memory_id=memory_id,
             verifier_name=verifier_name,
             status="disputed",
             notes=notes,
+            tenant_id=tenant_id,
         )
 
-    def get_unverified(self, speaker: str = None, limit: int = 50) -> List[Dict]:
+    def get_unverified(self, speaker: str = None, limit: int = 50,
+                       tenant_id: int = None) -> List[Dict]:
         """Get memories pending verification."""
         return self.db.get_memories(
             speaker=speaker,
             verification_status="unverified",
             limit=limit,
+            tenant_id=tenant_id,
         )
 
-    def get_verified(self, speaker: str = None, limit: int = 200) -> List[Dict]:
+    def get_verified(self, speaker: str = None, limit: int = 200,
+                     tenant_id: int = None) -> List[Dict]:
         """Get verified memories (for book building)."""
         return self.db.get_memories(
             speaker=speaker,
             verification_status="verified",
             limit=limit,
+            tenant_id=tenant_id,
         )
 
-    def get_verification_stats(self, speaker: str = None) -> Dict:
+    def get_verification_stats(self, speaker: str = None,
+                               tenant_id: int = None) -> Dict:
         """Get counts by verification status."""
-        all_memories = self.db.get_memories(speaker=speaker, limit=9999)
+        all_memories = self.db.get_memories(speaker=speaker, limit=9999,
+                                           tenant_id=tenant_id)
         stats = {"unverified": 0, "verified": 0, "disputed": 0, "total": len(all_memories)}
         for mem in all_memories:
             status = mem.get("verification_status", "unverified")

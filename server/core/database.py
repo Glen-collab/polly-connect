@@ -2153,14 +2153,20 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def get_narrative(self, narrative_id: int) -> dict:
+    def get_narrative(self, narrative_id: int, tenant_id: int = None) -> dict:
         """Get a single narrative by ID."""
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            row = conn.execute(
-                "SELECT * FROM story_narratives WHERE id = ?", (narrative_id,)
-            ).fetchone()
+            if tenant_id:
+                row = conn.execute(
+                    "SELECT * FROM story_narratives WHERE id = ? AND tenant_id = ?",
+                    (narrative_id, tenant_id)
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT * FROM story_narratives WHERE id = ?", (narrative_id,)
+                ).fetchone()
             return dict(row) if row else None
         finally:
             if not self._conn:
@@ -2518,13 +2524,19 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def get_memory_by_id(self, memory_id: int) -> Optional[Dict]:
+    def get_memory_by_id(self, memory_id: int, tenant_id: int = None) -> Optional[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            result = conn.execute(
-                "SELECT * FROM memories WHERE id = ?", (memory_id,)
-            ).fetchone()
+            if tenant_id:
+                result = conn.execute(
+                    "SELECT * FROM memories WHERE id = ? AND tenant_id = ?",
+                    (memory_id, tenant_id)
+                ).fetchone()
+            else:
+                result = conn.execute(
+                    "SELECT * FROM memories WHERE id = ?", (memory_id,)
+                ).fetchone()
             if not result:
                 return None
             d = dict(result)
@@ -2540,13 +2552,20 @@ class PollyDB:
 
     def verify_memory(self, memory_id: int, verifier_name: str,
                       verifier_relationship: str = None,
-                      status: str = "verified", notes: str = None) -> bool:
+                      status: str = "verified", notes: str = None,
+                      tenant_id: int = None) -> bool:
         conn = self._get_connection()
         try:
-            conn.execute("""
-                UPDATE memories SET verification_status = ?, verified_by = ?,
-                verified_at = CURRENT_TIMESTAMP WHERE id = ?
-            """, (status, verifier_name, memory_id))
+            if tenant_id:
+                conn.execute("""
+                    UPDATE memories SET verification_status = ?, verified_by = ?,
+                    verified_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?
+                """, (status, verifier_name, memory_id, tenant_id))
+            else:
+                conn.execute("""
+                    UPDATE memories SET verification_status = ?, verified_by = ?,
+                    verified_at = CURRENT_TIMESTAMP WHERE id = ?
+                """, (status, verifier_name, memory_id))
             conn.execute("""
                 INSERT INTO memory_verifications
                     (memory_id, verifier_name, verifier_relationship, status, notes)
@@ -2705,31 +2724,51 @@ class PollyDB:
 
     # ── Story verification ──
 
-    def get_story_by_id(self, story_id: int) -> Optional[Dict]:
+    def get_story_by_id(self, story_id: int, tenant_id: int = None) -> Optional[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            result = conn.execute("SELECT * FROM stories WHERE id = ?", (story_id,)).fetchone()
+            if tenant_id:
+                result = conn.execute(
+                    "SELECT * FROM stories WHERE id = ? AND tenant_id = ?",
+                    (story_id, tenant_id)
+                ).fetchone()
+            else:
+                result = conn.execute("SELECT * FROM stories WHERE id = ?", (story_id,)).fetchone()
             return dict(result) if result else None
         finally:
             if not self._conn:
                 conn.close()
 
     def verify_story(self, story_id: int, verified_by: str,
-                     corrected_transcript: str = None) -> bool:
+                     corrected_transcript: str = None,
+                     tenant_id: int = None) -> bool:
         conn = self._get_connection()
         try:
-            if corrected_transcript:
-                conn.execute("""
-                    UPDATE stories SET verified = 1, verified_by = ?,
-                    verified_at = CURRENT_TIMESTAMP, corrected_transcript = ?
-                    WHERE id = ?
-                """, (verified_by, corrected_transcript, story_id))
+            if tenant_id:
+                if corrected_transcript:
+                    conn.execute("""
+                        UPDATE stories SET verified = 1, verified_by = ?,
+                        verified_at = CURRENT_TIMESTAMP, corrected_transcript = ?
+                        WHERE id = ? AND tenant_id = ?
+                    """, (verified_by, corrected_transcript, story_id, tenant_id))
+                else:
+                    conn.execute("""
+                        UPDATE stories SET verified = 1, verified_by = ?,
+                        verified_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?
+                    """, (verified_by, story_id, tenant_id))
             else:
-                conn.execute("""
-                    UPDATE stories SET verified = 1, verified_by = ?,
-                    verified_at = CURRENT_TIMESTAMP WHERE id = ?
-                """, (verified_by, story_id))
+                if corrected_transcript:
+                    conn.execute("""
+                        UPDATE stories SET verified = 1, verified_by = ?,
+                        verified_at = CURRENT_TIMESTAMP, corrected_transcript = ?
+                        WHERE id = ?
+                    """, (verified_by, corrected_transcript, story_id))
+                else:
+                    conn.execute("""
+                        UPDATE stories SET verified = 1, verified_by = ?,
+                        verified_at = CURRENT_TIMESTAMP WHERE id = ?
+                    """, (verified_by, story_id))
             conn.commit()
             return True
         finally:
@@ -2775,11 +2814,17 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def get_photo_by_id(self, photo_id: int) -> Optional[Dict]:
+    def get_photo_by_id(self, photo_id: int, tenant_id: int = None) -> Optional[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            result = conn.execute("SELECT * FROM photos WHERE id = ?", (photo_id,)).fetchone()
+            if tenant_id:
+                result = conn.execute(
+                    "SELECT * FROM photos WHERE id = ? AND tenant_id = ?",
+                    (photo_id, tenant_id)
+                ).fetchone()
+            else:
+                result = conn.execute("SELECT * FROM photos WHERE id = ?", (photo_id,)).fetchone()
             return dict(result) if result else None
         finally:
             if not self._conn:
@@ -2787,13 +2832,19 @@ class PollyDB:
 
     def update_photo(self, photo_id: int, caption: str = None,
                      date_taken: str = None, tags: str = None,
-                     story_id: int = None) -> bool:
+                     story_id: int = None, tenant_id: int = None) -> bool:
         conn = self._get_connection()
         try:
-            conn.execute("""
-                UPDATE photos SET caption = ?, date_taken = ?, tags = ?,
-                story_id = ? WHERE id = ?
-            """, (caption, date_taken, tags, story_id, photo_id))
+            if tenant_id:
+                conn.execute("""
+                    UPDATE photos SET caption = ?, date_taken = ?, tags = ?,
+                    story_id = ? WHERE id = ? AND tenant_id = ?
+                """, (caption, date_taken, tags, story_id, photo_id, tenant_id))
+            else:
+                conn.execute("""
+                    UPDATE photos SET caption = ?, date_taken = ?, tags = ?,
+                    story_id = ? WHERE id = ?
+                """, (caption, date_taken, tags, story_id, photo_id))
             conn.commit()
             return True
         finally:
@@ -2821,20 +2872,31 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def link_photo_story(self, photo_id: int, story_id: int) -> bool:
+    def link_photo_story(self, photo_id: int, story_id: int,
+                         tenant_id: int = None) -> bool:
         conn = self._get_connection()
         try:
-            conn.execute("UPDATE photos SET story_id = ? WHERE id = ?", (story_id, photo_id))
+            if tenant_id:
+                conn.execute(
+                    "UPDATE photos SET story_id = ? WHERE id = ? AND tenant_id = ?",
+                    (story_id, photo_id, tenant_id))
+            else:
+                conn.execute("UPDATE photos SET story_id = ? WHERE id = ?", (story_id, photo_id))
             conn.commit()
             return True
         finally:
             if not self._conn:
                 conn.close()
 
-    def delete_photo(self, photo_id: int) -> bool:
+    def delete_photo(self, photo_id: int, tenant_id: int = None) -> bool:
         conn = self._get_connection()
         try:
-            cursor = conn.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
+            if tenant_id:
+                cursor = conn.execute(
+                    "DELETE FROM photos WHERE id = ? AND tenant_id = ?",
+                    (photo_id, tenant_id))
+            else:
+                cursor = conn.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
             conn.commit()
             return cursor.rowcount > 0
         finally:

@@ -1357,7 +1357,8 @@ async def transcription_verify(request: Request, story_id: int,
             conn.close()
 
     # Mark verified
-    db.verify_story(story_id, verified_by, corrected_transcript or None)
+    db.verify_story(story_id, verified_by, corrected_transcript or None,
+                     tenant_id=tid)
     return RedirectResponse("/web/transcriptions", status_code=303)
 
 
@@ -1492,14 +1493,15 @@ async def photo_delete(request: Request, photo_id: int):
         return redirect
 
     db = request.app.state.db
-    photo = db.get_photo_by_id(photo_id)
-    if photo and photo.get("tenant_id") == session["tenant_id"]:
+    tid = session["tenant_id"]
+    photo = db.get_photo_by_id(photo_id, tenant_id=tid)
+    if photo:
         # Delete file from disk
         uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads")
         filepath = os.path.join(uploads_dir, photo["filename"])
         if os.path.exists(filepath):
             os.remove(filepath)
-        db.delete_photo(photo_id)
+        db.delete_photo(photo_id, tenant_id=tid)
     return RedirectResponse("/web/photos", status_code=303)
 
 
@@ -1513,19 +1515,20 @@ async def photo_toggle_book(request: Request, photo_id: int):
 
     db = request.app.state.db
     tid = session["tenant_id"]
-    photo = db.get_photo_by_id(photo_id)
-    if not photo or photo.get("tenant_id") != tid:
+    photo = db.get_photo_by_id(photo_id, tenant_id=tid)
+    if not photo:
         return RedirectResponse("/web/photos", status_code=303)
 
     conn = db._get_connection()
     try:
         # Toggle on photos table
         new_val = 0 if photo.get("in_book", 1) else 1
-        conn.execute("UPDATE photos SET in_book = ? WHERE id = ?", (new_val, photo_id))
+        conn.execute("UPDATE photos SET in_book = ? WHERE id = ? AND tenant_id = ?",
+                     (new_val, photo_id, tid))
         # Also sync to linked story if exists
         if photo.get("story_id"):
-            conn.execute("UPDATE stories SET photo_in_book = ? WHERE id = ?",
-                         (new_val, photo["story_id"]))
+            conn.execute("UPDATE stories SET photo_in_book = ? WHERE id = ? AND tenant_id = ?",
+                         (new_val, photo["story_id"], tid))
         conn.commit()
     finally:
         if not db._conn:
@@ -1649,8 +1652,8 @@ async def photo_record_story(request: Request, photo_id: int,
         return JSONResponse({"error": "Plan limit reached. Upgrade to keep recording."}, status_code=403)
 
     # Verify photo belongs to this tenant
-    photo = db.get_photo_by_id(photo_id)
-    if not photo or photo.get("tenant_id") != tid:
+    photo = db.get_photo_by_id(photo_id, tenant_id=tid)
+    if not photo:
         return JSONResponse({"error": "Photo not found"}, status_code=404)
 
     # Read audio data
@@ -1703,7 +1706,7 @@ async def photo_record_story(request: Request, photo_id: int,
     )
 
     # Link story to photo (bidirectional)
-    db.link_photo_story(photo_id, story_id)
+    db.link_photo_story(photo_id, story_id, tenant_id=tid)
 
     # Extract structured memory for the legacy book
     memory_extractor = getattr(request.app.state, "memory_extractor", None)
@@ -1799,8 +1802,8 @@ async def photo_edit_page(request: Request, photo_id: int):
 
     db = request.app.state.db
     tid = session["tenant_id"]
-    photo = db.get_photo_by_id(photo_id)
-    if not photo or photo.get("tenant_id") != tid:
+    photo = db.get_photo_by_id(photo_id, tenant_id=tid)
+    if not photo:
         return RedirectResponse("/web/photos", status_code=303)
 
     # Parse tags for display
@@ -1836,8 +1839,8 @@ async def photo_edit_save(request: Request, photo_id: int,
 
     db = request.app.state.db
     tid = session["tenant_id"]
-    photo = db.get_photo_by_id(photo_id)
-    if not photo or photo.get("tenant_id") != tid:
+    photo = db.get_photo_by_id(photo_id, tenant_id=tid)
+    if not photo:
         return RedirectResponse("/web/photos", status_code=303)
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
@@ -1847,6 +1850,7 @@ async def photo_edit_save(request: Request, photo_id: int,
         date_taken=date_taken or None,
         tags=json.dumps(tag_list),
         story_id=int(story_id) if story_id else None,
+        tenant_id=tid,
     )
     return RedirectResponse("/web/photos", status_code=303)
 
@@ -2773,7 +2777,7 @@ async def book_overview(request: Request):
             ch["status"] = "has_draft"
 
     # Arc coverage
-    bucket_coverage = narrative_arc.get_bucket_coverage()
+    bucket_coverage = narrative_arc.get_bucket_coverage(tenant_id=tid)
     arc_coverage = {}
     for bucket_key, count in bucket_coverage.items():
         arc_coverage[bucket_key] = {
@@ -2783,7 +2787,7 @@ async def book_overview(request: Request):
         }
 
     # Life phase coverage
-    phase_cov = narrative_arc.get_life_phase_coverage()
+    phase_cov = narrative_arc.get_life_phase_coverage(tenant_id=tid)
     phase_coverage = {}
     for phase_key, count in phase_cov.items():
         phase_coverage[phase_key] = {
@@ -2791,7 +2795,7 @@ async def book_overview(request: Request):
             "count": count,
         }
 
-    gap_report = engagement.get_gap_report()
+    gap_report = engagement.get_gap_report(tenant_id=tid)
 
     return templates.TemplateResponse("book.html", {
         "request": request,
@@ -2858,11 +2862,11 @@ async def book_chapter_detail(request: Request, chapter_num: int):
     # Fetch full memories with audio keys from linked stories
     memories = []
     for mid in chapter.get("memory_ids", []):
-        mem = db.get_memory_by_id(mid)
+        mem = db.get_memory_by_id(mid, tenant_id=tid)
         if mem:
             # Look up audio from linked story
             if mem.get("story_id"):
-                story = db.get_story_by_id(mem["story_id"])
+                story = db.get_story_by_id(mem["story_id"], tenant_id=tid)
                 mem["audio_key"] = story.get("audio_s3_key") if story else None
             else:
                 mem["audio_key"] = None
@@ -3488,6 +3492,8 @@ async def photo_listen_page(request: Request, photo_id: int):
     if not photo:
         return HTMLResponse("<h2>Photo not found</h2>", status_code=404)
 
+    # Scope story query to the photo's tenant
+    photo_tenant = photo.get("tenant_id")
     conn = db._get_connection()
     try:
         import sqlite3
@@ -3497,8 +3503,8 @@ async def photo_listen_page(request: Request, photo_id: int):
             "COALESCE(s.corrected_transcript, s.transcript) as transcript, "
             "m.speaker FROM stories s "
             "LEFT JOIN memories m ON m.story_id = s.id "
-            "WHERE s.photo_id = ? AND s.audio_s3_key IS NOT NULL ORDER BY s.id",
-            (photo_id,)
+            "WHERE s.photo_id = ? AND s.tenant_id = ? AND s.audio_s3_key IS NOT NULL ORDER BY s.id",
+            (photo_id, photo_tenant)
         ).fetchall()
         stories = [dict(s) for s in stories]
     finally:
@@ -3586,20 +3592,24 @@ async def listen_page(request: Request, audio_key: str):
     db = request.app.state.db
     conn = db._get_connection()
     try:
+        import sqlite3 as _sqlite3
+        conn.row_factory = _sqlite3.Row
         story = conn.execute(
-            "SELECT id, question_text, recorded_at FROM stories WHERE audio_s3_key = ?",
+            "SELECT id, question_text, recorded_at, tenant_id FROM stories WHERE audio_s3_key = ?",
             (safe_key,)
         ).fetchone()
-        # Get memory speaker
+        # Get memory speaker — scoped to same tenant as the story
         speaker = ""
         story_question = ""
         if story:
-            story_question = story[1] or ""
+            story_question = story["question_text"] or ""
+            story_tid = story["tenant_id"]
             mem = conn.execute(
-                "SELECT speaker FROM memories WHERE story_id = ?", (story[0],)
+                "SELECT speaker FROM memories WHERE story_id = ? AND tenant_id = ?",
+                (story["id"], story_tid)
             ).fetchone()
             if mem:
-                speaker = mem[0] or ""
+                speaker = mem["speaker"] or ""
     except Exception:
         speaker = ""
         story_question = ""

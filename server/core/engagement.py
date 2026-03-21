@@ -68,7 +68,8 @@ class EngagementTracker:
         self.arc = narrative_arc
         self._asked_questions: Dict[str, Set[str]] = {}  # speaker -> set of question IDs
 
-    def select_question(self, data_loader, speaker: str = None) -> Optional[Dict]:
+    def select_question(self, data_loader, speaker: str = None,
+                        tenant_id: int = None) -> Optional[Dict]:
         """
         Intelligently select the next family question.
 
@@ -93,7 +94,7 @@ class EngagementTracker:
 
         # If we have narrative arc, prefer undercovered buckets
         if self.arc:
-            target_theme = self.arc.suggest_next_theme(speaker)
+            target_theme = self.arc.suggest_next_theme(speaker, tenant_id=tenant_id)
             themed = [q for q in unasked if q.get("theme") == target_theme]
             if themed:
                 chosen = random.choice(themed)
@@ -105,12 +106,14 @@ class EngagementTracker:
         self._mark_asked(speaker, chosen.get("id"))
         return chosen
 
-    def get_perspective_prompt(self, speaker: str = None) -> Optional[str]:
+    def get_perspective_prompt(self, speaker: str = None,
+                               tenant_id: int = None) -> Optional[str]:
         """
         After initial collection, offer a perspective rotation question.
         Returns a reflective prompt or None if not enough memories yet.
         """
-        memories = self.db.get_memories(speaker=speaker, limit=9999)
+        memories = self.db.get_memories(speaker=speaker, limit=9999,
+                                       tenant_id=tenant_id)
         if len(memories) < 10:
             return None
 
@@ -118,9 +121,11 @@ class EngagementTracker:
         prompt = random.choice(lens["prompts"])
         return f"{lens['prompt_prefix']}{prompt}"
 
-    def get_progress_feedback(self, speaker: str = None) -> str:
+    def get_progress_feedback(self, speaker: str = None,
+                              tenant_id: int = None) -> str:
         """Generate encouraging progress feedback."""
-        memories = self.db.get_memories(speaker=speaker, limit=9999)
+        memories = self.db.get_memories(speaker=speaker, limit=9999,
+                                       tenant_id=tenant_id)
         count = len(memories)
 
         if count == 0:
@@ -143,12 +148,13 @@ class EngagementTracker:
             return (f"{count} memories captured. That's enough for a beautiful book. "
                     f"We can keep going, or start putting chapters together whenever you're ready.")
 
-    def get_gap_report(self, speaker: str = None) -> str:
+    def get_gap_report(self, speaker: str = None,
+                       tenant_id: int = None) -> str:
         """Report on which areas of the story need more exploration."""
         if not self.arc:
             return "Story tracking is not available right now."
 
-        undercovered = self.arc.get_undercovered_buckets(speaker)
+        undercovered = self.arc.get_undercovered_buckets(speaker, tenant_id=tenant_id)
         if not undercovered:
             return "You've covered all the major areas of your story. That's wonderful!"
 
