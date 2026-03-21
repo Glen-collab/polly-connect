@@ -2,11 +2,15 @@
 {% block title %}Book Chapters - Polly Connect{% endblock %}
 
 {% block content %}
+<div class="overflow-x-hidden">
 <div class="mb-4">
     <a href="/web/book" class="text-emerald-600 hover:underline text-sm">&larr; Back to Book Overview</a>
 </div>
 
-<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Book Chapters</h1>
+<div class="flex items-center justify-between mb-4 sm:mb-6">
+    <h1 class="text-xl sm:text-2xl font-bold">Book Chapters</h1>
+    <a href="/web/book/album" class="text-sm bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">View Album</a>
+</div>
 
 <p class="text-sm text-gray-500 mb-6">
     {{ chapters|length }} chapter{{ 's' if chapters|length != 1 else '' }} outlined.
@@ -48,9 +52,9 @@
             <p class="text-xs text-gray-400 mb-2">Memories in this chapter:</p>
             <div class="space-y-1">
                 {% for mem in ch.memories[:5] %}
-                <p class="text-xs text-gray-600 truncate">
+                <p class="text-xs text-gray-600 truncate max-w-full overflow-hidden">
                     <span class="text-gray-400">{{ mem.speaker or 'Unknown' }}:</span>
-                    {{ mem.text_summary or mem.text[:80] }}
+                    {{ (mem.text_summary or mem.text or '')[:80] }}
                 </p>
                 {% endfor %}
                 {% if ch.memories|length > 5 %}
@@ -68,4 +72,5 @@
     <p class="text-sm text-gray-500 mt-2">Keep talking to Polly -- each story gets automatically categorized into the right chapter.</p>
 </div>
 {% endif %}
+</div>
 {% endblock %}

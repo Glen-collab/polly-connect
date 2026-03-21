@@ -2892,8 +2892,9 @@ async def book_chapter_detail(request: Request, chapter_num: int):
     song = None
     try:
         import sqlite3 as _sq
-        conn.row_factory = _sq.Row
-        song_row = conn.execute(
+        _conn = db._get_connection()
+        _conn.row_factory = _sq.Row
+        song_row = _conn.execute(
             "SELECT * FROM song_briefs WHERE tenant_id = ? AND chapter_number = ? ORDER BY id DESC LIMIT 1",
             (tid, chapter_num)
         ).fetchone()
