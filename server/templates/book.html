@@ -72,48 +72,24 @@
     </div>
 </div>
 
-<!-- Chapter Outline -->
-<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-6">
-    <div class="flex items-center justify-between mb-4">
-        <h2 class="text-base sm:text-lg font-semibold">Chapters</h2>
-        <a href="/web/book/chapters" class="text-emerald-600 text-sm hover:underline">View All</a>
-    </div>
-
-    {% if chapters %}
-    <div class="space-y-3">
-        {% for ch in chapters %}
-        {% if ch.status == 'has_draft' %}
-        <a href="/web/book/chapters/{{ ch.chapter_number }}" class="block border rounded-lg p-3 hover:bg-gray-50 transition">
-            <div class="flex items-center justify-between">
-                <div>
-                    <span class="text-xs text-gray-400">Chapter {{ ch.chapter_number }}</span>
-                    <h3 class="font-medium text-sm sm:text-base text-gray-800">{{ ch.title }}</h3>
-                    <p class="text-xs text-gray-500">{{ ch.memory_count }} memories &middot; {{ ch.bucket_label }}</p>
-                </div>
-                <span class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">Draft</span>
-            </div>
-        </a>
-        {% else %}
-        <div class="block border rounded-lg p-3 opacity-60">
-            <div class="flex items-center justify-between">
-                <div>
-                    <span class="text-xs text-gray-400">Chapter {{ ch.chapter_number }}</span>
-                    <h3 class="font-medium text-sm sm:text-base text-gray-800">{{ ch.title }}</h3>
-                    <p class="text-xs text-gray-500">{{ ch.memory_count }} memories &middot; {{ ch.bucket_label }}</p>
-                </div>
-                {% if ch.status == 'ready' %}
-                <span class="text-xs px-2 py-1 rounded bg-emerald-100 text-emerald-700">Ready</span>
-                {% else %}
-                <span class="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-700">Needs More</span>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-        {% endfor %}
-    </div>
-    {% else %}
-    <p class="text-gray-400 text-sm">No chapters yet. Keep talking to Polly and memories will start filling in the story arc above.</p>
-    {% endif %}
+<!-- Chapter & Song Actions -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+    <a href="/web/book/chapters"
+       class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl p-5 text-center shadow-lg transition active:scale-95">
+        <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <span class="text-lg font-bold">Chapter Progress</span>
+        <p class="text-xs text-blue-200 mt-1">{{ chapters|length }} chapters &middot; View, edit, and generate drafts</p>
+    </a>
+    <a href="/web/book/album"
+       class="bg-purple-600 hover:bg-purple-700 text-white rounded-xl p-5 text-center shadow-lg transition active:scale-95">
+        <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+        </svg>
+        <span class="text-lg font-bold">Life Soundtrack</span>
+        <p class="text-xs text-purple-200 mt-1">Generate songs from each chapter</p>
+    </a>
 </div>
 
 <!-- Encouragement / Next Steps -->
