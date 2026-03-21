@@ -102,8 +102,14 @@
                 <td class="px-4 py-3 text-gray-500 font-mono text-xs hidden sm:table-cell">{{ device.device_id }}</td>
                 <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ device.last_seen or 'Never' }}</td>
                 <td class="px-4 py-3">
-                    {% if device.api_key_hash %}
-                    <span class="inline-block bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Configured</span>
+                    {% if device.claimed_at and device.tenant_id %}
+                    <span class="inline-block bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-full">Claimed</span>
+                    {% elif device.tenant_id and device.api_key_hash %}
+                    <span class="inline-block bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Assigned</span>
+                    {% elif device.api_key_hash %}
+                    <span class="inline-block bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full">Configured</span>
+                    {% elif device.claim_code %}
+                    <span class="inline-block bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full">Awaiting Claim</span>
                     {% else %}
                     <span class="inline-block bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">No Key</span>
                     {% endif %}

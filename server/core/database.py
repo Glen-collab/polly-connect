@@ -1119,7 +1119,8 @@ class PollyDB:
             if not device:
                 return None
             conn.execute("""
-                UPDATE devices SET tenant_id = ?, claimed_at = CURRENT_TIMESTAMP
+                UPDATE devices SET tenant_id = ?, claimed_at = CURRENT_TIMESTAMP,
+                claim_code = NULL
                 WHERE device_id = ?
             """, (new_tenant_id, device["device_id"]))
             conn.commit()
