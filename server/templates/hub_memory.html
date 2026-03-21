@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Memory - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="/web/dashboard" class="text-emerald-600 hover:underline text-sm">&larr; Home</a>
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-2">Memory</h1>
+    <p class="text-sm text-gray-500 mt-1">Tell Polly where things are. Ask later when you forget.</p>
+</div>
+
+<div class="grid grid-cols-2 gap-5 sm:gap-6 max-w-lg mx-auto">
+    <a href="/web/memory/items" class="bg-amber-500 hover:bg-amber-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
+        <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span class="text-lg sm:text-xl font-bold">Stored Items</span>
+        <p class="text-xs text-amber-100 mt-1">Things Polly is remembering and where they are.</p>
+    </a>
+    <a href="/web/memory/photo-index" class="bg-amber-500 hover:bg-amber-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
+        <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span class="text-lg sm:text-xl font-bold">Photo Index</span>
+        <p class="text-xs text-amber-100 mt-1">Snap a photo of a space. Polly indexes what's in it.</p>
+    </a>
+</div>
+
+<!-- Item count -->
+{% if item_count > 0 %}
+<div class="max-w-lg mx-auto mt-6 text-center">
+    <p class="text-sm text-gray-500">Polly is tracking <span class="font-bold text-amber-700">{{ item_count }}</span> item{{ 's' if item_count != 1 else '' }}.</p>
+</div>
+{% endif %}
+{% endblock %}

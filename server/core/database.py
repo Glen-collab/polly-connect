@@ -669,6 +669,19 @@ class PollyDB:
                 WHERE id = 1 AND (subscription_tier IS NULL OR subscription_tier = 'trial')
             """)
 
+            # Photo index table (Memory module — photo-based item indexing)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS photo_indexes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    filename TEXT NOT NULL,
+                    location TEXT NOT NULL,
+                    description TEXT,
+                    item_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             conn.commit()
         finally:
             if not self._conn:

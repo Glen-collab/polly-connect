@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Stored Items - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="/web/hub/memory" class="text-emerald-600 hover:underline text-sm">&larr; Memory</a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">Stored Items</h1>
+    <p class="text-sm text-gray-500 mt-1">Things Polly is remembering for you. Say "my keys are on the hook by the door" to add more.</p>
+</div>
+
+{% if saved %}
+<div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4 max-w-lg mx-auto">
+    <p class="text-emerald-800 text-sm font-medium">Item saved!</p>
+</div>
+{% endif %}
+
+{% if deleted %}
+<div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-4 max-w-lg mx-auto">
+    <p class="text-red-800 text-sm font-medium">Item removed.</p>
+</div>
+{% endif %}
+
+<!-- Add Item Form -->
+<div class="bg-white rounded-lg shadow-md p-4 mb-6 max-w-lg mx-auto">
+    <h2 class="text-lg font-semibold mb-3">Add an Item</h2>
+    <form method="POST" action="/web/memory/items/add" class="space-y-3">
+        <div class="flex gap-3">
+            <input type="text" name="item" required placeholder="What? (e.g. keys)"
+                   class="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+            <input type="text" name="location" required placeholder="Where? (e.g. hook by garage door)"
+                   class="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+        </div>
+        <button type="submit"
+                class="w-full bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 font-medium text-sm">
+            Remember This
+        </button>
+    </form>
+</div>
+
+<!-- Search -->
+<div class="bg-white rounded-lg shadow-md p-4 mb-6 max-w-lg mx-auto">
+    <form method="GET" action="/web/memory/items" class="flex gap-3">
+        <input type="text" name="q" value="{{ query or '' }}" placeholder="Search items or locations..."
+               class="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+        <button type="submit"
+                class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 font-medium text-sm">
+            Search
+        </button>
+    </form>
+</div>
+
+<!-- Items List -->
+<div class="max-w-lg mx-auto">
+    {% if items %}
+    <div class="space-y-3">
+        {% for item in items %}
+        <div class="bg-white rounded-lg shadow p-4 flex items-start justify-between">
+            <div>
+                <p class="font-semibold text-gray-800">{{ item.item }}</p>
+                <p class="text-sm text-gray-500">{{ item.prep or 'on' }} <span class="text-amber-700 font-medium">{{ item.location }}</span></p>
+                {% if item.context %}
+                <p class="text-xs text-gray-400 mt-1">{{ item.context }}</p>
+                {% endif %}
+                <p class="text-xs text-gray-400 mt-1">Updated {{ item.updated_at }}</p>
+            </div>
+            <form method="POST" action="/web/memory/items/delete" class="ml-3">
+                <input type="hidden" name="item_name" value="{{ item.item }}">
+                <button type="submit" class="text-red-400 hover:text-red-600 text-xs"
+                        onclick="return confirm('Remove this item?')">Remove</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% elif query %}
+    <p class="text-center text-gray-400 py-8">No items matching "{{ query }}".</p>
+    {% else %}
+    <p class="text-center text-gray-400 py-8">No items stored yet. Tell Polly where things are, or add one above.</p>
+    {% endif %}
+</div>
+{% endblock %}

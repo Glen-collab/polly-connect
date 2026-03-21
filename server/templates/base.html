@@ -106,7 +106,7 @@
     <div class="bg-gray-100 border-t border-gray-200 mt-8">
         <div class="max-w-6xl mx-auto px-4 py-6">
             <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">Site Map</h3>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
                 <div>
                     <a href="/web/hub/stories" class="font-semibold text-emerald-600 hover:underline">Stories</a>
                     <ul class="mt-1 space-y-1 text-gray-500">
@@ -134,6 +134,13 @@
                     <a href="/web/hub/care" class="font-semibold text-purple-600 hover:underline">Care</a>
                     <ul class="mt-1 space-y-1 text-gray-500">
                         <li><a href="/web/medications" class="hover:text-gray-800">Medications</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <a href="/web/hub/memory" class="font-semibold text-amber-600 hover:underline">Memory</a>
+                    <ul class="mt-1 space-y-1 text-gray-500">
+                        <li><a href="/web/memory/items" class="hover:text-gray-800">Stored Items</a></li>
+                        <li><a href="/web/memory/photo-index" class="hover:text-gray-800">Photo Index</a></li>
                     </ul>
                 </div>
                 {% if session.role != 'family' %}

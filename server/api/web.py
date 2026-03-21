@@ -368,36 +368,6 @@ async def dashboard(request: Request):
         if not user.get("setup_complete"):
             return RedirectResponse("/web/welcome", status_code=302)
 
-    stories = db.get_stories(limit=5, tenant_id=tid)
-    medications = db.get_medications(tenant_id=tid)
-    items = db.list_all(tenant_id=tid)
-    stats = db.get_stats(tenant_id=tid)
-
-    # Get real story count (not limited to 5)
-    conn = db._get_connection()
-    try:
-        real_story_count = conn.execute(
-            "SELECT COUNT(*) FROM stories WHERE tenant_id = ?", (tid,)
-        ).fetchone()[0]
-    except Exception:
-        real_story_count = len(stories)
-
-    # Count question sessions
-    try:
-        q_count = conn.execute(
-            "SELECT COUNT(*) FROM question_sessions WHERE answered = 1 AND tenant_id = ?",
-            (tid,)
-        ).fetchone()[0]
-    except Exception:
-        q_count = 0
-    finally:
-        if not db._conn:
-            conn.close()
-
-    # Book progress
-    book_builder = getattr(request.app.state, "book_builder", None)
-    book_progress = book_builder.get_book_progress(tenant_id=session["tenant_id"]) if book_builder else None
-
     # Subscription status
     from core.subscription import get_subscription
     subscription = get_subscription(db, tid)
@@ -405,12 +375,6 @@ async def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "session": session,
-        "stories": stories,
-        "medications": medications,
-        "story_count": real_story_count,
-        "question_count": q_count,
-        "item_count": stats.get("total_items", 0),
-        "book_progress": book_progress,
         "subscription": subscription,
     })
 
@@ -479,6 +443,214 @@ async def hub_settings(request: Request):
         "request": request,
         "session": session,
         "book_progress": book_progress,
+    })
+
+
+@router.get("/hub/memory", response_class=HTMLResponse)
+async def hub_memory(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    items = db.list_all(tenant_id=tid)
+    return templates.TemplateResponse("hub_memory.html", {
+        "request": request,
+        "session": session,
+        "item_count": len(items),
+    })
+
+
+@router.get("/memory/items", response_class=HTMLResponse)
+async def memory_items_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    query = request.query_params.get("q", "").strip()
+    saved = request.query_params.get("saved")
+    deleted = request.query_params.get("deleted")
+    if query:
+        items = db.find_item(query, tenant_id=tid)
+        if not items:
+            items = db.find_by_location(query, tenant_id=tid)
+    else:
+        items = db.list_all(tenant_id=tid)
+    return templates.TemplateResponse("memory_items.html", {
+        "request": request,
+        "session": session,
+        "items": items,
+        "query": query,
+        "saved": saved,
+        "deleted": deleted,
+    })
+
+
+@router.post("/memory/items/add")
+async def memory_items_add(request: Request,
+                           item: str = Form(...),
+                           location: str = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    db.store_item(item.strip(), location.strip(), tenant_id=tid)
+    return RedirectResponse("/web/memory/items?saved=1", status_code=303)
+
+
+@router.post("/memory/items/delete")
+async def memory_items_delete(request: Request,
+                              item_name: str = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    db.delete_item(item_name.strip(), tenant_id=tid)
+    return RedirectResponse("/web/memory/items?deleted=1", status_code=303)
+
+
+@router.get("/memory/photo-index", response_class=HTMLResponse)
+async def memory_photo_index_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    conn = db._get_connection()
+    try:
+        import sqlite3 as _sq
+        conn.row_factory = _sq.Row
+        indexed_photos = [dict(r) for r in conn.execute(
+            "SELECT * FROM photo_indexes WHERE tenant_id = ? ORDER BY created_at DESC",
+            (tid,)
+        ).fetchall()]
+    finally:
+        if not db._conn:
+            conn.close()
+    error = request.query_params.get("error")
+    return templates.TemplateResponse("memory_photo_index.html", {
+        "request": request,
+        "session": session,
+        "indexed_photos": indexed_photos,
+        "result": None,
+        "error": error,
+    })
+
+
+@router.post("/memory/photo-index", response_class=HTMLResponse)
+async def memory_photo_index_upload(request: Request,
+                                    photo: UploadFile = File(...),
+                                    location: str = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Save photo to uploads
+    uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
+    import uuid
+    ext = os.path.splitext(photo.filename or "photo.jpg")[1] or ".jpg"
+    filename = f"idx_{uuid.uuid4().hex[:8]}{ext}"
+    filepath = os.path.join(uploads_dir, filename)
+    photo_data = await photo.read()
+    if len(photo_data) > 10 * 1024 * 1024:
+        return RedirectResponse("/web/memory/photo-index?error=Photo+too+large+(max+10MB)", status_code=303)
+    with open(filepath, "wb") as f:
+        f.write(photo_data)
+
+    # Send to GPT-4 Vision to identify items
+    import base64
+    b64 = base64.b64encode(photo_data).decode()
+    content_type = photo.content_type or "image/jpeg"
+
+    indexed_items = []
+    description = ""
+    try:
+        import openai
+        client = openai.OpenAI()
+        resp = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": (
+                        f"This is a photo of: {location.strip()}. "
+                        "List every identifiable item you can see and its specific location within the photo. "
+                        "Format each item on its own line as: ITEM: item name | LOCATION: where in the space "
+                        "(e.g. 'ITEM: cordless drill | LOCATION: top shelf left side'). "
+                        "Be specific about positions. Only list physical items, not the space itself."
+                    )},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:{content_type};base64,{b64}",
+                        "detail": "high",
+                    }},
+                ],
+            }],
+            max_tokens=1000,
+        )
+        raw = resp.choices[0].message.content or ""
+        description = raw
+
+        # Parse items from GPT response
+        for line in raw.split("\n"):
+            line = line.strip()
+            if "ITEM:" in line and "LOCATION:" in line:
+                parts = line.split("LOCATION:")
+                item_part = parts[0].split("ITEM:")[-1].strip().rstrip("|").strip()
+                loc_part = parts[1].strip()
+                if item_part and loc_part:
+                    full_location = f"{location.strip()} - {loc_part}"
+                    db.store_item(item_part, full_location,
+                                 context=f"Indexed from photo of {location.strip()}",
+                                 tenant_id=tid)
+                    indexed_items.append({"item": item_part, "location": full_location})
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Photo index error: {e}")
+        description = f"Error: {e}"
+
+    # Save photo index record
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "INSERT INTO photo_indexes (tenant_id, filename, location, description, item_count) VALUES (?, ?, ?, ?, ?)",
+            (tid, filename, location.strip(), description[:2000], len(indexed_items))
+        )
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    # Re-fetch indexed photos for display
+    conn = db._get_connection()
+    try:
+        import sqlite3 as _sq
+        conn.row_factory = _sq.Row
+        indexed_photos = [dict(r) for r in conn.execute(
+            "SELECT * FROM photo_indexes WHERE tenant_id = ? ORDER BY created_at DESC",
+            (tid,)
+        ).fetchall()]
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return templates.TemplateResponse("memory_photo_index.html", {
+        "request": request,
+        "session": session,
+        "indexed_photos": indexed_photos,
+        "result": {"item_count": len(indexed_items), "items": indexed_items},
+        "error": None,
     })
 
 
