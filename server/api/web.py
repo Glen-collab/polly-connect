@@ -208,6 +208,18 @@ async def register_submit(request: Request, name: str = Form(...),
     # Ensure a user_profile exists for this tenant
     db.get_or_create_user(name=name, tenant_id=tenant_id)
 
+    # Notify admin of new registration
+    try:
+        from core.notify import notify_new_registration
+        import threading
+        threading.Thread(
+            target=notify_new_registration,
+            args=(name, email, household_name),
+            daemon=True,
+        ).start()
+    except Exception:
+        pass
+
     # Auto-login
     session_id = db.create_web_session(
         account_id, tenant_id,

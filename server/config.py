@@ -51,6 +51,11 @@ class Settings:
     # Web session duration (hours)
     SESSION_DURATION_HOURS: int = int(os.getenv("POLLY_SESSION_HOURS", "72"))
 
+    # Email notifications
+    NOTIFY_EMAIL: str = os.getenv("POLLY_NOTIFY_EMAIL", "wisco.barbell@gmail.com")
+    GMAIL_USER: str = os.getenv("GMAIL_USER", "wisco.barbell@gmail.com")
+    GMAIL_APP_PASSWORD: str = os.getenv("GMAIL_APP_PASSWORD", "")
+
     # Data directory
     DATA_DIR: str = os.getenv("POLLY_DATA_DIR", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data"))
 
