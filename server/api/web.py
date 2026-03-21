@@ -239,6 +239,9 @@ async def welcome_page(request: Request):
         "request": request,
         "session": session,
         "user": user,
+        "claim_code": "",
+        "claim_error": None,
+        "claim_success": None,
     })
 
 
@@ -251,7 +254,8 @@ async def welcome_save(request: Request):
 
     form = await request.form()
     db = request.app.state.db
-    user = db.get_or_create_user(tenant_id=session["tenant_id"])
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
 
     name = form.get("name", "").strip()
     familiar_name = form.get("familiar_name", "").strip()
@@ -292,6 +296,14 @@ async def welcome_save(request: Request):
     finally:
         if not db._conn:
             conn.close()
+
+    # Claim device if code provided
+    claim_code = form.get("claim_code", "").strip()
+    if claim_code and len(claim_code) == 6 and claim_code.isdigit():
+        device = db.claim_device(claim_code, tid)
+        if not device:
+            # Code invalid — still save profile but show error on dashboard
+            return RedirectResponse("/web/dashboard?claim_error=Invalid+or+already+claimed+code", status_code=303)
 
     return RedirectResponse("/web/dashboard", status_code=303)
 
