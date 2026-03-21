@@ -41,8 +41,12 @@
                         <h2 class="font-bold text-gray-800">{{ song.song_title }}</h2>
                         <p class="text-xs text-gray-400">{{ song.chapter_title }} &middot; {{ song.genre }} &middot; {{ song.jungian_stage | replace('_', ' ') | title }}</p>
                     </div>
-                    <a href="/web/book/chapters/{{ song.chapter_number }}"
-                       class="text-xs text-purple-600 hover:underline shrink-0 ml-2">View Lyrics</a>
+                    <div class="flex gap-2 shrink-0 ml-2">
+                        <button onclick="document.getElementById('lyrics-{{ song.chapter_number }}').classList.toggle('hidden'); this.textContent = this.textContent === 'Hide Lyrics' ? 'View Lyrics' : 'Hide Lyrics';"
+                                class="text-xs text-purple-600 hover:underline">View Lyrics</button>
+                        <a href="/web/book/chapters/{{ song.chapter_number }}"
+                           class="text-xs text-gray-400 hover:underline">Edit</a>
+                    </div>
                 </div>
 
                 {% if song.audio_filename %}
@@ -51,7 +55,7 @@
                 </audio>
                 {% endif %}
 
-                <!-- Chorus preview -->
+                <!-- Chorus preview (always visible) -->
                 {% if song.lyrics and song.lyrics.get('chorus') %}
                 <div class="bg-purple-50 rounded p-2 mt-3">
                     <p class="text-xs font-semibold text-purple-600 mb-0.5">[Chorus]</p>
@@ -59,7 +63,20 @@
                 </div>
                 {% endif %}
 
-                <p class="text-xs text-gray-300 mt-2">{{ song.style_prompt }}</p>
+                <!-- Full lyrics (hidden until toggled) -->
+                {% if song.lyrics %}
+                <div id="lyrics-{{ song.chapter_number }}" class="hidden mt-3 space-y-3 border-t pt-3">
+                    {% for section, label in [('verse1','Verse 1'),('chorus','Chorus'),('verse2','Verse 2'),('bridge','Bridge'),('outro','Outro')] %}
+                    {% if song.lyrics.get(section) %}
+                    <div>
+                        <p class="text-xs font-bold text-purple-600 mb-0.5">[{{ label }}]</p>
+                        <p class="text-xs text-gray-700 whitespace-pre-line leading-relaxed">{{ song.lyrics[section] }}</p>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    <p class="text-xs text-gray-300 mt-2"><strong>Style:</strong> {{ song.style_prompt }}</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
