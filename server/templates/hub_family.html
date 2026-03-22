@@ -7,7 +7,7 @@
     <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-2">Family</h1>
 </div>
 
-<div class="grid grid-cols-2 gap-5 sm:gap-6 max-w-lg mx-auto">
+<div class="grid grid-cols-2 gap-5 sm:gap-6 max-w-2xl mx-auto">
     <a href="/web/family-tree" class="bg-blue-500 hover:bg-blue-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
         <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -75,7 +75,7 @@
 
 <!-- Book Progress -->
 {% if book_progress %}
-<div class="bg-red-50 rounded-lg shadow p-4 sm:p-6 mt-6 max-w-lg mx-auto" style="border: 1px solid #991b1b;">
+<div class="bg-red-50 rounded-lg shadow p-4 sm:p-6 mt-6 max-w-2xl mx-auto" style="border: 1px solid #991b1b;">
     <div class="flex items-center justify-between mb-3">
         <h2 class="text-sm font-bold text-red-700" style="-webkit-text-stroke: 0.5px black; paint-order: stroke fill;">Legacy Book Progress</h2>
         <span class="text-xs font-bold text-red-700">{{ book_progress.percent_complete }}%</span>
