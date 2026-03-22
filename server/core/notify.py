@@ -8,17 +8,18 @@ from email.mime.multipart import MIMEMultipart
 logger = logging.getLogger(__name__)
 
 
-def send_notification(subject: str, body: str):
-    """Send an email notification to the admin."""
+def send_notification(subject: str, body: str, to_email: str = None):
+    """Send an email notification. Defaults to admin if no to_email specified."""
     from config import settings
 
     if not settings.GMAIL_APP_PASSWORD:
         logger.warning("GMAIL_APP_PASSWORD not set — skipping email notification")
         return False
 
+    recipient = to_email or settings.NOTIFY_EMAIL
     msg = MIMEMultipart("alternative")
     msg["From"] = f"Polly Connect <{settings.GMAIL_USER}>"
-    msg["To"] = settings.NOTIFY_EMAIL
+    msg["To"] = recipient
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "html"))
 

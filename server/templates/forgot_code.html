@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Forgot Access Code - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-8">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold text-emerald-700 mb-2 text-center">Forgot Access Code?</h1>
+        <p class="text-sm text-gray-500 text-center mb-6">Answer the security questions to recover your family access code.</p>
+
+        {% if error %}
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        {% if recovered_code %}
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-6 text-center mb-4">
+            <p class="text-sm text-emerald-700 font-medium mb-2">Your access code is:</p>
+            <p class="text-3xl font-bold font-mono tracking-widest text-emerald-800">{{ recovered_code }}</p>
+            <p class="text-xs text-emerald-600 mt-3">Write it down somewhere safe!</p>
+        </div>
+        <a href="/web/family" class="block text-center bg-emerald-600 text-white py-2 px-4 rounded-lg hover:bg-emerald-700 font-medium">
+            Go to Family Login
+        </a>
+        {% else %}
+
+        {% if questions %}
+        <form method="POST" action="/web/forgot-code" class="space-y-4">
+            <input type="hidden" name="household" value="{{ household }}">
+            {% for q in questions %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ q.question }}</label>
+                <input type="text" name="answer_{{ loop.index0 }}" required
+                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                       placeholder="Your answer">
+            </div>
+            {% endfor %}
+            <button type="submit"
+                    class="w-full bg-emerald-600 text-white py-2 px-4 rounded-lg hover:bg-emerald-700 font-medium">
+                Recover Code
+            </button>
+        </form>
+        {% else %}
+        <form method="GET" action="/web/forgot-code" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Household / Family Name</label>
+                <input type="text" name="household" required
+                       class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                       placeholder="e.g. The Rogers Family">
+                <p class="text-xs text-gray-400 mt-1">This is the name the account owner registered with.</p>
+            </div>
+            <button type="submit"
+                    class="w-full bg-emerald-600 text-white py-2 px-4 rounded-lg hover:bg-emerald-700 font-medium">
+                Look Up Security Questions
+            </button>
+        </form>
+        {% endif %}
+
+        {% endif %}
+
+        <p class="mt-4 text-center text-sm text-gray-500">
+            <a href="/web/family" class="text-emerald-600 hover:underline font-medium">Back to family login</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

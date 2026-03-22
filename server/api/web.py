@@ -181,6 +181,211 @@ async def logout(request: Request):
     return response
 
 
+# ── Password Reset ──
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    return templates.TemplateResponse("forgot_password.html", {
+        "request": request, "error": None, "success": None, "email": "", "session": None,
+    })
+
+
+@router.post("/forgot-password")
+async def forgot_password_submit(request: Request, email: str = Form(...)):
+    db = request.app.state.db
+    email = email.strip().lower()
+    account = db.get_account_by_email(email)
+
+    # Always show success to prevent email enumeration
+    success_msg = "If an account exists with that email, a reset link has been sent."
+
+    if account:
+        from core.password_reset import generate_reset_token
+        token = generate_reset_token(account["id"], email)
+        reset_url = f"https://polly-connect.com/web/reset-password?token={token}"
+
+        try:
+            from core.notify import send_notification
+            import threading
+            threading.Thread(
+                target=send_notification,
+                args=(
+                    "Polly Connect Password Reset",
+                    f"""
+                    <div style="font-family: sans-serif; max-width: 500px;">
+                        <h2 style="color: #059669;">Password Reset</h2>
+                        <p>Click the link below to reset your password. This link expires in 1 hour.</p>
+                        <p><a href="{reset_url}" style="color: #059669; font-weight: bold;">{reset_url}</a></p>
+                        <p style="color: #666; font-size: 12px;">If you didn't request this, ignore this email.</p>
+                    </div>
+                    """,
+                ),
+                kwargs={"to_email": email},
+                daemon=True,
+            ).start()
+        except Exception:
+            pass
+
+    return templates.TemplateResponse("forgot_password.html", {
+        "request": request, "error": None, "success": success_msg, "email": email, "session": None,
+    })
+
+
+@router.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request):
+    token = request.query_params.get("token", "")
+    db = request.app.state.db
+    from core.password_reset import validate_reset_token
+    account = validate_reset_token(token, db)
+    if not account:
+        return templates.TemplateResponse("forgot_password.html", {
+            "request": request, "error": "Invalid or expired reset link. Please try again.",
+            "success": None, "email": "", "session": None,
+        })
+    return templates.TemplateResponse("reset_password.html", {
+        "request": request, "token": token, "email": account["email"],
+        "error": None, "session": None,
+    })
+
+
+@router.post("/reset-password")
+async def reset_password_submit(request: Request,
+                                 token: str = Form(...),
+                                 password: str = Form(...),
+                                 password_confirm: str = Form(...)):
+    db = request.app.state.db
+    from core.password_reset import validate_reset_token
+    account = validate_reset_token(token, db)
+    if not account:
+        return templates.TemplateResponse("forgot_password.html", {
+            "request": request, "error": "Invalid or expired reset link. Please try again.",
+            "success": None, "email": "", "session": None,
+        })
+
+    if password != password_confirm:
+        return templates.TemplateResponse("reset_password.html", {
+            "request": request, "token": token, "email": account["email"],
+            "error": "Passwords don't match.", "session": None,
+        })
+    if len(password) < 10:
+        return templates.TemplateResponse("reset_password.html", {
+            "request": request, "token": token, "email": account["email"],
+            "error": "Password must be at least 10 characters.", "session": None,
+        })
+
+    new_hash = hash_password(password)
+    conn = db._get_connection()
+    try:
+        conn.execute("UPDATE accounts SET password_hash = ? WHERE id = ?",
+                     (new_hash, account["id"]))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return RedirectResponse("/web/login?reset=1", status_code=303)
+
+
+# ── Family Code Recovery ──
+
+@router.get("/forgot-code", response_class=HTMLResponse)
+async def forgot_code_page(request: Request):
+    db = request.app.state.db
+    household = request.query_params.get("household", "").strip()
+    questions = []
+
+    if household:
+        # Find tenant by name (case-insensitive)
+        conn = db._get_connection()
+        try:
+            import sqlite3 as _sq
+            conn.row_factory = _sq.Row
+            tenant = conn.execute(
+                "SELECT id FROM tenants WHERE LOWER(TRIM(name)) = LOWER(?)", (household,)
+            ).fetchone()
+            if tenant:
+                rows = conn.execute(
+                    "SELECT question FROM security_questions WHERE tenant_id = ? ORDER BY id",
+                    (tenant["id"],)
+                ).fetchall()
+                questions = [{"question": r["question"]} for r in rows]
+        finally:
+            if not db._conn:
+                conn.close()
+
+    error = None
+    if household and not questions:
+        error = "No security questions found for that household. Ask your caretaker to set them up in Settings."
+
+    return templates.TemplateResponse("forgot_code.html", {
+        "request": request, "error": error, "questions": questions,
+        "household": household, "recovered_code": None, "session": None,
+    })
+
+
+@router.post("/forgot-code")
+async def forgot_code_submit(request: Request):
+    form = await request.form()
+    db = request.app.state.db
+    household = form.get("household", "").strip()
+
+    conn = db._get_connection()
+    try:
+        import sqlite3 as _sq
+        conn.row_factory = _sq.Row
+        tenant = conn.execute(
+            "SELECT id, family_code FROM tenants WHERE LOWER(TRIM(name)) = LOWER(?)", (household,)
+        ).fetchone()
+        if not tenant or not tenant["family_code"]:
+            return templates.TemplateResponse("forgot_code.html", {
+                "request": request, "error": "Household not found.",
+                "questions": [], "household": household,
+                "recovered_code": None, "session": None,
+            })
+
+        # Get security questions + hashed answers
+        rows = conn.execute(
+            "SELECT question, answer_hash FROM security_questions WHERE tenant_id = ? ORDER BY id",
+            (tenant["id"],)
+        ).fetchall()
+        if not rows:
+            return templates.TemplateResponse("forgot_code.html", {
+                "request": request,
+                "error": "No security questions set up. Ask your caretaker.",
+                "questions": [], "household": household,
+                "recovered_code": None, "session": None,
+            })
+
+        # Verify answers
+        import hashlib
+        all_correct = True
+        for i, row in enumerate(rows):
+            answer = form.get(f"answer_{i}", "").strip().lower()
+            answer_hash = hashlib.sha256(answer.encode()).hexdigest()
+            if answer_hash != row["answer_hash"]:
+                all_correct = False
+                break
+
+        if not all_correct:
+            questions = [{"question": r["question"]} for r in rows]
+            return templates.TemplateResponse("forgot_code.html", {
+                "request": request,
+                "error": "One or more answers are incorrect. Please try again.",
+                "questions": questions, "household": household,
+                "recovered_code": None, "session": None,
+            })
+
+        # All correct — show the code
+        return templates.TemplateResponse("forgot_code.html", {
+            "request": request, "error": None, "questions": [],
+            "household": household, "recovered_code": tenant["family_code"],
+            "session": None,
+        })
+    finally:
+        if not db._conn:
+            conn.close()
+
+
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     session = await get_web_session(request)
@@ -1299,6 +1504,20 @@ async def settings_page(request: Request):
 
     pronunciations = db.get_pronunciations(session["tenant_id"])
 
+    # Load security questions
+    conn = db._get_connection()
+    try:
+        import sqlite3 as _sq
+        conn.row_factory = _sq.Row
+        sq_rows = conn.execute(
+            "SELECT question FROM security_questions WHERE tenant_id = ? ORDER BY id",
+            (session["tenant_id"],)
+        ).fetchall()
+        security_questions = [dict(r) for r in sq_rows]
+    finally:
+        if not db._conn:
+            conn.close()
+
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "session": session,
@@ -1306,6 +1525,7 @@ async def settings_page(request: Request):
         "tenant": tenant,
         "is_snoozed": is_snoozed,
         "pronunciations": pronunciations,
+        "security_questions": security_questions,
     })
 
 
@@ -2048,6 +2268,46 @@ async def family_code_revoke(request: Request):
 
     db = request.app.state.db
     db.revoke_family_code(session["tenant_id"])
+    return RedirectResponse("/web/settings", status_code=303)
+
+
+@router.post("/settings/security-questions")
+async def security_questions_save(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    form = await request.form()
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    import hashlib
+    questions = []
+    for i in [1, 2]:
+        q = form.get(f"question_{i}", "").strip()
+        a = form.get(f"answer_{i}", "").strip().lower()
+        if q and a:
+            answer_hash = hashlib.sha256(a.encode()).hexdigest()
+            questions.append((q, answer_hash))
+
+    if len(questions) < 2:
+        return RedirectResponse("/web/settings", status_code=303)
+
+    conn = db._get_connection()
+    try:
+        # Replace existing questions
+        conn.execute("DELETE FROM security_questions WHERE tenant_id = ?", (tid,))
+        for q, ah in questions:
+            conn.execute(
+                "INSERT INTO security_questions (tenant_id, question, answer_hash) VALUES (?, ?, ?)",
+                (tid, q, ah)
+            )
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
     return RedirectResponse("/web/settings", status_code=303)
 
 

@@ -687,6 +687,17 @@ class PollyDB:
             if "recorded_by_member_id" not in story_cols:
                 conn.execute("ALTER TABLE stories ADD COLUMN recorded_by_member_id INTEGER")
 
+            # Security questions for code recovery
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS security_questions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER NOT NULL,
+                    question TEXT NOT NULL,
+                    answer_hash TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             conn.commit()
         finally:
             if not self._conn:

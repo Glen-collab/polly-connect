@@ -12,6 +12,11 @@
             {{ error }}
         </div>
         {% endif %}
+        {% if request.query_params.get('reset') %}
+        <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded mb-4 text-sm">
+            Password updated. Sign in with your new password.
+        </div>
+        {% endif %}
 
         <form method="POST" action="/web/login" class="space-y-4">
             <div>
@@ -34,6 +39,9 @@
         </form>
 
         <p class="mt-4 text-center text-sm text-gray-500">
+            <a href="/web/forgot-password" class="text-emerald-600 hover:underline font-medium">Forgot password?</a>
+        </p>
+        <p class="mt-2 text-center text-sm text-gray-500">
             Don't have an account?
             <a href="/web/register" class="text-emerald-600 hover:underline font-medium">Create one</a>
         </p>
