@@ -391,12 +391,14 @@ async def forgot_code_submit(request: Request):
 @router.get("/contact", response_class=HTMLResponse)
 async def contact_page(request: Request):
     session = await get_web_session(request)
+    subject = request.query_params.get("subject", "")
     return templates.TemplateResponse("contact.html", {
         "request": request, "session": session,
         "error": None, "success": False,
         "name": session["name"] if session else "",
         "email": session.get("email", "") if session else "",
         "message": "",
+        "selected_subject": subject,
     })
 
 
