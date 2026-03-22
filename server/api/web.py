@@ -101,9 +101,21 @@ async def login_page(request: Request):
 @router.post("/login")
 async def login_submit(request: Request, email: str = Form(...),
                         password: str = Form(...)):
+    from core.rate_limit import is_rate_limited, record_attempt, get_remaining_lockout
+    client_ip = request.client.host if request.client else "unknown"
+    if is_rate_limited(client_ip):
+        mins = get_remaining_lockout(client_ip) // 60 + 1
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": f"Too many login attempts. Try again in {mins} minutes.",
+            "email": email,
+            "session": None,
+        })
+
     db = request.app.state.db
     account = db.get_account_by_email(email.strip().lower())
     if not account or not verify_password(password, account["password_hash"]):
+        record_attempt(client_ip)
         return templates.TemplateResponse("login.html", {
             "request": request,
             "error": "Invalid email or password.",

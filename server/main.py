@@ -167,6 +167,40 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Polly Connect", version="0.1.0", lifespan=lifespan)
 
+
+# Block unauthenticated access to private static files (recordings, uploads)
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+
+class PrivateStaticMiddleware(BaseHTTPMiddleware):
+    """Require a valid session cookie for /static/uploads/ (photos).
+    Recordings are left accessible — they use UUID filenames (unguessable)
+    and are linked from public QR code pages in printed books."""
+    PROTECTED_PREFIXES = ["/static/uploads/"]
+
+    async def dispatch(self, request, call_next):
+        path = request.url.path
+        if any(path.startswith(p) for p in self.PROTECTED_PREFIXES):
+            # Allow QR listen/photo-listen pages (they use referer from polly-connect.com)
+            # Check for valid session cookie
+            session_id = request.cookies.get("polly_session")
+            if session_id:
+                db = request.app.state.db
+                session = db.get_web_session(session_id)
+                if session:
+                    return await call_next(request)
+            # Also allow device API key access (for firmware/device playback)
+            api_key = request.headers.get("X-API-Key", "")
+            if api_key:
+                from core.auth import verify_device_api_key
+                if verify_device_api_key(api_key, request.app.state.db):
+                    return await call_next(request)
+            return Response("Unauthorized", status_code=401)
+        return await call_next(request)
+
+
+app.add_middleware(PrivateStaticMiddleware)
 app.add_middleware(APIKeyMiddleware)
 app.add_middleware(
     CORSMiddleware,
