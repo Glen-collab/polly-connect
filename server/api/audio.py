@@ -296,6 +296,7 @@ async def continuous_stream(websocket: WebSocket):
                             _pr_last_check[0] = now
 
                             from datetime import datetime
+                            from core.medications import _get_local_now
                             local_now = _get_local_now()
                             current_time = local_now.strftime("%H:%M")
                             day_of_week = local_now.weekday()
@@ -575,6 +576,14 @@ async def continuous_stream(websocket: WebSocket):
 
                         await websocket.send_json({"event": "wake_word_detected"})
 
+                        # Send a short chirp so user knows Polly is listening
+                        ack_cache = getattr(app.state, "ack_cache", None)
+                        if ack_cache and ack_cache.ready:
+                            listen_dur = await ack_cache.send_ack(
+                                websocket, squawk_mgr=squawk_mgr, device_id=device_id)
+                            if listen_dur > 0:
+                                logger.info(f"Listen chirp sent ({listen_dur:.2f}s)")
+
                 elif state == "recording":
                     command_audio.extend(chunk_bytes)
 
@@ -750,25 +759,38 @@ async def _process_command(
         dur = await _send_tts(websocket, tts, fallback, squawk_mgr=squawk_mgr, device_id=device_id)
         return dur
 
-    # If using VAD detector, check transcription for wake phrase (skip in conversational mode)
-    if detector and isinstance(detector, VADWakeWordDetector) and not skip_wake_check:
-        is_wake, cleaned = detector.check_transcription(transcription)
-        if not is_wake:
-            # Allow "repeat" / "say that again" / "slower" without wake word
-            text_check = transcription.lower().strip()
-            repeat_phrases = ["repeat", "say that again", "say it again", "what did you say",
-                              "can you repeat", "repeat that", "one more time", "slower"]
-            if any(p in text_check for p in repeat_phrases):
-                logger.info(f"VAD: no wake phrase but repeat command detected: {transcription}")
-                transcription = text_check
+    # Strip wake phrase from transcription
+    if not skip_wake_check:
+        if detector and isinstance(detector, VADWakeWordDetector):
+            # VAD mode: must contain wake phrase or reject
+            is_wake, cleaned = detector.check_transcription(transcription)
+            if not is_wake:
+                text_check = transcription.lower().strip()
+                repeat_phrases = ["repeat", "say that again", "say it again", "what did you say",
+                                  "can you repeat", "repeat that", "one more time", "slower"]
+                if any(p in text_check for p in repeat_phrases):
+                    logger.info(f"VAD: no wake phrase but repeat command detected: {transcription}")
+                    transcription = text_check
+                else:
+                    logger.info(f"VAD: no wake phrase in transcription, ignoring: {transcription}")
+                    await websocket.send_json({"event": "no_wake_word", "text": transcription})
+                    return 0.0
             else:
-                logger.info(f"VAD: no wake phrase in transcription, ignoring: {transcription}")
-                # Tell ESP32 to resume streaming (no command to process)
-                await websocket.send_json({"event": "no_wake_word", "text": transcription})
-                return 0.0
+                logger.info(f"VAD: wake phrase found, command: {cleaned}")
+                transcription = cleaned
         else:
-            logger.info(f"VAD: wake phrase found, command: {cleaned}")
-            transcription = cleaned
+            # OpenWakeWord mode: model already confirmed wake word, just strip the phrase
+            import re as _re
+            text_lower = transcription.lower().strip()
+            for phrase in ["hey polly", "hey poly", "hey holly", "hey paulie",
+                           "hey pauly", "hey paul", "polly", "poly"]:
+                if text_lower.startswith(phrase):
+                    cleaned = text_lower[len(phrase):].strip()
+                    cleaned = _re.sub(r'^[,.\s]+', '', cleaned)
+                    if cleaned:
+                        logger.info(f"Wake phrase stripped: '{transcription}' → '{cleaned}'")
+                        transcription = cleaned
+                    break
 
     # Check if user is telling the parrot to be quiet
     text_lower = transcription.lower().strip()
