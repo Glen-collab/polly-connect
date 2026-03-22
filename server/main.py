@@ -170,9 +170,9 @@ app = FastAPI(title="Polly Connect", version="0.1.0", lifespan=lifespan)
 app.add_middleware(APIKeyMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://polly-connect.com", "https://www.polly-connect.com"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -224,12 +224,10 @@ async def stripe_webhook(request: Request):
         import stripe
         stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 
-        if webhook_secret:
-            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-        else:
-            # No webhook secret configured — parse event directly (dev/test mode)
-            import json
-            event = json.loads(payload)
+        if not webhook_secret:
+            logger.warning("STRIPE_WEBHOOK_SECRET not set — rejecting webhook")
+            return JSONResponse({"error": "Webhook secret not configured"}, status_code=500)
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
 
         from core.subscription import handle_webhook_event
         db = request.app.state.db

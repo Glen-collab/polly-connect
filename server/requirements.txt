@@ -7,6 +7,7 @@ numpy>=1.24.0
 pydantic>=2.5.0
 python-dotenv>=1.0.0
 jinja2>=3.1.0
+bcrypt>=4.0.0
 
 # AWS (cloud deployment)
 boto3>=1.34.0

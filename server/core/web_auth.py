@@ -14,21 +14,28 @@ logger = logging.getLogger(__name__)
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using SHA-256 with a salt prefix.
-    Uses hashlib (stdlib) so no extra dependencies needed."""
-    import secrets
-    salt = secrets.token_hex(16)
-    hashed = hashlib.sha256((salt + password).encode()).hexdigest()
-    return f"{salt}:{hashed}"
+    """Hash a password using bcrypt (adaptive cost factor, GPU-resistant)."""
+    import bcrypt
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    """Verify a password against a stored hash."""
-    if ":" not in password_hash:
-        return False
-    salt, stored_hash = password_hash.split(":", 1)
-    check_hash = hashlib.sha256((salt + password).encode()).hexdigest()
-    return check_hash == stored_hash
+    """Verify a password. Supports bcrypt (new) and SHA-256 (legacy)."""
+    if password_hash.startswith("$2b$") or password_hash.startswith("$2a$"):
+        # bcrypt hash
+        import bcrypt
+        return bcrypt.checkpw(password.encode(), password_hash.encode())
+    elif ":" in password_hash:
+        # Legacy SHA-256 with salt — still verify but caller should upgrade
+        salt, stored_hash = password_hash.split(":", 1)
+        check_hash = hashlib.sha256((salt + password).encode()).hexdigest()
+        return check_hash == stored_hash
+    return False
+
+
+def needs_rehash(password_hash: str) -> bool:
+    """Check if a password hash should be upgraded to bcrypt."""
+    return not (password_hash.startswith("$2b$") or password_hash.startswith("$2a$"))
 
 
 async def get_web_session(request: Request) -> Optional[Dict]:

@@ -111,6 +111,19 @@ async def login_submit(request: Request, email: str = Form(...),
             "session": None,
         })
 
+    # Auto-upgrade legacy SHA-256 hash to bcrypt on successful login
+    from core.web_auth import needs_rehash
+    if needs_rehash(account["password_hash"]):
+        new_hash = hash_password(password)
+        conn = db._get_connection()
+        try:
+            conn.execute("UPDATE accounts SET password_hash = ? WHERE id = ?",
+                         (new_hash, account["id"]))
+            conn.commit()
+        finally:
+            if not db._conn:
+                conn.close()
+
     # Create session
     session_id = db.create_web_session(
         account["id"], account["tenant_id"],
@@ -170,9 +183,9 @@ async def register_submit(request: Request, name: str = Form(...),
             "name": name, "email": email, "household_name": household_name,
             "session": None,
         })
-    if len(password) < 6:
+    if len(password) < 10:
         return templates.TemplateResponse("register.html", {
-            "request": request, "error": "Password must be at least 6 characters.",
+            "request": request, "error": "Password must be at least 10 characters.",
             "name": name, "email": email, "household_name": household_name,
             "session": None,
         })
