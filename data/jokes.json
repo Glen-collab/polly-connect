@@ -1402,5 +1402,13 @@
                 { "id": "eg_w52_19", "setup": "Why did the day feel gentle?", "punchline": "Everything moved smoothly." },
                 { "id": "eg_w52_20", "setup": "What do calm days offer?", "punchline": "Comfort." }
             ]
+        },
+        {
+            "week": 0,
+            "season": "any",
+            "mode": "regular",
+            "jokes": [
+                { "id": "reg_001", "setup": "What did one butt cheek say to the other?", "punchline": "Together, we can stop this crap!" }
+            ]
         }
 ]
