@@ -386,6 +386,79 @@ async def forgot_code_submit(request: Request):
             conn.close()
 
 
+# ── Contact Us ──
+
+@router.get("/contact", response_class=HTMLResponse)
+async def contact_page(request: Request):
+    session = await get_web_session(request)
+    return templates.TemplateResponse("contact.html", {
+        "request": request, "session": session,
+        "error": None, "success": False,
+        "name": session["name"] if session else "",
+        "email": session.get("email", "") if session else "",
+        "message": "",
+    })
+
+
+@router.post("/contact")
+async def contact_submit(request: Request,
+                          name: str = Form(...),
+                          email: str = Form(...),
+                          subject: str = Form("General Question"),
+                          message: str = Form(...)):
+    session = await get_web_session(request)
+
+    # Rate limit contact form
+    from core.rate_limit import is_rate_limited, record_attempt
+    client_ip = request.client.host if request.client else "unknown"
+    if is_rate_limited(client_ip):
+        return templates.TemplateResponse("contact.html", {
+            "request": request, "session": session,
+            "error": "Too many messages. Please try again later.",
+            "success": False, "name": name, "email": email, "message": message,
+        })
+
+    if len(message.strip()) < 10:
+        return templates.TemplateResponse("contact.html", {
+            "request": request, "session": session,
+            "error": "Please write a longer message.",
+            "success": False, "name": name, "email": email, "message": message,
+        })
+
+    # Send to admin
+    try:
+        from core.notify import send_notification
+        import threading
+        body = f"""
+        <div style="font-family: sans-serif; max-width: 500px;">
+            <h2 style="color: #059669;">Contact Form: {subject}</h2>
+            <table style="border-collapse: collapse; width: 100%;">
+                <tr><td style="padding: 8px; font-weight: bold;">From</td><td style="padding: 8px;">{name}</td></tr>
+                <tr><td style="padding: 8px; font-weight: bold;">Email</td><td style="padding: 8px;"><a href="mailto:{email}">{email}</a></td></tr>
+                <tr><td style="padding: 8px; font-weight: bold;">Subject</td><td style="padding: 8px;">{subject}</td></tr>
+            </table>
+            <div style="margin-top: 16px; padding: 16px; background: #f9fafb; border-radius: 8px;">
+                <p style="white-space: pre-wrap;">{message}</p>
+            </div>
+        </div>
+        """
+        threading.Thread(
+            target=send_notification,
+            args=(f"Polly Contact: {subject} — {name}", body),
+            daemon=True,
+        ).start()
+    except Exception:
+        pass
+
+    record_attempt(client_ip)  # count toward rate limit
+
+    return templates.TemplateResponse("contact.html", {
+        "request": request, "session": session,
+        "error": None, "success": True,
+        "name": name, "email": email, "message": "",
+    })
+
+
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     session = await get_web_session(request)
