@@ -280,7 +280,7 @@ async def welcome_save(request: Request):
     if birth_year:
         try:
             birth_year_int = int(birth_year)
-            birth_year_int = max(1900, min(2010, birth_year_int))
+            birth_year_int = max(1800, min(2026, birth_year_int))
         except ValueError:
             pass
 
@@ -1336,7 +1336,7 @@ async def settings_save(request: Request):
     if birth_year and birth_year.strip():
         try:
             birth_year_int = int(birth_year.strip())
-            birth_year_int = max(1900, min(2010, birth_year_int))
+            birth_year_int = max(1800, min(2026, birth_year_int))
         except ValueError:
             pass
 
@@ -2092,6 +2092,8 @@ RELATIONSHIP_CHOICES = [
     ("granddaughter", "Granddaughter"),
     ("great-grandson", "Great-grandson"),
     ("great-granddaughter", "Great-granddaughter"),
+    ("great-great-grandson", "Great-Great-Grandson"),
+    ("great-great-granddaughter", "Great-Great-Granddaughter"),
     # -- Non-family --
     ("friend", "Friend"),
     ("neighbor", "Neighbor"),
@@ -2116,6 +2118,7 @@ RELATION_GENERATION = {
     "nephew": 1, "niece": 1,
     "grandson": 2, "granddaughter": 2,
     "great-grandson": 3, "great-granddaughter": 3,
+    "great-great-grandson": 4, "great-great-granddaughter": 4,
     "friend": 0, "neighbor": 0, "caretaker": 0, "other": 0,
 }
 
@@ -2185,10 +2188,10 @@ async def family_tree_add(request: Request,
     # Parse birth_year / deceased_year
     by = None
     if birth_year and birth_year.strip().isdigit():
-        by = max(1900, min(2026, int(birth_year.strip())))
+        by = max(1800, min(2026, int(birth_year.strip())))
     dy = None
     if deceased_year and deceased_year.strip().isdigit():
-        dy = max(1900, min(2026, int(deceased_year.strip())))
+        dy = max(1800, min(2026, int(deceased_year.strip())))
 
     # Use add_family_member to create or update
     member_id = db.add_family_member(
@@ -2246,10 +2249,10 @@ async def family_tree_edit(request: Request, member_id: int,
 
     by = None
     if birth_year and birth_year.strip().isdigit():
-        by = max(1900, min(2026, int(birth_year.strip())))
+        by = max(1800, min(2026, int(birth_year.strip())))
     dy = None
     if deceased_year and deceased_year.strip().isdigit():
-        dy = max(1900, min(2026, int(deceased_year.strip())))
+        dy = max(1800, min(2026, int(deceased_year.strip())))
 
     db.update_family_member(
         member_id,

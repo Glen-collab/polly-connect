@@ -62,7 +62,7 @@
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
-                <input type="number" name="birth_year" min="1900" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1952">
+                <input type="number" name="birth_year" min="1800" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1952">
             </div>
             <div class="flex items-end pb-1">
                 <label class="flex items-center gap-2 text-sm text-gray-600">
@@ -72,7 +72,7 @@
             </div>
             <div class="hidden col-span-2 sm:col-span-2">
                 <label class="block text-sm text-gray-600 mb-1">Year Passed</label>
-                <input type="number" name="deceased_year" min="1900" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 2018">
+                <input type="number" name="deceased_year" min="1800" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 2018">
             </div>
         </div>
         <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded text-sm hover:bg-emerald-700">
@@ -144,6 +144,7 @@
     {{ gen_row(1, "Children, In-Laws & Nephews/Nieces", "bg-emerald-50 border border-emerald-200", "text-emerald-600") }}
     {{ gen_row(2, "Grandchildren", "bg-amber-50 border border-amber-200", "text-amber-600") }}
     {{ gen_row(3, "Great-Grandchildren", "bg-pink-50 border border-pink-200", "text-pink-600") }}
+    {{ gen_row(4, "Great-Great-Grandchildren", "bg-rose-50 border border-rose-200", "text-rose-600") }}
 
     <p class="text-xs text-gray-400 text-center mt-4">{{ members|length }} family member{{ 's' if members|length != 1 else '' }} &middot; Hover or tap a card to edit or remove</p>
 
@@ -214,7 +215,7 @@
                 </div>
                 <div>
                     <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
-                    <input type="number" name="birth_year" id="edit-birth-year" min="1900" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1952">
+                    <input type="number" name="birth_year" id="edit-birth-year" min="1800" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 1952">
                 </div>
                 <div>
                     <label class="block text-sm text-gray-600 mb-1">Short bio / family ties</label>
@@ -229,7 +230,7 @@
                 </div>
                 <div id="edit-deceased-year-row" class="hidden">
                     <label class="block text-sm text-gray-600 mb-1">Year Passed</label>
-                    <input type="number" name="deceased_year" id="edit-deceased-year" min="1900" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 2018">
+                    <input type="number" name="deceased_year" id="edit-deceased-year" min="1800" max="2026" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 2018">
                 </div>
             </div>
             <div class="flex gap-2">
