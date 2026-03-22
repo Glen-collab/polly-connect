@@ -69,7 +69,7 @@ static const char *TAG = "POLLY-WS";
 #define WIFI_MAX_SAVED  5   // Max remembered WiFi networks
 
 // Server
-#define SERVER_HOST     "3.14.130.158"
+#define SERVER_HOST     "polly-connect.com"
 #define SERVER_PORT     8000
 #define WS_URI          "ws://" SERVER_HOST ":8000/api/audio/continuous"
 
