@@ -2,8 +2,9 @@
 {% block title %}Medications - Polly Connect{% endblock %}
 
 {% block content %}
+<div style="width:100%">
 <a href="/web/hub/care" class="text-emerald-600 hover:underline text-sm">&larr; Care</a>
-<div class="flex items-center justify-between mb-4 sm:mb-6 mt-1 w-full">
+<div class="flex items-center justify-between mb-4 sm:mb-6 mt-1">
     <h1 class="text-xl sm:text-2xl font-bold">Reminders</h1>
     {% if medications %}
     <a href="/web/medications/calendar"
@@ -105,6 +106,7 @@
     {% else %}
     <p class="text-gray-400 text-sm">No medications scheduled. Add one above or say "remind me to take aspirin at 8am".</p>
     {% endif %}
+</div>
 </div>
 {% endblock %}
 
