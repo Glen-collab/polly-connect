@@ -682,6 +682,11 @@ class PollyDB:
                 )
             """)
 
+            # Add recorded_by_member_id to stories (tracks which family member recorded)
+            story_cols = {row[1] for row in conn.execute("PRAGMA table_info(stories)").fetchall()}
+            if "recorded_by_member_id" not in story_cols:
+                conn.execute("ALTER TABLE stories ADD COLUMN recorded_by_member_id INTEGER")
+
             conn.commit()
         finally:
             if not self._conn:
@@ -1445,15 +1450,17 @@ class PollyDB:
                    speaker_name: str = None, source: str = "voice",
                    duration_seconds: float = None, user_id: int = None,
                    tenant_id: int = None, question_text: str = None,
-                   photo_id: int = None) -> int:
+                   photo_id: int = None, recorded_by_member_id: int = None) -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
                 INSERT INTO stories (user_id, transcript, audio_s3_key, speaker_name,
-                                    source, duration_seconds, tenant_id, question_text, photo_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    source, duration_seconds, tenant_id, question_text,
+                                    photo_id, recorded_by_member_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (user_id, transcript, audio_s3_key, speaker_name, source,
-                  duration_seconds, tenant_id, question_text, photo_id))
+                  duration_seconds, tenant_id, question_text, photo_id,
+                  recorded_by_member_id))
             conn.commit()
             return cursor.lastrowid
         finally:

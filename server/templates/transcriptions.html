@@ -50,16 +50,21 @@
             <p class="text-xs text-gray-400">Verified by {{ story.verified_by }}{% if story.verified_at %} on {{ story.verified_at }}{% endif %}</p>
             {% endif %}
             <div class="flex gap-3 mt-2">
+                {% if session.role != 'family' or (session.family_member_id and story.recorded_by_member_id == session.family_member_id) %}
                 <button onclick="toggleEdit({{ story.id }})"
                         class="text-sm text-emerald-600 hover:underline py-1">Edit &amp; Verify</button>
+                {% endif %}
+                {% if session.role != 'family' %}
                 <form method="POST" action="/web/transcriptions/{{ story.id }}/delete" class="inline"
                       onsubmit="return confirm('Are you sure you want to delete this story? This cannot be undone.')">
                     <button type="submit" class="text-sm text-red-400 hover:text-red-600 py-1">Delete</button>
                 </form>
+                {% endif %}
             </div>
         </div>
 
         <!-- Edit mode (hidden by default) -->
+        {% if session.role != 'family' or (session.family_member_id and story.recorded_by_member_id == session.family_member_id) %}
         <div id="edit-{{ story.id }}" class="hidden">
             <form method="POST" action="/web/transcriptions/{{ story.id }}/verify">
                 <div class="mb-3">
@@ -89,6 +94,7 @@
                 </div>
             </form>
         </div>
+        {% endif %}
     </div>
     {% endfor %}
 </div>

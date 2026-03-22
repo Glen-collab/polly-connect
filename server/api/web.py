@@ -1544,6 +1544,13 @@ async def transcription_verify(request: Request, story_id: int,
     db = request.app.state.db
     tid = session["tenant_id"]
 
+    # Family members can only verify their own stories
+    if session.get("role") == "family":
+        story = db.get_story_by_id(story_id, tenant_id=tid)
+        member_id = session.get("family_member_id")
+        if not story or not member_id or story.get("recorded_by_member_id") != member_id:
+            return RedirectResponse("/web/transcriptions", status_code=303)
+
     # Update speaker name if changed
     conn = db._get_connection()
     try:
@@ -1808,6 +1815,13 @@ async def web_record_story(request: Request):
     if not transcription or len(transcription.strip()) < 5:
         transcription = "[Audio memory]"
 
+    # Auto-set speaker name from family member if not provided
+    member_id = session.get("family_member_id")
+    if not speaker_name and member_id:
+        member = db.get_family_member_by_id(member_id)
+        if member:
+            speaker_name = member.get("name", "")
+
     # Save as story
     user = db.get_or_create_user(tenant_id=tid)
     story_id = db.save_story(
@@ -1817,6 +1831,7 @@ async def web_record_story(request: Request):
         source="web_recording",
         user_id=user["id"],
         tenant_id=tid,
+        recorded_by_member_id=member_id,
     )
 
     # Extract memory if transcription is real
@@ -1892,6 +1907,13 @@ async def photo_record_story(request: Request, photo_id: int,
     caption = photo.get("caption") or "this photo"
     question_text = f"Tell me about {caption}"
 
+    # Auto-set speaker name from family member if not provided
+    member_id = session.get("family_member_id")
+    if not speaker_name and member_id:
+        member = db.get_family_member_by_id(member_id)
+        if member:
+            speaker_name = member.get("name", "")
+
     # Save as story linked to the photo
     user = db.get_or_create_user(tenant_id=tid)
     story_id = db.save_story(
@@ -1903,6 +1925,7 @@ async def photo_record_story(request: Request, photo_id: int,
         tenant_id=tid,
         question_text=question_text,
         photo_id=photo_id,
+        recorded_by_member_id=member_id,
     )
 
     # Link story to photo (bidirectional)
