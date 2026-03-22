@@ -34,7 +34,7 @@ class WakeWordDetector:
             return
 
         try:
-            self.model = Model(wakeword_models=[model_path])
+            self.model = Model(wakeword_models=[model_path], inference_framework="onnx")
             # Discover the model key used by predict()
             # OpenWakeWord uses the model filename (without extension) as key
             self.model_name = os.path.splitext(os.path.basename(model_path))[0]
