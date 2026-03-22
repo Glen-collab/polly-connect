@@ -134,7 +134,7 @@
                 <div>
                     <a href="/web/hub/care" class="font-semibold text-purple-600 hover:underline">Care</a>
                     <ul class="mt-1 space-y-1 text-gray-500">
-                        <li><a href="/web/medications" class="hover:text-gray-800">Medications</a></li>
+                        <li><a href="/web/medications" class="hover:text-gray-800">Reminders</a></li>
                     </ul>
                 </div>
                 <div>
@@ -179,29 +179,24 @@
             console.log('SW registration failed:', err);
         });
     }
-    // CSRF protection: auto-inject token into all forms and fetch calls
+    // CSRF protection: set token as cookie + header for all requests
     var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     (function() {
-        // Inject hidden field into all POST forms
-        document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(form) {
-            if (!form.querySelector('input[name="csrf_token"]')) {
-                var input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'csrf_token';
-                input.value = CSRF_TOKEN;
-                form.appendChild(input);
-            }
-        });
-        // Patch FormData to auto-append CSRF token
-        var _origAppend = FormData.prototype.append;
-        var _patched = new WeakSet();
-        var _origSend = window.fetch;
+        // Set CSRF token as cookie (readable by middleware without parsing body)
+        document.cookie = "csrf_token=" + CSRF_TOKEN + ";path=/;SameSite=Lax";
+
+        // Patch fetch to add X-CSRF-Token header on POST requests
+        var _origFetch = window.fetch;
         window.fetch = function(url, opts) {
-            if (opts && opts.body instanceof FormData && !_patched.has(opts.body)) {
-                opts.body.append('csrf_token', CSRF_TOKEN);
-                _patched.add(opts.body);
+            if (opts && opts.method && opts.method.toUpperCase() === 'POST') {
+                opts.headers = opts.headers || {};
+                if (opts.headers instanceof Headers) {
+                    opts.headers.set('X-CSRF-Token', CSRF_TOKEN);
+                } else {
+                    opts.headers['X-CSRF-Token'] = CSRF_TOKEN;
+                }
             }
-            return _origSend.apply(this, arguments);
+            return _origFetch.apply(this, arguments);
         };
     })();
     </script>

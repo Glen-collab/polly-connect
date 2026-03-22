@@ -12,22 +12,22 @@
         <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
         </svg>
-        <span class="text-lg sm:text-xl font-bold">Medications</span>
-        <p class="text-xs text-purple-100 mt-1">Add and manage daily medications. Polly reminds you when it's time.</p>
+        <span class="text-lg sm:text-xl font-bold">Reminders</span>
+        <p class="text-xs text-purple-100 mt-1">Add daily reminders. Polly tells you when it's time.</p>
     </a>
     <a href="/web/medications/calendar" class="bg-purple-500 hover:bg-purple-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
         <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
-        <span class="text-lg sm:text-xl font-bold">Med Calendar</span>
-        <p class="text-xs text-purple-100 mt-1">View medication schedule and check what's been taken today.</p>
+        <span class="text-lg sm:text-xl font-bold">Calendar</span>
+        <p class="text-xs text-purple-100 mt-1">View reminder schedule and check what's done today.</p>
     </a>
 </div>
 
 <!-- Upcoming Meds Quick View -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6 mt-6 max-w-lg mx-auto">
     <div class="flex items-center justify-between mb-3">
-        <h2 class="text-sm font-semibold text-gray-600">Today's Medications</h2>
+        <h2 class="text-sm font-semibold text-gray-600">Today's Reminders</h2>
         <span id="med-time" class="text-xs text-gray-400"></span>
     </div>
     <div id="med-list">
@@ -41,7 +41,7 @@
             {% endfor %}
         </ul>
         {% else %}
-        <p class="text-gray-400 text-sm">No medications set up yet.</p>
+        <p class="text-gray-400 text-sm">No reminders set up yet.</p>
         {% endif %}
     </div>
 </div>
@@ -73,7 +73,7 @@ function loadMeds() {
 
             var list = document.getElementById('med-list');
             if (!data.medications || data.medications.length === 0) {
-                list.innerHTML = '<p class="text-gray-400 text-sm">No medications set up yet.</p>';
+                list.innerHTML = '<p class="text-gray-400 text-sm">No reminders set up yet.</p>';
                 return;
             }
 

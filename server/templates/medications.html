@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Medications - Polly Connect{% endblock %}
+{% block title %}Reminders - Polly Connect{% endblock %}
 
 {% block content %}
 <a href="/web/hub/care" class="text-emerald-600 hover:underline text-sm">&larr; Care</a>
 <div class="flex items-center justify-between mb-4 sm:mb-6 mt-1">
-    <h1 class="text-xl sm:text-2xl font-bold">Medication Reminders</h1>
+    <h1 class="text-xl sm:text-2xl font-bold">Reminders</h1>
     {% if medications %}
     <a href="/web/medications/calendar"
        class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-xs sm:text-sm">
@@ -16,16 +16,16 @@
 {% if session.role != 'family' %}
 <!-- Add Medication Form -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
-    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Add Medication</h2>
+    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Add Reminder</h2>
     <form method="POST" action="/web/medications/add">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Name</label>
-                <input type="text" name="name" required class="w-full border rounded px-3 py-2 text-sm" placeholder="Aspirin">
+                <input type="text" name="name" required class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Brush teeth, Take vitamins">
             </div>
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Dosage</label>
-                <input type="text" name="dosage" class="w-full border rounded px-3 py-2 text-sm" placeholder="100mg">
+                <input type="text" name="dosage" class="w-full border rounded px-3 py-2 text-sm" placeholder="Optional details">
             </div>
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Times (comma-separated)</label>
@@ -41,7 +41,7 @@
 
 <!-- Medication List -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6">
-    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Current Medications</h2>
+    <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Current Reminders</h2>
     {% if medications %}
     <!-- Mobile: card layout -->
     <div class="sm:hidden space-y-3">
