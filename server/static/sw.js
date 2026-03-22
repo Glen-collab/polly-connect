@@ -1,5 +1,5 @@
 // Polly Connect Service Worker — enables PWA install + offline login page
-const CACHE_NAME = 'polly-v1';
+const CACHE_NAME = 'polly-v2';
 
 // Cache the login page and key assets on install
 self.addEventListener('install', event => {
