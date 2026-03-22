@@ -576,14 +576,6 @@ async def continuous_stream(websocket: WebSocket):
 
                         await websocket.send_json({"event": "wake_word_detected"})
 
-                        # Send a short chirp so user knows Polly is listening
-                        ack_cache = getattr(app.state, "ack_cache", None)
-                        if ack_cache and ack_cache.ready:
-                            listen_dur = await ack_cache.send_ack(
-                                websocket, squawk_mgr=squawk_mgr, device_id=device_id)
-                            if listen_dur > 0:
-                                logger.info(f"Listen chirp sent ({listen_dur:.2f}s)")
-
                 elif state == "recording":
                     command_audio.extend(chunk_bytes)
 
