@@ -7,6 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Polly">
+    <meta name="csrf-token" content="{{ csrf_token(request) }}">
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/png" href="/static/polly_logo.png">
     <link rel="apple-touch-icon" href="/static/polly_logo.png">
@@ -178,6 +179,31 @@
             console.log('SW registration failed:', err);
         });
     }
+    // CSRF protection: auto-inject token into all forms and fetch calls
+    var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    (function() {
+        // Inject hidden field into all POST forms
+        document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(form) {
+            if (!form.querySelector('input[name="csrf_token"]')) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = CSRF_TOKEN;
+                form.appendChild(input);
+            }
+        });
+        // Patch FormData to auto-append CSRF token
+        var _origAppend = FormData.prototype.append;
+        var _patched = new WeakSet();
+        var _origSend = window.fetch;
+        window.fetch = function(url, opts) {
+            if (opts && opts.body instanceof FormData && !_patched.has(opts.body)) {
+                opts.body.append('csrf_token', CSRF_TOKEN);
+                _patched.add(opts.body);
+            }
+            return _origSend.apply(this, arguments);
+        };
+    })();
     </script>
     {% block scripts %}{% endblock %}
 </body>

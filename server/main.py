@@ -200,6 +200,54 @@ class PrivateStaticMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class CSRFMiddleware(BaseHTTPMiddleware):
+    """Validate CSRF token on POST requests to web routes."""
+    # Routes that don't need CSRF (API endpoints, webhooks, file uploads via JS)
+    EXEMPT_PREFIXES = ["/api/", "/stripe-webhook"]
+
+    async def dispatch(self, request, call_next):
+        if request.method == "POST":
+            path = request.url.path
+            # Only check web form posts, not API or webhook
+            if not any(path.startswith(p) for p in self.EXEMPT_PREFIXES):
+                # Get token from form data or header
+                content_type = request.headers.get("content-type", "")
+                csrf_token = None
+                if "multipart/form-data" in content_type or "x-www-form-urlencoded" in content_type:
+                    # Read form — need to cache body for downstream
+                    body = await request.body()
+                    # Parse csrf_token from form
+                    from urllib.parse import parse_qs
+                    if "x-www-form-urlencoded" in content_type:
+                        parsed = parse_qs(body.decode())
+                        csrf_token = parsed.get("csrf_token", [None])[0]
+                    elif "multipart/form-data" in content_type:
+                        # For multipart, check header fallback
+                        csrf_token = request.headers.get("X-CSRF-Token")
+                        # Also try to extract from multipart body
+                        if not csrf_token:
+                            try:
+                                text = body.decode("utf-8", errors="ignore")
+                                import re
+                                match = re.search(r'name="csrf_token"\r?\n\r?\n([^\r\n-]+)', text)
+                                if match:
+                                    csrf_token = match.group(1).strip()
+                            except Exception:
+                                pass
+
+                if not csrf_token:
+                    csrf_token = request.headers.get("X-CSRF-Token")
+
+                from core.csrf import validate_csrf_token
+                session_id = request.cookies.get("polly_session", "anonymous")
+                if not csrf_token or not validate_csrf_token(csrf_token, session_id):
+                    from starlette.responses import Response as _Resp
+                    return _Resp("CSRF validation failed", status_code=403)
+
+        return await call_next(request)
+
+
+app.add_middleware(CSRFMiddleware)
 app.add_middleware(PrivateStaticMiddleware)
 app.add_middleware(APIKeyMiddleware)
 app.add_middleware(

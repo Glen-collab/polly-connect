@@ -85,6 +85,18 @@ router = APIRouter()
 templates_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 templates = Jinja2Templates(directory=templates_dir)
 
+# Make csrf_token() available in all templates
+from core.csrf import generate_csrf_token as _gen_csrf
+
+
+def _csrf_token_for_request(request):
+    """Generate a CSRF token from the current session cookie."""
+    session_id = request.cookies.get("polly_session", "anonymous")
+    return _gen_csrf(session_id)
+
+
+templates.env.globals["csrf_token"] = _csrf_token_for_request
+
 
 # ── Auth routes (no session required) ──
 
