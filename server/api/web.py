@@ -441,6 +441,8 @@ async def hub_care(request: Request):
     redirect = require_login(session)
     if redirect:
         return redirect
+    if session.get("role") == "family":
+        return RedirectResponse("/web/dashboard", status_code=302)
     db = request.app.state.db
     medications = db.get_medications(tenant_id=session["tenant_id"])
     book_builder = getattr(request.app.state, "book_builder", None)
@@ -476,6 +478,8 @@ async def hub_memory(request: Request):
     redirect = require_login(session)
     if redirect:
         return redirect
+    if session.get("role") == "family":
+        return RedirectResponse("/web/dashboard", status_code=302)
     db = request.app.state.db
     tid = session["tenant_id"]
     items = db.list_all(tenant_id=tid)
