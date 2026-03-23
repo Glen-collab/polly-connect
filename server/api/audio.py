@@ -278,6 +278,7 @@ async def continuous_stream(websocket: WebSocket):
                         _ns_ws = websocket
                         _ns_smgr = squawk_mgr
                         _ns_dev = device_id
+                        _ns_cmd = cmd
                         async def _nostalgia_chatter():
                             snippet = _ns_db.get_next_nostalgia_snippet(_ns_tid)
                             if snippet:
@@ -285,6 +286,9 @@ async def continuous_stream(websocket: WebSocket):
                                 logger.info(f"Nostalgia snippet → {_ns_dev}: {snippet['text'][:60]}...")
                                 await _send_tts(_ns_ws, _ns_tts, snippet["text"],
                                                 squawk_mgr=_ns_smgr, device_id=_ns_dev)
+                                # Set last_response so "repeat" works
+                                if _ns_cmd:
+                                    _ns_cmd._last_response[_ns_dev] = snippet["text"]
                             else:
                                 await _ns_smgr.send_chatter(_ns_dev)
                         squawk_mgr.register_nostalgia_callback(device_id, _nostalgia_chatter)
@@ -296,6 +300,7 @@ async def continuous_stream(websocket: WebSocket):
                         _pr_smgr = squawk_mgr
                         _pr_dev = device_id
                         _pr_tid = tenant_id
+                        _pr_cmd = cmd
                         _pr_last_check = [0]  # mutable for closure
 
                         async def _check_scheduled_prayers():
@@ -344,6 +349,9 @@ async def continuous_stream(websocket: WebSocket):
                                             wav_data = f.read()
                                         await _pr_smgr._send_wav(_pr_dev, wav_data)
                                         _pr_db.update_prayer_recording_played(prayer["id"])
+                                        # Set last_response so "repeat" works
+                                        if _pr_cmd:
+                                            _pr_cmd._last_response[_pr_dev] = intro
                                         return True
                             return False
 

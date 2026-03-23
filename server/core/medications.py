@@ -149,6 +149,7 @@ class MedicationScheduler:
         self._websockets = {}  # device_id -> {"ws": websocket, "tenant_id": int}
         self._task = None
         self._last_reminded = {}  # med_id:time_str -> "YYYY-MM-DD HH:MM"
+        self._cmd_processor = None  # set after init for repeat support
 
     def register_websocket(self, device_id: str, websocket, tenant_id: int = 1):
         """Track active WebSocket connections for push reminders."""
@@ -262,6 +263,9 @@ class MedicationScheduler:
                         await asyncio.sleep(0.05)
 
                 sent_count += 1
+                # Update last_response so "repeat" works for reminders
+                if self._cmd_processor:
+                    self._cmd_processor._last_response[device_id] = msg
             except Exception as e:
                 logger.warning(f"Failed to send reminder to {device_id}: {e}")
                 self.unregister_websocket(device_id)

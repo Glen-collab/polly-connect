@@ -146,6 +146,9 @@ async def lifespan(app: FastAPI):
         followup_gen=app.state.followup_gen,
     )
 
+    # Link med scheduler to command processor for "repeat" support
+    app.state.med_scheduler._cmd_processor = app.state.cmd
+
     # Squawk / ambient parrot sounds
     sounds_dir = os.path.join(os.path.dirname(__file__), "static", "sounds")
     app.state.squawk = SquawkManager(sounds_dir)
