@@ -714,10 +714,19 @@ async def dashboard(request: Request):
     from core.subscription import get_subscription
     subscription = get_subscription(db, tid)
 
+    # Check if tenant has any devices (for claim code prompt)
+    devices = db.get_devices_by_tenant(tid)
+    has_device = len(devices) > 0
+    claim_error = request.query_params.get("claim_error")
+    claim_success = request.query_params.get("claim_success")
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "session": session,
         "subscription": subscription,
+        "has_device": has_device,
+        "claim_error": claim_error,
+        "claim_success": claim_success,
     })
 
 
@@ -3405,20 +3414,25 @@ async def device_claim(request: Request, claim_code: str = Form(...)):
     tid = session["tenant_id"]
     code = claim_code.strip()
 
+    # Detect if claim came from dashboard vs devices page
+    referer = request.headers.get("referer", "")
+    from_dashboard = "dashboard" in referer or referer.endswith("/web/")
+    redirect_base = "/web/dashboard" if from_dashboard else "/web/devices"
+
     if not code or len(code) != 6 or not code.isdigit():
         return RedirectResponse(
-            "/web/devices?claim_error=Please+enter+a+valid+6-digit+claim+code",
+            f"{redirect_base}?claim_error=Please+enter+a+valid+6-digit+claim+code",
             status_code=303)
 
     device = db.claim_device(code, tid)
     if not device:
         return RedirectResponse(
-            "/web/devices?claim_error=Invalid+or+already+claimed+code",
+            f"{redirect_base}?claim_error=Invalid+or+already+claimed+code",
             status_code=303)
 
     name = device.get("name") or device["device_id"]
     return RedirectResponse(
-        f"/web/devices?claim_success={name}",
+        f"{redirect_base}?claim_success={name}",
         status_code=303)
 
 
