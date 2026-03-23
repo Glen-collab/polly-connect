@@ -10,7 +10,7 @@
 
 {% if saved %}
 <div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4 max-w-lg mx-auto">
-    <p class="text-emerald-800 text-sm font-medium">Item saved!</p>
+    <p class="text-emerald-800 text-sm font-medium">{% if saved|int > 1 %}{{ saved }} items saved!{% else %}Item saved!{% endif %}</p>
 </div>
 {% endif %}
 
@@ -35,6 +35,37 @@
             Remember This
         </button>
     </form>
+</div>
+
+<!-- Bulk Add Items -->
+<div class="bg-white rounded-lg shadow-md p-4 mb-6 max-w-lg mx-auto">
+    <button type="button" onclick="document.getElementById('bulk-add-body').classList.toggle('hidden'); document.getElementById('bulk-add-arrow').classList.toggle('rotate-180')"
+            class="w-full flex items-center justify-between text-left">
+        <h2 class="text-lg font-semibold">Add Multiple Items</h2>
+        <svg id="bulk-add-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div id="bulk-add-body" class="hidden mt-3">
+        <p class="text-xs text-gray-500 mb-3">Add a list of items that all go in the same location.</p>
+        <form method="POST" action="/web/memory/items/add-bulk" class="space-y-3">
+            <div>
+                <label class="block text-xs text-gray-600 mb-1">Location</label>
+                <input type="text" name="location" required placeholder="Where? (e.g. top shelf in kitchen)"
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+            </div>
+            <div>
+                <label class="block text-xs text-gray-600 mb-1">Items (comma or line separated)</label>
+                <textarea name="items_list" required rows="4"
+                          placeholder="keys, wallet, sunglasses&#10;medicine bottle&#10;phone charger"
+                          class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+            </div>
+            <button type="submit"
+                    class="w-full bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 font-medium text-sm">
+                Remember All
+            </button>
+        </form>
+    </div>
 </div>
 
 <!-- Search -->

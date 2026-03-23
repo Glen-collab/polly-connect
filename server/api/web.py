@@ -849,6 +849,27 @@ async def memory_items_add(request: Request,
     return RedirectResponse("/web/memory/items?saved=1", status_code=303)
 
 
+@router.post("/memory/items/add-bulk")
+async def memory_items_add_bulk(request: Request,
+                                location: str = Form(...),
+                                items_list: str = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    loc = location.strip()
+    count = 0
+    for line in items_list.split("\n"):
+        for item_name in line.split(","):
+            item_name = item_name.strip()
+            if item_name:
+                db.store_item(item_name, loc, tenant_id=tid)
+                count += 1
+    return RedirectResponse(f"/web/memory/items?saved={count}", status_code=303)
+
+
 @router.post("/memory/items/delete")
 async def memory_items_delete(request: Request,
                               item_name: str = Form(...)):
