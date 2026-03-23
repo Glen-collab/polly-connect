@@ -10,6 +10,7 @@ import logging
 import os
 import struct
 import uuid
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -1568,23 +1569,60 @@ async def settings_page(request: Request):
     user = db.get_or_create_user(tenant_id=session["tenant_id"])
     tenant = db.get_tenant(session["tenant_id"])
 
-    # Check snooze status for any connected device
-    squawk_mgr = getattr(request.app.state, "squawk", None)
+    # Check snooze status from DB (works even when device is disconnected)
     is_snoozed = False
     snooze_status = "awake"
     snooze_minutes = 0
-    if squawk_mgr:
-        for dev_id in squawk_mgr._active_devices:
-            status = squawk_mgr.snooze_status(dev_id)
-            if status.startswith("snoozed:"):
+    snoozed_until_str = user.get("squawk_snoozed_until")
+    if snoozed_until_str:
+        try:
+            snoozed_until = datetime.fromisoformat(snoozed_until_str)
+            remaining = (snoozed_until - datetime.utcnow()).total_seconds() / 60
+            if remaining > 0:
                 is_snoozed = True
                 snooze_status = "snoozed"
-                snooze_minutes = int(status.split(":")[1])
-                break
-            elif status == "quiet_hours":
-                is_snoozed = True
-                snooze_status = "quiet_hours"
-                break
+                snooze_minutes = int(remaining)
+        except (ValueError, TypeError):
+            pass
+
+    # Check quiet hours if not manually snoozed
+    if not is_snoozed:
+        from config import settings as app_settings
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(app_settings.TIMEZONE)
+        except Exception:
+            try:
+                import pytz
+                tz = pytz.timezone(app_settings.TIMEZONE)
+            except Exception:
+                from datetime import timezone as _tz
+                tz = _tz.utc
+        now_hour = datetime.now(tz).hour
+        start = user.get("quiet_hours_start", 21) or 21
+        end = user.get("quiet_hours_end", 7) or 7
+        in_quiet = False
+        if start > end:
+            in_quiet = now_hour >= start or now_hour < end
+        elif start < end:
+            in_quiet = start <= now_hour < end
+
+        if in_quiet and not user.get("squawk_quiet_override"):
+            # In quiet hours and no wake override — show sleeping
+            is_snoozed = True
+            snooze_status = "quiet_hours"
+        elif not in_quiet and user.get("squawk_quiet_override"):
+            # Quiet hours ended naturally — clear the override
+            conn = db._get_connection()
+            try:
+                conn.execute(
+                    "UPDATE user_profiles SET squawk_quiet_override = 0 WHERE tenant_id = ?",
+                    (session["tenant_id"],)
+                )
+                conn.commit()
+            finally:
+                if not db._conn:
+                    conn.close()
 
     pronunciations = db.get_pronunciations(session["tenant_id"])
 
@@ -1773,6 +1811,23 @@ async def squawk_snooze(request: Request, duration: int = Form(30)):
         return redirect
 
     duration = max(5, min(480, duration))  # 5 min to 8 hours
+    tenant_id = session["tenant_id"]
+    db = request.app.state.db
+
+    # Store snooze in DB (persists across restarts/disconnects)
+    snoozed_until = (datetime.utcnow() + timedelta(minutes=duration)).isoformat()
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "UPDATE user_profiles SET squawk_snoozed_until = ?, squawk_quiet_override = 0 WHERE tenant_id = ?",
+            (snoozed_until, tenant_id)
+        )
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    # Also update in-memory for any connected devices
     squawk_mgr = getattr(request.app.state, "squawk", None)
     if squawk_mgr:
         for dev_id in list(squawk_mgr._active_devices.keys()):
@@ -1788,6 +1843,22 @@ async def squawk_unsnooze(request: Request):
     if redirect:
         return redirect
 
+    tenant_id = session["tenant_id"]
+    db = request.app.state.db
+
+    # Clear snooze in DB and set quiet_override flag
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "UPDATE user_profiles SET squawk_snoozed_until = NULL, squawk_quiet_override = 1 WHERE tenant_id = ?",
+            (tenant_id,)
+        )
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    # Also update in-memory for any connected devices
     squawk_mgr = getattr(request.app.state, "squawk", None)
     if squawk_mgr:
         for dev_id in list(squawk_mgr._active_devices.keys()):

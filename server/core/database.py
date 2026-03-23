@@ -418,6 +418,7 @@ class PollyDB:
                 "nostalgia_profile": "ALTER TABLE user_profiles ADD COLUMN nostalgia_profile TEXT",
                 "hometown": "ALTER TABLE user_profiles ADD COLUMN hometown TEXT",
                 "birth_year": "ALTER TABLE user_profiles ADD COLUMN birth_year INTEGER",
+                "squawk_quiet_override": "ALTER TABLE user_profiles ADD COLUMN squawk_quiet_override INTEGER DEFAULT 0",
             }
             for col, sql in migrations.items():
                 if col not in cols:

@@ -258,6 +258,18 @@ async def continuous_stream(websocket: WebSocket):
                                                    quiet_hours_start=quiet_start,
                                                    quiet_hours_end=quiet_end,
                                                    squawk_volume=squawk_vol)
+                        # Load DB snooze state (survives restarts/disconnects)
+                        try:
+                            snoozed_str = profile.get("squawk_snoozed_until")
+                            if snoozed_str:
+                                from datetime import datetime as _dt
+                                remaining_sec = (_dt.fromisoformat(snoozed_str) - _dt.utcnow()).total_seconds()
+                                if remaining_sec > 0:
+                                    squawk_mgr.snooze(device_id, int(remaining_sec / 60) + 1)
+                            if profile.get("squawk_quiet_override"):
+                                squawk_mgr._quiet_override[device_id] = True
+                        except Exception:
+                            pass
 
                         # Register nostalgia callback for chatter slots (20% chance)
                         _ns_tid = tenant_id
