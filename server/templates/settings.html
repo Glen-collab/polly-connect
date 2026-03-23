@@ -288,10 +288,23 @@
     <p class="text-xs sm:text-sm text-gray-500 mb-3">
         Temporarily quiet all bird sounds — great for nap time. Polly will still respond to voice commands.
     </p>
-    {% if is_snoozed %}
+    <!-- Status banner -->
+    {% if snooze_status == 'snoozed' %}
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
-        <p class="text-sm text-amber-800 font-medium">Polly is snoozed (no bird sounds)</p>
+        <p class="text-sm text-amber-800 font-medium">Polly is snoozed — {{ snooze_minutes }} minute{{ 's' if snooze_minutes != 1 }} remaining</p>
     </div>
+    {% elif snooze_status == 'quiet_hours' %}
+    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-3">
+        <p class="text-sm text-indigo-800 font-medium">Polly is sleeping (quiet hours: 9 PM – 7 AM)</p>
+    </div>
+    {% else %}
+    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-3">
+        <p class="text-sm text-emerald-800 font-medium">Polly is awake and chirping</p>
+    </div>
+    {% endif %}
+
+    <!-- Actions -->
+    {% if is_snoozed %}
     <form method="POST" action="/web/settings/squawk-unsnooze">
         <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
             Wake Up Polly

@@ -1568,13 +1568,22 @@ async def settings_page(request: Request):
     user = db.get_or_create_user(tenant_id=session["tenant_id"])
     tenant = db.get_tenant(session["tenant_id"])
 
-    # Check if any device is currently snoozed
+    # Check snooze status for any connected device
     squawk_mgr = getattr(request.app.state, "squawk", None)
     is_snoozed = False
+    snooze_status = "awake"
+    snooze_minutes = 0
     if squawk_mgr:
         for dev_id in squawk_mgr._active_devices:
-            if squawk_mgr.is_snoozed(dev_id):
+            status = squawk_mgr.snooze_status(dev_id)
+            if status.startswith("snoozed:"):
                 is_snoozed = True
+                snooze_status = "snoozed"
+                snooze_minutes = int(status.split(":")[1])
+                break
+            elif status == "quiet_hours":
+                is_snoozed = True
+                snooze_status = "quiet_hours"
                 break
 
     pronunciations = db.get_pronunciations(session["tenant_id"])
@@ -1599,6 +1608,8 @@ async def settings_page(request: Request):
         "user": user,
         "tenant": tenant,
         "is_snoozed": is_snoozed,
+        "snooze_status": snooze_status,
+        "snooze_minutes": snooze_minutes,
         "pronunciations": pronunciations,
         "security_questions": security_questions,
     })

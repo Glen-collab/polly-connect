@@ -266,6 +266,16 @@ class SquawkManager:
             return True
         return self._in_quiet_hours(device_id)
 
+    def snooze_status(self, device_id: str) -> str:
+        """Return snooze reason: 'snoozed', 'quiet_hours', or 'awake'."""
+        until = self._snoozed_until.get(device_id)
+        if until and time.time() < until:
+            remaining = int((until - time.time()) / 60)
+            return f"snoozed:{remaining}"
+        if self._in_quiet_hours(device_id):
+            return "quiet_hours"
+        return "awake"
+
     def _in_quiet_hours(self, device_id: str) -> bool:
         """Check if current time is within quiet hours (no squawks at night)."""
         from config import settings as app_settings
