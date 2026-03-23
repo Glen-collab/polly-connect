@@ -356,50 +356,60 @@
     </form>
     {% endif %}
 
-    <!-- Security Questions for Code Recovery -->
-    <h3 class="text-base font-semibold mt-6 mb-2">Code Recovery Questions</h3>
-    <p class="text-xs text-gray-400 mb-3">
-        Set 2 security questions so family members can recover their access code if they forget it.
-    </p>
-    {% if security_questions %}
-    <div class="bg-gray-50 border rounded-lg p-3 mb-3">
-        <p class="text-xs text-emerald-600 font-medium mb-1">Questions set up:</p>
-        {% for q in security_questions %}
-        <p class="text-sm text-gray-700">{{ loop.index }}. {{ q.question }}</p>
-        {% endfor %}
-    </div>
-    {% endif %}
-    <form method="POST" action="/web/settings/security-questions" class="space-y-3">
-        <div>
-            <label class="block text-xs text-gray-600 mb-1">Question 1</label>
-            <select name="question_1" class="w-full border rounded px-3 py-2 text-sm">
-                <option value="What street did you grow up on?">What street did you grow up on?</option>
-                <option value="What was the name of your first pet?">What was the name of your first pet?</option>
-                <option value="What city were you married in?">What city were you married in?</option>
-                <option value="What was your mother's maiden name?">What was your mother's maiden name?</option>
-                <option value="What school did you attend?">What school did you attend?</option>
-                <option value="What was your childhood nickname?">What was your childhood nickname?</option>
-            </select>
-            <input type="text" name="answer_1" required placeholder="Answer"
-                   class="w-full border rounded px-3 py-2 text-sm mt-1">
-        </div>
-        <div>
-            <label class="block text-xs text-gray-600 mb-1">Question 2</label>
-            <select name="question_2" class="w-full border rounded px-3 py-2 text-sm">
-                <option value="What was the name of your first pet?">What was the name of your first pet?</option>
-                <option value="What street did you grow up on?">What street did you grow up on?</option>
-                <option value="What city were you married in?">What city were you married in?</option>
-                <option value="What was your mother's maiden name?">What was your mother's maiden name?</option>
-                <option value="What school did you attend?">What school did you attend?</option>
-                <option value="What was your childhood nickname?">What was your childhood nickname?</option>
-            </select>
-            <input type="text" name="answer_2" required placeholder="Answer"
-                   class="w-full border rounded px-3 py-2 text-sm mt-1">
-        </div>
-        <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
-            {{ 'Update Questions' if security_questions else 'Save Questions' }}
+    <!-- Security Questions for Code Recovery (collapsible) -->
+    <div class="mt-6 border-t pt-4">
+        <button type="button" onclick="document.getElementById('security-q-body').classList.toggle('hidden'); document.getElementById('security-q-arrow').classList.toggle('rotate-180')"
+                class="w-full flex items-center justify-between text-left">
+            <div>
+                <h3 class="text-base font-semibold">Code Recovery Questions</h3>
+                <p class="text-xs text-gray-400">Set 2 security questions so family members can recover their access code.</p>
+            </div>
+            <svg id="security-q-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
         </button>
-    </form>
+        <div id="security-q-body" class="hidden mt-3">
+            {% if security_questions %}
+            <div class="bg-gray-50 border rounded-lg p-3 mb-3">
+                <p class="text-xs text-emerald-600 font-medium mb-1">Questions set up:</p>
+                {% for q in security_questions %}
+                <p class="text-sm text-gray-700">{{ loop.index }}. {{ q.question }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <form method="POST" action="/web/settings/security-questions" class="space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Question 1</label>
+                    <select name="question_1" class="w-full border rounded px-3 py-2 text-sm">
+                        <option value="What street did you grow up on?">What street did you grow up on?</option>
+                        <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                        <option value="What city were you married in?">What city were you married in?</option>
+                        <option value="What was your mother's maiden name?">What was your mother's maiden name?</option>
+                        <option value="What school did you attend?">What school did you attend?</option>
+                        <option value="What was your childhood nickname?">What was your childhood nickname?</option>
+                    </select>
+                    <input type="text" name="answer_1" required placeholder="Answer"
+                           class="w-full border rounded px-3 py-2 text-sm mt-1">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">Question 2</label>
+                    <select name="question_2" class="w-full border rounded px-3 py-2 text-sm">
+                        <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                        <option value="What street did you grow up on?">What street did you grow up on?</option>
+                        <option value="What city were you married in?">What city were you married in?</option>
+                        <option value="What was your mother's maiden name?">What was your mother's maiden name?</option>
+                        <option value="What school did you attend?">What school did you attend?</option>
+                        <option value="What was your childhood nickname?">What was your childhood nickname?</option>
+                    </select>
+                    <input type="text" name="answer_2" required placeholder="Answer"
+                           class="w-full border rounded px-3 py-2 text-sm mt-1">
+                </div>
+                <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
+                    {{ 'Update Questions' if security_questions else 'Save Questions' }}
+                </button>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
