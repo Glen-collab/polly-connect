@@ -113,6 +113,7 @@ class SquawkManager:
         self._busy: Dict[str, bool] = {}     # True if device is recording/processing/playing TTS
         self._send_locks: Dict[str, asyncio.Lock] = {}  # prevent concurrent WS writes
         self._snoozed_until: Dict[str, Optional[float]] = {}  # epoch time when snooze ends
+        self._quiet_override: Dict[str, bool] = {}  # True = ignore quiet hours until they end
         self._quiet_hours: Dict[str, tuple] = {}  # per-device (start_hour, end_hour)
         self.last_squawk_end: Dict[str, float] = {}  # monotonic time when last squawk/chatter finished
         self._volume: Dict[str, float] = {}  # per-device volume (0.0-1.0)
@@ -250,12 +251,14 @@ class SquawkManager:
     def snooze(self, device_id: str, minutes: int):
         """Snooze all squawks/chatter for N minutes."""
         self._snoozed_until[device_id] = time.time() + minutes * 60
+        self._quiet_override.pop(device_id, None)  # cancel any wake override
         logger.info(f"Squawks snoozed for {minutes}min → {device_id}")
 
     def unsnooze(self, device_id: str):
-        """Cancel snooze and resume squawks immediately."""
+        """Cancel snooze and resume squawks immediately (overrides quiet hours too)."""
         self._snoozed_until.pop(device_id, None)
-        logger.info(f"Squawks unsnoozed → {device_id}")
+        self._quiet_override[device_id] = True
+        logger.info(f"Squawks unsnoozed (quiet hours overridden) → {device_id}")
 
     def is_snoozed(self, device_id: str) -> bool:
         until = self._snoozed_until.get(device_id)
@@ -279,12 +282,20 @@ class SquawkManager:
         now_hour = datetime.now(tz).hour
         start, end = self._quiet_hours.get(device_id, (21, 7))
         if start > end:
-            # Wraps midnight: e.g. 21-7 means 9PM to 7AM
-            return now_hour >= start or now_hour < end
+            in_quiet = now_hour >= start or now_hour < end
         elif start < end:
-            # Same day: e.g. 14-16 means 2PM to 4PM
-            return start <= now_hour < end
-        return False
+            in_quiet = start <= now_hour < end
+        else:
+            in_quiet = False
+
+        # Handle quiet hours override from "Wake Up Polly"
+        if self._quiet_override.get(device_id):
+            if not in_quiet:
+                # Quiet hours ended naturally — clear the override
+                self._quiet_override.pop(device_id, None)
+            return False  # Override active — not quiet
+
+        return in_quiet
 
     def update_intervals(self, device_id: str, squawk_interval: int = None,
                          chatter_interval: int = None,
