@@ -59,7 +59,7 @@ static const char *TAG = "POLLY-WS";
 /* --- Configuration --- */
 
 // Firmware version (for OTA updates)
-#define FW_VERSION      "1.0.0"
+#define FW_VERSION      "1.0.2"
 #define FW_VARIANT      "waveshare"
 
 // WiFi
@@ -1638,9 +1638,21 @@ static void play_response_audio(void)
     }
 
     size_t play_len = response_audio_len - offset;
-    size_t written = 0;
-    i2s_channel_write(spk_handle, response_audio + offset,
-                      play_len, &written, pdMS_TO_TICKS(15000));
+    size_t total_written = 0;
+    // Write in chunks to avoid blocking on long audio (prayers, narratives)
+    size_t chunk = 16000;  // ~0.5s per chunk at 16kHz 16-bit
+    while (total_written < play_len) {
+        size_t remaining = play_len - total_written;
+        size_t to_write = remaining < chunk ? remaining : chunk;
+        size_t written = 0;
+        i2s_channel_write(spk_handle, response_audio + offset + total_written,
+                          to_write, &written, pdMS_TO_TICKS(5000));
+        total_written += written;
+        if (written == 0) {
+            ESP_LOGW(TAG, "I2S write stalled at %d/%d bytes", (int)total_written, (int)play_len);
+            break;
+        }
+    }
 
     // Flush DMA with silence
     size_t silence_len = SAMPLE_RATE * sizeof(int16_t) / 4;  // 0.25s
@@ -1654,7 +1666,7 @@ static void play_response_audio(void)
     // Disable speaker amplifier (saves power, reduces noise)
     tca9555_amp_enable(false);
 
-    ESP_LOGI(TAG, "Playback complete (%d bytes written)", (int)written);
+    ESP_LOGI(TAG, "Playback complete (%d/%d bytes written)", (int)total_written, (int)play_len);
 
     // Reset buffer
     response_audio_len = 0;
@@ -1700,8 +1712,25 @@ static void mic_stream_task(void *arg)
                 mic_read(audio_chunk, CHUNK_SAMPLES);
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
+
+            // Clear any stale response data that arrived during playback
+            xSemaphoreTake(response_mutex, portMAX_DELAY);
+            response_audio_len = 0;
+            response_complete = false;
+            xSemaphoreGive(response_mutex);
+
             streaming_paused = false;
-            ESP_LOGI(TAG, "Back to streaming...");
+
+            // If WebSocket died during playback, force immediate reboot to reconnect
+            if (!ws_connected) {
+                ESP_LOGW(TAG, "WebSocket lost during playback — rebooting to reconnect");
+                vTaskDelay(pdMS_TO_TICKS(500));
+                esp_restart();
+            }
+
+            ESP_LOGI(TAG, "Back to streaming (heap: %u, PSRAM: %u)",
+                     (unsigned)esp_get_free_heap_size(),
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
         }
 
         // Stream mic audio to server (unless paused for playback)
