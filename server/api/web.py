@@ -3602,6 +3602,17 @@ async def book_chapters_list(request: Request):
     })
 
 
+@router.get("/book/chapters/generate-status")
+async def book_generate_status(request: Request):
+    """Poll endpoint for draft generation progress."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    tid = session["tenant_id"]
+    status = _draft_generation_status.get(tid, {"total": 0, "done": 0, "running": False, "msg": ""})
+    return JSONResponse(status)
+
+
 @router.get("/book/chapters/{chapter_num}", response_class=HTMLResponse)
 async def book_chapter_detail(request: Request, chapter_num: int):
     session = await get_web_session(request)
@@ -3868,17 +3879,6 @@ async def book_generate_all_drafts(request: Request):
 
     asyncio.ensure_future(_generate_in_background())
     return RedirectResponse("/web/book/chapters?generating=1", status_code=303)
-
-
-@router.get("/book/chapters/generate-status")
-async def book_generate_status(request: Request):
-    """Poll endpoint for draft generation progress."""
-    session = await get_web_session(request)
-    if not session:
-        return JSONResponse({"error": "Not logged in"}, status_code=401)
-    tid = session["tenant_id"]
-    status = _draft_generation_status.get(tid, {"total": 0, "done": 0, "running": False, "msg": ""})
-    return JSONResponse(status)
 
 
 @router.post("/book/chapters/{chapter_num}/save")
