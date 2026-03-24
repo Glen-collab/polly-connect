@@ -184,12 +184,15 @@ class MedicationScheduler:
             await asyncio.sleep(60)
 
     async def _check_medications(self):
-        """Check if any medications are due now (using configured timezone)."""
+        """Check if any medications are due now (using configured timezone).
+        Batches multiple reminders at the same time into one announcement."""
         now = _get_local_now()
         current_time = now.strftime("%H:%M")
         current_day = now.strftime("%a").lower()
         today_key = now.strftime("%Y-%m-%d")
 
+        # Collect all due meds grouped by tenant
+        due_by_tenant = {}  # tenant_id -> [(med, med_time), ...]
         meds = self.db.get_medications()
         for med in meds:
             times = json.loads(med["times"]) if isinstance(med["times"], str) else med["times"]
@@ -202,18 +205,81 @@ class MedicationScheduler:
 
             for med_time in times:
                 if med_time == current_time:
-                    # Prevent duplicate sends within the same minute
                     dedup_key = f"{med['id']}:{med_time}:{today_key}"
                     if dedup_key in self._last_reminded:
                         continue
                     self._last_reminded[dedup_key] = True
+                    due_by_tenant.setdefault(tenant_id, []).append((med, med_time))
 
-                    await self._send_reminder(med, med_time, tenant_id)
+        # Send one combined reminder per tenant
+        for tenant_id, med_list in due_by_tenant.items():
+            if len(med_list) == 1:
+                await self._send_reminder(med_list[0][0], med_list[0][1], tenant_id)
+            else:
+                await self._send_batch_reminder(med_list, tenant_id)
 
         # Clean old dedup keys (keep only today's)
         old_keys = [k for k in self._last_reminded if not k.endswith(today_key)]
         for k in old_keys:
             del self._last_reminded[k]
+
+    async def _send_batch_reminder(self, med_list: list, tenant_id: int = None):
+        """Combine multiple reminders at the same time into one announcement."""
+        med_time = med_list[0][1]
+        time_display = format_time_12hr(med_time)
+
+        # Build combined list: "your vitamin D, your fish oil, and your creatine"
+        parts = []
+        for med, _ in med_list:
+            name = med["name"]
+            dosage = med.get("dosage", "")
+            if dosage:
+                parts.append(f"{dosage} of {name}")
+            else:
+                parts.append(f"your {name}")
+
+        if len(parts) == 2:
+            items = f"{parts[0]} and {parts[1]}"
+        else:
+            items = ", ".join(parts[:-1]) + f", and {parts[-1]}"
+
+        msg = f"It's {time_display}, time to take {items}."
+        logger.info(f"Batch medication reminder ({len(med_list)} items): {msg}")
+
+        combined_wav = await self._build_reminder_audio(msg)
+
+        sent_count = 0
+        for device_id, info in list(self._websockets.items()):
+            if tenant_id is not None and info["tenant_id"] != tenant_id:
+                continue
+            ws = info["ws"]
+            try:
+                await ws.send_json({
+                    "event": "medication_reminder",
+                    "text": msg,
+                    "medication_id": med_list[0][0]["id"],
+                    "medication_name": "multiple",
+                })
+                if combined_wav:
+                    chunk_size = 8000
+                    for i in range(0, len(combined_wav), chunk_size):
+                        chunk = combined_wav[i:i + chunk_size]
+                        chunk_b64 = base64.b64encode(chunk).decode()
+                        await ws.send_json({
+                            "event": "audio_chunk",
+                            "audio": chunk_b64,
+                            "final": (i + chunk_size >= len(combined_wav)),
+                        })
+                        await asyncio.sleep(0.05)
+                sent_count += 1
+                if self._cmd_processor:
+                    self._cmd_processor._last_response[device_id] = msg
+            except Exception as e:
+                logger.warning(f"Failed to send batch reminder to {device_id}: {e}")
+                self.unregister_websocket(device_id)
+
+        if sent_count > 0:
+            logger.info(f"Batch reminder sent to {sent_count} device(s)")
 
     async def _send_reminder(self, med: dict, med_time: str, tenant_id: int = None):
         """Push squawk + TTS medication reminder to connected devices for this tenant."""
