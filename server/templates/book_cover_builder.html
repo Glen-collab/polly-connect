@@ -58,14 +58,30 @@
     <h2 class="text-base font-semibold mb-3">Design</h2>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-            <label class="block text-sm text-gray-600 mb-1">Background Color</label>
-            <div class="flex items-center gap-2">
+            <label class="block text-sm text-gray-600 mb-1">Background</label>
+            <input type="hidden" name="bg_style" id="bg-style" value="{{ cover_config.bg_style or 'solid' }}">
+            <div class="flex items-center gap-2 mb-2">
                 <input type="color" name="bg_color" id="bg-color"
                        value="{{ cover_config.bg_color or '#1a3c5e' }}"
                        class="w-10 h-10 rounded border cursor-pointer"
-                       oninput="updatePreview()">
+                       oninput="selectBgStyle('solid'); updatePreview()">
                 <span id="bg-color-hex" class="text-xs text-gray-500 font-mono">{{ cover_config.bg_color or '#1a3c5e' }}</span>
             </div>
+            <div class="flex gap-2 flex-wrap">
+                <button type="button" onclick="selectBgStyle('sunset')" title="Sunset"
+                        class="w-10 h-10 rounded border-2 cursor-pointer bg-style-btn {% if (cover_config.bg_style or '') == 'sunset' %}border-purple-500{% else %}border-gray-200{% endif %}"
+                        style="background: linear-gradient(to top, #1a1a2e, #16213e, #0f3460, #e94560);"></button>
+                <button type="button" onclick="selectBgStyle('ocean')" title="Ocean"
+                        class="w-10 h-10 rounded border-2 cursor-pointer bg-style-btn {% if (cover_config.bg_style or '') == 'ocean' %}border-purple-500{% else %}border-gray-200{% endif %}"
+                        style="background: linear-gradient(to top, #0a1628, #1a3c5e, #2980b9, #6dd5fa);"></button>
+                <button type="button" onclick="selectBgStyle('forest')" title="Forest"
+                        class="w-10 h-10 rounded border-2 cursor-pointer bg-style-btn {% if (cover_config.bg_style or '') == 'forest' %}border-purple-500{% else %}border-gray-200{% endif %}"
+                        style="background: linear-gradient(to top, #1b2a1b, #2d4a2d, #3e6b3e, #8fbc8f);"></button>
+                <button type="button" onclick="selectBgStyle('midnight')" title="Midnight"
+                        class="w-10 h-10 rounded border-2 cursor-pointer bg-style-btn {% if (cover_config.bg_style or '') == 'midnight' %}border-purple-500{% else %}border-gray-200{% endif %}"
+                        style="background: linear-gradient(to top, #0c0c1d, #1a1a3e, #2d2d6b, #4a4a8a);"></button>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">Pick a solid color or click a gradient preset.</p>
         </div>
         <div>
             <label class="block text-sm text-gray-600 mb-1">Font Color</label>
@@ -258,6 +274,32 @@ var fontMap = {
     'Lora': 'Lora, serif'
 };
 
+var gradientCSS = {
+    'sunset': 'linear-gradient(to top, #1a1a2e, #16213e, #0f3460, #e94560)',
+    'ocean': 'linear-gradient(to top, #0a1628, #1a3c5e, #2980b9, #6dd5fa)',
+    'forest': 'linear-gradient(to top, #1b2a1b, #2d4a2d, #3e6b3e, #8fbc8f)',
+    'midnight': 'linear-gradient(to top, #0c0c1d, #1a1a3e, #2d2d6b, #4a4a8a)'
+};
+
+function selectBgStyle(style) {
+    document.getElementById('bg-style').value = style;
+    // Highlight selected swatch
+    document.querySelectorAll('.bg-style-btn').forEach(function(btn) {
+        btn.classList.remove('border-purple-500');
+        btn.classList.add('border-gray-200');
+    });
+    if (style !== 'solid') {
+        var btns = document.querySelectorAll('.bg-style-btn');
+        var names = ['sunset', 'ocean', 'forest', 'midnight'];
+        var idx = names.indexOf(style);
+        if (idx >= 0 && btns[idx]) {
+            btns[idx].classList.remove('border-gray-200');
+            btns[idx].classList.add('border-purple-500');
+        }
+    }
+    updatePreview();
+}
+
 function updatePreview() {
     var bg = document.getElementById('bg-color').value;
     var fg = document.getElementById('font-color').value;
@@ -265,8 +307,10 @@ function updatePreview() {
     var isBold = fontVal.indexOf('Bold') !== -1;
     var cssFont = fontMap[fontVal] || 'sans-serif';
 
-    document.getElementById('preview-front').style.background = bg;
-    document.getElementById('preview-back').style.background = bg;
+    var bgStyle = document.getElementById('bg-style').value;
+    var bgValue = (bgStyle !== 'solid' && gradientCSS[bgStyle]) ? gradientCSS[bgStyle] : bg;
+    document.getElementById('preview-front').style.background = bgValue;
+    document.getElementById('preview-back').style.background = bgValue;
 
     var els = ['preview-title', 'preview-subtitle', 'preview-author'];
     for (var i = 0; i < els.length; i++) {

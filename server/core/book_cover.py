@@ -95,6 +95,46 @@ FONT_CHOICES = {
 }
 
 
+GRADIENT_PRESETS = {
+    "solid": None,
+    "sunset": [("#1a1a2e", 0), ("#16213e", 0.3), ("#0f3460", 0.6), ("#e94560", 1.0)],
+    "ocean": [("#0a1628", 0), ("#1a3c5e", 0.3), ("#2980b9", 0.7), ("#6dd5fa", 1.0)],
+    "forest": [("#1b2a1b", 0), ("#2d4a2d", 0.3), ("#3e6b3e", 0.65), ("#8fbc8f", 1.0)],
+    "midnight": [("#0c0c1d", 0), ("#1a1a3e", 0.35), ("#2d2d6b", 0.7), ("#4a4a8a", 1.0)],
+}
+
+
+def _draw_gradient(c, x, y, w, h, stops):
+    """Draw a vertical gradient using thin horizontal strips."""
+    num_strips = int(h / 2)  # 2pt strips
+    strip_h = h / num_strips
+    for i in range(num_strips):
+        t = i / num_strips  # 0 to 1, bottom to top
+        # Find which two stops we're between
+        color = _interpolate_gradient(stops, t)
+        c.setFillColor(color)
+        c.rect(x, y + i * strip_h, w, strip_h + 0.5, fill=True, stroke=False)
+
+
+def _interpolate_gradient(stops, t):
+    """Interpolate color at position t (0=bottom, 1=top) between gradient stops."""
+    # Find surrounding stops
+    for i in range(len(stops) - 1):
+        c1_hex, t1 = stops[i]
+        c2_hex, t2 = stops[i + 1]
+        if t1 <= t <= t2:
+            local_t = (t - t1) / (t2 - t1) if t2 > t1 else 0
+            r1, g1, b1 = int(c1_hex[1:3], 16), int(c1_hex[3:5], 16), int(c1_hex[5:7], 16)
+            r2, g2, b2 = int(c2_hex[1:3], 16), int(c2_hex[3:5], 16), int(c2_hex[5:7], 16)
+            r = int(r1 + (r2 - r1) * local_t)
+            g = int(g1 + (g2 - g1) * local_t)
+            b = int(b1 + (b2 - b1) * local_t)
+            return Color(r / 255, g / 255, b / 255)
+    # Fallback to last stop
+    last_hex = stops[-1][0]
+    return hex_to_color(last_hex)
+
+
 def generate_cover_pdf(
     page_count: int,
     title: str = "My Legacy",
@@ -105,6 +145,7 @@ def generate_cover_pdf(
     bg_color: str = "#1a3c5e",
     font_color: str = "#ffffff",
     font_name: str = "Helvetica-Bold",
+    bg_style: str = "solid",
     spine_text: str = "",
     title_offset: float = 0.0,
     photo_offset: float = 0.0,
@@ -130,8 +171,12 @@ def generate_cover_pdf(
     font = FONT_CHOICES.get(font_name, "Helvetica-Bold")
 
     # ── Fill background ──
-    c.setFillColor(bg)
-    c.rect(0, 0, total_w, total_h, fill=True, stroke=False)
+    gradient_stops = GRADIENT_PRESETS.get(bg_style)
+    if gradient_stops:
+        _draw_gradient(c, 0, 0, total_w, total_h, gradient_stops)
+    else:
+        c.setFillColor(bg)
+        c.rect(0, 0, total_w, total_h, fill=True, stroke=False)
 
     # ── Coordinate helpers (from trim edges, not bleed) ──
     # Back cover: left trim starts at BLEED
