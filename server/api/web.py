@@ -3943,7 +3943,7 @@ async def book_export_pdf(request: Request):
 
     # Get speaker name from user profile
     user = db.get_or_create_user(tenant_id=tid)
-    speaker_name = user.get("name", "")
+    speaker_name = user.get("familiar_name") or user.get("name", "")
 
     # Get optional params from query string
     title = request.query_params.get("title") or None
@@ -3952,6 +3952,7 @@ async def book_export_pdf(request: Request):
     include_qr = request.query_params.get("qr", "0") == "1"
 
     from core.book_pdf import LegacyBookPDF
+    # Don't pass speaker to PDF gen — let it use tenant_id to find all memories
     pdf_gen = LegacyBookPDF(db, book_builder, tenant_id=tid)
 
     try:
