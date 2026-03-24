@@ -15,6 +15,20 @@
 </div>
 {% endif %}
 
+{% if generating %}
+<!-- Generation progress bar -->
+<div id="gen-progress" class="bg-purple-50 border border-purple-300 rounded-lg p-4 mb-4">
+    <div class="flex items-center justify-between mb-2">
+        <p class="text-sm text-purple-800 font-medium" id="gen-label">Starting generation...</p>
+        <span class="text-xs text-purple-600" id="gen-count"></span>
+    </div>
+    <div class="w-full bg-purple-200 rounded-full h-3">
+        <div id="gen-bar" class="bg-purple-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+    </div>
+    <p class="text-xs text-purple-500 mt-2" id="gen-chapter">Preparing...</p>
+</div>
+{% endif %}
+
 <p class="text-sm text-gray-500 mb-4">
     {{ chapters|length }} chapter{{ 's' if chapters|length != 1 else '' }} outlined.
     Click a chapter to view the draft, edit, or generate a song.
@@ -72,3 +86,39 @@
 </div>
 {% endif %}
 {% endblock %}
+
+{% if generating %}
+{% block scripts %}
+<script>
+(function() {
+    function poll() {
+        fetch('/web/book/chapters/generate-status')
+            .then(function(r) { return r.json(); })
+            .then(function(s) {
+                var pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0;
+                document.getElementById('gen-bar').style.width = pct + '%';
+                document.getElementById('gen-count').textContent = s.done + ' / ' + s.total;
+                document.getElementById('gen-chapter').textContent = s.msg || '';
+
+                if (s.running) {
+                    document.getElementById('gen-label').textContent = 'Generating chapter drafts...';
+                    setTimeout(poll, 3000);
+                } else {
+                    document.getElementById('gen-label').textContent = 'Done!';
+                    document.getElementById('gen-bar').style.width = '100%';
+                    document.getElementById('gen-chapter').textContent = s.msg;
+                    // Reload page after short delay to show updated chapter statuses
+                    setTimeout(function() {
+                        window.location.href = '/web/book/chapters?msg=' + encodeURIComponent(s.msg);
+                    }, 2000);
+                }
+            })
+            .catch(function() {
+                setTimeout(poll, 5000);
+            });
+    }
+    poll();
+})();
+</script>
+{% endblock %}
+{% endif %}

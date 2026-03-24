@@ -3592,11 +3592,13 @@ async def book_chapters_list(request: Request):
             ch["status"] = "has_draft"
 
     msg = request.query_params.get("msg")
+    generating = request.query_params.get("generating") == "1"
     return templates.TemplateResponse("book_chapters.html", {
         "request": request,
         "session": session,
         "chapters": chapters,
         "msg": msg,
+        "generating": generating,
     })
 
 
@@ -3766,9 +3768,11 @@ async def book_chapter_generate(request: Request, chapter_num: int):
     )
 
 
+_draft_generation_status = {}  # tenant_id -> {"total": N, "done": N, "running": bool, "msg": ""}
+
 @router.post("/book/chapters/generate-all")
 async def book_generate_all_drafts(request: Request):
-    """Generate AI drafts for all chapters in order, with continuity summaries."""
+    """Kick off background draft generation for all chapters."""
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -3777,7 +3781,6 @@ async def book_generate_all_drafts(request: Request):
     db = request.app.state.db
     tid = session["tenant_id"]
 
-    # Must be Legacy tier for all chapters
     gate = _gate_feature(db, session, "book_export",
                          "Upgrade to Polly Legacy to generate all chapter drafts.")
     if gate:
@@ -3786,73 +3789,96 @@ async def book_generate_all_drafts(request: Request):
     form = await request.form()
     overwrite = form.get("overwrite") == "1"
 
+    # Check if already running
+    status = _draft_generation_status.get(tid, {})
+    if status.get("running"):
+        return RedirectResponse("/web/book/chapters?msg=Generation already in progress...", status_code=303)
+
     book_builder = request.app.state.book_builder
     chapters = book_builder.generate_chapter_outline(tenant_id=tid)
 
     if not chapters:
         return RedirectResponse("/web/book/chapters?msg=No chapters to generate.", status_code=303)
 
-    import json as _json
-    generated = 0
-    skipped = 0
-    previous_summaries = []
+    # Start background task
+    _draft_generation_status[tid] = {"total": len(chapters), "done": 0, "running": True, "msg": "Starting..."}
 
-    # Load existing summaries for continuity
-    existing_drafts = {d["chapter_number"]: d for d in db.get_chapter_drafts(tenant_id=tid)}
+    async def _generate_in_background():
+        import json as _json
+        generated = 0
+        skipped = 0
+        previous_summaries = []
+        existing_drafts = {d["chapter_number"]: d for d in db.get_chapter_drafts(tenant_id=tid)}
 
-    for ch in chapters:
-        ch_num = ch["chapter_number"]
+        for ch in chapters:
+            ch_num = ch["chapter_number"]
+            _draft_generation_status[tid]["msg"] = f"Chapter {ch_num}: {ch['title']}"
 
-        # Skip chapters that already have drafts (unless overwrite is checked)
-        if not overwrite and ch_num in existing_drafts and existing_drafts[ch_num].get("content"):
-            # Still collect summary for continuity
-            if existing_drafts[ch_num].get("summary"):
-                previous_summaries.append(existing_drafts[ch_num]["summary"])
-            skipped += 1
-            continue
+            if not overwrite and ch_num in existing_drafts and existing_drafts[ch_num].get("content"):
+                if existing_drafts[ch_num].get("summary"):
+                    previous_summaries.append(existing_drafts[ch_num]["summary"])
+                skipped += 1
+                _draft_generation_status[tid]["done"] = generated + skipped
+                continue
 
-        # Generate draft
-        content = await book_builder.generate_chapter_draft(
-            ch, tenant_id=tid,
-            previous_summaries=previous_summaries if previous_summaries else None,
-        )
+            try:
+                content = await book_builder.generate_chapter_draft(
+                    ch, tenant_id=tid,
+                    previous_summaries=previous_summaries if previous_summaries else None,
+                )
 
-        if content:
-            # Delete any existing draft
-            conn = db._get_connection()
-            conn.execute(
-                "DELETE FROM chapter_drafts WHERE chapter_number = ? AND tenant_id = ?",
-                (ch_num, tid)
-            )
-            conn.commit()
+                if content:
+                    conn = db._get_connection()
+                    conn.execute(
+                        "DELETE FROM chapter_drafts WHERE chapter_number = ? AND tenant_id = ?",
+                        (ch_num, tid)
+                    )
+                    conn.commit()
 
-            db.save_chapter_draft(
-                chapter_number=ch_num,
-                title=ch["title"],
-                bucket=ch["bucket"],
-                life_phase=ch["life_phase"],
-                memory_ids=_json.dumps(ch.get("memory_ids", [])),
-                content=content,
-                tenant_id=tid,
-            )
+                    db.save_chapter_draft(
+                        chapter_number=ch_num,
+                        title=ch["title"],
+                        bucket=ch["bucket"],
+                        life_phase=ch["life_phase"],
+                        memory_ids=_json.dumps(ch.get("memory_ids", [])),
+                        content=content,
+                        tenant_id=tid,
+                    )
 
-            # Generate summary for continuity chain
-            summary = await book_builder.generate_chapter_summary(content)
-            if summary:
-                drafts_after = db.get_chapter_drafts(tenant_id=tid)
-                for d in drafts_after:
-                    if d.get("chapter_number") == ch_num:
-                        db.update_chapter_summary(d["id"], summary)
-                        previous_summaries.append(summary)
-                        break
+                    summary = await book_builder.generate_chapter_summary(content)
+                    if summary:
+                        drafts_after = db.get_chapter_drafts(tenant_id=tid)
+                        for d in drafts_after:
+                            if d.get("chapter_number") == ch_num:
+                                db.update_chapter_summary(d["id"], summary)
+                                previous_summaries.append(summary)
+                                break
 
-            generated += 1
-            logger.info(f"Generated draft for chapter {ch_num} ({generated}/{len(chapters)})")
+                    generated += 1
+                    logger.info(f"Generated draft for chapter {ch_num} ({generated}/{len(chapters)})")
+            except Exception as e:
+                logger.error(f"Chapter {ch_num} generation failed: {e}")
 
-    msg = f"Generated {generated} chapter draft{'s' if generated != 1 else ''}"
-    if skipped:
-        msg += f", skipped {skipped} existing"
-    return RedirectResponse(f"/web/book/chapters?msg={msg}", status_code=303)
+            _draft_generation_status[tid]["done"] = generated + skipped
+
+        msg = f"Generated {generated} chapter draft{'s' if generated != 1 else ''}"
+        if skipped:
+            msg += f", skipped {skipped} existing"
+        _draft_generation_status[tid] = {"total": len(chapters), "done": len(chapters), "running": False, "msg": msg}
+
+    asyncio.ensure_future(_generate_in_background())
+    return RedirectResponse("/web/book/chapters?generating=1", status_code=303)
+
+
+@router.get("/book/chapters/generate-status")
+async def book_generate_status(request: Request):
+    """Poll endpoint for draft generation progress."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    tid = session["tenant_id"]
+    status = _draft_generation_status.get(tid, {"total": 0, "done": 0, "running": False, "msg": ""})
+    return JSONResponse(status)
 
 
 @router.post("/book/chapters/{chapter_num}/save")
