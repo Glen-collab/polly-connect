@@ -3,7 +3,7 @@
 
 {% block head %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Pinyon+Script&family=Dancing+Script&family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Pinyon+Script&family=Dancing+Script&family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@700&family=Lora:wght@400;700&display=swap" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -86,7 +86,7 @@
                 {% endfor %}
                 </optgroup>
                 <optgroup label="Elegant Serif">
-                {% for val, label in [("PlayfairDisplay-Bold", "Playfair Display Bold"), ("PlayfairDisplay", "Playfair Display"), ("CormorantGaramond-Bold", "Cormorant Garamond Bold"), ("Times-Bold", "Times Bold"), ("Times-Roman", "Times Roman")] %}
+                {% for val, label in [("PlayfairDisplay-Bold", "Playfair Display Bold"), ("PlayfairDisplay", "Playfair Display"), ("CormorantGaramond-Bold", "Cormorant Garamond Bold"), ("Lora-Bold", "Lora Bold"), ("Lora", "Lora"), ("Times-Bold", "Times Bold"), ("Times-Roman", "Times Roman")] %}
                 <option value="{{ val }}" {% if (cover_config.font_name or '') == val %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
                 </optgroup>
@@ -174,7 +174,9 @@ var fontMap = {
     'DancingScript': '"Dancing Script", cursive',
     'PlayfairDisplay': '"Playfair Display", serif',
     'PlayfairDisplay-Bold': '"Playfair Display", serif',
-    'CormorantGaramond-Bold': '"Cormorant Garamond", serif'
+    'CormorantGaramond-Bold': '"Cormorant Garamond", serif',
+    'Lora-Bold': 'Lora, serif',
+    'Lora': 'Lora, serif'
 };
 
 function updatePreview() {

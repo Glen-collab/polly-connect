@@ -64,6 +64,8 @@ def _register_fonts():
             "PlayfairDisplay": "PlayfairDisplay-Regular.ttf",
             "DancingScript": "DancingScript-Regular.ttf",
             "CormorantGaramond-Bold": "CormorantGaramond-Bold.ttf",
+            "Lora-Bold": "Lora-Bold.ttf",
+            "Lora": "Lora-Regular.ttf",
         }
         for name, filename in font_files.items():
             path = os.path.join(fonts_dir, filename)
@@ -88,6 +90,8 @@ FONT_CHOICES = {
     "PlayfairDisplay": "PlayfairDisplay",
     "PlayfairDisplay-Bold": "PlayfairDisplay-Bold",
     "CormorantGaramond-Bold": "CormorantGaramond-Bold",
+    "Lora-Bold": "Lora-Bold",
+    "Lora": "Lora",
 }
 
 
@@ -154,6 +158,7 @@ def generate_cover_pdf(
         "Helvetica-Bold": "Helvetica", "Times-Bold": "Times-Roman",
         "Courier-Bold": "Courier", "PlayfairDisplay-Bold": "PlayfairDisplay",
         "CormorantGaramond-Bold": "CormorantGaramond-Bold",
+        "Lora-Bold": "Lora",
     }
     sub_font_name = _bold_to_regular.get(font, font)
 
@@ -177,16 +182,17 @@ def generate_cover_pdf(
     photo_zone_bottom = author_top_y + 0.1 * inch
     photo_zone_h = photo_zone_top - photo_zone_bottom
 
-    # ── 4. Draw title + subtitle ──
+    # ── 4. Draw title + subtitle (grouped tightly) ──
     c.setFillColor(fg)
     c.setFont(font, title_font_size)
     y = safe_top - title_padding
-    for line in title_lines:
+    for i, line in enumerate(title_lines):
         c.drawCentredString(front_cx, y, line)
-        y -= title_line_h
+        if i < len(title_lines) - 1:
+            y -= title_line_h  # only drop between title lines, not after last
 
     if subtitle:
-        y -= sub_gap
+        y -= sub_font_size + sub_gap  # tight gap: just subtitle font size + small gap
         c.setFont(sub_font_name, sub_font_size)
         c.drawCentredString(front_cx, y, subtitle)
 
