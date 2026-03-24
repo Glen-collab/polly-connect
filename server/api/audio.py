@@ -356,6 +356,24 @@ async def continuous_stream(websocket: WebSocket):
                             return False
 
                         squawk_mgr.register_prayer_callback(device_id, _check_scheduled_prayers)
+
+                        # Register message nag callback
+                        _msg_db = db
+                        _msg_tid = tenant_id
+                        _msg_ws = websocket
+                        _msg_tts = tts
+                        _msg_smgr = squawk_mgr
+                        _msg_dev = device_id
+                        _msg_cmd = cmd
+                        async def _has_messages():
+                            msgs = _msg_db.get_messages_for(tenant_id=_msg_tid)
+                            return len(msgs) > 0
+                        async def _tts_message(text):
+                            await _send_tts(_msg_ws, _msg_tts, text,
+                                           squawk_mgr=_msg_smgr, device_id=_msg_dev)
+                            if _msg_cmd:
+                                _msg_cmd._last_response[_msg_dev] = "You have messages on the board. Say 'check messages' to hear them."
+                        squawk_mgr.register_message_callback(device_id, _has_messages, _tts_message)
                         # No startup squawk — scheduler handles timing with RECONNECT_GRACE
 
                     continue

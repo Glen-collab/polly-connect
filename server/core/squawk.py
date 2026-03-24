@@ -115,6 +115,9 @@ class SquawkManager:
         self._snoozed_until: Dict[str, Optional[float]] = {}  # epoch time when snooze ends
         self._quiet_override: Dict[str, bool] = {}  # True = ignore quiet hours until they end
         self._quiet_hours: Dict[str, tuple] = {}  # per-device (start_hour, end_hour)
+        self._message_callbacks: Dict[str, Any] = {}  # device_id -> async fn() -> bool (has messages)
+        self._tts_callbacks: Dict[str, Any] = {}  # device_id -> async fn(text) -> None
+        self._last_message_nag: Dict[str, float] = {}  # device_id -> last nag time
         self.last_squawk_end: Dict[str, float] = {}  # monotonic time when last squawk/chatter finished
         self._volume: Dict[str, float] = {}  # per-device volume (0.0-1.0)
 
@@ -240,11 +243,21 @@ class SquawkManager:
         if hasattr(self, '_prayer_callbacks'):
             self._prayer_callbacks.pop(device_id, None)
 
+    def register_message_callback(self, device_id: str, has_messages_cb, tts_cb):
+        """Register callbacks for message nagging.
+        has_messages_cb: async fn() -> bool (True if unread messages exist)
+        tts_cb: async fn(text) -> None (sends TTS to device)
+        """
+        self._message_callbacks[device_id] = has_messages_cb
+        self._tts_callbacks[device_id] = tts_cb
+
     def unregister_device(self, device_id: str):
         """Mark device as disconnected. Does NOT cancel schedules."""
         self._active_devices.pop(device_id, None)
         self._playing.pop(device_id, None)
         self._nostalgia_callbacks.pop(device_id, None)
+        self._message_callbacks.pop(device_id, None)
+        self._tts_callbacks.pop(device_id, None)
         # Keep send lock, schedules, intervals, quiet hours — they survive reconnects
         # The scheduler loop will idle while device is not in _active_devices
 
@@ -383,6 +396,26 @@ class SquawkManager:
                             continue  # Prayer played — skip squawk/chatter this cycle
                     except Exception as e:
                         logger.error(f"Prayer callback error: {e}")
+
+                # Check for pending messages — nag every 15 min
+                msg_cb = self._message_callbacks.get(device_id)
+                tts_cb = self._tts_callbacks.get(device_id)
+                if msg_cb and tts_cb:
+                    last_nag = self._last_message_nag.get(device_id, 0)
+                    if now - last_nag >= 900:  # 15 minutes
+                        try:
+                            has_msgs = await msg_cb()
+                            if has_msgs:
+                                self._last_message_nag[device_id] = now
+                                # Squawk first, then say "Message!"
+                                if self.squawks:
+                                    await self.send_squawk(device_id)
+                                    await asyncio.sleep(1.0)
+                                await tts_cb("Message! Message!")
+                                logger.info(f"Message nag → {device_id}")
+                                continue  # Skip regular squawk/chatter this cycle
+                        except Exception as e:
+                            logger.error(f"Message nag error: {e}")
 
                 # Check squawk schedule
                 next_sq = self._next_squawk_time.get(device_id, 0)
