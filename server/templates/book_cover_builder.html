@@ -135,13 +135,32 @@
 
 {% block scripts %}
 <script>
+var fontMap = {
+    'Helvetica-Bold': '"Helvetica Neue", Helvetica, Arial, sans-serif',
+    'Helvetica': '"Helvetica Neue", Helvetica, Arial, sans-serif',
+    'Times-Bold': '"Times New Roman", Times, Georgia, serif',
+    'Times-Roman': '"Times New Roman", Times, Georgia, serif',
+    'Courier-Bold': '"Courier New", Courier, monospace',
+    'Courier': '"Courier New", Courier, monospace'
+};
+
 function updatePreview() {
     var bg = document.getElementById('bg-color').value;
     var fg = document.getElementById('font-color').value;
+    var fontVal = document.getElementById('font-select').value;
+    var isBold = fontVal.indexOf('Bold') !== -1;
+    var cssFont = fontMap[fontVal] || 'sans-serif';
+
     document.getElementById('preview-front').style.background = bg;
-    document.getElementById('preview-title').style.color = fg;
-    document.getElementById('preview-subtitle').style.color = fg;
-    document.getElementById('preview-author').style.color = fg;
+
+    var els = ['preview-title', 'preview-subtitle', 'preview-author'];
+    for (var i = 0; i < els.length; i++) {
+        var el = document.getElementById(els[i]);
+        el.style.color = fg;
+        el.style.fontFamily = cssFont;
+        el.style.fontWeight = isBold ? 'bold' : 'normal';
+    }
+
     document.getElementById('bg-color-hex').textContent = bg;
     document.getElementById('font-color-hex').textContent = fg;
 }

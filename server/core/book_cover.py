@@ -250,20 +250,15 @@ def _wrap_text(text, font_name, font_size, max_width):
 
 def generate_blurb_from_chapters(db, tenant_id: int, speaker_name: str = "") -> str:
     """Use GPT to generate a back cover blurb from chapter summaries."""
-    try:
-        from core.followup import FollowUpGenerator
-        gen = FollowUpGenerator()
-        if not gen.available:
-            return ""
-    except Exception:
-        return ""
-
-    # Gather chapter summaries
+    # Gather chapter summaries first
     drafts = db.get_chapter_drafts(tenant_id=tenant_id)
     summaries = []
     for d in drafts:
         if d.get("summary"):
             summaries.append(f"Chapter {d['chapter_number']} ({d.get('title', '')}): {d['summary']}")
+        elif d.get("content"):
+            # Use first 200 chars of content as fallback
+            summaries.append(f"Chapter {d['chapter_number']} ({d.get('title', '')}): {d['content'][:200]}...")
 
     if not summaries:
         return ""
