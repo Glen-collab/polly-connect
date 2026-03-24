@@ -130,7 +130,8 @@
                 Include QR codes for voice recordings
             </label>
         </div>
-        <button type="submit"
+        <button type="submit" id="pdf-btn"
+                onclick="this.disabled=true; this.textContent='Generating PDF... this will take a few moments'; this.form.submit();"
                 class="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-emerald-700 text-sm sm:text-base">
             Download PDF
         </button>

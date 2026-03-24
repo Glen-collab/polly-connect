@@ -124,6 +124,7 @@
 <!-- Download -->
 <div class="text-center">
     <button type="submit"
+            onclick="this.disabled=true; this.textContent='Generating cover... this will take a few moments'; this.form.submit();"
             class="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 text-base font-medium shadow-lg">
         Download Cover PDF
     </button>
