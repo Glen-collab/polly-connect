@@ -109,6 +109,7 @@ def generate_cover_pdf(
     title_offset: float = 0.0,
     photo_offset: float = 0.0,
     author_offset: float = 0.0,
+    blurb_bg_color: str = "#ffffff",
 ) -> bytes:
     """
     Generate a KDP-ready full wrap cover PDF.
@@ -250,19 +251,41 @@ def generate_cover_pdf(
     back_text_width = back_safe_right - back_safe_left
 
     if blurb:
-        # Draw blurb text with word wrapping
-        c.setFillColor(fg)
-        blurb_font = font.replace("Bold", "Roman").replace("Courier-Roman", "Courier")
-        if blurb_font not in FONT_CHOICES.values():
-            blurb_font = font
+        # Draw blurb in a colored box
+        blurb_bg = hex_to_color(blurb_bg_color)
+        blurb_font_name = _bold_to_regular.get(font, font)
         blurb_size = 12
-        c.setFont(blurb_font, blurb_size)
-        lines = _wrap_text(blurb, blurb_font, blurb_size, back_text_width)
-        y = safe_top - 1.0 * inch
-        line_height = blurb_size * 1.4
+        blurb_padding = 0.3 * inch
+        blurb_box_width = back_text_width + blurb_padding * 2
+        line_height = blurb_size * 1.5
+
+        # Wrap text to calculate box height
+        inner_width = back_text_width - 0.2 * inch
+        lines = _wrap_text(blurb, blurb_font_name, blurb_size, inner_width)
+        blurb_text_height = len(lines) * line_height
+        blurb_box_height = blurb_text_height + blurb_padding * 2
+
+        # Center the box on the back cover
+        box_x = back_cx - blurb_box_width / 2
+        box_top = safe_top - 0.8 * inch
+        box_y = box_top - blurb_box_height
+
+        # Draw rounded background box
+        c.setFillColor(blurb_bg)
+        c.roundRect(box_x, box_y, blurb_box_width, blurb_box_height, 8, fill=True, stroke=False)
+
+        # Draw text inside the box
+        # Use dark text on light bg, or light text on dark bg
+        blurb_r = int(blurb_bg_color.lstrip("#")[0:2], 16) / 255
+        blurb_g_val = int(blurb_bg_color.lstrip("#")[2:4], 16) / 255
+        blurb_b = int(blurb_bg_color.lstrip("#")[4:6], 16) / 255
+        blurb_brightness = (blurb_r * 299 + blurb_g_val * 587 + blurb_b * 114) / 1000
+        blurb_text_color = black if blurb_brightness > 0.5 else white
+
+        c.setFillColor(blurb_text_color)
+        c.setFont(blurb_font_name, blurb_size)
+        y = box_top - blurb_padding
         for line in lines:
-            if y < safe_bottom + 1.0 * inch:
-                break
             c.drawCentredString(back_cx, y, line)
             y -= line_height
 

@@ -148,18 +148,32 @@
         </div>
     </div>
 
-    <!-- Live Preview -->
+    <!-- Live Preview — Front + Back -->
     <div class="mt-4">
         <label class="block text-sm text-gray-600 mb-2">Preview</label>
-        <div id="cover-preview" class="rounded-lg overflow-hidden shadow-md inline-block">
-            <div id="preview-front" style="width: 180px; height: 270px; background: {{ cover_config.bg_color or '#1a3c5e' }}; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 16px; position: relative; overflow: hidden;">
-                <div id="preview-title-group" style="text-align: center; position: relative; top: {{ ((cover_config.title_offset or 0) * 30)|int }}px;">
-                    <span id="preview-title" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 16px; font-weight: bold;">{{ cover_config.title or 'My Legacy' }}</span>
-                    <br>
-                    <span id="preview-subtitle" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 10px; opacity: 0.8;">{{ cover_config.subtitle or '' }}</span>
+        <div class="flex gap-3 flex-wrap">
+            <!-- Back Cover -->
+            <div>
+                <p class="text-xs text-gray-400 mb-1 text-center">Back</p>
+                <div id="preview-back" class="rounded-lg overflow-hidden shadow-md" style="width: 180px; height: 270px; background: {{ cover_config.bg_color or '#1a3c5e' }}; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; position: relative;">
+                    <div id="preview-blurb-box" style="background: {{ cover_config.blurb_bg_color or '#ffffff' }}; border-radius: 6px; padding: 10px 12px; max-width: 90%;">
+                        <p id="preview-blurb" style="font-size: 7px; line-height: 1.4; text-align: center; color: #333; margin: 0;">{{ (cover_config.blurb or 'Your back cover blurb will appear here...')[:200] }}</p>
+                    </div>
+                    <span style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 7px; position: absolute; bottom: 10px; opacity: 0.7;">polly-connect.com</span>
                 </div>
-                <img id="preview-photo" src="" alt="" style="max-width: 80%; max-height: 120px; object-fit: contain; border-radius: 4px; display: none; position: relative; top: {{ ((cover_config.photo_offset or 0) * 30)|int }}px;">
-                <span id="preview-author" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 11px; position: relative; top: {{ ((cover_config.author_offset or 0) * -30)|int }}px;">{{ cover_config.author_name or user.name or '' }}</span>
+            </div>
+            <!-- Front Cover -->
+            <div>
+                <p class="text-xs text-gray-400 mb-1 text-center">Front</p>
+                <div id="preview-front" class="rounded-lg overflow-hidden shadow-md" style="width: 180px; height: 270px; background: {{ cover_config.bg_color or '#1a3c5e' }}; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 16px; position: relative; overflow: hidden;">
+                    <div id="preview-title-group" style="text-align: center; position: relative; top: {{ ((cover_config.title_offset or 0) * 30)|int }}px;">
+                        <span id="preview-title" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 16px; font-weight: bold;">{{ cover_config.title or 'My Legacy' }}</span>
+                        <br>
+                        <span id="preview-subtitle" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 10px; opacity: 0.8;">{{ cover_config.subtitle or '' }}</span>
+                    </div>
+                    <img id="preview-photo" src="" alt="" style="max-width: 80%; max-height: 120px; object-fit: contain; border-radius: 4px; display: none; position: relative; top: {{ ((cover_config.photo_offset or 0) * 30)|int }}px;">
+                    <span id="preview-author" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 11px; position: relative; top: {{ ((cover_config.author_offset or 0) * -30)|int }}px;">{{ cover_config.author_name or user.name or '' }}</span>
+                </div>
             </div>
         </div>
         <p class="text-xs text-gray-400 mt-1">Approximate preview. Final PDF will have exact KDP dimensions.</p>
@@ -172,7 +186,16 @@
     <p class="text-xs text-gray-500 mb-3">A short description for the back of the book. Click "Generate" to have AI write one from your stories.</p>
     <textarea name="blurb" id="blurb-text" rows="5"
               placeholder="A warm description of the life captured in these pages..."
+              oninput="updateBackPreview()"
               class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">{{ cover_config.blurb or '' }}</textarea>
+    <div class="flex items-center gap-3 mt-2 mb-2">
+        <label class="text-sm text-gray-600">Blurb Box Color</label>
+        <input type="color" name="blurb_bg_color" id="blurb-bg-color"
+               value="{{ cover_config.blurb_bg_color or '#ffffff' }}"
+               class="w-10 h-10 rounded border cursor-pointer"
+               oninput="updateBackPreview()">
+        <span id="blurb-bg-hex" class="text-xs text-gray-500 font-mono">{{ cover_config.blurb_bg_color or '#ffffff' }}</span>
+    </div>
     <button type="button" onclick="generateBlurb()" id="blurb-btn"
             class="mt-2 bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 text-sm font-medium">
         Generate with AI
@@ -231,6 +254,7 @@ function updatePreview() {
     var cssFont = fontMap[fontVal] || 'sans-serif';
 
     document.getElementById('preview-front').style.background = bg;
+    document.getElementById('preview-back').style.background = bg;
 
     var els = ['preview-title', 'preview-subtitle', 'preview-author'];
     for (var i = 0; i < els.length; i++) {
@@ -242,6 +266,21 @@ function updatePreview() {
 
     document.getElementById('bg-color-hex').textContent = bg;
     document.getElementById('font-color-hex').textContent = fg;
+    updateBackPreview();
+}
+
+function updateBackPreview() {
+    var blurbText = document.getElementById('blurb-text').value || 'Your back cover blurb will appear here...';
+    var blurbBg = document.getElementById('blurb-bg-color').value;
+    document.getElementById('preview-blurb').textContent = blurbText.substring(0, 200);
+    document.getElementById('preview-blurb-box').style.background = blurbBg;
+    document.getElementById('blurb-bg-hex').textContent = blurbBg;
+    // Auto text color based on brightness
+    var r = parseInt(blurbBg.substring(1,3), 16) / 255;
+    var g = parseInt(blurbBg.substring(3,5), 16) / 255;
+    var b = parseInt(blurbBg.substring(5,7), 16) / 255;
+    var brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    document.getElementById('preview-blurb').style.color = brightness > 0.5 ? '#333' : '#fff';
 }
 
 function generateBlurb() {

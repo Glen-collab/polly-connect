@@ -4076,6 +4076,7 @@ async def cover_download(request: Request):
     bg_color = form.get("bg_color", "#1a3c5e")
     font_color = form.get("font_color", "#ffffff")
     font_name = form.get("font_name", "Helvetica-Bold")
+    blurb_bg_color = form.get("blurb_bg_color", "#ffffff")
     page_count = user.get("book_page_count", 100)
     try:
         title_offset = float(form.get("title_offset", 0))
@@ -4112,7 +4113,7 @@ async def cover_download(request: Request):
     config = {
         "title": title, "subtitle": subtitle, "author_name": author_name,
         "blurb": blurb, "bg_color": bg_color, "font_color": font_color,
-        "font_name": font_name,
+        "font_name": font_name, "blurb_bg_color": blurb_bg_color,
         "title_offset": title_offset, "photo_offset": photo_offset,
         "author_offset": author_offset,
     }
@@ -4137,6 +4138,7 @@ async def cover_download(request: Request):
             bg_color=bg_color,
             font_color=font_color,
             font_name=font_name,
+            blurb_bg_color=blurb_bg_color,
             title_offset=title_offset,
             photo_offset=photo_offset,
             author_offset=author_offset,
