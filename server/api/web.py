@@ -1670,6 +1670,9 @@ async def settings_page(request: Request):
         if not db._conn:
             conn.close()
 
+    # Load devices for this tenant (for future per-device settings UI)
+    tenant_devices = db.get_devices_by_tenant(session["tenant_id"])
+
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "session": session,
@@ -1680,6 +1683,7 @@ async def settings_page(request: Request):
         "snooze_minutes": snooze_minutes,
         "pronunciations": pronunciations,
         "security_questions": security_questions,
+        "devices": tenant_devices,
     })
 
 
@@ -1834,7 +1838,8 @@ async def pronunciation_delete(request: Request, pronunciation_id: int = Form(..
 
 
 @router.post("/settings/squawk-snooze")
-async def squawk_snooze(request: Request, duration: int = Form(30)):
+async def squawk_snooze(request: Request, duration: int = Form(30),
+                        device_id: str = Form(None)):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -1843,31 +1848,39 @@ async def squawk_snooze(request: Request, duration: int = Form(30)):
     duration = max(5, min(480, duration))  # 5 min to 8 hours
     tenant_id = session["tenant_id"]
     db = request.app.state.db
-
-    # Store snooze in DB (persists across restarts/disconnects)
-    snoozed_until = (datetime.utcnow() + timedelta(minutes=duration)).isoformat()
-    conn = db._get_connection()
-    try:
-        conn.execute(
-            "UPDATE user_profiles SET squawk_snoozed_until = ?, squawk_quiet_override = 0 WHERE tenant_id = ?",
-            (snoozed_until, tenant_id)
-        )
-        conn.commit()
-    finally:
-        if not db._conn:
-            conn.close()
-
-    # Also update in-memory for any connected devices
     squawk_mgr = getattr(request.app.state, "squawk", None)
-    if squawk_mgr:
-        for dev_id in list(squawk_mgr._active_devices.keys()):
-            squawk_mgr.snooze(dev_id, duration)
+    snoozed_until = (datetime.utcnow() + timedelta(minutes=duration)).isoformat()
+
+    if device_id:
+        # Per-device snooze
+        device = db.get_device(device_id)
+        if not device or device.get("tenant_id") != tenant_id:
+            return RedirectResponse("/web/settings", status_code=303)
+        db.update_device_settings(device_id, squawk_snoozed_until=snoozed_until,
+                                  squawk_quiet_override=0)
+        if squawk_mgr:
+            squawk_mgr.snooze(device_id, duration)
+    else:
+        # Tenant-wide snooze (all devices)
+        conn = db._get_connection()
+        try:
+            conn.execute(
+                "UPDATE user_profiles SET squawk_snoozed_until = ?, squawk_quiet_override = 0 WHERE tenant_id = ?",
+                (snoozed_until, tenant_id)
+            )
+            conn.commit()
+        finally:
+            if not db._conn:
+                conn.close()
+        if squawk_mgr:
+            for dev_id in list(squawk_mgr._active_devices.keys()):
+                squawk_mgr.snooze(dev_id, duration)
 
     return RedirectResponse("/web/settings", status_code=303)
 
 
 @router.post("/settings/squawk-unsnooze")
-async def squawk_unsnooze(request: Request):
+async def squawk_unsnooze(request: Request, device_id: str = Form(None)):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -1875,24 +1888,32 @@ async def squawk_unsnooze(request: Request):
 
     tenant_id = session["tenant_id"]
     db = request.app.state.db
-
-    # Clear snooze in DB and set quiet_override flag
-    conn = db._get_connection()
-    try:
-        conn.execute(
-            "UPDATE user_profiles SET squawk_snoozed_until = NULL, squawk_quiet_override = 1 WHERE tenant_id = ?",
-            (tenant_id,)
-        )
-        conn.commit()
-    finally:
-        if not db._conn:
-            conn.close()
-
-    # Also update in-memory for any connected devices
     squawk_mgr = getattr(request.app.state, "squawk", None)
-    if squawk_mgr:
-        for dev_id in list(squawk_mgr._active_devices.keys()):
-            squawk_mgr.unsnooze(dev_id)
+
+    if device_id:
+        # Per-device unsnooze
+        device = db.get_device(device_id)
+        if not device or device.get("tenant_id") != tenant_id:
+            return RedirectResponse("/web/settings", status_code=303)
+        db.update_device_settings(device_id, squawk_snoozed_until=None,
+                                  squawk_quiet_override=1)
+        if squawk_mgr:
+            squawk_mgr.unsnooze(device_id)
+    else:
+        # Tenant-wide unsnooze
+        conn = db._get_connection()
+        try:
+            conn.execute(
+                "UPDATE user_profiles SET squawk_snoozed_until = NULL, squawk_quiet_override = 1 WHERE tenant_id = ?",
+                (tenant_id,)
+            )
+            conn.commit()
+        finally:
+            if not db._conn:
+                conn.close()
+        if squawk_mgr:
+            for dev_id in list(squawk_mgr._active_devices.keys()):
+                squawk_mgr.unsnooze(dev_id)
 
     return RedirectResponse("/web/settings", status_code=303)
 

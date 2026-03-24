@@ -223,23 +223,23 @@ async def continuous_stream(websocket: WebSocket):
                     _evt_ctx["db_device_id"] = device_info.get("device_id", device_id) if device_info else device_id
                     _log_event("connect")
 
-                    # Load squawk intervals + tuning from user profile
-                    squawk_int = 10
-                    chatter_int = 45
-                    quiet_start = 21
-                    quiet_end = 7
-                    squawk_vol = 30
-                    user_rms_threshold = None
+                    # Load merged device + tenant settings (device overrides > tenant defaults)
+                    ds = {"squawk_interval": 10, "chatter_interval": 45,
+                          "quiet_hours_start": 21, "quiet_hours_end": 7,
+                          "squawk_volume": 30, "rms_threshold": None,
+                          "message_nag_enabled": 1}
                     try:
-                        profile = db.get_or_create_user(tenant_id=tenant_id)
-                        squawk_int = profile.get("squawk_interval") or 10
-                        chatter_int = profile.get("chatter_interval") or 45
-                        quiet_start = profile.get("quiet_hours_start") if profile.get("quiet_hours_start") is not None else 21
-                        quiet_end = profile.get("quiet_hours_end") if profile.get("quiet_hours_end") is not None else 7
-                        squawk_vol = profile.get("squawk_volume") if profile.get("squawk_volume") is not None else 30
-                        user_rms_threshold = profile.get("rms_threshold")
+                        ds = db.get_device_settings(device_id, tenant_id)
                     except Exception:
                         pass
+
+                    squawk_int = ds["squawk_interval"]
+                    chatter_int = ds["chatter_interval"]
+                    quiet_start = ds["quiet_hours_start"]
+                    quiet_end = ds["quiet_hours_end"]
+                    squawk_vol = ds["squawk_volume"]
+                    user_rms_threshold = ds.get("rms_threshold")
+                    msg_nag_enabled = ds.get("message_nag_enabled", 1)
 
                     # Apply user's RMS threshold if set
                     if user_rms_threshold is not None:
@@ -257,16 +257,17 @@ async def continuous_stream(websocket: WebSocket):
                                                    chatter_interval=chatter_int,
                                                    quiet_hours_start=quiet_start,
                                                    quiet_hours_end=quiet_end,
-                                                   squawk_volume=squawk_vol)
+                                                   squawk_volume=squawk_vol,
+                                                   message_nag_enabled=msg_nag_enabled)
                         # Load DB snooze state (survives restarts/disconnects)
                         try:
-                            snoozed_str = profile.get("squawk_snoozed_until")
+                            snoozed_str = ds.get("squawk_snoozed_until")
                             if snoozed_str:
                                 from datetime import datetime as _dt
                                 remaining_sec = (_dt.fromisoformat(snoozed_str) - _dt.utcnow()).total_seconds()
                                 if remaining_sec > 0:
                                     squawk_mgr.snooze(device_id, int(remaining_sec / 60) + 1)
-                            if profile.get("squawk_quiet_override"):
+                            if ds.get("squawk_quiet_override"):
                                 squawk_mgr._quiet_override[device_id] = True
                         except Exception:
                             pass

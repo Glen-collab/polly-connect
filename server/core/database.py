@@ -477,6 +477,21 @@ class PollyDB:
             if "claimed_at" not in cols:
                 conn.execute("ALTER TABLE devices ADD COLUMN claimed_at TIMESTAMP")
 
+            # Per-device settings (NULL = inherit from tenant user_profiles)
+            device_settings_migrations = {
+                "dev_quiet_hours_start": "ALTER TABLE devices ADD COLUMN dev_quiet_hours_start INTEGER",
+                "dev_quiet_hours_end": "ALTER TABLE devices ADD COLUMN dev_quiet_hours_end INTEGER",
+                "dev_squawk_interval": "ALTER TABLE devices ADD COLUMN dev_squawk_interval INTEGER",
+                "dev_chatter_interval": "ALTER TABLE devices ADD COLUMN dev_chatter_interval INTEGER",
+                "dev_squawk_volume": "ALTER TABLE devices ADD COLUMN dev_squawk_volume INTEGER",
+                "dev_snoozed_until": "ALTER TABLE devices ADD COLUMN dev_snoozed_until TIMESTAMP",
+                "dev_quiet_override": "ALTER TABLE devices ADD COLUMN dev_quiet_override INTEGER",
+                "dev_message_nag": "ALTER TABLE devices ADD COLUMN dev_message_nag INTEGER",
+            }
+            for col, sql in device_settings_migrations.items():
+                if col not in cols:
+                    conn.execute(sql)
+
             # Create default tenant #1 and backfill
             conn.execute("INSERT OR IGNORE INTO tenants (id, name) VALUES (1, 'Default')")
             for table in tenant_tables:
@@ -1075,6 +1090,76 @@ class PollyDB:
                 (tenant_id,)
             ).fetchall()
             return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_device_settings(self, device_id: str, tenant_id: int) -> Dict:
+        """Get merged settings: device-level overrides > tenant profile defaults.
+        NULL device columns inherit from user_profiles."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            device = conn.execute(
+                "SELECT * FROM devices WHERE device_id = ?", (device_id,)
+            ).fetchone()
+            profile = conn.execute(
+                "SELECT * FROM user_profiles WHERE tenant_id = ? LIMIT 1", (tenant_id,)
+            ).fetchone()
+
+            dev = dict(device) if device else {}
+            prof = dict(profile) if profile else {}
+
+            def _pick(dev_key, prof_key, default):
+                v = dev.get(dev_key)
+                if v is not None:
+                    return v
+                v = prof.get(prof_key)
+                if v is not None:
+                    return v
+                return default
+
+            return {
+                "squawk_interval": _pick("dev_squawk_interval", "squawk_interval", 10),
+                "chatter_interval": _pick("dev_chatter_interval", "chatter_interval", 45),
+                "quiet_hours_start": _pick("dev_quiet_hours_start", "quiet_hours_start", 21),
+                "quiet_hours_end": _pick("dev_quiet_hours_end", "quiet_hours_end", 7),
+                "squawk_volume": _pick("dev_squawk_volume", "squawk_volume", 30),
+                "squawk_snoozed_until": dev.get("dev_snoozed_until") or prof.get("squawk_snoozed_until"),
+                "squawk_quiet_override": dev.get("dev_quiet_override") if dev.get("dev_quiet_override") is not None else prof.get("squawk_quiet_override", 0),
+                "message_nag_enabled": _pick("dev_message_nag", "message_nag_enabled", 1) if "message_nag_enabled" in prof else (dev.get("dev_message_nag") if dev.get("dev_message_nag") is not None else 1),
+                "rms_threshold": prof.get("rms_threshold", 200),
+                "voice_volume": prof.get("voice_volume", 100),
+            }
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_device_settings(self, device_id: str, **kwargs) -> None:
+        """Update per-device settings columns. Only updates provided keys.
+        Pass None to clear an override (revert to tenant default)."""
+        col_map = {
+            "quiet_hours_start": "dev_quiet_hours_start",
+            "quiet_hours_end": "dev_quiet_hours_end",
+            "squawk_interval": "dev_squawk_interval",
+            "chatter_interval": "dev_chatter_interval",
+            "squawk_volume": "dev_squawk_volume",
+            "squawk_snoozed_until": "dev_snoozed_until",
+            "squawk_quiet_override": "dev_quiet_override",
+            "message_nag_enabled": "dev_message_nag",
+        }
+        updates = {}
+        for k, v in kwargs.items():
+            if k in col_map:
+                updates[col_map[k]] = v
+        if not updates:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [device_id]
+        conn = self._get_connection()
+        try:
+            conn.execute(f"UPDATE devices SET {set_clause} WHERE device_id = ?", values)
+            conn.commit()
         finally:
             if not self._conn:
                 conn.close()

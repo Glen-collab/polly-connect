@@ -118,6 +118,7 @@ class SquawkManager:
         self._message_callbacks: Dict[str, Any] = {}  # device_id -> async fn() -> bool (has messages)
         self._tts_callbacks: Dict[str, Any] = {}  # device_id -> async fn(text) -> None
         self._last_message_nag: Dict[str, float] = {}  # device_id -> last nag time
+        self._message_nag_enabled: Dict[str, bool] = {}  # per-device message nag toggle
         self.last_squawk_end: Dict[str, float] = {}  # monotonic time when last squawk/chatter finished
         self._volume: Dict[str, float] = {}  # per-device volume (0.0-1.0)
 
@@ -190,7 +191,7 @@ class SquawkManager:
     def register_device(self, device_id: str, websocket,
                         squawk_interval: int = None, chatter_interval: int = None,
                         quiet_hours_start: int = 21, quiet_hours_end: int = 7,
-                        squawk_volume: int = 30):
+                        squawk_volume: int = 30, message_nag_enabled: int = 1):
         """Register or re-register a connected device. Preserves existing schedules."""
         # Always update the websocket reference
         self._active_devices[device_id] = websocket
@@ -198,6 +199,7 @@ class SquawkManager:
         self._send_locks[device_id] = asyncio.Lock()
         self._quiet_hours[device_id] = (quiet_hours_start, quiet_hours_end)
         self._volume[device_id] = max(0, min(100, squawk_volume)) / 100.0
+        self._message_nag_enabled[device_id] = bool(message_nag_enabled)
 
         # Update intervals
         self._squawk_interval[device_id] = squawk_interval or DEFAULT_SQUAWK_MINUTES
@@ -397,10 +399,10 @@ class SquawkManager:
                     except Exception as e:
                         logger.error(f"Prayer callback error: {e}")
 
-                # Check for pending messages — nag every 15 min
+                # Check for pending messages — nag every 15 min (if enabled for this device)
                 msg_cb = self._message_callbacks.get(device_id)
                 tts_cb = self._tts_callbacks.get(device_id)
-                if msg_cb and tts_cb:
+                if msg_cb and tts_cb and self._message_nag_enabled.get(device_id, True):
                     last_nag = self._last_message_nag.get(device_id, 0)
                     if now - last_nag >= 900:  # 15 minutes
                         try:
