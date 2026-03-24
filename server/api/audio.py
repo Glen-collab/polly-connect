@@ -177,10 +177,13 @@ async def continuous_stream(websocket: WebSocket):
                             db.update_device_firmware_info(db_device_id, fw_version, fw_variant)
                             logger.info(f"Device {device_id} firmware: v{fw_version} ({fw_variant})")
                         logger.info(f"Continuous stream device: {device_id} (tenant={device_info['tenant_id']})")
-                        # Load voice volume from user profile
+                        # Load voice volume + default speaker from user profile
                         try:
                             user_profile = db.get_or_create_user(tenant_id=tenant_id)
                             conv_state.voice_volume = user_profile.get("voice_volume") or 100
+                            # Default speaker to owner name so stories aren't "Unknown"
+                            if not conv_state.speaker_name:
+                                conv_state.speaker_name = user_profile.get("familiar_name") or user_profile.get("name")
                             logger.info(f"Voice volume: {conv_state.voice_volume}%")
                         except Exception:
                             conv_state.voice_volume = 100
