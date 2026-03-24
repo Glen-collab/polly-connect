@@ -46,7 +46,35 @@ def hex_to_color(hex_str: str) -> Color:
     return Color(r / 255, g / 255, b / 255)
 
 
-# Bundled font families (ReportLab built-ins)
+# Register custom TTF fonts
+_fonts_registered = False
+
+def _register_fonts():
+    global _fonts_registered
+    if _fonts_registered:
+        return
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        fonts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "fonts")
+        font_files = {
+            "GreatVibes": "GreatVibes-Regular.ttf",
+            "PinyonScript": "PinyonScript-Regular.ttf",
+            "PlayfairDisplay-Bold": "PlayfairDisplay-Bold.ttf",
+            "PlayfairDisplay": "PlayfairDisplay-Regular.ttf",
+            "DancingScript": "DancingScript-Regular.ttf",
+            "CormorantGaramond-Bold": "CormorantGaramond-Bold.ttf",
+        }
+        for name, filename in font_files.items():
+            path = os.path.join(fonts_dir, filename)
+            if os.path.exists(path):
+                pdfmetrics.registerFont(TTFont(name, path))
+        _fonts_registered = True
+    except Exception as e:
+        logger.warning(f"Custom font registration failed: {e}")
+
+
+# Font choices — built-ins + custom TTFs
 FONT_CHOICES = {
     "Helvetica": "Helvetica",
     "Helvetica-Bold": "Helvetica-Bold",
@@ -54,6 +82,12 @@ FONT_CHOICES = {
     "Times-Bold": "Times-Bold",
     "Courier": "Courier",
     "Courier-Bold": "Courier-Bold",
+    "GreatVibes": "GreatVibes",
+    "PinyonScript": "PinyonScript",
+    "DancingScript": "DancingScript",
+    "PlayfairDisplay": "PlayfairDisplay",
+    "PlayfairDisplay-Bold": "PlayfairDisplay-Bold",
+    "CormorantGaramond-Bold": "CormorantGaramond-Bold",
 }
 
 
@@ -74,6 +108,7 @@ def generate_cover_pdf(
 
     Returns PDF bytes.
     """
+    _register_fonts()
     spine_w = calculate_spine_width(page_count)
     total_w = (BLEED + TRIM_W + spine_w + TRIM_W + BLEED) * inch
     total_h = (BLEED + TRIM_H + BLEED) * inch
@@ -114,9 +149,13 @@ def generate_cover_pdf(
     # ── 1. Measure title + subtitle block ──
     title_font_size = 36
     sub_font_size = 18
-    sub_font_name = font.replace("Bold", "Roman").replace("Courier-Roman", "Courier")
-    if sub_font_name not in FONT_CHOICES.values():
-        sub_font_name = font
+    # For subtitle, use non-bold variant if available, else same font
+    _bold_to_regular = {
+        "Helvetica-Bold": "Helvetica", "Times-Bold": "Times-Roman",
+        "Courier-Bold": "Courier", "PlayfairDisplay-Bold": "PlayfairDisplay",
+        "CormorantGaramond-Bold": "CormorantGaramond-Bold",
+    }
+    sub_font_name = _bold_to_regular.get(font, font)
 
     title_lines = _wrap_text(title, font, title_font_size, max_text_w)
     title_line_h = title_font_size * 1.3

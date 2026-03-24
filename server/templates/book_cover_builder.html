@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Cover Builder - Polly Connect{% endblock %}
 
+{% block head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Pinyon+Script&family=Dancing+Script&family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@700&display=swap" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 <div class="mb-6">
     <a href="/web/book" class="text-emerald-600 hover:underline text-sm">&larr; Book</a>
@@ -75,9 +80,26 @@
         <div>
             <label class="block text-sm text-gray-600 mb-1">Font</label>
             <select name="font_name" id="font-select" class="w-full border rounded px-3 py-2 text-sm" onchange="updatePreview()">
-                {% for val, label in [("Helvetica-Bold", "Helvetica Bold"), ("Helvetica", "Helvetica"), ("Times-Bold", "Times Bold"), ("Times-Roman", "Times Roman"), ("Courier-Bold", "Courier Bold"), ("Courier", "Courier")] %}
+                <optgroup label="Clean">
+                {% for val, label in [("Helvetica-Bold", "Helvetica Bold"), ("Helvetica", "Helvetica")] %}
                 <option value="{{ val }}" {% if (cover_config.font_name or 'Helvetica-Bold') == val %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
+                </optgroup>
+                <optgroup label="Elegant Serif">
+                {% for val, label in [("PlayfairDisplay-Bold", "Playfair Display Bold"), ("PlayfairDisplay", "Playfair Display"), ("CormorantGaramond-Bold", "Cormorant Garamond Bold"), ("Times-Bold", "Times Bold"), ("Times-Roman", "Times Roman")] %}
+                <option value="{{ val }}" {% if (cover_config.font_name or '') == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+                </optgroup>
+                <optgroup label="Script & Calligraphy">
+                {% for val, label in [("GreatVibes", "Great Vibes"), ("PinyonScript", "Pinyon Script"), ("DancingScript", "Dancing Script")] %}
+                <option value="{{ val }}" {% if (cover_config.font_name or '') == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+                </optgroup>
+                <optgroup label="Monospace">
+                {% for val, label in [("Courier-Bold", "Courier Bold"), ("Courier", "Courier")] %}
+                <option value="{{ val }}" {% if (cover_config.font_name or '') == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+                </optgroup>
             </select>
         </div>
     </div>
@@ -146,7 +168,13 @@ var fontMap = {
     'Times-Bold': '"Times New Roman", Times, Georgia, serif',
     'Times-Roman': '"Times New Roman", Times, Georgia, serif',
     'Courier-Bold': '"Courier New", Courier, monospace',
-    'Courier': '"Courier New", Courier, monospace'
+    'Courier': '"Courier New", Courier, monospace',
+    'GreatVibes': '"Great Vibes", cursive',
+    'PinyonScript': '"Pinyon Script", cursive',
+    'DancingScript': '"Dancing Script", cursive',
+    'PlayfairDisplay': '"Playfair Display", serif',
+    'PlayfairDisplay-Bold': '"Playfair Display", serif',
+    'CormorantGaramond-Bold': '"Cormorant Garamond", serif'
 };
 
 function updatePreview() {
