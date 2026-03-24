@@ -308,6 +308,7 @@ function generateBlurb() {
             if (data.blurb) {
                 document.getElementById('blurb-text').value = data.blurb;
                 status.textContent = 'Done!';
+                updateBackPreview();
             } else {
                 status.textContent = 'No chapter summaries found. Generate chapters first.';
             }
