@@ -106,6 +106,9 @@ def generate_cover_pdf(
     font_color: str = "#ffffff",
     font_name: str = "Helvetica-Bold",
     spine_text: str = "",
+    title_offset: float = 0.0,
+    photo_offset: float = 0.0,
+    author_offset: float = 0.0,
 ) -> bytes:
     """
     Generate a KDP-ready full wrap cover PDF.
@@ -182,17 +185,18 @@ def generate_cover_pdf(
     photo_zone_bottom = author_top_y + 0.1 * inch
     photo_zone_h = photo_zone_top - photo_zone_bottom
 
-    # ── 4. Draw title + subtitle (grouped tightly) ──
+    # ── 4. Draw title + subtitle (grouped tightly, with user offset) ──
+    title_y_offset = title_offset * inch  # positive = up, negative = down
     c.setFillColor(fg)
     c.setFont(font, title_font_size)
-    y = safe_top - title_padding
+    y = safe_top - title_padding - title_y_offset
     for i, line in enumerate(title_lines):
         c.drawCentredString(front_cx, y, line)
         if i < len(title_lines) - 1:
-            y -= title_line_h  # only drop between title lines, not after last
+            y -= title_line_h
 
     if subtitle:
-        y -= sub_font_size + sub_gap  # tight gap: just subtitle font size + small gap
+        y -= sub_font_size + sub_gap
         c.setFont(sub_font_name, sub_font_size)
         c.drawCentredString(front_cx, y, subtitle)
 
@@ -207,17 +211,19 @@ def generate_cover_pdf(
             draw_w = iw * scale
             draw_h = ih * scale
             img_x = front_cx - draw_w / 2
-            # Center photo in the photo zone
-            img_y = photo_zone_bottom + (photo_zone_h - draw_h) / 2
+            # Center photo in the photo zone, with user offset
+            photo_y_offset = photo_offset * inch
+            img_y = photo_zone_bottom + (photo_zone_h - draw_h) / 2 - photo_y_offset
             c.drawImage(img, img_x, img_y, draw_w, draw_h, preserveAspectRatio=True)
         except Exception as e:
             logger.warning(f"Cover photo failed: {e}")
 
     # ── 6. Draw author name at bottom ──
     if author_name:
+        author_y_offset = author_offset * inch
         c.setFillColor(fg)
         c.setFont(font, author_font_size)
-        c.drawCentredString(front_cx, safe_bottom + 0.3 * inch, author_name)
+        c.drawCentredString(front_cx, safe_bottom + 0.3 * inch + author_y_offset, author_name)
 
     # ── SPINE ──
     if spine_w >= MIN_SPINE:

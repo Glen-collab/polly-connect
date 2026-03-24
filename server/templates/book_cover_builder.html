@@ -104,18 +104,62 @@
         </div>
     </div>
 
+    <!-- Position Controls -->
+    <div class="mt-4 pt-4 border-t">
+        <label class="block text-sm text-gray-600 mb-2 font-medium">Position Adjustments</label>
+        <p class="text-xs text-gray-400 mb-3">Slide to move elements up or down on the cover.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Title</label>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400">Up</span>
+                    <input type="range" name="title_offset" id="title-offset" min="-2" max="2" step="0.1"
+                           value="{{ cover_config.title_offset or 0 }}"
+                           class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                           oninput="document.getElementById('title-offset-val').textContent = this.value + '&quot;'; updatePositionPreview();">
+                    <span class="text-xs text-gray-400">Down</span>
+                    <span id="title-offset-val" class="text-xs font-mono text-gray-600 w-8 text-right">{{ cover_config.title_offset or 0 }}"</span>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Photo</label>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400">Up</span>
+                    <input type="range" name="photo_offset" id="photo-offset" min="-2" max="2" step="0.1"
+                           value="{{ cover_config.photo_offset or 0 }}"
+                           class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                           oninput="document.getElementById('photo-offset-val').textContent = this.value + '&quot;'; updatePositionPreview();">
+                    <span class="text-xs text-gray-400">Down</span>
+                    <span id="photo-offset-val" class="text-xs font-mono text-gray-600 w-8 text-right">{{ cover_config.photo_offset or 0 }}"</span>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Author</label>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400">Down</span>
+                    <input type="range" name="author_offset" id="author-offset" min="-1" max="3" step="0.1"
+                           value="{{ cover_config.author_offset or 0 }}"
+                           class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                           oninput="document.getElementById('author-offset-val').textContent = this.value + '&quot;'; updatePositionPreview();">
+                    <span class="text-xs text-gray-400">Up</span>
+                    <span id="author-offset-val" class="text-xs font-mono text-gray-600 w-8 text-right">{{ cover_config.author_offset or 0 }}"</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Live Preview -->
     <div class="mt-4">
         <label class="block text-sm text-gray-600 mb-2">Preview</label>
         <div id="cover-preview" class="rounded-lg overflow-hidden shadow-md inline-block">
             <div id="preview-front" style="width: 180px; height: 270px; background: {{ cover_config.bg_color or '#1a3c5e' }}; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 16px; position: relative; overflow: hidden;">
-                <span id="preview-title" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 16px; font-weight: bold; text-align: center; z-index: 1;">{{ cover_config.title or 'My Legacy' }}</span>
-                <img id="preview-photo" src="" alt="" style="max-width: 80%; max-height: 120px; object-fit: contain; border-radius: 4px; display: none; z-index: 1;">
-                <div style="text-align: center; z-index: 1;">
-                    <span id="preview-subtitle" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 10px; opacity: 0.8;">{{ cover_config.subtitle or '' }}</span>
+                <div id="preview-title-group" style="text-align: center; position: relative; top: {{ ((cover_config.title_offset or 0) * 30)|int }}px;">
+                    <span id="preview-title" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 16px; font-weight: bold;">{{ cover_config.title or 'My Legacy' }}</span>
                     <br>
-                    <span id="preview-author" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 11px;">{{ cover_config.author_name or user.name or '' }}</span>
+                    <span id="preview-subtitle" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 10px; opacity: 0.8;">{{ cover_config.subtitle or '' }}</span>
                 </div>
+                <img id="preview-photo" src="" alt="" style="max-width: 80%; max-height: 120px; object-fit: contain; border-radius: 4px; display: none; position: relative; top: {{ ((cover_config.photo_offset or 0) * 30)|int }}px;">
+                <span id="preview-author" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 11px; position: relative; top: {{ ((cover_config.author_offset or 0) * -30)|int }}px;">{{ cover_config.author_name or user.name or '' }}</span>
             </div>
         </div>
         <p class="text-xs text-gray-400 mt-1">Approximate preview. Final PDF will have exact KDP dimensions.</p>
@@ -224,6 +268,16 @@ function generateBlurb() {
             btn.disabled = false;
             btn.textContent = 'Generate with AI';
         });
+}
+
+function updatePositionPreview() {
+    var titleOff = parseFloat(document.getElementById('title-offset').value) || 0;
+    var photoOff = parseFloat(document.getElementById('photo-offset').value) || 0;
+    var authorOff = parseFloat(document.getElementById('author-offset').value) || 0;
+    // 30px per inch in preview (preview is ~270px for 9 inches)
+    document.getElementById('preview-title-group').style.top = (titleOff * 30) + 'px';
+    document.getElementById('preview-photo').style.top = (photoOff * 30) + 'px';
+    document.getElementById('preview-author').style.top = (authorOff * -30) + 'px';
 }
 
 function previewCoverPhoto(input) {

@@ -4077,6 +4077,18 @@ async def cover_download(request: Request):
     font_color = form.get("font_color", "#ffffff")
     font_name = form.get("font_name", "Helvetica-Bold")
     page_count = user.get("book_page_count", 100)
+    try:
+        title_offset = float(form.get("title_offset", 0))
+    except (ValueError, TypeError):
+        title_offset = 0.0
+    try:
+        photo_offset = float(form.get("photo_offset", 0))
+    except (ValueError, TypeError):
+        photo_offset = 0.0
+    try:
+        author_offset = float(form.get("author_offset", 0))
+    except (ValueError, TypeError):
+        author_offset = 0.0
 
     # Handle cover photo upload
     cover_photo_path = None
@@ -4101,6 +4113,8 @@ async def cover_download(request: Request):
         "title": title, "subtitle": subtitle, "author_name": author_name,
         "blurb": blurb, "bg_color": bg_color, "font_color": font_color,
         "font_name": font_name,
+        "title_offset": title_offset, "photo_offset": photo_offset,
+        "author_offset": author_offset,
     }
     conn = db._get_connection()
     try:
@@ -4123,6 +4137,9 @@ async def cover_download(request: Request):
             bg_color=bg_color,
             font_color=font_color,
             font_name=font_name,
+            title_offset=title_offset,
+            photo_offset=photo_offset,
+            author_offset=author_offset,
         )
     except Exception as e:
         logger.error(f"Cover generation failed: {e}")
