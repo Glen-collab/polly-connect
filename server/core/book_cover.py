@@ -285,7 +285,7 @@ def generate_cover_pdf(
         blurb_y_offset = blurb_offset * inch
         back_center_y = bottom_trim + (TRIM_H * inch) / 2
         box_x = back_cx - blurb_box_width / 2
-        box_y = back_center_y - blurb_box_height / 2 + blurb_y_offset
+        box_y = back_center_y - blurb_box_height / 2 - blurb_y_offset
         box_top = box_y + blurb_box_height
 
         # Draw rounded background box
