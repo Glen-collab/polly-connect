@@ -1670,8 +1670,14 @@ async def settings_page(request: Request):
         if not db._conn:
             conn.close()
 
-    # Load devices for this tenant (for future per-device settings UI)
+    # Load devices with per-device settings for settings UI
     tenant_devices = db.get_devices_by_tenant(session["tenant_id"])
+    for dev in tenant_devices:
+        try:
+            dev["settings"] = db.get_device_settings(dev["device_id"], session["tenant_id"])
+        except Exception:
+            dev["settings"] = {}
+    has_multiple_devices = len(tenant_devices) > 1
 
     return templates.TemplateResponse("settings.html", {
         "request": request,
@@ -1684,6 +1690,7 @@ async def settings_page(request: Request):
         "pronunciations": pronunciations,
         "security_questions": security_questions,
         "devices": tenant_devices,
+        "has_multiple_devices": has_multiple_devices,
     })
 
 
@@ -1784,13 +1791,31 @@ async def settings_save(request: Request):
         if not db._conn:
             conn.close()
 
-    # Update live squawk manager if devices are connected
+    # Per-device sound settings override
+    target_device = form.get("device_id", "").strip()
     squawk_mgr = getattr(request.app.state, "squawk", None)
-    if squawk_mgr:
-        for dev_id in list(squawk_mgr._active_devices.keys()):
-            squawk_mgr.update_intervals(dev_id, squawk_interval, chatter_interval,
-                                        quiet_hours_start, quiet_hours_end,
-                                        squawk_volume=squawk_volume)
+    if target_device and section == "sounds":
+        # Verify device belongs to this tenant
+        target_dev = db.get_device(target_device)
+        if target_dev and target_dev.get("tenant_id") == session["tenant_id"]:
+            db.update_device_settings(target_device,
+                                      squawk_interval=squawk_interval,
+                                      chatter_interval=chatter_interval,
+                                      quiet_hours_start=quiet_hours_start,
+                                      quiet_hours_end=quiet_hours_end,
+                                      squawk_volume=squawk_volume)
+            # Update only this device in squawk manager
+            if squawk_mgr and target_device in squawk_mgr._active_devices:
+                squawk_mgr.update_intervals(target_device, squawk_interval, chatter_interval,
+                                            quiet_hours_start, quiet_hours_end,
+                                            squawk_volume=squawk_volume)
+    else:
+        # Update live squawk manager for all connected devices (tenant-wide)
+        if squawk_mgr:
+            for dev_id in list(squawk_mgr._active_devices.keys()):
+                squawk_mgr.update_intervals(dev_id, squawk_interval, chatter_interval,
+                                            quiet_hours_start, quiet_hours_end,
+                                            squawk_volume=squawk_volume)
 
     # Update live VAD threshold if devices are connected
     detector = getattr(request.app.state, "wake_word_detector", None)
