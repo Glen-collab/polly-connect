@@ -3559,6 +3559,14 @@ async def book_overview(request: Request):
 
     gap_report = engagement.get_gap_report(tenant_id=tid)
 
+    # Load cover config for pre-filling export form
+    cover_config = {}
+    if user.get("book_cover_config"):
+        try:
+            cover_config = json.loads(user["book_cover_config"])
+        except (ValueError, TypeError):
+            pass
+
     return templates.TemplateResponse("book.html", {
         "request": request,
         "session": session,
@@ -3568,6 +3576,7 @@ async def book_overview(request: Request):
         "arc_coverage": arc_coverage,
         "phase_coverage": phase_coverage,
         "gap_report": gap_report,
+        "cover_config": cover_config,
     })
 
 
@@ -3970,12 +3979,28 @@ async def book_export_pdf(request: Request):
             status_code=303,
         )
 
-    # Save page count for cover builder spine calculation
+    # Save page count + sync title/subtitle/dedication to cover config
     page_count = pdf_gen._page_count
+    existing_config = {}
+    if user.get("book_cover_config"):
+        try:
+            existing_config = json.loads(user["book_cover_config"])
+        except (ValueError, TypeError):
+            pass
+    # Update config with export form values (don't overwrite cover-specific settings)
+    if title:
+        existing_config["title"] = title
+    if subtitle:
+        existing_config["subtitle"] = subtitle
+    if dedication:
+        existing_config["dedication"] = dedication
+    if not existing_config.get("author_name"):
+        existing_config["author_name"] = speaker_name
+
     conn = db._get_connection()
     try:
-        conn.execute("UPDATE user_profiles SET book_page_count = ? WHERE tenant_id = ?",
-                     (page_count, tid))
+        conn.execute("UPDATE user_profiles SET book_page_count = ?, book_cover_config = ? WHERE tenant_id = ?",
+                     (page_count, json.dumps(existing_config), tid))
         conn.commit()
     finally:
         if not db._conn:
