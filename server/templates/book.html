@@ -5,9 +5,9 @@
 <a href="/web/hub/stories" class="text-emerald-600 hover:underline text-sm">&larr; Stories</a>
 <div class="flex items-center justify-between mb-4 sm:mb-6 mt-1">
     <h1 class="text-xl sm:text-2xl font-bold">Legacy Book</h1>
-    <a href="/web/book/export"
-       class="text-sm bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700">
-        Export PDF (6x9)
+    <a href="/web/book/chapters"
+       class="text-sm bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+        Chapters
     </a>
 </div>
 
@@ -131,7 +131,7 @@
             </label>
         </div>
         <button type="submit" id="pdf-btn"
-                onclick="this.disabled=true; this.textContent='Generating PDF... this will take a few moments'; this.form.submit();"
+                onclick="var btn=this; setTimeout(function(){ btn.textContent='Generating PDF... this will take a few moments'; btn.classList.add('opacity-75'); }, 100);"
                 class="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-emerald-700 text-sm sm:text-base">
             Download PDF
         </button>
