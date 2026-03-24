@@ -3783,6 +3783,9 @@ async def book_generate_all_drafts(request: Request):
     if gate:
         return gate
 
+    form = await request.form()
+    overwrite = form.get("overwrite") == "1"
+
     book_builder = request.app.state.book_builder
     chapters = book_builder.generate_chapter_outline(tenant_id=tid)
 
@@ -3800,8 +3803,8 @@ async def book_generate_all_drafts(request: Request):
     for ch in chapters:
         ch_num = ch["chapter_number"]
 
-        # Skip chapters that already have drafts (don't overwrite)
-        if ch_num in existing_drafts and existing_drafts[ch_num].get("content"):
+        # Skip chapters that already have drafts (unless overwrite is checked)
+        if not overwrite and ch_num in existing_drafts and existing_drafts[ch_num].get("content"):
             # Still collect summary for continuity
             if existing_drafts[ch_num].get("summary"):
                 previous_summaries.append(existing_drafts[ch_num]["summary"])

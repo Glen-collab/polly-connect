@@ -24,11 +24,17 @@
 <!-- Generate All button -->
 <div class="mb-4">
     <form method="POST" action="/web/book/chapters/generate-all"
-          onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Generating... (this may take a few minutes)'; return true;">
-        <button type="submit"
-                class="w-full sm:w-auto bg-purple-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-purple-700 text-sm sm:text-base font-medium">
-            Generate All Drafts
-        </button>
+          onsubmit="this.querySelector('button[type=submit]').disabled=true; this.querySelector('button[type=submit]').textContent='Generating... (this may take a few minutes)'; return true;">
+        <div class="flex flex-wrap items-center gap-3">
+            <button type="submit"
+                    class="w-full sm:w-auto bg-purple-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-purple-700 text-sm sm:text-base font-medium">
+                Generate All Drafts
+            </button>
+            <label class="flex items-center gap-2 text-sm text-gray-600">
+                <input type="checkbox" name="overwrite" value="1" class="rounded">
+                Regenerate existing drafts
+            </label>
+        </div>
         <p class="text-xs text-gray-400 mt-1">Generates AI narrative drafts for all chapters without existing drafts. Uses continuity summaries between chapters.</p>
     </form>
 </div>
