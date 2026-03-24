@@ -167,11 +167,11 @@
             <!-- Back Cover -->
             <div>
                 <p class="text-xs text-gray-400 mb-1 text-center">Back</p>
-                <div id="preview-back" class="rounded-lg overflow-hidden shadow-md" style="width: 180px; height: 270px; background: {{ cover_config.bg_color or '#1a3c5e' }}; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; position: relative;">
-                    <div id="preview-blurb-box" style="background: {{ cover_config.blurb_bg_color or '#ffffff' }}; border-radius: 6px; padding: 10px 12px; max-width: 90%; position: relative; top: {{ ((cover_config.blurb_offset or 0) * 30)|int }}px;">
-                        <p id="preview-blurb" style="font-size: 7px; line-height: 1.4; text-align: center; color: #333; margin: 0;">{{ (cover_config.blurb or 'Your back cover blurb will appear here...')[:200] }}</p>
+                <div id="preview-back" class="rounded-lg overflow-hidden shadow-md" style="width: 180px; height: 270px; background: {{ cover_config.bg_color or '#1a3c5e' }}; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 10px; position: relative;">
+                    <div id="preview-blurb-box" style="background: {{ cover_config.blurb_bg_color or '#ffffff' }}; border-radius: 6px; padding: 8px 10px; max-width: 92%; max-height: 220px; overflow-y: auto; position: relative; top: {{ ((cover_config.blurb_offset or 0) * 30)|int }}px;">
+                        <p id="preview-blurb" style="font-size: 6.5px; line-height: 1.5; text-align: center; color: #333; margin: 0; word-wrap: break-word;">{{ cover_config.blurb or 'Your back cover blurb will appear here...' }}</p>
                     </div>
-                    <span style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 7px; position: absolute; bottom: 10px; opacity: 0.7;">polly-connect.com</span>
+                    <span style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 7px; position: absolute; bottom: 8px; opacity: 0.7;">polly-connect.com</span>
                 </div>
             </div>
             <!-- Front Cover -->
@@ -284,7 +284,7 @@ function updatePreview() {
 function updateBackPreview() {
     var blurbText = document.getElementById('blurb-text').value || 'Your back cover blurb will appear here...';
     var blurbBg = document.getElementById('blurb-bg-color').value;
-    document.getElementById('preview-blurb').textContent = blurbText.substring(0, 200);
+    document.getElementById('preview-blurb').textContent = blurbText;
     document.getElementById('preview-blurb-box').style.background = blurbBg;
     document.getElementById('blurb-bg-hex').textContent = blurbBg;
     // Auto text color based on brightness
