@@ -154,6 +154,16 @@ async def continuous_stream(websocket: WebSocket):
                     # Authenticate device
                     device_info = verify_device_api_key(msg_data.get("api_key", ""), db)
                     if device_info:
+                        # Guard: reject unclaimed devices with claim codes
+                        if device_info.get("claim_code") and not device_info.get("claimed_at"):
+                            logger.warning(f"Unclaimed device rejected: {device_id} (claim_code={device_info['claim_code']})")
+                            await websocket.send_json({"event": "connected", "message": "Streaming mode ready"})
+                            # Tell user to claim their device
+                            unclaimed_msg = "Hello! I'm not set up yet. Please visit polly connect dot com, log in, and enter your claim code to activate me."
+                            await _send_tts(websocket, tts, unclaimed_msg)
+                            await websocket.close()
+                            return
+
                         conv_state = cmd._get_state(device_id)
                         # Reset conversation mode on reconnect so stale
                         # FOLLOWUP_WAIT / STORY_PROMPT state doesn't persist

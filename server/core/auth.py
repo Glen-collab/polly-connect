@@ -89,6 +89,8 @@ def verify_device_api_key(key: str, db) -> Optional[dict]:
             "device_id": device["device_id"],
             "tenant_id": device.get("tenant_id") or 1,
             "user_id": device.get("user_id"),
+            "claim_code": device.get("claim_code"),
+            "claimed_at": device.get("claimed_at"),
         }
 
     # Fallback: global API key maps to tenant #1
