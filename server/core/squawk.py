@@ -151,7 +151,7 @@ class SquawkManager:
                     raw_bytes = f.read()
                 converted = _convert_to_16k_mono(raw_bytes)
                 raw_full = _convert_to_16k_mono(raw_bytes, volume=1.0)
-                if fname.startswith('chatter'):
+                if fname.startswith('chatter') or fname.startswith('parrot'):
                     self.chatter.append(converted)
                     self._raw_chatter.append(raw_full)
                     logger.info(f"Loaded chatter sound: {fname}")
