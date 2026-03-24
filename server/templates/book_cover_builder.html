@@ -42,7 +42,8 @@
 <div class="bg-white rounded-lg shadow p-4 sm:p-5">
     <h2 class="text-base font-semibold mb-3">Cover Photo</h2>
     <p class="text-xs text-gray-500 mb-3">Upload a photo for the front cover. Family portraits, heritage photos, or anything meaningful.</p>
-    <input type="file" name="cover_photo" accept="image/*"
+    <input type="file" name="cover_photo" accept="image/*" id="cover-photo-input"
+           onchange="previewCoverPhoto(this)"
            class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
     <p class="text-xs text-gray-400 mt-1">JPG or PNG. Will be centered on the front cover.</p>
 </div>
@@ -85,10 +86,14 @@
     <div class="mt-4">
         <label class="block text-sm text-gray-600 mb-2">Preview</label>
         <div id="cover-preview" class="rounded-lg overflow-hidden shadow-md inline-block">
-            <div id="preview-front" style="width: 180px; height: 270px; background: {{ cover_config.bg_color or '#1a3c5e' }}; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px;">
-                <span id="preview-title" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 16px; font-weight: bold; text-align: center;">{{ cover_config.title or 'My Legacy' }}</span>
-                <span id="preview-subtitle" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 10px; text-align: center; margin-top: 4px; opacity: 0.8;">{{ cover_config.subtitle or '' }}</span>
-                <span id="preview-author" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 11px; position: absolute; bottom: 16px; text-align: center;">{{ cover_config.author_name or user.name or '' }}</span>
+            <div id="preview-front" style="width: 180px; height: 270px; background: {{ cover_config.bg_color or '#1a3c5e' }}; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 16px; position: relative; overflow: hidden;">
+                <span id="preview-title" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 16px; font-weight: bold; text-align: center; z-index: 1;">{{ cover_config.title or 'My Legacy' }}</span>
+                <img id="preview-photo" src="" alt="" style="max-width: 80%; max-height: 120px; object-fit: contain; border-radius: 4px; display: none; z-index: 1;">
+                <div style="text-align: center; z-index: 1;">
+                    <span id="preview-subtitle" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 10px; opacity: 0.8;">{{ cover_config.subtitle or '' }}</span>
+                    <br>
+                    <span id="preview-author" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 11px;">{{ cover_config.author_name or user.name or '' }}</span>
+                </div>
             </div>
         </div>
         <p class="text-xs text-gray-400 mt-1">Approximate preview. Final PDF will have exact KDP dimensions.</p>
@@ -189,6 +194,21 @@ function generateBlurb() {
             btn.disabled = false;
             btn.textContent = 'Generate with AI';
         });
+}
+
+function previewCoverPhoto(input) {
+    var img = document.getElementById('preview-photo');
+    if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            img.src = e.target.result;
+            img.style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        img.style.display = 'none';
+        img.src = '';
+    }
 }
 
 // Update preview on title/subtitle/author input
