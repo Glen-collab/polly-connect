@@ -440,28 +440,25 @@ class IntentParser:
             elif any(w in text_lower for w in ["kid", "kids", "children", "grandkid", "grandchildren", "grandson", "granddaughter", "family"]):
                 theme = "family"
 
-            # Check for "pray for [person]" / "prayer for [person]" pattern
+            # Check for "pray for [person/topic]" pattern
             pray_for_match = re.search(r'pray(?:er)?\s+(?:for|over)\s+(?:my\s+)?(.+?)(?:\s+please)?$', text_lower)
             if pray_for_match:
                 target = pray_for_match.group(1).strip()
-                # Skip generic/theme words that aren't people names
-                skip = {
-                    "me", "us", "family", "kids", "children", "grandchildren",
-                    "grandkids", "the family", "my family", "the kids",
-                    # Prayer themes — not people
-                    "healing", "strength", "peace", "hope", "faith", "courage",
-                    "resilience", "grace", "comfort", "guidance", "joy", "love",
-                    "gratitude", "forgiveness", "patience", "wisdom", "rest",
-                    "calm", "purpose", "blessings", "protection", "health",
-                    "happiness", "glory", "mercy", "perseverance",
-                    # Emotional states
-                    "anxiety", "grief", "loneliness", "fear", "worry",
-                }
+                # Skip only truly generic self-references
+                skip = {"me", "us", "the family", "my family", "the kids"}
                 if target and target not in skip:
-                    # If theme was already detected from the same word, it's a theme not a person
-                    if theme:
-                        pray_for = None
-                    else:
+                    # Check if target matches a known family member
+                    is_family = False
+                    if self._family_names:
+                        for fn in self._family_names:
+                            if fn.lower() == target or fn.lower() in target:
+                                is_family = True
+                                pray_for = fn  # use proper casing from family tree
+                                theme = None  # person prayer, not themed
+                                break
+                    if not is_family:
+                        # Not a family member — still pass it through
+                        # "world peace", "the troops", "grace", "healing" all work
                         pray_for = target
 
             return {"intent": "prayer", "theme": theme, "pray_for": pray_for, "confidence": 0.9}
