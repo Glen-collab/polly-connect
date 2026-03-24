@@ -252,21 +252,34 @@ def generate_cover_pdf(
     back_text_width = back_safe_right - back_safe_left
 
     if blurb:
-        # Draw blurb in a colored box
+        # Draw blurb in a colored box — auto-shrink font to fit
         blurb_bg = hex_to_color(blurb_bg_color)
         blurb_font_name = _bold_to_regular.get(font, font)
-        blurb_size = 11
-        blurb_padding_x = 0.35 * inch
-        blurb_padding_top = 0.3 * inch
-        blurb_padding_bottom = 0.4 * inch  # extra for descenders
-        line_height = blurb_size * 1.6
+        # Use Helvetica for blurb if custom font (script fonts hard to read small)
+        if blurb_font_name not in ("Helvetica", "Helvetica-Bold", "Times-Roman",
+                                    "Times-Bold", "Courier", "Courier-Bold",
+                                    "PlayfairDisplay", "PlayfairDisplay-Bold",
+                                    "Lora", "Lora-Bold", "CormorantGaramond-Bold"):
+            blurb_font_name = "Helvetica"
 
-        # Wrap text to calculate box height
+        blurb_padding_x = 0.4 * inch
+        blurb_padding_y = 0.35 * inch
         blurb_box_width = back_text_width
         inner_width = blurb_box_width - blurb_padding_x * 2
-        lines = _wrap_text(blurb, blurb_font_name, blurb_size, inner_width)
-        blurb_text_height = len(lines) * line_height
-        blurb_box_height = blurb_padding_top + blurb_text_height + blurb_padding_bottom
+
+        # Max box height: 70% of back cover safe area
+        max_box_height = (TRIM_H - SAFE_ZONE * 2) * inch * 0.7
+
+        # Auto-shrink font until box fits
+        blurb_size = 12
+        while blurb_size >= 8:
+            line_height = blurb_size * 1.6
+            lines = _wrap_text(blurb, blurb_font_name, blurb_size, inner_width)
+            blurb_text_height = len(lines) * line_height
+            blurb_box_height = blurb_padding_y + blurb_text_height + blurb_padding_y
+            if blurb_box_height <= max_box_height:
+                break
+            blurb_size -= 0.5
 
         # Center the box vertically on the back cover, with user offset
         blurb_y_offset = blurb_offset * inch
@@ -288,7 +301,9 @@ def generate_cover_pdf(
 
         c.setFillColor(blurb_text_color)
         c.setFont(blurb_font_name, blurb_size)
-        y = box_top - blurb_padding_top
+        # Draw from top of box, centered vertically in the box
+        text_start_y = box_top - blurb_padding_y
+        y = text_start_y
         for line in lines:
             c.drawCentredString(back_cx, y, line)
             y -= line_height
