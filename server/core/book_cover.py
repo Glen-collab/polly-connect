@@ -107,45 +107,71 @@ def generate_cover_pdf(
     front_cx = front_left + (TRIM_W * inch) / 2
     safe_top = top_trim - SAFE_ZONE * inch
     safe_bottom = bottom_trim + SAFE_ZONE * inch
+    max_text_w = (TRIM_W - SAFE_ZONE * 2) * inch
 
-    # Cover photo (if provided)
+    # Cover photo (if provided) — draw first so we know where the top of the image is
+    img_top_y = None
     if cover_photo_path and os.path.exists(cover_photo_path):
         try:
             img = ImageReader(cover_photo_path)
             iw, ih = img.getSize()
-            # Scale to fit within front cover area with some padding
-            max_w = (TRIM_W - SAFE_ZONE * 2) * inch
-            max_h = 4.0 * inch  # leave room for title above/below
+            max_w = max_text_w
+            max_h = 4.0 * inch
             scale = min(max_w / iw, max_h / ih)
             draw_w = iw * scale
             draw_h = ih * scale
-            # Center horizontally, position in middle of cover
             img_x = front_cx - draw_w / 2
             img_y = bottom_trim + (TRIM_H * inch) / 2 - draw_h / 2
             c.drawImage(img, img_x, img_y, draw_w, draw_h, preserveAspectRatio=True)
+            img_top_y = img_y + draw_h
         except Exception as e:
             logger.warning(f"Cover photo failed: {e}")
 
-    # Title
+    # Title + subtitle — flex-fit between safe_top and image top (or center of cover)
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    title_zone_top = safe_top
+    title_zone_bottom = (img_top_y + 0.15 * inch) if img_top_y else (safe_top - 4.0 * inch)
+    title_zone_height = title_zone_top - title_zone_bottom
+
+    # Calculate how much space title + subtitle need
+    title_font_size = 36
+    sub_font_size = 18
+    sub_font_name = font.replace("Bold", "Roman").replace("Courier-Roman", "Courier")
+    if sub_font_name not in FONT_CHOICES.values():
+        sub_font_name = font
+
+    # Wrap title into lines
+    title_lines = _wrap_text(title, font, title_font_size, max_text_w)
+    title_block_height = len(title_lines) * title_font_size * 1.2
+    sub_block_height = sub_font_size * 1.2 if subtitle else 0
+    total_text_height = title_block_height + sub_block_height
+    gap = 6  # points between title and subtitle
+
+    # Shrink title if it doesn't fit
+    while total_text_height > title_zone_height and title_font_size > 18:
+        title_font_size -= 2
+        title_lines = _wrap_text(title, font, title_font_size, max_text_w)
+        title_block_height = len(title_lines) * title_font_size * 1.2
+        total_text_height = title_block_height + sub_block_height
+
+    # Center vertically in the zone
+    text_start_y = title_zone_bottom + (title_zone_height + total_text_height) / 2
+
+    # Draw title lines
     c.setFillColor(fg)
-    c.setFont(font, 36)
-    # Wrap long titles — drop down one font-height from safe zone
-    title_y = safe_top - 1.0 * inch
-    if cover_photo_path and os.path.exists(cover_photo_path):
-        title_y = safe_top - 0.9 * inch  # above the photo
+    c.setFont(font, title_font_size)
+    line_height = title_font_size * 1.2
+    y = text_start_y
+    for line in title_lines:
+        c.drawCentredString(front_cx, y, line)
+        y -= line_height
 
-    _draw_centered_text(c, title, front_cx, title_y, font, 36, fg,
-                        max_width=(TRIM_W - SAFE_ZONE * 2) * inch)
-
-    # Subtitle
+    # Draw subtitle
     if subtitle:
-        c.setFont(font.replace("Bold", "Roman").replace("Courier-Roman", "Courier"), 18)
-        sub_font = font.replace("Bold", "Roman").replace("Courier-Roman", "Courier")
-        if sub_font not in FONT_CHOICES.values():
-            sub_font = font
-        _draw_centered_text(c, subtitle, front_cx, title_y - 0.5 * inch,
-                            sub_font, 18, fg,
-                            max_width=(TRIM_W - SAFE_ZONE * 2) * inch)
+        y -= gap
+        c.setFont(sub_font_name, sub_font_size)
+        c.drawCentredString(front_cx, y, subtitle)
 
     # Author name at bottom
     if author_name:
