@@ -104,79 +104,74 @@ def generate_cover_pdf(
     top_trim = (BLEED + TRIM_H) * inch
 
     # ── FRONT COVER ──
+    # Layout: Title+Subtitle (top) → Photo (middle, fills available space) → Author (bottom)
     front_cx = front_left + (TRIM_W * inch) / 2
     safe_top = top_trim - SAFE_ZONE * inch
     safe_bottom = bottom_trim + SAFE_ZONE * inch
     max_text_w = (TRIM_W - SAFE_ZONE * 2) * inch
-
-    # Cover photo (if provided) — draw first so we know where the top of the image is
-    img_top_y = None
-    if cover_photo_path and os.path.exists(cover_photo_path):
-        try:
-            img = ImageReader(cover_photo_path)
-            iw, ih = img.getSize()
-            max_w = max_text_w
-            max_h = 4.0 * inch
-            scale = min(max_w / iw, max_h / ih)
-            draw_w = iw * scale
-            draw_h = ih * scale
-            img_x = front_cx - draw_w / 2
-            img_y = bottom_trim + (TRIM_H * inch) / 2 - draw_h / 2
-            c.drawImage(img, img_x, img_y, draw_w, draw_h, preserveAspectRatio=True)
-            img_top_y = img_y + draw_h
-        except Exception as e:
-            logger.warning(f"Cover photo failed: {e}")
-
-    # Title + subtitle — flex-fit between safe_top and image top (or center of cover)
     from reportlab.pdfbase.pdfmetrics import stringWidth
 
-    title_zone_top = safe_top
-    title_zone_bottom = (img_top_y + 0.15 * inch) if img_top_y else (safe_top - 4.0 * inch)
-    title_zone_height = title_zone_top - title_zone_bottom
-
-    # Calculate how much space title + subtitle need
+    # ── 1. Measure title + subtitle block ──
     title_font_size = 36
     sub_font_size = 18
     sub_font_name = font.replace("Bold", "Roman").replace("Courier-Roman", "Courier")
     if sub_font_name not in FONT_CHOICES.values():
         sub_font_name = font
 
-    # Wrap title into lines
     title_lines = _wrap_text(title, font, title_font_size, max_text_w)
-    title_block_height = len(title_lines) * title_font_size * 1.2
-    sub_block_height = sub_font_size * 1.2 if subtitle else 0
-    total_text_height = title_block_height + sub_block_height
-    gap = 6  # points between title and subtitle
+    title_line_h = title_font_size * 1.3
+    title_block_h = len(title_lines) * title_line_h
+    sub_gap = 8  # points between title and subtitle
+    sub_line_h = sub_font_size * 1.3
+    sub_block_h = (sub_line_h + sub_gap) if subtitle else 0
+    text_block_h = title_block_h + sub_block_h
+    title_padding = 0.3 * inch  # padding above and below text block
 
-    # Shrink title if it doesn't fit
-    while total_text_height > title_zone_height and title_font_size > 18:
-        title_font_size -= 2
-        title_lines = _wrap_text(title, font, title_font_size, max_text_w)
-        title_block_height = len(title_lines) * title_font_size * 1.2
-        total_text_height = title_block_height + sub_block_height
+    # ── 2. Measure author block ──
+    author_font_size = 20
+    author_block_h = (author_font_size * 1.3 + 0.2 * inch) if author_name else 0
 
-    # Center vertically in the zone
-    text_start_y = title_zone_bottom + (title_zone_height + total_text_height) / 2
+    # ── 3. Calculate photo zone (everything between title block and author) ──
+    text_bottom_y = safe_top - title_padding - text_block_h - title_padding
+    author_top_y = safe_bottom + author_block_h
+    photo_zone_top = text_bottom_y - 0.1 * inch
+    photo_zone_bottom = author_top_y + 0.1 * inch
+    photo_zone_h = photo_zone_top - photo_zone_bottom
 
-    # Draw title lines
+    # ── 4. Draw title + subtitle ──
     c.setFillColor(fg)
     c.setFont(font, title_font_size)
-    line_height = title_font_size * 1.2
-    y = text_start_y
+    y = safe_top - title_padding
     for line in title_lines:
         c.drawCentredString(front_cx, y, line)
-        y -= line_height
+        y -= title_line_h
 
-    # Draw subtitle
     if subtitle:
-        y -= gap
+        y -= sub_gap
         c.setFont(sub_font_name, sub_font_size)
         c.drawCentredString(front_cx, y, subtitle)
 
-    # Author name at bottom
+    # ── 5. Draw photo (fills middle zone, respects aspect ratio) ──
+    if cover_photo_path and os.path.exists(cover_photo_path):
+        try:
+            img = ImageReader(cover_photo_path)
+            iw, ih = img.getSize()
+            max_w = max_text_w
+            max_h = max(photo_zone_h, 1.0 * inch)  # at least 1 inch
+            scale = min(max_w / iw, max_h / ih)
+            draw_w = iw * scale
+            draw_h = ih * scale
+            img_x = front_cx - draw_w / 2
+            # Center photo in the photo zone
+            img_y = photo_zone_bottom + (photo_zone_h - draw_h) / 2
+            c.drawImage(img, img_x, img_y, draw_w, draw_h, preserveAspectRatio=True)
+        except Exception as e:
+            logger.warning(f"Cover photo failed: {e}")
+
+    # ── 6. Draw author name at bottom ──
     if author_name:
         c.setFillColor(fg)
-        c.setFont(font, 20)
+        c.setFont(font, author_font_size)
         c.drawCentredString(front_cx, safe_bottom + 0.3 * inch, author_name)
 
     # ── SPINE ──
