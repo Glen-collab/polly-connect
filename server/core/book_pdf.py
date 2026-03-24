@@ -525,8 +525,8 @@ class LegacyBookPDF:
 
                     # Build a mini block: QR + label with speaker name
                     qr_img = Image(qr_buf, width=QR_SIZE, height=QR_SIZE)
-                    speaker = oq.get("speaker", "")
-                    label = oq.get("label", "Voice Recording")
+                    speaker = oq.get("speaker") or ""
+                    label = oq.get("label") or "Voice Recording"
                     # Escape for ReportLab
                     label = label.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                     speaker = speaker.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
