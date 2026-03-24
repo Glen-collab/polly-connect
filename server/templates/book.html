@@ -135,6 +135,16 @@
             Download PDF
         </button>
     </form>
+
+    {% if user.book_page_count %}
+    <div class="mt-4 pt-4 border-t">
+        <a href="/web/book/cover-builder"
+           class="inline-block bg-purple-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-purple-700 text-sm sm:text-base font-medium">
+            Cover Builder
+        </a>
+        <p class="text-xs text-gray-400 mt-1">Design a KDP-ready book cover ({{ user.book_page_count }} pages, {{ "%.2f"|format(user.book_page_count * 0.002252) }}" spine)</p>
+    </div>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

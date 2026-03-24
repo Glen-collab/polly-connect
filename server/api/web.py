@@ -3522,6 +3522,7 @@ async def book_overview(request: Request):
 
     db = request.app.state.db
     tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
     book_builder = request.app.state.book_builder
     narrative_arc = request.app.state.narrative_arc
     engagement = request.app.state.engagement
@@ -3561,6 +3562,7 @@ async def book_overview(request: Request):
     return templates.TemplateResponse("book.html", {
         "request": request,
         "session": session,
+        "user": user,
         "progress": progress,
         "chapters": chapters,
         "arc_coverage": arc_coverage,
@@ -3850,9 +3852,166 @@ async def book_export_pdf(request: Request):
             status_code=303,
         )
 
+    # Save page count for cover builder spine calculation
+    page_count = pdf_gen._page_count
+    conn = db._get_connection()
+    try:
+        conn.execute("UPDATE user_profiles SET book_page_count = ? WHERE tenant_id = ?",
+                     (page_count, tid))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
     safe_name = speaker_name.replace(" ", "_").lower() if speaker_name else "legacy"
     filename = f"polly_book_{safe_name}.pdf"
 
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+# ── Cover Builder ──
+
+@router.get("/book/cover-builder", response_class=HTMLResponse)
+async def cover_builder_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    gate = _gate_feature(db, session, "book_export",
+                         "Upgrade to Polly Legacy to use the Cover Builder.")
+    if gate:
+        return gate
+
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+
+    if not user.get("book_page_count"):
+        return RedirectResponse("/web/book?msg=Download your book PDF first so we know the page count for the spine.", status_code=303)
+
+    page_count = user["book_page_count"]
+    spine_width = round(page_count * 0.002252, 3)
+
+    # Load saved cover config if any
+    cover_config = {}
+    if user.get("book_cover_config"):
+        try:
+            cover_config = json.loads(user["book_cover_config"])
+        except (ValueError, TypeError):
+            pass
+
+    return templates.TemplateResponse("book_cover_builder.html", {
+        "request": request,
+        "session": session,
+        "user": user,
+        "page_count": page_count,
+        "spine_width": spine_width,
+        "cover_config": cover_config,
+    })
+
+
+@router.post("/book/cover-builder/generate-blurb")
+async def cover_generate_blurb(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+
+    from core.book_cover import generate_blurb_from_chapters
+    blurb = generate_blurb_from_chapters(db, tid, speaker_name=user.get("name", ""))
+
+    return JSONResponse({"blurb": blurb})
+
+
+@router.post("/book/cover-builder/download")
+async def cover_download(request: Request):
+    from fastapi.responses import Response
+
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    gate = _gate_feature(db, session, "book_export",
+                         "Upgrade to Polly Legacy to download your cover.")
+    if gate:
+        return gate
+
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+    form = await request.form()
+
+    title = form.get("title", "My Legacy")
+    subtitle = form.get("subtitle", "")
+    author_name = form.get("author_name", user.get("name", ""))
+    blurb = form.get("blurb", "")
+    bg_color = form.get("bg_color", "#1a3c5e")
+    font_color = form.get("font_color", "#ffffff")
+    font_name = form.get("font_name", "Helvetica-Bold")
+    page_count = user.get("book_page_count", 100)
+
+    # Handle cover photo upload
+    cover_photo_path = None
+    cover_photo = form.get("cover_photo")
+    if cover_photo and hasattr(cover_photo, 'read'):
+        photo_bytes = await cover_photo.read()
+        if photo_bytes and len(photo_bytes) > 100:
+            covers_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "covers")
+            os.makedirs(covers_dir, exist_ok=True)
+            cover_photo_path = os.path.join(covers_dir, f"cover_{tid}.jpg")
+            with open(cover_photo_path, "wb") as f:
+                f.write(photo_bytes)
+
+    # Check for previously uploaded cover photo
+    if not cover_photo_path:
+        prev_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "covers", f"cover_{tid}.jpg")
+        if os.path.exists(prev_path):
+            cover_photo_path = prev_path
+
+    # Save config for next time
+    config = {
+        "title": title, "subtitle": subtitle, "author_name": author_name,
+        "blurb": blurb, "bg_color": bg_color, "font_color": font_color,
+        "font_name": font_name,
+    }
+    conn = db._get_connection()
+    try:
+        conn.execute("UPDATE user_profiles SET book_cover_config = ? WHERE tenant_id = ?",
+                     (json.dumps(config), tid))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    from core.book_cover import generate_cover_pdf
+    try:
+        pdf_bytes = generate_cover_pdf(
+            page_count=page_count,
+            title=title,
+            subtitle=subtitle,
+            author_name=author_name,
+            blurb=blurb,
+            cover_photo_path=cover_photo_path,
+            bg_color=bg_color,
+            font_color=font_color,
+            font_name=font_name,
+        )
+    except Exception as e:
+        logger.error(f"Cover generation failed: {e}")
+        return RedirectResponse(f"/web/book/cover-builder?msg=Cover generation failed: {e}", status_code=303)
+
+    safe_name = author_name.replace(" ", "_").lower() if author_name else "polly"
+    filename = f"polly_cover_{safe_name}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

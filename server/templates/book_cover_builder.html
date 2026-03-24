@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Cover Builder - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="/web/book" class="text-emerald-600 hover:underline text-sm">&larr; Book</a>
+    <h1 class="text-2xl font-bold text-gray-800 mt-2">Cover Builder</h1>
+    <p class="text-sm text-gray-500 mt-1">Design a KDP-ready book cover. {{ page_count }} pages, {{ "%.3f"|format(spine_width) }}" spine.</p>
+</div>
+
+<form method="POST" action="/web/book/cover-builder/download" enctype="multipart/form-data" class="space-y-6 max-w-2xl mx-auto">
+
+<!-- Title & Author -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-5">
+    <h2 class="text-base font-semibold mb-3">Title & Author</h2>
+    <div class="space-y-3">
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Book Title</label>
+            <input type="text" name="title" required
+                   value="{{ cover_config.title or '' }}"
+                   placeholder="My Legacy"
+                   class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Subtitle (optional)</label>
+            <input type="text" name="subtitle"
+                   value="{{ cover_config.subtitle or '' }}"
+                   placeholder="Stories, Memories, and Wisdom"
+                   class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Author Name</label>
+            <input type="text" name="author_name"
+                   value="{{ cover_config.author_name or user.name or '' }}"
+                   placeholder="{{ user.name or 'Author Name' }}"
+                   class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">
+        </div>
+    </div>
+</div>
+
+<!-- Cover Photo -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-5">
+    <h2 class="text-base font-semibold mb-3">Cover Photo</h2>
+    <p class="text-xs text-gray-500 mb-3">Upload a photo for the front cover. Family portraits, heritage photos, or anything meaningful.</p>
+    <input type="file" name="cover_photo" accept="image/*"
+           class="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
+    <p class="text-xs text-gray-400 mt-1">JPG or PNG. Will be centered on the front cover.</p>
+</div>
+
+<!-- Colors & Font -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-5">
+    <h2 class="text-base font-semibold mb-3">Design</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Background Color</label>
+            <div class="flex items-center gap-2">
+                <input type="color" name="bg_color" id="bg-color"
+                       value="{{ cover_config.bg_color or '#1a3c5e' }}"
+                       class="w-10 h-10 rounded border cursor-pointer"
+                       oninput="updatePreview()">
+                <span id="bg-color-hex" class="text-xs text-gray-500 font-mono">{{ cover_config.bg_color or '#1a3c5e' }}</span>
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Font Color</label>
+            <div class="flex items-center gap-2">
+                <input type="color" name="font_color" id="font-color"
+                       value="{{ cover_config.font_color or '#ffffff' }}"
+                       class="w-10 h-10 rounded border cursor-pointer"
+                       oninput="updatePreview()">
+                <span id="font-color-hex" class="text-xs text-gray-500 font-mono">{{ cover_config.font_color or '#ffffff' }}</span>
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Font</label>
+            <select name="font_name" id="font-select" class="w-full border rounded px-3 py-2 text-sm" onchange="updatePreview()">
+                {% for val, label in [("Helvetica-Bold", "Helvetica Bold"), ("Helvetica", "Helvetica"), ("Times-Bold", "Times Bold"), ("Times-Roman", "Times Roman"), ("Courier-Bold", "Courier Bold"), ("Courier", "Courier")] %}
+                <option value="{{ val }}" {% if (cover_config.font_name or 'Helvetica-Bold') == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <!-- Live Preview -->
+    <div class="mt-4">
+        <label class="block text-sm text-gray-600 mb-2">Preview</label>
+        <div id="cover-preview" class="rounded-lg overflow-hidden shadow-md inline-block">
+            <div id="preview-front" style="width: 180px; height: 270px; background: {{ cover_config.bg_color or '#1a3c5e' }}; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px;">
+                <span id="preview-title" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 16px; font-weight: bold; text-align: center;">{{ cover_config.title or 'My Legacy' }}</span>
+                <span id="preview-subtitle" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 10px; text-align: center; margin-top: 4px; opacity: 0.8;">{{ cover_config.subtitle or '' }}</span>
+                <span id="preview-author" style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 11px; position: absolute; bottom: 16px; text-align: center;">{{ cover_config.author_name or user.name or '' }}</span>
+            </div>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">Approximate preview. Final PDF will have exact KDP dimensions.</p>
+    </div>
+</div>
+
+<!-- Back Cover Blurb -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-5">
+    <h2 class="text-base font-semibold mb-3">Back Cover Blurb</h2>
+    <p class="text-xs text-gray-500 mb-3">A short description for the back of the book. Click "Generate" to have AI write one from your stories.</p>
+    <textarea name="blurb" id="blurb-text" rows="5"
+              placeholder="A warm description of the life captured in these pages..."
+              class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500">{{ cover_config.blurb or '' }}</textarea>
+    <button type="button" onclick="generateBlurb()" id="blurb-btn"
+            class="mt-2 bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 text-sm font-medium">
+        Generate with AI
+    </button>
+    <span id="blurb-status" class="text-xs text-gray-400 ml-2"></span>
+</div>
+
+<!-- KDP Specs (read-only info) -->
+<div class="bg-gray-50 rounded-lg p-4 text-xs text-gray-500">
+    <p class="font-medium text-gray-700 mb-1">KDP Cover Specs (6x9 trim, white paper)</p>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div>Pages: <strong>{{ page_count }}</strong></div>
+        <div>Spine: <strong>{{ "%.3f"|format(spine_width) }}"</strong></div>
+        <div>Total width: <strong>{{ "%.3f"|format(0.125 + 6 + spine_width + 6 + 0.125) }}"</strong></div>
+        <div>Total height: <strong>9.250"</strong></div>
+    </div>
+    <p class="mt-1">Includes 0.125" bleed on all edges. Trim marks included in PDF.</p>
+</div>
+
+<!-- Download -->
+<div class="text-center">
+    <button type="submit"
+            class="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 text-base font-medium shadow-lg">
+        Download Cover PDF
+    </button>
+</div>
+
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updatePreview() {
+    var bg = document.getElementById('bg-color').value;
+    var fg = document.getElementById('font-color').value;
+    document.getElementById('preview-front').style.background = bg;
+    document.getElementById('preview-title').style.color = fg;
+    document.getElementById('preview-subtitle').style.color = fg;
+    document.getElementById('preview-author').style.color = fg;
+    document.getElementById('bg-color-hex').textContent = bg;
+    document.getElementById('font-color-hex').textContent = fg;
+}
+
+function generateBlurb() {
+    var btn = document.getElementById('blurb-btn');
+    var status = document.getElementById('blurb-status');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    status.textContent = '';
+
+    fetch('/web/book/cover-builder/generate-blurb', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.blurb) {
+                document.getElementById('blurb-text').value = data.blurb;
+                status.textContent = 'Done!';
+            } else {
+                status.textContent = 'No chapter summaries found. Generate chapters first.';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Generate with AI';
+        })
+        .catch(function(err) {
+            status.textContent = 'Error: ' + err;
+            btn.disabled = false;
+            btn.textContent = 'Generate with AI';
+        });
+}
+
+// Update preview on title/subtitle/author input
+document.querySelectorAll('input[name="title"], input[name="subtitle"], input[name="author_name"]').forEach(function(el) {
+    el.addEventListener('input', function() {
+        var field = el.name;
+        if (field === 'title') document.getElementById('preview-title').textContent = el.value || 'My Legacy';
+        if (field === 'subtitle') document.getElementById('preview-subtitle').textContent = el.value;
+        if (field === 'author_name') document.getElementById('preview-author').textContent = el.value;
+    });
+});
+</script>
+{% endblock %}
