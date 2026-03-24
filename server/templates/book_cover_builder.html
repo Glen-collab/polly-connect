@@ -108,7 +108,7 @@
     <div class="mt-4 pt-4 border-t">
         <label class="block text-sm text-gray-600 mb-2 font-medium">Position Adjustments</label>
         <p class="text-xs text-gray-400 mb-3">Slide to move elements up or down on the cover.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label class="block text-xs text-gray-500 mb-1">Title</label>
                 <div class="flex items-center gap-2">
@@ -145,6 +145,18 @@
                     <span id="author-offset-val" class="text-xs font-mono text-gray-600 w-8 text-right">{{ cover_config.author_offset or 0 }}"</span>
                 </div>
             </div>
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">Blurb (back)</label>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400">Down</span>
+                    <input type="range" name="blurb_offset" id="blurb-offset" min="-2" max="2" step="0.1"
+                           value="{{ cover_config.blurb_offset or 0 }}"
+                           class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                           oninput="document.getElementById('blurb-offset-val').textContent = this.value + '&quot;'; updatePositionPreview();">
+                    <span class="text-xs text-gray-400">Up</span>
+                    <span id="blurb-offset-val" class="text-xs font-mono text-gray-600 w-8 text-right">{{ cover_config.blurb_offset or 0 }}"</span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -156,7 +168,7 @@
             <div>
                 <p class="text-xs text-gray-400 mb-1 text-center">Back</p>
                 <div id="preview-back" class="rounded-lg overflow-hidden shadow-md" style="width: 180px; height: 270px; background: {{ cover_config.bg_color or '#1a3c5e' }}; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; position: relative;">
-                    <div id="preview-blurb-box" style="background: {{ cover_config.blurb_bg_color or '#ffffff' }}; border-radius: 6px; padding: 10px 12px; max-width: 90%;">
+                    <div id="preview-blurb-box" style="background: {{ cover_config.blurb_bg_color or '#ffffff' }}; border-radius: 6px; padding: 10px 12px; max-width: 90%; position: relative; top: {{ ((cover_config.blurb_offset or 0) * 30)|int }}px;">
                         <p id="preview-blurb" style="font-size: 7px; line-height: 1.4; text-align: center; color: #333; margin: 0;">{{ (cover_config.blurb or 'Your back cover blurb will appear here...')[:200] }}</p>
                     </div>
                     <span style="color: {{ cover_config.font_color or '#ffffff' }}; font-size: 7px; position: absolute; bottom: 10px; opacity: 0.7;">polly-connect.com</span>
@@ -313,10 +325,12 @@ function updatePositionPreview() {
     var titleOff = parseFloat(document.getElementById('title-offset').value) || 0;
     var photoOff = parseFloat(document.getElementById('photo-offset').value) || 0;
     var authorOff = parseFloat(document.getElementById('author-offset').value) || 0;
+    var blurbOff = parseFloat(document.getElementById('blurb-offset').value) || 0;
     // 30px per inch in preview (preview is ~270px for 9 inches)
     document.getElementById('preview-title-group').style.top = (titleOff * 30) + 'px';
     document.getElementById('preview-photo').style.top = (photoOff * 30) + 'px';
     document.getElementById('preview-author').style.top = (authorOff * -30) + 'px';
+    document.getElementById('preview-blurb-box').style.top = (blurbOff * 30) + 'px';
 }
 
 function previewCoverPhoto(input) {

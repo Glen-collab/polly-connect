@@ -4090,6 +4090,10 @@ async def cover_download(request: Request):
         author_offset = float(form.get("author_offset", 0))
     except (ValueError, TypeError):
         author_offset = 0.0
+    try:
+        blurb_offset = float(form.get("blurb_offset", 0))
+    except (ValueError, TypeError):
+        blurb_offset = 0.0
 
     # Handle cover photo upload
     cover_photo_path = None
@@ -4115,7 +4119,7 @@ async def cover_download(request: Request):
         "blurb": blurb, "bg_color": bg_color, "font_color": font_color,
         "font_name": font_name, "blurb_bg_color": blurb_bg_color,
         "title_offset": title_offset, "photo_offset": photo_offset,
-        "author_offset": author_offset,
+        "author_offset": author_offset, "blurb_offset": blurb_offset,
     }
     conn = db._get_connection()
     try:
@@ -4139,6 +4143,7 @@ async def cover_download(request: Request):
             font_color=font_color,
             font_name=font_name,
             blurb_bg_color=blurb_bg_color,
+            blurb_offset=blurb_offset,
             title_offset=title_offset,
             photo_offset=photo_offset,
             author_offset=author_offset,

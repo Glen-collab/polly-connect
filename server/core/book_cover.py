@@ -110,6 +110,7 @@ def generate_cover_pdf(
     photo_offset: float = 0.0,
     author_offset: float = 0.0,
     blurb_bg_color: str = "#ffffff",
+    blurb_offset: float = 0.0,
 ) -> bytes:
     """
     Generate a KDP-ready full wrap cover PDF.
@@ -254,28 +255,31 @@ def generate_cover_pdf(
         # Draw blurb in a colored box
         blurb_bg = hex_to_color(blurb_bg_color)
         blurb_font_name = _bold_to_regular.get(font, font)
-        blurb_size = 12
-        blurb_padding = 0.3 * inch
-        blurb_box_width = back_text_width + blurb_padding * 2
-        line_height = blurb_size * 1.5
+        blurb_size = 11
+        blurb_padding_x = 0.35 * inch
+        blurb_padding_top = 0.3 * inch
+        blurb_padding_bottom = 0.4 * inch  # extra for descenders
+        line_height = blurb_size * 1.6
 
         # Wrap text to calculate box height
-        inner_width = back_text_width - 0.2 * inch
+        blurb_box_width = back_text_width
+        inner_width = blurb_box_width - blurb_padding_x * 2
         lines = _wrap_text(blurb, blurb_font_name, blurb_size, inner_width)
         blurb_text_height = len(lines) * line_height
-        blurb_box_height = blurb_text_height + blurb_padding * 2
+        blurb_box_height = blurb_padding_top + blurb_text_height + blurb_padding_bottom
 
-        # Center the box on the back cover
+        # Center the box vertically on the back cover, with user offset
+        blurb_y_offset = blurb_offset * inch
+        back_center_y = bottom_trim + (TRIM_H * inch) / 2
         box_x = back_cx - blurb_box_width / 2
-        box_top = safe_top - 0.8 * inch
-        box_y = box_top - blurb_box_height
+        box_y = back_center_y - blurb_box_height / 2 + blurb_y_offset
+        box_top = box_y + blurb_box_height
 
         # Draw rounded background box
         c.setFillColor(blurb_bg)
-        c.roundRect(box_x, box_y, blurb_box_width, blurb_box_height, 8, fill=True, stroke=False)
+        c.roundRect(box_x, box_y, blurb_box_width, blurb_box_height, 10, fill=True, stroke=False)
 
-        # Draw text inside the box
-        # Use dark text on light bg, or light text on dark bg
+        # Auto text color based on box brightness
         blurb_r = int(blurb_bg_color.lstrip("#")[0:2], 16) / 255
         blurb_g_val = int(blurb_bg_color.lstrip("#")[2:4], 16) / 255
         blurb_b = int(blurb_bg_color.lstrip("#")[4:6], 16) / 255
@@ -284,7 +288,7 @@ def generate_cover_pdf(
 
         c.setFillColor(blurb_text_color)
         c.setFont(blurb_font_name, blurb_size)
-        y = box_top - blurb_padding
+        y = box_top - blurb_padding_top
         for line in lines:
             c.drawCentredString(back_cx, y, line)
             y -= line_height
