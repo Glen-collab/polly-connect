@@ -129,10 +129,10 @@ def generate_cover_pdf(
     # Title
     c.setFillColor(fg)
     c.setFont(font, 36)
-    # Wrap long titles
-    title_y = safe_top - 0.5 * inch
+    # Wrap long titles — drop down one font-height from safe zone
+    title_y = safe_top - 1.0 * inch
     if cover_photo_path and os.path.exists(cover_photo_path):
-        title_y = safe_top - 0.4 * inch  # above the photo
+        title_y = safe_top - 0.9 * inch  # above the photo
 
     _draw_centered_text(c, title, front_cx, title_y, font, 36, fg,
                         max_width=(TRIM_W - SAFE_ZONE * 2) * inch)
