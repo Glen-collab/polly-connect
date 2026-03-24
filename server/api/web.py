@@ -3591,10 +3591,12 @@ async def book_chapters_list(request: Request):
         if ch["chapter_number"] in existing_drafts:
             ch["status"] = "has_draft"
 
+    msg = request.query_params.get("msg")
     return templates.TemplateResponse("book_chapters.html", {
         "request": request,
         "session": session,
         "chapters": chapters,
+        "msg": msg,
     })
 
 
@@ -3762,6 +3764,92 @@ async def book_chapter_generate(request: Request, chapter_num: int):
         f"/web/book/chapters/{chapter_num}?msg={msg}",
         status_code=303,
     )
+
+
+@router.post("/book/chapters/generate-all")
+async def book_generate_all_drafts(request: Request):
+    """Generate AI drafts for all chapters in order, with continuity summaries."""
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Must be Legacy tier for all chapters
+    gate = _gate_feature(db, session, "book_export",
+                         "Upgrade to Polly Legacy to generate all chapter drafts.")
+    if gate:
+        return gate
+
+    book_builder = request.app.state.book_builder
+    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
+
+    if not chapters:
+        return RedirectResponse("/web/book/chapters?msg=No chapters to generate.", status_code=303)
+
+    import json as _json
+    generated = 0
+    skipped = 0
+    previous_summaries = []
+
+    # Load existing summaries for continuity
+    existing_drafts = {d["chapter_number"]: d for d in db.get_chapter_drafts(tenant_id=tid)}
+
+    for ch in chapters:
+        ch_num = ch["chapter_number"]
+
+        # Skip chapters that already have drafts (don't overwrite)
+        if ch_num in existing_drafts and existing_drafts[ch_num].get("content"):
+            # Still collect summary for continuity
+            if existing_drafts[ch_num].get("summary"):
+                previous_summaries.append(existing_drafts[ch_num]["summary"])
+            skipped += 1
+            continue
+
+        # Generate draft
+        content = await book_builder.generate_chapter_draft(
+            ch, tenant_id=tid,
+            previous_summaries=previous_summaries if previous_summaries else None,
+        )
+
+        if content:
+            # Delete any existing draft
+            conn = db._get_connection()
+            conn.execute(
+                "DELETE FROM chapter_drafts WHERE chapter_number = ? AND tenant_id = ?",
+                (ch_num, tid)
+            )
+            conn.commit()
+
+            db.save_chapter_draft(
+                chapter_number=ch_num,
+                title=ch["title"],
+                bucket=ch["bucket"],
+                life_phase=ch["life_phase"],
+                memory_ids=_json.dumps(ch.get("memory_ids", [])),
+                content=content,
+                tenant_id=tid,
+            )
+
+            # Generate summary for continuity chain
+            summary = await book_builder.generate_chapter_summary(content)
+            if summary:
+                drafts_after = db.get_chapter_drafts(tenant_id=tid)
+                for d in drafts_after:
+                    if d.get("chapter_number") == ch_num:
+                        db.update_chapter_summary(d["id"], summary)
+                        previous_summaries.append(summary)
+                        break
+
+            generated += 1
+            logger.info(f"Generated draft for chapter {ch_num} ({generated}/{len(chapters)})")
+
+    msg = f"Generated {generated} chapter draft{'s' if generated != 1 else ''}"
+    if skipped:
+        msg += f", skipped {skipped} existing"
+    return RedirectResponse(f"/web/book/chapters?msg={msg}", status_code=303)
 
 
 @router.post("/book/chapters/{chapter_num}/save")

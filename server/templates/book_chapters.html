@@ -9,12 +9,29 @@
     <a href="/web/book/album" class="text-sm bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">View Album</a>
 </div>
 
+{% if msg %}
+<div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4">
+    <p class="text-emerald-800 text-sm font-medium">{{ msg }}</p>
+</div>
+{% endif %}
+
 <p class="text-sm text-gray-500 mb-4">
     {{ chapters|length }} chapter{{ 's' if chapters|length != 1 else '' }} outlined.
     Click a chapter to view the draft, edit, or generate a song.
 </p>
 
 {% if chapters %}
+<!-- Generate All button -->
+<div class="mb-4">
+    <form method="POST" action="/web/book/chapters/generate-all"
+          onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Generating... (this may take a few minutes)'; return true;">
+        <button type="submit"
+                class="w-full sm:w-auto bg-purple-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-purple-700 text-sm sm:text-base font-medium">
+            Generate All Drafts
+        </button>
+        <p class="text-xs text-gray-400 mt-1">Generates AI narrative drafts for all chapters without existing drafts. Uses continuity summaries between chapters.</p>
+    </form>
+</div>
 <div class="space-y-3">
     {% for ch in chapters %}
     <a href="/web/book/chapters/{{ ch.chapter_number }}" class="block">
