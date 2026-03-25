@@ -228,22 +228,36 @@ class MedicationScheduler:
         med_time = med_list[0][1]
         time_display = format_time_12hr(med_time)
 
-        # Build combined list: "your vitamin D, your fish oil, and your creatine"
-        parts = []
+        # Build combined list — smart phrasing per item
+        action_starters = ("tell ", "call ", "go ", "take ", "check ", "do ", "make ",
+                           "send ", "pick ", "get ", "put ", "clean ", "walk ", "feed ",
+                           "water ", "start ", "stop ", "remind ", "ask ", "say ")
+        med_parts = []
+        task_parts = []
         for med, _ in med_list:
             name = med["name"]
             dosage = med.get("dosage", "")
-            if dosage:
-                parts.append(f"{dosage} of {name}")
+            name_lower = name.lower().strip()
+            if any(name_lower.startswith(v) for v in action_starters):
+                task_parts.append(name)
+            elif dosage:
+                med_parts.append(f"{dosage} of {name}")
             else:
-                parts.append(f"your {name}")
+                med_parts.append(f"your {name}")
 
-        if len(parts) == 2:
-            items = f"{parts[0]} and {parts[1]}"
-        else:
-            items = ", ".join(parts[:-1]) + f", and {parts[-1]}"
+        parts = []
+        if med_parts:
+            if len(med_parts) == 1:
+                items = med_parts[0]
+            elif len(med_parts) == 2:
+                items = f"{med_parts[0]} and {med_parts[1]}"
+            else:
+                items = ", ".join(med_parts[:-1]) + f", and {med_parts[-1]}"
+            parts.append(f"time for {items}")
+        for t in task_parts:
+            parts.append(t)
 
-        msg = f"It's {time_display}, time to take {items}."
+        msg = f"It's {time_display}, " + ". ".join(parts) + "."
         logger.info(f"Batch medication reminder ({len(med_list)} items): {msg}")
 
         combined_wav = await self._build_reminder_audio(msg)
@@ -287,12 +301,18 @@ class MedicationScheduler:
         dosage = med.get("dosage", "")
         time_display = format_time_12hr(med_time)
 
-        # Build announcement text
-        msg = f"It's {time_display}, time to take"
-        if dosage:
-            msg += f" {dosage} of {name}"
+        # Build announcement text — smart phrasing based on reminder type
+        name_lower = name.lower().strip()
+        # If name starts with a verb or looks like a task, use "time to [name]"
+        action_starters = ("tell ", "call ", "go ", "take ", "check ", "do ", "make ",
+                           "send ", "pick ", "get ", "put ", "clean ", "walk ", "feed ",
+                           "water ", "start ", "stop ", "remind ", "ask ", "say ")
+        if any(name_lower.startswith(v) for v in action_starters):
+            msg = f"It's {time_display}. Reminder: {name}."
+        elif dosage:
+            msg = f"It's {time_display}, time to take {dosage} of {name}."
         else:
-            msg += f" your {name}"
+            msg = f"It's {time_display}, time for your {name}."
 
         logger.info(f"Medication reminder: {msg}")
 
