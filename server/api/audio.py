@@ -1018,14 +1018,12 @@ async def _process_command(
         import random as _rnd
         _n = _owner_name
         buffer_phrases = [
-            f"Let's bow our heads, {_n}." if _n else "Let's bow our heads.",
-            "Let us pray together.",
-            "Let me lead us in prayer.",
-            f"Let's take a moment with the Lord, {_n}." if _n else "Let's take a moment with the Lord.",
-            f"Close your eyes, {_n}. Let's pray." if _n else "Close your eyes. Let's pray.",
-            "Let's come before the Lord together.",
-            f"{_n}, let me say a prayer for you." if _n else "Let me say a prayer for you.",
-            "Let's be still for a moment and pray.",
+            f"Please bow your head in silence for a moment, {_n}. Let us come before the Lord together." if _n else "Please bow your head in silence for a moment. Let us come before the Lord together.",
+            f"Now let us pray. Please bow your head in silence, {_n}, while I prepare this prayer for you." if _n else "Now let us pray. Please bow your head in silence while I prepare this prayer for you.",
+            f"Let's be still and quiet for a moment, {_n}. Take a deep breath and let the Lord into your heart." if _n else "Let's be still and quiet for a moment. Take a deep breath and let the Lord into your heart.",
+            f"Close your eyes, {_n}. Let's take a moment of silence together before we pray." if _n else "Close your eyes. Let's take a moment of silence together before we pray.",
+            f"{_n}, let's bow our heads and be still. Give yourself a moment of peace before we begin." if _n else "Let's bow our heads and be still. Give yourself a moment of peace before we begin.",
+            f"Please take a moment of quiet, {_n}. Let the world slow down while I lead us in prayer." if _n else "Please take a moment of quiet. Let the world slow down while I lead us in prayer.",
         ]
         buffer_phrase = _rnd.choice(buffer_phrases)
         _buffer_sent_at = time.monotonic()
