@@ -59,7 +59,7 @@ static const char *TAG = "POLLY-WS";
 /* --- Configuration --- */
 
 // Firmware version (for OTA updates)
-#define FW_VERSION      "1.0.2"
+#define FW_VERSION      "1.0.3"
 #define FW_VARIANT      "waveshare"
 
 // WiFi
@@ -1712,12 +1712,6 @@ static void mic_stream_task(void *arg)
                 mic_read(audio_chunk, CHUNK_SAMPLES);
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
-
-            // Clear any stale response data that arrived during playback
-            xSemaphoreTake(response_mutex, portMAX_DELAY);
-            response_audio_len = 0;
-            response_complete = false;
-            xSemaphoreGive(response_mutex);
 
             streaming_paused = false;
 
