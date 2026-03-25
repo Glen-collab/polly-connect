@@ -103,18 +103,9 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Owner's Guide Button -->
-    {% if session %}
-    <div class="text-center py-4">
-        <a href="/web/guide" class="inline-block bg-emerald-600 text-white px-5 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium">
-            Owner's Guide
-        </a>
-    </div>
-    {% endif %}
-
     <!-- Site Map (bottom nav) -->
     {% if session %}
-    <div class="bg-gray-100 border-t border-gray-200 mt-0">
+    <div class="bg-gray-100 border-t border-gray-200 mt-8">
         <div class="max-w-6xl mx-auto px-4 py-6">
             <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-4">Site Map</h3>
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
