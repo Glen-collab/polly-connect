@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Owner's Guide - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+
+{% if session %}
+<a href="/web/dashboard" class="text-emerald-600 hover:underline text-sm">&larr; Home</a>
+{% else %}
+<a href="/" class="text-emerald-600 hover:underline text-sm">&larr; Back</a>
+{% endif %}
+
+<h1 class="text-2xl font-bold text-gray-800 mt-2 mb-1">Polly Owner's Guide</h1>
+<p class="text-sm text-gray-500 mb-6">Everything Polly can do. Say <strong>"Hey Polly"</strong> then any command below.</p>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- VOICE COMMAND CHEAT SHEET -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">
+    <h2 class="text-base font-bold text-emerald-800 mb-2">Quick Commands</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+        <div><span class="text-emerald-700 font-medium">"Ask me a question"</span></div>
+        <div><span class="text-emerald-700 font-medium">"Tell me a joke"</span></div>
+        <div><span class="text-emerald-700 font-medium">"What's the weather?"</span></div>
+        <div><span class="text-emerald-700 font-medium">"What time is it?"</span></div>
+        <div><span class="text-emerald-700 font-medium">"Read me a bible verse"</span></div>
+        <div><span class="text-emerald-700 font-medium">"Say a prayer"</span></div>
+        <div><span class="text-emerald-700 font-medium">"Where are my keys?"</span></div>
+        <div><span class="text-emerald-700 font-medium">"Play a meal blessing"</span></div>
+        <div><span class="text-emerald-700 font-medium">"Tell me a story"</span></div>
+        <div><span class="text-emerald-700 font-medium">"Check messages"</span></div>
+        <div><span class="text-emerald-700 font-medium">"Repeat that"</span></div>
+        <div><span class="text-emerald-700 font-medium">"Be quiet"</span></div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- ESSENTIALS — Everyone gets these -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+{% if role == 'family' %}
+<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+    <h2 class="text-base font-bold text-blue-800 mb-2">Welcome, Family Member</h2>
+    <p class="text-sm text-blue-700">You're connected to your family's Polly. Here's what you can do on the app:</p>
+    <ul class="text-sm text-blue-700 mt-2 space-y-1 list-disc list-inside">
+        <li>View and listen to stories</li>
+        <li>Browse family photos and record photo stories</li>
+        <li>See the family tree and add family members</li>
+        <li>Send and check messages</li>
+        <li>Verify transcriptions (fix what Polly heard)</li>
+        <li>View the legacy book</li>
+        <li>Record a memory from your phone</li>
+    </ul>
+</div>
+{% endif %}
+
+<div class="space-y-4">
+
+<!-- Memory & Items -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">Remember Where Things Are</h3>
+    <p class="text-xs text-gray-500 mt-1">Your personal parrot that remembers everything.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Store:</strong> <em>"My keys are on the hook by the door"</em></p>
+        <p><strong>Find:</strong> <em>"Where are my keys?"</em></p>
+        <p><strong>Lost:</strong> <em>"I can't find the hammer"</em> — Polly responds like Mom</p>
+        <p><strong>Found:</strong> <em>"I found it"</em> — Polly asks where it was</p>
+        <p><strong>Web:</strong> Add items in bulk on the Stored Items page</p>
+    </div>
+</div>
+
+<!-- Reminders -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">Daily Reminders</h3>
+    <p class="text-xs text-gray-500 mt-1">Never miss a vitamin, pill, or appointment.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Setup:</strong> Add reminders on the Care page with times and days</p>
+        <p><strong>Polly says:</strong> <em>"It's 4 AM, time to take your vitamin D, fish oil, and creatine."</em></p>
+        <p><strong>Repeat:</strong> <em>"Repeat that"</em> if you missed it</p>
+    </div>
+</div>
+
+<!-- Messages -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">Family Message Board</h3>
+    <p class="text-xs text-gray-500 mt-1">Leave a message. Polly nags until they check it.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Leave:</strong> <em>"Tell mom I'll be home late"</em></p>
+        <p><strong>Check:</strong> <em>"Check messages"</em></p>
+        <p><strong>Clear:</strong> <em>"Clear messages"</em></p>
+        <p><strong>Nag:</strong> Polly squawks "Message!" every 15 min until checked</p>
+        <p><strong>Web:</strong> Type messages on the Messages page too</p>
+    </div>
+</div>
+
+<!-- Blessings -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">Hear Your Father's Blessing Forever</h3>
+    <p class="text-xs text-gray-500 mt-1">Record a blessing once. Play it back any time in their real voice.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Record:</strong> Go to Prayers page &rarr; Record a Blessing</p>
+        <p><strong>Play:</strong> <em>"Play a meal blessing"</em> or <em>"Play Dad's bedtime blessing"</em></p>
+        <p><strong>Categories:</strong> meal, bedtime, morning, gratitude, general</p>
+    </div>
+</div>
+
+<!-- Prayers -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">AI Prayers</h3>
+    <p class="text-xs text-gray-500 mt-1">Polly leads a prayer tailored to how you're feeling.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>General:</strong> <em>"Say a prayer"</em></p>
+        <p><strong>For someone:</strong> <em>"Pray for Nolan"</em> or <em>"Pray for world peace"</em></p>
+        <p><strong>Mood:</strong> <em>"I'm having a hard day"</em> or <em>"I feel alone"</em></p>
+        <p><strong>15 categories:</strong> hope, anxiety, grief, healing, faith, gratitude, and more</p>
+    </div>
+</div>
+
+<!-- Fun -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">Fun Stuff</h3>
+    <p class="text-xs text-gray-500 mt-1">Polly's got personality.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Jokes:</strong> <em>"Tell me a joke"</em> or <em>"Tell me a kid joke"</em></p>
+        <p><strong>Weather:</strong> <em>"What's the weather?"</em></p>
+        <p><strong>Bible:</strong> <em>"Read me a bible verse"</em> or <em>"Read me a Psalm"</em></p>
+        <p><strong>Time:</strong> <em>"What time is it?"</em> or <em>"What's the date?"</em></p>
+        <p><strong>Bird sounds:</strong> Polly squawks and chatters on her own schedule</p>
+    </div>
+</div>
+
+<!-- Polly Sounds Settings -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">Polly's Sounds & Sleep</h3>
+    <p class="text-xs text-gray-500 mt-1">Control when Polly chirps and when she sleeps.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Volume:</strong> Settings &rarr; Bird Sound Volume, Voice Volume, Blessing Volume</p>
+        <p><strong>Frequency:</strong> Settings &rarr; Short Squawks and Long Chatter intervals (or Off)</p>
+        <p><strong>Quiet hours:</strong> Settings &rarr; Bedtime and Wake up times</p>
+        <p><strong>Snooze:</strong> Settings &rarr; Snooze Polly for 30 min to 8 hours</p>
+        <p><strong>Voice:</strong> <em>"Be quiet"</em> to stop a squawk mid-play</p>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- BASIC TIER -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+{% if tier in ('basic', 'legacy') or role == 'family' %}
+<div class="border-t-4 border-blue-400 mt-6 pt-4">
+    <p class="text-xs text-blue-600 font-bold uppercase tracking-wide mb-3">Polly Basic</p>
+</div>
+
+<!-- Stories -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">Record & Preserve Family Stories</h3>
+    <p class="text-xs text-gray-500 mt-1">Every voice. Every memory. Saved forever.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Interview:</strong> <em>"Ask me a question"</em> — Polly asks, you answer, story saved</p>
+        <p><strong>Free-form:</strong> <em>"I want to tell a story"</em></p>
+        <p><strong>Listen:</strong> <em>"Tell me a story"</em> — Polly reads back a memory</p>
+        <p><strong>Phone:</strong> Record a Memory button on the app — audio saved even if transcription fails</p>
+        <p><strong>Edit:</strong> Fix transcriptions on the Stories page</p>
+    </div>
+</div>
+
+<!-- Family -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">Family Tree & Photos</h3>
+    <p class="text-xs text-gray-500 mt-1">Build your family's history. 8 generations deep.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Tree:</strong> Add family members with relationships, bios, birth years</p>
+        <p><strong>Photos:</strong> Upload photos. Record voice stories about each one.</p>
+        <p><strong>Share:</strong> Generate a family access code so relatives can view and contribute</p>
+        <p><strong>Nostalgia:</strong> Polly generates era-based memories from your hometown and birth year</p>
+    </div>
+</div>
+
+{% elif tier == 'trial' and role != 'family' %}
+<!-- Upgrade prompt for Basic -->
+<div class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mt-6">
+    <h3 class="font-bold text-blue-800">Record & Preserve Family Stories Forever</h3>
+    <p class="text-sm text-blue-700 mt-1">Unlimited stories, family tree, photos, and nostalgia. Every voice saved.</p>
+    <a href="/web/pricing" class="inline-block mt-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 font-medium">Upgrade to Basic &rarr;</a>
+</div>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- LEGACY TIER -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+{% if tier == 'legacy' %}
+<div class="border-t-4 border-red-400 mt-6 pt-4">
+    <p class="text-xs text-red-600 font-bold uppercase tracking-wide mb-3">Polly Legacy</p>
+</div>
+
+<!-- Book -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">Print a Real Book of Your Life</h3>
+    <p class="text-xs text-gray-500 mt-1">AI writes the chapters. You hold the book.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Chapters:</strong> Stories organized into a Jungian narrative arc automatically</p>
+        <p><strong>Generate:</strong> One click generates all chapter drafts with AI</p>
+        <p><strong>Photos & QR:</strong> Inline photos and QR codes that play back the voice recording</p>
+        <p><strong>Export:</strong> Download a print-ready 6x9 PDF for KDP, Lulu, or any printer</p>
+        <p><strong>Cover:</strong> Design your cover with fonts, colors, gradients, and position sliders</p>
+    </div>
+</div>
+
+<!-- Multi-device -->
+<div class="bg-white rounded-lg shadow p-4">
+    <h3 class="font-bold text-gray-800">Multiple Pollys</h3>
+    <p class="text-xs text-gray-500 mt-1">One at home, one at the office, one in the bedroom. All connected.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Up to 3 devices</strong> on the same account</p>
+        <p><strong>Per-device settings:</strong> Different quiet hours, volume, and sounds per device</p>
+        <p><strong>Shared data:</strong> Stories, messages, and reminders sync across all devices</p>
+    </div>
+</div>
+
+{% elif tier in ('trial', 'basic') and role != 'family' %}
+<!-- Upgrade prompt for Legacy -->
+<div class="bg-red-50 border-2 border-red-300 rounded-lg p-4 mt-6">
+    <h3 class="font-bold text-red-800">Print a Real Book. Hear Their Voice Forever.</h3>
+    <p class="text-sm text-red-700 mt-1">AI-written chapters, KDP-ready PDF, custom cover, QR codes that play voice recordings. Up to 3 devices.</p>
+    <a href="/web/pricing" class="inline-block mt-2 bg-red-700 text-white px-4 py-2 rounded text-sm hover:bg-red-800 font-medium">Upgrade to Legacy &rarr;</a>
+</div>
+{% endif %}
+
+</div>
+
+<!-- Pronunciation -->
+<div class="bg-white rounded-lg shadow p-4 mt-4">
+    <h3 class="font-bold text-gray-800">Teach Polly Names</h3>
+    <p class="text-xs text-gray-500 mt-1">Polly mispronouncing a name? Fix it once.</p>
+    <div class="mt-2 text-sm text-gray-700 space-y-1">
+        <p><strong>Settings &rarr; Pronunciation Guide:</strong> Type the word and how to say it</p>
+        <p><strong>Example:</strong> Nawrott &rarr; Nore-Rott</p>
+    </div>
+</div>
+
+<p class="text-center text-xs text-gray-400 mt-6 mb-4">Polly Connect &mdash; polly-connect.com</p>
+
+</div>
+{% endblock %}

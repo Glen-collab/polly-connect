@@ -4617,21 +4617,24 @@ async def prayer_recording_schedule(request: Request, recording_id: int,
 
 # ── Owner's Guide ──
 
-@router.get("/guide")
+@router.get("/guide", response_class=HTMLResponse)
 async def owners_guide(request: Request):
-    """Owner's Guide — opens PDF in browser's native viewer with back support."""
-    from fastapi.responses import FileResponse
-    import os
-
-    pdf_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "static", "Polly_User_Guide.pdf"
-    )
-    # Serve inline so the browser's own PDF viewer handles it (scrollable, zoomable)
-    return FileResponse(
-        path=pdf_path,
-        media_type="application/pdf",
-        headers={"Content-Disposition": "inline; filename=Polly_User_Guide.pdf"},
-    )
+    """Owner's Guide — tier-aware, shows features relevant to the user."""
+    session = await get_web_session(request)
+    tier = "trial"
+    role = "owner"
+    if session:
+        db = request.app.state.db
+        from core.subscription import get_subscription
+        sub = get_subscription(db, session["tenant_id"])
+        tier = sub["tier"]
+        role = session.get("role", "owner")
+    return templates.TemplateResponse("guide.html", {
+        "request": request,
+        "session": session,
+        "tier": tier,
+        "role": role,
+    })
 
 
 # ── Photo Listen Page (multi-voice) ──
