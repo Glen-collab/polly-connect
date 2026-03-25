@@ -1691,8 +1691,15 @@ async def settings_page(request: Request):
         "security_questions": security_questions,
         "devices": tenant_devices,
         "has_multiple_devices": has_multiple_devices,
-        "ambient_active": any(squawk_mgr.is_ambient(d) for d in squawk_mgr._active_devices) if squawk_mgr else False,
+        "ambient_active": _check_ambient_active(request),
     })
+
+
+def _check_ambient_active(request) -> bool:
+    smgr = getattr(request.app.state, "squawk", None)
+    if not smgr:
+        return False
+    return any(smgr.is_ambient(d) for d in smgr._active_devices)
 
 
 @router.post("/settings")
