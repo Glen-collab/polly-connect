@@ -622,12 +622,13 @@ class IntentParser:
 
         # Patterns for playing a blessing
         patterns = [
-            r"play (?:a |the |my )?(?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
-            r"play (?:a |the |my )?(?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?prayer recording",
-            r"play (?:a |the )?(?:(\w+)(?:'s|s))?\s*(?:recorded |voice )?(?:(\w+)\s+)?prayer",
-            r"(?:can you |could you )?play (?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
+            r"(?:play|give)(?: me)? (?:a |the |my )?(?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
+            r"(?:play|give)(?: me)? (?:a |the |my )?(?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?prayer recording",
+            r"(?:play|give)(?: me)? (?:a |the )?(?:(\w+)(?:'s|s))?\s*(?:recorded |voice )?(?:(\w+)\s+)?prayer",
+            r"(?:can you |could you |i want )(?:play|hear|say)(?: me)? (?:a |the )?(?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
             r"let(?:'s| me) hear (?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
-            r"play (?:a |the )?(\w+) blessing",
+            r"(?:play|give)(?: me)? (?:a |the )?(\w+) blessing",
+            r"(?:say|read)(?: me)? (?:a |the |my )?(?:(\w+)\s+)?blessing",
         ]
 
         for pattern in patterns:
@@ -658,9 +659,22 @@ class IntentParser:
             "play a blessing", "play blessing", "play a recorded blessing",
             "play a voice blessing", "play my blessing",
             "play a recorded prayer", "play a voice prayer",
+            "play me a blessing", "give me a blessing",
+            "say a blessing", "read a blessing",
+            "meal blessing", "mealtime blessing", "dinner blessing",
+            "supper blessing", "bedtime blessing", "morning blessing",
+            "play me a meal blessing", "give me a meal blessing",
+            "play me a dinner blessing", "play me a bedtime blessing",
+            "say a meal blessing", "say grace",
         ]
         if any(t in text for t in simple_triggers):
-            return {"intent": "play_blessing", "speaker": None, "category": None, "confidence": 0.9}
+            # Try to extract category from the trigger text
+            cat = None
+            for word, mapped in category_map.items():
+                if word in text:
+                    cat = mapped
+                    break
+            return {"intent": "play_blessing", "speaker": None, "category": cat, "confidence": 0.9}
 
         return None
 
