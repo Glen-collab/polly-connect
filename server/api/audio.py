@@ -1065,7 +1065,8 @@ async def _process_command(
                 await asyncio.sleep(1.0)  # brief pause between intro and prayer
                 with open(filepath, "rb") as f:
                     wav_data = f.read()
-                await squawk_mgr._send_wav(device_id, wav_data)
+                ws = squawk_mgr._active_devices.get(device_id, websocket)
+                await squawk_mgr._send_wav(ws, device_id, wav_data)
                 duration = len(wav_data) / 32000.0 + intro_dur
             else:
                 duration = intro_dur
