@@ -207,7 +207,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     """Validate CSRF token on POST requests to web routes.
     Token is read from X-CSRF-Token header or csrf_token cookie — NOT from
     the request body, to avoid consuming the body before downstream handlers."""
-    EXEMPT_PREFIXES = ["/api/", "/stripe-webhook"]
+    EXEMPT_PREFIXES = ["/api/", "/stripe-webhook", "/web/firmware/"]
 
     async def dispatch(self, request, call_next):
         if request.method == "POST":
