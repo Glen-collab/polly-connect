@@ -59,7 +59,7 @@ static const char *TAG = "POLLY-WS";
 /* --- Configuration --- */
 
 // Firmware version (for OTA updates)
-#define FW_VERSION      "1.0.3"
+#define FW_VERSION      "1.0.4"
 #define FW_VARIANT      "waveshare"
 
 // WiFi
@@ -1593,7 +1593,8 @@ static esp_err_t ws_init(void)
         .reconnect_timeout_ms = WS_RECONNECT_MS,
         .network_timeout_ms = 30000,        // 30s TCP timeout (was 10s — caused idle disconnects)
         .ping_interval_sec = 20,            // RFC 6455 WebSocket ping every 20s (keeps connection alive)
-        .task_stack = 8192,
+        .pingpong_timeout_sec = 60,         // Allow up to 60s for pong (long recordings block sends)
+        .task_stack = 12288,                // 12KB stack for WS task (was 8K — stack overflow on long sessions)
     };
 
     ws_client = esp_websocket_client_init(&ws_cfg);
@@ -1751,15 +1752,24 @@ static void mic_stream_task(void *arg)
                     ws_client,
                     (const char *)audio_chunk,
                     samples * sizeof(int16_t),
-                    pdMS_TO_TICKS(2000)
+                    pdMS_TO_TICKS(500)  // 500ms timeout (was 2s — long blocks starve ping/pong)
                 );
                 if (ret < 0) {
                     ESP_LOGW(TAG, "WebSocket send failed (ret=%d), free heap=%u",
                              ret, (unsigned)esp_get_free_heap_size());
-                    ws_connected = false;  // Treat send failure as disconnect
-                    streaming_paused = false;
-                    led_set(0);
+                    // Don't immediately disconnect on single failure — retry next loop
+                    // Only disconnect on consecutive failures
+                    static int send_fail_count = 0;
+                    send_fail_count++;
+                    if (send_fail_count >= 5) {
+                        ws_connected = false;
+                        streaming_paused = false;
+                        led_set(0);
+                        send_fail_count = 0;
+                    }
                     vTaskDelay(pdMS_TO_TICKS(100));
+                } else {
+                    send_fail_count = 0;  // Reset on success
                 }
             }
         } else {
