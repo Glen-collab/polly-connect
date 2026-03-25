@@ -348,6 +348,30 @@
     {% endif %}
 </div>
 
+<!-- Ambient Bird Sounds -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-5 mb-4">
+    <h2 class="text-base sm:text-lg font-semibold mb-3">Bird Sounds</h2>
+    <p class="text-xs sm:text-sm text-gray-500 mb-3">
+        Play 10 minutes of calming bird sounds. Polly stops listening for commands during ambient mode.
+    </p>
+    {% if ambient_active %}
+    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-3">
+        <p class="text-sm text-emerald-800 font-medium">Bird sounds playing...</p>
+    </div>
+    <form method="POST" action="/web/settings/ambient-stop">
+        <button type="submit" class="w-full sm:w-auto bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 text-sm font-medium">
+            Stop Bird Sounds
+        </button>
+    </form>
+    {% else %}
+    <form method="POST" action="/web/settings/ambient-start">
+        <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm font-medium">
+            Play Bird Sounds (10 min)
+        </button>
+    </form>
+    {% endif %}
+</div>
+
 <!-- Family Access Code (always open) -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-5 mb-4">
     <h2 class="text-base sm:text-lg font-semibold mb-3">Family Access Code</h2>

@@ -121,6 +121,8 @@ class SquawkManager:
         self._message_nag_enabled: Dict[str, bool] = {}  # per-device message nag toggle
         self.last_squawk_end: Dict[str, float] = {}  # monotonic time when last squawk/chatter finished
         self._volume: Dict[str, float] = {}  # per-device volume (0.0-1.0)
+        self._ambient_tasks: Dict[str, asyncio.Task] = {}  # device_id -> ambient mode task
+        self._ambient_active: Dict[str, bool] = {}  # device_id -> True if ambient playing
 
         # Clock-based scheduling: wall-clock epoch timestamps
         self._next_squawk_time: Dict[str, float] = {}  # next squawk epoch
@@ -491,6 +493,62 @@ class SquawkManager:
             if self.is_busy(device_id) or self.is_snoozed(device_id):
                 return
             await self.send_squawk(device_id)
+
+    # ── Ambient bird sounds mode ──────────────────────────────────────
+
+    def is_ambient(self, device_id: str) -> bool:
+        return self._ambient_active.get(device_id, False)
+
+    async def start_ambient(self, device_id: str, duration_minutes: int = 10):
+        """Start ambient bird sounds — plays chatter clips back to back for N minutes."""
+        # Stop any existing ambient session
+        await self.stop_ambient(device_id)
+
+        self._ambient_active[device_id] = True
+        self.set_busy(device_id, True)  # suppress normal squawks/commands during ambient
+
+        async def _ambient_loop():
+            try:
+                end_time = time.time() + duration_minutes * 60
+                clip_count = 0
+                logger.info(f"Ambient mode started → {device_id} ({duration_minutes} min)")
+                while time.time() < end_time and self._ambient_active.get(device_id):
+                    ws = self._active_devices.get(device_id)
+                    if not ws:
+                        break
+                    # Pick a random chatter clip
+                    if self._raw_chatter:
+                        clip = self._pick_sound(device_id, self._raw_chatter, self.chatter)
+                        await self._send_wav(ws, device_id, clip, interruptible=False)
+                        clip_count += 1
+                    # Short pause between clips (2-5 seconds)
+                    pause = random.uniform(2.0, 5.0)
+                    await asyncio.sleep(pause)
+                logger.info(f"Ambient mode ended → {device_id} ({clip_count} clips played)")
+            except asyncio.CancelledError:
+                logger.info(f"Ambient mode cancelled → {device_id}")
+            except Exception as e:
+                logger.error(f"Ambient mode error → {device_id}: {e}")
+            finally:
+                self._ambient_active[device_id] = False
+                self.set_busy(device_id, False)
+
+        task = asyncio.ensure_future(_ambient_loop())
+        self._ambient_tasks[device_id] = task
+
+    async def stop_ambient(self, device_id: str):
+        """Stop ambient bird sounds and return to normal listening."""
+        self._ambient_active[device_id] = False
+        task = self._ambient_tasks.pop(device_id, None)
+        if task and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        self.set_busy(device_id, False)
+        self.stop_playback(device_id)
+        logger.info(f"Ambient mode stopped → {device_id}")
 
     async def send_wake_squawk(self, device_id: str):
         """Short squawk on wake word detection."""

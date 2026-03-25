@@ -1691,6 +1691,7 @@ async def settings_page(request: Request):
         "security_questions": security_questions,
         "devices": tenant_devices,
         "has_multiple_devices": has_multiple_devices,
+        "ambient_active": any(squawk_mgr.is_ambient(d) for d in squawk_mgr._active_devices) if squawk_mgr else False,
     })
 
 
@@ -1944,6 +1945,32 @@ async def squawk_unsnooze(request: Request, device_id: str = Form(None)):
 
 
 # ── Setup ──
+
+@router.post("/settings/ambient-start")
+async def ambient_start(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    squawk_mgr = getattr(request.app.state, "squawk", None)
+    if squawk_mgr:
+        for dev_id in list(squawk_mgr._active_devices.keys()):
+            await squawk_mgr.start_ambient(dev_id, duration_minutes=10)
+    return RedirectResponse("/web/settings", status_code=303)
+
+
+@router.post("/settings/ambient-stop")
+async def ambient_stop(request: Request):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    squawk_mgr = getattr(request.app.state, "squawk", None)
+    if squawk_mgr:
+        for dev_id in list(squawk_mgr._active_devices.keys()):
+            await squawk_mgr.stop_ambient(dev_id)
+    return RedirectResponse("/web/settings", status_code=303)
+
 
 @router.get("/setup", response_class=HTMLResponse)
 async def setup_page(request: Request):
