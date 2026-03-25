@@ -59,7 +59,7 @@ static const char *TAG = "POLLY-WS";
 /* --- Configuration --- */
 
 // Firmware version (for OTA updates)
-#define FW_VERSION      "1.0.5"
+#define FW_VERSION      "1.0.6"
 #define FW_VARIANT      "waveshare"
 
 // WiFi
@@ -2113,7 +2113,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Setup complete. Streaming audio to server...");
 
     // Start story button polling task (K1/+ via TCA9555 I/O expander)
-    xTaskCreate(story_button_task, "story_btn", 2048, NULL, 3, NULL);
+    xTaskCreate(story_button_task, "story_btn", 4096, NULL, 3, NULL);
 
     // Start mic streaming task on core 1 (core 0 handles WiFi/WebSocket)
     xTaskCreatePinnedToCore(mic_stream_task, "mic_stream", 8192, NULL, 5, NULL, 1);
