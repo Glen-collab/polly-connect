@@ -2351,10 +2351,15 @@ async def web_record_story(request: Request):
         f.write(wav_bytes)
 
     # Try to transcribe, but keep audio regardless
+    transcription_failed = False
     transcriber = request.app.state.transcriber
-    transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+    try:
+        transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+    except Exception:
+        transcription = None
     if not transcription or len(transcription.strip()) < 5:
-        transcription = "[Audio memory]"
+        transcription = "(no transcription — audio saved)"
+        transcription_failed = True
 
     # Auto-set speaker name from family member if not provided
     member_id = session.get("family_member_id")
@@ -2375,8 +2380,8 @@ async def web_record_story(request: Request):
         recorded_by_member_id=member_id,
     )
 
-    # Extract memory if transcription is real
-    if transcription != "[Audio memory]":
+    # Extract memory if transcription succeeded
+    if not transcription_failed:
         memory_extractor = getattr(request.app.state, "memory_extractor", None)
         if memory_extractor:
             try:
@@ -2389,7 +2394,12 @@ async def web_record_story(request: Request):
             except Exception as e:
                 logger.error(f"Memory extraction failed for web recording: {e}")
 
-    return JSONResponse({"transcript": transcription, "story_id": story_id})
+    return JSONResponse({
+        "transcript": transcription,
+        "story_id": story_id,
+        "transcription_failed": transcription_failed,
+        "message": "Memory saved! Transcription couldn't pick up the audio — you can type it out on the story edit page." if transcription_failed else "Memory saved!",
+    })
 
 
 @router.post("/photos/{photo_id}/record-story")
