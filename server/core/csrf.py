@@ -8,8 +8,19 @@ import time
 
 logger = logging.getLogger(__name__)
 
-# Secret key for CSRF tokens — generated once at startup
-_csrf_secret = secrets.token_hex(32)
+# Secret key for CSRF tokens — persistent across restarts
+import os
+_csrf_secret_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".csrf_secret")
+if os.path.exists(_csrf_secret_file):
+    with open(_csrf_secret_file, "r") as f:
+        _csrf_secret = f.read().strip()
+else:
+    _csrf_secret = secrets.token_hex(32)
+    try:
+        with open(_csrf_secret_file, "w") as f:
+            f.write(_csrf_secret)
+    except Exception:
+        pass  # If we can't write, it'll regenerate next restart
 
 # Token validity: 4 hours
 TOKEN_MAX_AGE = 4 * 3600
