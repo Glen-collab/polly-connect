@@ -1375,6 +1375,38 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def update_item(self, item_id: int, item: str = None, location: str = None,
+                    prep: str = None, tenant_id: int = None) -> bool:
+        conn = self._get_connection()
+        try:
+            updates = []
+            params = []
+            if item is not None:
+                updates.append("item = ?")
+                updates.append("item_normalized = ?")
+                params.extend([item, self._normalize(item)])
+            if location is not None:
+                updates.append("location = ?")
+                updates.append("location_normalized = ?")
+                params.extend([location, self._normalize(location)])
+            if prep is not None:
+                updates.append("prep = ?")
+                params.append(prep)
+            if not updates:
+                return False
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            query = f"UPDATE items SET {', '.join(updates)} WHERE id = ?"
+            params.append(item_id)
+            if tenant_id:
+                query += " AND tenant_id = ?"
+                params.append(tenant_id)
+            cursor = conn.execute(query, params)
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
     def delete_item(self, item: str, tenant_id: int = None) -> bool:
         item_norm = self._normalize(item)
         conn = self._get_connection()
