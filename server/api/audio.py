@@ -1087,11 +1087,27 @@ async def _process_command(
                                          squawk_mgr=squawk_mgr, device_id=device_id,
                                          pronunciations=_pronunciations)
 
-            # Then play the recorded WAV
+            # Then play the recorded WAV (apply voice volume)
             if os.path.exists(filepath) and squawk_mgr:
                 await asyncio.sleep(1.0)  # brief pause between intro and prayer
                 with open(filepath, "rb") as f:
                     wav_data = f.read()
+                # Scale volume to match voice volume setting
+                try:
+                    _cmd = getattr(websocket.app.state, "cmd", None)
+                    if _cmd and device_id:
+                        _cs = _cmd._get_state(device_id)
+                        _vol = getattr(_cs, "voice_volume", 100)
+                        if _vol < 100:
+                            import numpy as _np
+                            # Skip WAV header (44 bytes) if present
+                            hdr = 44 if wav_data[:4] == b'RIFF' else 0
+                            samples = _np.frombuffer(wav_data[hdr:], dtype=_np.int16).astype(_np.float32)
+                            samples = samples * (_vol / 100.0)
+                            samples = _np.clip(samples, -32768, 32767).astype(_np.int16)
+                            wav_data = wav_data[:hdr] + samples.tobytes()
+                except Exception:
+                    pass
                 ws = squawk_mgr._active_devices.get(device_id, websocket)
                 await squawk_mgr._send_wav(ws, device_id, wav_data)
                 duration = len(wav_data) / 32000.0 + intro_dur
