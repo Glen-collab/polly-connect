@@ -495,9 +495,18 @@ class IntentParser:
         if self._is_list(text_lower):
             return {"intent": "list_all", "confidence": 1.0}
 
+        # "I found it" / "got it" / "never mind"
+        if self._is_found_it(text_lower):
+            return {"intent": "found_it", "confidence": 0.9}
+
         delete_match = self._is_delete(text_lower)
         if delete_match:
             return {"intent": "delete", "item": delete_match, "confidence": 0.9}
+
+        # "I can't find the hammer" / "I lost my keys"
+        cant_find = self._is_cant_find(text_lower)
+        if cant_find:
+            return {"intent": "retrieve_item", "item": cant_find, "mom_mode": True, "confidence": 0.9}
 
         location_query = self._is_location_query(text_lower)
         if location_query:
@@ -588,6 +597,33 @@ class IntentParser:
                 location = match.group(1).strip()
                 if location:
                     return location
+        return None
+
+    def _is_found_it(self, text: str) -> bool:
+        patterns = [
+            r"^i found it", r"^found it", r"^never ?mind", r"^got it",
+            r"^i see it", r"^i found the", r"^i found my",
+        ]
+        for p in patterns:
+            if re.search(p, text):
+                return True
+        return False
+
+    def _is_cant_find(self, text: str) -> Optional[str]:
+        patterns = [
+            r"i can'?t find (?:the |my |a )?(.+?)(?:\?|$)",
+            r"i lost (?:the |my |a )?(.+?)(?:\?|$)",
+            r"i'?m looking for (?:the |my |a )?(.+?)(?:\?|$)",
+            r"have you seen (?:the |my |a )?(.+?)(?:\?|$)",
+            r"i can'?t remember where (?:the |my |a )?(.+?)(?:\s+is|\?|$)",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                item = match.group(1).strip()
+                item = re.sub(r'\s+(?:at|is|are|again)$', '', item)
+                if item:
+                    return item
         return None
 
     def _is_item_query(self, text: str) -> Optional[str]:

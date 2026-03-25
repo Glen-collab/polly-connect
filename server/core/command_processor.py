@@ -39,6 +39,7 @@ class CommandProcessor:
         self.engagement = engagement
         self.followup_gen = followup_gen
         self._last_response = {}
+        self._last_missing_item = {}  # device_id -> item name (for "found it")
         self._conversation_states = {}  # device_id -> ConversationState
 
     def _get_state(self, device_id: str) -> ConversationState:
@@ -74,21 +75,70 @@ class CommandProcessor:
             return "I didn't understand what to store."
 
         elif intent == "retrieve_item":
+            import random
             item = intent_result.get("item")
+            mom = intent_result.get("mom_mode", False)
             if item:
                 results = self.db.find_item(item, tenant_id=tid)
                 if results:
-                    r = results[0]
-                    prep = r.get("prep") or "on"
-                    verb = "are" if r['item'].endswith("s") and not r['item'].endswith("ss") else "is"
-                    if r.get("context"):
-                        resp = f"The {r['item']} {verb} {prep} the {r['location']}, {r['context']}."
+                    if len(results) == 1:
+                        r = results[0]
+                        prep = r.get("prep") or "on"
+                        loc = r["location"]
+                        if mom:
+                            phrases = [
+                                f"Have you looked {prep} the {loc}?",
+                                f"Did you try the {loc}?",
+                                f"I think it's {prep} the {loc}, sweetie.",
+                                f"Check the {loc}, honey.",
+                                f"It should be {prep} the {loc}. Did you really look?",
+                                f"Last I heard, it was {prep} the {loc}.",
+                                f"Did you check the {loc}? Really check?",
+                            ]
+                            resp = random.choice(phrases)
+                        else:
+                            verb = "are" if r['item'].endswith("s") and not r['item'].endswith("ss") else "is"
+                            if r.get("context"):
+                                resp = f"The {r['item']} {verb} {prep} the {r['location']}, {r['context']}."
+                            else:
+                                resp = f"The {r['item']} {verb} {prep} the {r['location']}."
                     else:
-                        resp = f"The {r['item']} {verb} {prep} the {r['location']}."
+                        locations = [f"{r.get('prep', 'on')} the {r['location']}" for r in results]
+                        if len(locations) == 2:
+                            resp = f"Did you check {locations[0]} or {locations[1]}?"
+                        else:
+                            resp = f"Did you check {', '.join(locations[:-1])}, or {locations[-1]}?"
                     self._last_response[device_id] = resp
                     return resp
-                return f"I don't know where the {item} is."
-            return "What item are you looking for?"
+                # Not found — track it for "found it"
+                self._last_missing_item[device_id] = item
+                if mom:
+                    phrases = [
+                        f"Hmm, I don't remember where you put the {item}. When you find it, let me know!",
+                        f"I'm not sure where the {item} is. Did you put it away properly?",
+                        f"The {item}? I don't know, sweetie. Where did you last have it?",
+                    ]
+                    resp = random.choice(phrases)
+                else:
+                    resp = f"I don't know where the {item} is."
+                self._last_response[device_id] = resp
+                return resp
+            return "What are you looking for?"
+
+        elif intent == "found_it":
+            import random
+            last_item = self._last_missing_item.pop(device_id, None)
+            phrases = [
+                "See? It was right where I said!",
+                "Good! Now put it back when you're done.",
+                "Told you! Moms always know.",
+                "Great! Was it in the last place you looked?",
+            ]
+            resp = random.choice(phrases)
+            if last_item:
+                resp += f" Where was the {last_item}?"
+            self._last_response[device_id] = resp
+            return resp
 
         elif intent == "retrieve_location":
             location = intent_result.get("location")
