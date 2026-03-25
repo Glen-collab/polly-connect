@@ -508,6 +508,11 @@ class PollyDB:
             if "family_code_created_at" not in cols:
                 conn.execute("ALTER TABLE tenants ADD COLUMN family_code_created_at TIMESTAMP")
 
+            # ── Medications device_id column ──
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(medications)").fetchall()}
+            if "device_id" not in cols:
+                conn.execute("ALTER TABLE medications ADD COLUMN device_id TEXT")
+
             # ── Items prep column ──
             cols = {row[1] for row in conn.execute("PRAGMA table_info(items)").fetchall()}
             if "prep" not in cols:
@@ -1480,14 +1485,15 @@ class PollyDB:
     # ── Medications ──
 
     def add_medication(self, user_id: int, name: str, dosage: str, times: str,
-                       active_days: str = None, tenant_id: int = None) -> int:
+                       active_days: str = None, tenant_id: int = None,
+                       device_id: str = None) -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
-                INSERT INTO medications (user_id, name, dosage, times, active_days, tenant_id)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO medications (user_id, name, dosage, times, active_days, tenant_id, device_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (user_id, name, dosage, times,
-                  active_days or '["mon","tue","wed","thu","fri","sat","sun"]', tenant_id))
+                  active_days or '["mon","tue","wed","thu","fri","sat","sun"]', tenant_id, device_id))
             conn.commit()
             return cursor.lastrowid
         finally:

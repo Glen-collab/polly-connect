@@ -1218,16 +1218,19 @@ async def medications_page(request: Request):
 
     db = request.app.state.db
     medications = db.get_medications(tenant_id=session["tenant_id"])
+    devices = db.get_devices_by_tenant(session["tenant_id"])
     return templates.TemplateResponse("medications.html", {
         "request": request,
         "session": session,
         "medications": medications,
+        "devices": devices,
     })
 
 
 @router.post("/medications/add")
 async def medication_add(request: Request, name: str = Form(...),
-                         dosage: str = Form(""), times: str = Form(...)):
+                         dosage: str = Form(""), times: str = Form(...),
+                         device_id: str = Form("")):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -1238,7 +1241,8 @@ async def medication_add(request: Request, name: str = Form(...),
     user = db.get_or_create_user(tenant_id=tid)
     # Parse comma-separated times (supports "8am", "2:30 PM", "14:00")
     time_list = [parse_time_input(t) for t in times.split(",") if t.strip()]
-    db.add_medication(user["id"], name, dosage, json.dumps(time_list), tenant_id=tid)
+    db.add_medication(user["id"], name, dosage, json.dumps(time_list),
+                      tenant_id=tid, device_id=device_id or None)
     return RedirectResponse("/web/medications", status_code=303)
 
 

@@ -31,6 +31,17 @@
                 <label class="block text-sm text-gray-600 mb-1">Times (comma-separated)</label>
                 <input type="text" name="times" required class="w-full border rounded px-3 py-2 text-sm" placeholder="8am, 2pm or 8:00, 14:00">
             </div>
+            {% if devices and devices|length > 1 %}
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Device</label>
+                <select name="device_id" class="w-full border rounded px-3 py-2 text-sm">
+                    <option value="">All Devices</option>
+                    {% for dev in devices %}
+                    <option value="{{ dev.device_id }}">{{ dev.name or dev.device_id }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
             <div class="flex items-end">
                 <button type="submit" class="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700 w-full text-sm">Add</button>
             </div>
@@ -52,6 +63,9 @@
                     <p class="font-medium text-sm">{{ med.name }}</p>
                     <p class="text-xs text-gray-500">{{ med.dosage or '' }}</p>
                     <p class="text-xs text-gray-500 mt-1" id="med-times-m-{{ med.id }}">{{ med.times }}</p>
+                    {% if med.device_id %}
+                    <p class="text-xs text-blue-500 mt-0.5">{{ med.device_id }}</p>
+                    {% endif %}
                 </div>
                 {% if session.role != 'family' %}
                 <div class="flex gap-2">

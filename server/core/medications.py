@@ -191,8 +191,8 @@ class MedicationScheduler:
         current_day = now.strftime("%a").lower()
         today_key = now.strftime("%Y-%m-%d")
 
-        # Collect all due meds grouped by tenant
-        due_by_tenant = {}  # tenant_id -> [(med, med_time), ...]
+        # Collect all due meds grouped by (tenant, device)
+        due_by_key = {}  # (tenant_id, device_id) -> [(med, med_time), ...]
         meds = self.db.get_medications()
         for med in meds:
             times = json.loads(med["times"]) if isinstance(med["times"], str) else med["times"]
@@ -202,6 +202,7 @@ class MedicationScheduler:
                 continue
 
             tenant_id = med.get("tenant_id")
+            device_id = med.get("device_id")  # None = all devices
 
             for med_time in times:
                 if med_time == current_time:
@@ -209,10 +210,11 @@ class MedicationScheduler:
                     if dedup_key in self._last_reminded:
                         continue
                     self._last_reminded[dedup_key] = True
-                    due_by_tenant.setdefault(tenant_id, []).append((med, med_time))
+                    group_key = (tenant_id, device_id)
+                    due_by_key.setdefault(group_key, []).append((med, med_time))
 
-        # Send one combined reminder per tenant
-        for tenant_id, med_list in due_by_tenant.items():
+        # Send one combined reminder per (tenant, device) group
+        for (tenant_id, device_id), med_list in due_by_key.items():
             if len(med_list) == 1:
                 await self._send_reminder(med_list[0][0], med_list[0][1], tenant_id)
             else:
@@ -319,10 +321,14 @@ class MedicationScheduler:
         # Generate combined squawk + TTS audio
         combined_wav = await self._build_reminder_audio(msg)
 
+        target_device = med.get("device_id")  # None = all devices
         sent_count = 0
         for device_id, info in list(self._websockets.items()):
             # Only send to devices belonging to this medication's tenant
             if tenant_id is not None and info["tenant_id"] != tenant_id:
+                continue
+            # If reminder is assigned to a specific device, only send to that one
+            if target_device and device_id != target_device:
                 continue
 
             ws = info["ws"]
