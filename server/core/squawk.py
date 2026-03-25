@@ -106,8 +106,10 @@ class SquawkManager:
     def __init__(self, sounds_dir: str):
         self.squawks: List[bytes] = []       # short squawk WAVs (16kHz mono, default volume)
         self.chatter: List[bytes] = []       # long chatter WAVs (16kHz mono, default volume)
+        self.ambient: List[bytes] = []       # ambient bird clips (for button mode only)
         self._raw_squawks: List[bytes] = []  # raw WAVs at full volume (for per-device volume)
         self._raw_chatter: List[bytes] = []  # raw WAVs at full volume (for per-device volume)
+        self._raw_ambient: List[bytes] = []  # raw ambient WAVs at full volume
         self._active_devices: Dict[str, asyncio.WebSocketServerProtocol] = {}
         self._playing: Dict[str, bool] = {}  # True if currently sending squawk/chatter
         self._busy: Dict[str, bool] = {}     # True if device is recording/processing/playing TTS
@@ -153,7 +155,11 @@ class SquawkManager:
                     raw_bytes = f.read()
                 converted = _convert_to_16k_mono(raw_bytes)
                 raw_full = _convert_to_16k_mono(raw_bytes, volume=1.0)
-                if fname.startswith('chatter') or fname.startswith('parrot'):
+                if fname.startswith('ambient'):
+                    self.ambient.append(converted)
+                    self._raw_ambient.append(raw_full)
+                    logger.info(f"Loaded ambient sound: {fname}")
+                elif fname.startswith('chatter'):
                     self.chatter.append(converted)
                     self._raw_chatter.append(raw_full)
                     logger.info(f"Loaded chatter sound: {fname}")
@@ -164,7 +170,7 @@ class SquawkManager:
             except Exception as e:
                 logger.error(f"Failed to load sound {fname}: {e}")
 
-        logger.info(f"SquawkManager ready: {len(self.squawks)} squawks, {len(self.chatter)} chatter files")
+        logger.info(f"SquawkManager ready: {len(self.squawks)} squawks, {len(self.chatter)} chatter, {len(self.ambient)} ambient")
 
     def _schedule_next_squawk(self, device_id: str, min_delay: float = 0):
         """Set the next squawk time based on interval + jitter. 0 = disabled."""
@@ -516,9 +522,11 @@ class SquawkManager:
                     ws = self._active_devices.get(device_id)
                     if not ws:
                         break
-                    # Pick a random chatter clip
-                    if self._raw_chatter:
-                        clip = self._pick_sound(device_id, self._raw_chatter, self.chatter)
+                    # Pick a random ambient clip (fall back to chatter if no ambient)
+                    raw_pool = self._raw_ambient if self._raw_ambient else self._raw_chatter
+                    default_pool = self.ambient if self.ambient else self.chatter
+                    if raw_pool:
+                        clip = self._pick_sound(device_id, raw_pool, default_pool)
                         await self._send_wav(ws, device_id, clip, interruptible=False)
                         clip_count += 1
                     # Short pause between clips (2-5 seconds)
