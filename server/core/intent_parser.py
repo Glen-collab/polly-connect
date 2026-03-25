@@ -79,6 +79,15 @@ class IntentParser:
             "kids joke", "tell us a kid joke",
             "tell a kid joke", "got any kid jokes",
         ]
+        self._tell_naughty_joke_phrases = [
+            "tell me a naughty joke", "naughty joke", "dirty joke",
+            "tell me a dirty joke", "adult joke", "tell me an adult joke",
+            "spicy joke", "tell me a spicy joke", "risque joke",
+            "tell me a risque joke", "cheeky joke", "tell me a cheeky joke",
+            "tell me something naughty", "got any naughty jokes",
+            "give me a naughty joke", "got a dirty joke",
+            "tell me a grown up joke", "grown up joke",
+        ]
         self._tell_joke_phrases = [
             "tell me a joke", "make me laugh", "say something funny",
             "i need a laugh", "cheer me up", "tell a joke",
@@ -345,6 +354,9 @@ class IntentParser:
         # Check non-memory intents (they're simpler/faster)
         if self._matches(text_lower, self._tell_kid_joke_phrases):
             return {"intent": "tell_kid_joke", "confidence": 0.95}
+
+        if self._matches(text_lower, self._tell_naughty_joke_phrases):
+            return {"intent": "tell_naughty_joke", "confidence": 0.95}
 
         if self._matches(text_lower, self._tell_joke_phrases):
             return {"intent": "tell_joke", "confidence": 0.95}

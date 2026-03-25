@@ -23,6 +23,7 @@ class DataLoader:
         # Flat lists for random access
         self._all_jokes: List[Dict] = []
         self._all_kid_jokes: List[Dict] = []
+        self._all_naughty_jokes: List[Dict] = []
         self._all_questions: List[Dict] = []
         self._standalone_questions: List[Dict] = []  # only context-free questions (first per week)
         self._all_family_questions: List[Dict] = []
@@ -34,6 +35,7 @@ class DataLoader:
 
         self._load_jokes()
         self._load_kid_jokes()
+        self._load_naughty_jokes()
         self._load_questions()
         self._load_family_questions()
         self._load_age_questions()
@@ -138,6 +140,21 @@ class DataLoader:
         if not self._all_kid_jokes:
             return None
         return random.choice(self._all_kid_jokes)
+
+    def _load_naughty_jokes(self):
+        path = os.path.join(self.data_dir, "naughty_jokes.json")
+        if not os.path.exists(path):
+            logger.warning(f"Naughty jokes file not found: {path}")
+            return
+        with open(path, "r", encoding="utf-8") as f:
+            self._all_naughty_jokes = json.load(f)
+        logger.info(f"Loaded {len(self._all_naughty_jokes)} naughty jokes")
+
+    def get_naughty_joke(self) -> Optional[Dict]:
+        """Return a random naughty joke dict with 'setup' and 'punchline'."""
+        if not self._all_naughty_jokes:
+            return None
+        return random.choice(self._all_naughty_jokes)
 
     def get_question(self, owner_age: int = None) -> Optional[Dict]:
         """Return a random question, age-appropriate if owner_age is provided.
