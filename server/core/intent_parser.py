@@ -471,8 +471,10 @@ class IntentParser:
         if self._matches(text_lower, self._nostalgia_phrases):
             return {"intent": "nostalgia", "confidence": 0.9}
 
+        # Only match medication if it's not an item query ("where are my medicine balls")
         if self._matches(text_lower, self._medication_phrases):
-            return {"intent": "medication", "confidence": 0.9, "raw": text}
+            if not any(q in text_lower for q in ["where", "find", "lost", "can't find", "looking for"]):
+                return {"intent": "medication", "confidence": 0.9, "raw": text}
 
         if self._matches(text_lower, self._weather_phrases):
             return {"intent": "weather", "confidence": 0.9}
