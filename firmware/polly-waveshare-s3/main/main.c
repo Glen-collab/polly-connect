@@ -59,7 +59,7 @@ static const char *TAG = "POLLY-WS";
 /* --- Configuration --- */
 
 // Firmware version (for OTA updates)
-#define FW_VERSION      "1.0.4"
+#define FW_VERSION      "1.0.5"
 #define FW_VARIANT      "waveshare"
 
 // WiFi
@@ -1753,7 +1753,7 @@ static void mic_stream_task(void *arg)
                     ws_client,
                     (const char *)audio_chunk,
                     samples * sizeof(int16_t),
-                    pdMS_TO_TICKS(500)  // 500ms timeout (was 2s — long blocks starve ping/pong)
+                    pdMS_TO_TICKS(2000)  // 2s timeout (500ms was too aggressive — caused write failures)
                 );
                 if (ret < 0) {
                     ESP_LOGW(TAG, "WebSocket send failed (ret=%d), free heap=%u",
