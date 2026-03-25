@@ -1311,7 +1311,7 @@ NARRATIVE:"""
         else:
             name_part = f", {state.speaker_name}" if state.speaker_name else ""
             closing = f"That was a wonderful story. Thank you for sharing{name_part}."
-        closing += " Say 'ask me a question' if you'd like another one."
+        # No follow-up prompt — clean ending
         state.reset()
         return (closing, ConversationMode.COMMAND)
 
