@@ -87,25 +87,28 @@ class CommandProcessor:
                         loc = r["location"]
                         # Skip prep if location already starts with a preposition
                         loc_lower = loc.lower()
-                        if loc_lower.startswith(("by ", "in ", "on ", "at ", "near ", "under ", "behind ", "next to ", "inside ")):
-                            prep = ""
+                        has_prep = loc_lower.startswith(("by ", "in ", "on ", "at ", "near ", "under ", "behind ", "next to ", "inside "))
+                        if has_prep:
+                            loc_phrase = loc.lower()  # "by the bathroom"
+                        else:
+                            loc_phrase = f"{prep} the {loc}"  # "on the shelf"
                         if mom:
                             phrases = [
-                                f"Have you looked {prep} the {loc}?",
-                                f"Did you try the {loc}?",
-                                f"I think it's {prep} the {loc}, sweetie.",
-                                f"Check the {loc}, honey.",
-                                f"It should be {prep} the {loc}. Did you really look?",
-                                f"Last I heard, it was {prep} the {loc}.",
-                                f"Did you check the {loc}? Really check?",
+                                f"Have you looked {loc_phrase}?",
+                                f"Did you try {loc_phrase}?",
+                                f"I think it's {loc_phrase}, sweetie.",
+                                f"Check {loc_phrase}, honey.",
+                                f"It should be {loc_phrase}. Did you really look?",
+                                f"Last I heard, it was {loc_phrase}.",
+                                f"Did you check {loc_phrase}? Really check?",
                             ]
                             resp = random.choice(phrases)
                         else:
                             verb = "are" if r['item'].endswith("s") and not r['item'].endswith("ss") else "is"
                             if r.get("context"):
-                                resp = f"The {r['item']} {verb} {prep} the {r['location']}, {r['context']}."
+                                resp = f"The {r['item']} {verb} {loc_phrase}, {r['context']}."
                             else:
-                                resp = f"The {r['item']} {verb} {prep} the {r['location']}."
+                                resp = f"The {r['item']} {verb} {loc_phrase}."
                     else:
                         locations = [f"{r.get('prep', 'on')} the {r['location']}" for r in results]
                         if len(locations) == 2:
