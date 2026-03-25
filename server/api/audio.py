@@ -781,6 +781,31 @@ async def _process_command(
         await websocket.send_json({"event": "response", "text": "I didn't hear anything.", "audio": None})
         return 0.0
 
+    # Save WAV first for conversational recordings (story answers)
+    # Audio is preserved even if transcription or connection fails
+    _saved_wav_filename = None
+    conv_state_check = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+    if conv_state_check and conv_state_check.is_conversational and len(command_audio) > 16000:
+        try:
+            import uuid as _uuid
+            wav_buf = io.BytesIO()
+            with wave.open(wav_buf, 'wb') as wf:
+                wf.setnchannels(settings.CHANNELS)
+                wf.setsampwidth(2)
+                wf.setframerate(settings.SAMPLE_RATE)
+                wf.writeframes(command_audio)
+            recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+            os.makedirs(recordings_dir, exist_ok=True)
+            _saved_wav_filename = f"story_{device_id}_{_uuid.uuid4().hex[:8]}.wav"
+            filepath = os.path.join(recordings_dir, _saved_wav_filename)
+            with open(filepath, "wb") as f:
+                f.write(wav_buf.getvalue())
+            duration_sec = len(command_audio) / (settings.SAMPLE_RATE * 2)
+            logger.info(f"Story audio saved: {_saved_wav_filename} ({duration_sec:.1f}s)")
+        except Exception as e:
+            logger.warning(f"Failed to save story WAV: {e}")
+            _saved_wav_filename = None
+
     if pre_transcription:
         transcription = pre_transcription
     else:
@@ -1006,6 +1031,10 @@ async def _process_command(
         _buffer_sent_at = time.monotonic()
         _buffer_duration = await _send_tts(websocket, tts, buffer_phrase, squawk_mgr=squawk_mgr,
                         device_id=device_id, pronunciations=_pronunciations)
+
+    # Attach saved WAV filename to conversation state for story saving
+    if _saved_wav_filename and conv_state_check:
+        conv_state_check._pending_wav = _saved_wav_filename
 
     # Use conversation-aware processing if available
     if hasattr(cmd, 'process_in_context'):

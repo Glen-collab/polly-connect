@@ -1250,14 +1250,19 @@ NARRATIVE:"""
         # Save the answer as a story part
         state.story_parts.append(answer_text)
 
-        # Save raw story to DB
+        # Save raw story to DB (with WAV if available)
+        wav_filename = getattr(state, '_pending_wav', None)
         story_id = self.db.save_story(
             transcript=answer_text,
+            audio_s3_key=wav_filename,
             speaker_name=state.speaker_name,
             source="family_story",
             tenant_id=tid,
             question_text=state.current_question,
         )
+        if wav_filename:
+            state._pending_wav = None
+            logger.info(f"Story #{story_id} saved with audio: {wav_filename}")
         # Auto-tag story
         try:
             self.db.auto_tag_story(story_id, answer_text, tenant_id=tid)
@@ -1314,13 +1319,18 @@ NARRATIVE:"""
 
         state.story_parts.append(transcript)
 
-        # Save raw story
+        # Save raw story (with WAV if available)
+        wav_filename = getattr(state, '_pending_wav', None)
         story_id = self.db.save_story(
             transcript=transcript,
+            audio_s3_key=wav_filename,
             speaker_name=state.speaker_name,
             source="family_story",
             tenant_id=tid,
         )
+        if wav_filename:
+            state._pending_wav = None
+            logger.info(f"Story #{story_id} saved with audio: {wav_filename}")
         # Auto-tag story
         try:
             self.db.auto_tag_story(story_id, transcript, tenant_id=tid)
