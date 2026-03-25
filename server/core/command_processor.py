@@ -85,6 +85,10 @@ class CommandProcessor:
                         r = results[0]
                         prep = r.get("prep") or "on"
                         loc = r["location"]
+                        # Skip prep if location already starts with a preposition
+                        loc_lower = loc.lower()
+                        if loc_lower.startswith(("by ", "in ", "on ", "at ", "near ", "under ", "behind ", "next to ", "inside ")):
+                            prep = ""
                         if mom:
                             phrases = [
                                 f"Have you looked {prep} the {loc}?",

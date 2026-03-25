@@ -1756,6 +1756,8 @@ async def settings_save(request: Request):
                         user.get("squawk_volume") if user.get("squawk_volume") is not None else 30))
     voice_volume = int(form.get("voice_volume",
                        user.get("voice_volume") if user.get("voice_volume") is not None else 100))
+    blessing_volume = int(form.get("blessing_volume",
+                          user.get("blessing_volume") if user.get("blessing_volume") is not None else 80))
     rms_threshold = int(form.get("rms_threshold",
                         user.get("rms_threshold") if user.get("rms_threshold") is not None else 200))
 
@@ -1766,6 +1768,7 @@ async def settings_save(request: Request):
     quiet_hours_end = max(0, min(23, quiet_hours_end))
     squawk_volume = max(0, min(100, squawk_volume))
     voice_volume = max(10, min(100, voice_volume))
+    blessing_volume = max(10, min(100, blessing_volume))
     rms_threshold = max(50, min(2000, rms_threshold))
 
     # Geocode location if changed
@@ -1799,7 +1802,7 @@ async def settings_save(request: Request):
             memory_care_mode = ?, squawk_interval = ?, chatter_interval = ?,
             quiet_hours_start = ?, quiet_hours_end = ?,
             location_city = ?, location_lat = ?, location_lon = ?,
-            squawk_volume = ?, voice_volume = ?, rms_threshold = ?,
+            squawk_volume = ?, voice_volume = ?, blessing_volume = ?, rms_threshold = ?,
             hometown = ?, birth_year = ?,
             updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -1808,7 +1811,7 @@ async def settings_save(request: Request):
               squawk_interval, chatter_interval,
               quiet_hours_start, quiet_hours_end,
               location_city, location_lat, location_lon,
-              squawk_volume, voice_volume, rms_threshold,
+              squawk_volume, voice_volume, blessing_volume, rms_threshold,
               hometown.strip() or None, birth_year_int,
               user["id"]))
         conn.commit()

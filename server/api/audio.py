@@ -1092,13 +1092,17 @@ async def _process_command(
                 await asyncio.sleep(1.0)  # brief pause between intro and prayer
                 with open(filepath, "rb") as f:
                     wav_data = f.read()
-                # Scale volume to match voice volume setting
+                # Scale volume to match blessing volume setting
                 try:
+                    _db = getattr(websocket.app.state, "db", None)
                     _cmd = getattr(websocket.app.state, "cmd", None)
-                    if _cmd and device_id:
-                        _cs = _cmd._get_state(device_id)
-                        _vol = getattr(_cs, "voice_volume", 100)
-                        if _vol < 100:
+                    _cs = _cmd._get_state(device_id) if _cmd else None
+                    _tid = _cs.tenant_id if _cs else 1
+                    _usr = _db.get_or_create_user(tenant_id=_tid) if _db else {}
+                    _vol = _usr.get("blessing_volume", 80)
+                    if _vol is None:
+                        _vol = 80
+                    if _vol < 100:
                             import numpy as _np
                             # Skip WAV header (44 bytes) if present
                             hdr = 44 if wav_data[:4] == b'RIFF' else 0
