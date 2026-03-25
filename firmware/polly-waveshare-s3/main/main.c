@@ -1748,6 +1748,7 @@ static void mic_stream_task(void *arg)
                     ws_connected = false;
                     continue;
                 }
+                static int send_fail_count = 0;
                 int ret = esp_websocket_client_send_bin(
                     ws_client,
                     (const char *)audio_chunk,
@@ -1759,7 +1760,6 @@ static void mic_stream_task(void *arg)
                              ret, (unsigned)esp_get_free_heap_size());
                     // Don't immediately disconnect on single failure — retry next loop
                     // Only disconnect on consecutive failures
-                    static int send_fail_count = 0;
                     send_fail_count++;
                     if (send_fail_count >= 5) {
                         ws_connected = false;
