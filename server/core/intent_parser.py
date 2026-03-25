@@ -400,6 +400,11 @@ class IntentParser:
                 topic = "Proverb"
             return {"intent": "bible_verse", "topic": topic, "confidence": 0.9}
 
+        # Check for blessing playback (recorded voice prayers) before AI prayers
+        blessing_result = self._is_play_blessing(text_lower)
+        if blessing_result:
+            return blessing_result
+
         if self._matches(text_lower, self._prayer_phrases):
             theme = None
             pray_for = None  # specific person to pray for
@@ -597,6 +602,66 @@ class IntentParser:
                 location = match.group(1).strip()
                 if location:
                     return location
+        return None
+
+    def _is_play_blessing(self, text: str) -> Optional[Dict]:
+        """Detect 'play a blessing' / 'play dad's meal blessing' etc."""
+        import re
+
+        # Category mapping — what the user might say → DB category
+        category_map = {
+            "meal": "grace", "mealtime": "grace", "supper": "grace",
+            "dinner": "grace", "lunch": "grace", "breakfast": "grace",
+            "food": "grace", "grace": "grace", "table": "grace",
+            "bedtime": "bedtime", "goodnight": "bedtime", "nighttime": "bedtime",
+            "evening": "bedtime", "sleep": "bedtime", "night": "bedtime",
+            "morning": "morning", "wake up": "morning", "sunrise": "morning",
+            "general": "general", "gratitude": "gratitude", "thanks": "gratitude",
+            "thankful": "gratitude",
+        }
+
+        # Patterns for playing a blessing
+        patterns = [
+            r"play (?:a |the |my )?(?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
+            r"play (?:a |the |my )?(?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?prayer recording",
+            r"play (?:a |the )?(?:(\w+)(?:'s|s))?\s*(?:recorded |voice )?(?:(\w+)\s+)?prayer",
+            r"(?:can you |could you )?play (?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
+            r"let(?:'s| me) hear (?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
+            r"play (?:a |the )?(\w+) blessing",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                groups = match.groups()
+                speaker = None
+                category = None
+
+                for g in groups:
+                    if g:
+                        g_lower = g.lower()
+                        if g_lower in category_map:
+                            category = category_map[g_lower]
+                        elif g_lower not in ("a", "the", "my", "play", "can", "you"):
+                            # Probably a person name
+                            speaker = g
+
+                return {
+                    "intent": "play_blessing",
+                    "speaker": speaker,
+                    "category": category,
+                    "confidence": 0.9,
+                }
+
+        # Simple triggers without regex
+        simple_triggers = [
+            "play a blessing", "play blessing", "play a recorded blessing",
+            "play a voice blessing", "play my blessing",
+            "play a recorded prayer", "play a voice prayer",
+        ]
+        if any(t in text for t in simple_triggers):
+            return {"intent": "play_blessing", "speaker": None, "category": None, "confidence": 0.9}
+
         return None
 
     def _is_found_it(self, text: str) -> bool:

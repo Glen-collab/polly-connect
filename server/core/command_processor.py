@@ -140,6 +140,47 @@ class CommandProcessor:
             self._last_response[device_id] = resp
             return resp
 
+        elif intent == "play_blessing":
+            import random, os
+            speaker_filter = intent_result.get("speaker")
+            category_filter = intent_result.get("category")
+
+            # Get all recordings for this tenant
+            recordings = self.db.get_prayer_recordings(tid)
+            if not recordings:
+                return "No blessings have been recorded yet. You can record one on the prayers page."
+
+            # Filter by speaker if specified
+            if speaker_filter:
+                speaker_lower = speaker_filter.lower()
+                filtered = [r for r in recordings if speaker_lower in (r.get("speaker_name") or "").lower()]
+                if filtered:
+                    recordings = filtered
+
+            # Filter by category if specified
+            if category_filter:
+                filtered = [r for r in recordings if r.get("category") == category_filter]
+                if filtered:
+                    recordings = filtered
+
+            # Pick one
+            rec = random.choice(recordings)
+            audio_file = rec.get("audio_filename")
+            if not audio_file:
+                return "That blessing doesn't have an audio recording."
+
+            speaker = rec.get("speaker_name", "")
+            title = rec.get("title", "a blessing")
+            category = rec.get("category", "blessing")
+
+            # Update play count
+            self.db.update_prayer_recording_played(rec["id"])
+
+            # Return special marker for audio.py to play the WAV file
+            intro = f"{speaker}'s {category} blessing." if speaker else f"A {category} blessing."
+            self._last_response[device_id] = intro
+            return f"__PLAY_PRAYER__{audio_file}__INTRO__{intro}"
+
         elif intent == "retrieve_location":
             location = intent_result.get("location")
             if location:
