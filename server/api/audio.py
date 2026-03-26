@@ -76,7 +76,17 @@ async def continuous_stream(websocket: WebSocket):
     db = app.state.db
     transcriber = app.state.transcriber
     tts = app.state.tts
-    detector = app.state.wake_word_detector
+    # Create a per-connection wake word detector (model has internal state that
+    # gets corrupted when multiple audio streams are interleaved into one instance)
+    from core.wakeword import WakeWordDetector
+    _shared_detector = app.state.wake_word_detector
+    if _shared_detector.ready and _shared_detector.model_path:
+        detector = WakeWordDetector(
+            model_path=_shared_detector.model_path,
+            threshold=_shared_detector.threshold,
+        )
+    else:
+        detector = _shared_detector
     cmd = app.state.cmd
 
     if not detector.ready:
