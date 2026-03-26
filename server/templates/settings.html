@@ -63,11 +63,26 @@
         </svg>
     </button>
     <div id="prefs-body" class="hidden border-t px-4 sm:px-5 pb-4 sm:pb-5 pt-3">
+        {% if has_multiple_devices %}
+        <div class="flex flex-wrap gap-2 mb-4 border-b pb-3">
+            <button type="button" onclick="switchPrefsDevice('')"
+                    id="prefs-tab-all" class="px-3 py-1 rounded-full text-sm font-medium bg-emerald-600 text-white">
+                All Devices
+            </button>
+            {% for dev in devices %}
+            <button type="button" onclick="switchPrefsDevice('{{ dev.device_id }}')"
+                    id="prefs-tab-{{ dev.device_id }}" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">
+                {{ dev.name or dev.device_id }}
+            </button>
+            {% endfor %}
+        </div>
+        {% endif %}
         <form method="POST" action="/web/settings">
             <input type="hidden" name="_section" value="prefs">
+            <input type="hidden" name="device_id" id="prefs-device-id" value="">
             <div class="space-y-3">
                 <label class="flex items-center gap-2">
-                    <input type="checkbox" name="kid_mode" value="1"
+                    <input type="checkbox" name="kid_mode" id="prefs-kid-mode" value="1"
                            {% if user.kid_mode %}checked{% endif %} class="w-5 h-5">
                     <span class="text-sm text-gray-700">Kid Mode (only kid-friendly jokes, no naughty jokes)</span>
                 </label>
@@ -466,7 +481,8 @@ var deviceSettings = {
         chatter_interval: {{ dev.settings.chatter_interval or 45 }},
         squawk_volume: {{ dev.settings.squawk_volume if dev.settings.squawk_volume is not none else 30 }},
         quiet_hours_start: {{ dev.settings.quiet_hours_start if dev.settings.quiet_hours_start is not none else 21 }},
-        quiet_hours_end: {{ dev.settings.quiet_hours_end if dev.settings.quiet_hours_end is not none else 7 }}
+        quiet_hours_end: {{ dev.settings.quiet_hours_end if dev.settings.quiet_hours_end is not none else 7 }},
+        kid_mode: {{ dev.settings.kid_mode if dev.settings.kid_mode is not none else 0 }}
     },
     {% endfor %}
 };
@@ -502,6 +518,22 @@ function switchSoundDevice(deviceId) {
     } else {
         btn.textContent = 'Save Sounds (All Devices)';
     }
+}
+
+function switchPrefsDevice(deviceId) {
+    document.getElementById('prefs-device-id').value = deviceId;
+    // Highlight tab
+    var tabs = document.querySelectorAll('[id^="prefs-tab-"]');
+    tabs.forEach(function(t) {
+        t.className = 'px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200';
+    });
+    var active = document.getElementById('prefs-tab-' + (deviceId || 'all'));
+    if (active) active.className = 'px-3 py-1 rounded-full text-sm font-medium bg-emerald-600 text-white';
+
+    // Load kid_mode for this device
+    var ds = deviceSettings[deviceId] || deviceSettings[''];
+    var kidMode = ds ? ds.kid_mode : {{ user.kid_mode or 0 }};
+    document.getElementById('prefs-kid-mode').checked = !!kidMode;
 }
 {% endif %}
 </script>

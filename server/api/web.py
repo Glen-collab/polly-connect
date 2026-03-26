@@ -1851,6 +1851,13 @@ async def settings_save(request: Request):
                                             quiet_hours_start, quiet_hours_end,
                                             squawk_volume=squawk_volume)
 
+    # Per-device preferences override
+    if target_device and section == "prefs":
+        target_dev = db.get_device(target_device)
+        if target_dev and target_dev.get("tenant_id") == session["tenant_id"]:
+            db.update_device_settings(target_device,
+                                      kid_mode=1 if kid_mode else 0)
+
     # Update live VAD threshold if devices are connected
     detector = getattr(request.app.state, "wake_word_detector", None)
     if detector:
