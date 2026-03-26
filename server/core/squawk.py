@@ -330,15 +330,8 @@ class SquawkManager:
                 # Quiet hours ended naturally — clear override everywhere
                 self._quiet_override.pop(device_id, None)
                 logger.info(f"Quiet override auto-cleared (quiet hours ended) → {device_id}")
-                # Also clear in DB so reconnects don't re-load it
-                try:
-                    if self._db:
-                        conn = self._db._get_connection()
-                        conn.execute("UPDATE user_profiles SET squawk_quiet_override = 0 WHERE tenant_id = (SELECT tenant_id FROM devices WHERE device_id = ? LIMIT 1)", (device_id,))
-                        conn.execute("UPDATE devices SET dev_quiet_override = 0 WHERE device_id = ?", (device_id,))
-                        conn.commit()
-                except Exception:
-                    pass
+                # DB clear handled by settings page, not scheduler
+                pass
 
         return in_quiet
 

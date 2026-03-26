@@ -629,7 +629,7 @@ async def continuous_stream(websocket: WebSocket):
                             last_voice_time = time.monotonic()
                             command_start_time = time.monotonic()
                             await websocket.send_json({"event": "conversation_listening"})
-                    elif await asyncio.to_thread(detector.detected, chunk_int16):
+                    elif detector.detected(chunk_int16):
                         # Ignore triggers during cooldown after response (speaker feedback)
                         if time.monotonic() - last_response_time < RESPONSE_COOLDOWN:
                             continue
