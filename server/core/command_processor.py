@@ -333,9 +333,10 @@ class CommandProcessor:
         # ── Jokes & questions ──
 
         elif intent == "tell_joke":
-            # In kid mode, only serve kid jokes
-            user_profile = self.db.get_or_create_user(tenant_id=tid)
-            if user_profile.get("kid_mode"):
+            # In kid mode, only serve kid jokes (check per-device first)
+            _ds = self.db.get_device_settings(device_id, tid) if device_id else {}
+            _kid = _ds.get("kid_mode") if _ds else self.db.get_or_create_user(tenant_id=tid).get("kid_mode")
+            if _kid:
                 joke = self.data.get_kid_joke()
             else:
                 joke = self.data.get_joke()
@@ -346,9 +347,10 @@ class CommandProcessor:
             return "I'm fresh out of jokes right now!"
 
         elif intent == "tell_naughty_joke":
-            # Check kid mode
-            user_profile = self.db.get_or_create_user(tenant_id=tid)
-            if user_profile.get("kid_mode"):
+            # Check kid mode (per-device first)
+            _ds = self.db.get_device_settings(device_id, tid) if device_id else {}
+            _kid = _ds.get("kid_mode") if _ds else self.db.get_or_create_user(tenant_id=tid).get("kid_mode")
+            if _kid:
                 joke = self.data.get_kid_joke()
                 if joke:
                     resp = f"<speak>How about a kid joke instead? {joke['setup']}<break time=\"2s\"/>{joke['punchline']}</speak>"

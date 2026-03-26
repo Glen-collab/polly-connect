@@ -491,6 +491,7 @@ class PollyDB:
                 "dev_snoozed_until": "ALTER TABLE devices ADD COLUMN dev_snoozed_until TIMESTAMP",
                 "dev_quiet_override": "ALTER TABLE devices ADD COLUMN dev_quiet_override INTEGER",
                 "dev_message_nag": "ALTER TABLE devices ADD COLUMN dev_message_nag INTEGER",
+                "dev_kid_mode": "ALTER TABLE devices ADD COLUMN dev_kid_mode INTEGER",
             }
             for col, sql in device_settings_migrations.items():
                 if col not in cols:
@@ -1139,6 +1140,7 @@ class PollyDB:
                 "message_nag_enabled": _pick("dev_message_nag", "message_nag_enabled", 1) if "message_nag_enabled" in prof else (dev.get("dev_message_nag") if dev.get("dev_message_nag") is not None else 1),
                 "rms_threshold": prof.get("rms_threshold", 200),
                 "voice_volume": prof.get("voice_volume", 100),
+                "kid_mode": dev.get("dev_kid_mode") if dev.get("dev_kid_mode") is not None else prof.get("kid_mode", 0),
             }
         finally:
             if not self._conn:
@@ -1156,6 +1158,7 @@ class PollyDB:
             "squawk_snoozed_until": "dev_snoozed_until",
             "squawk_quiet_override": "dev_quiet_override",
             "message_nag_enabled": "dev_message_nag",
+            "kid_mode": "dev_kid_mode",
         }
         updates = {}
         for k, v in kwargs.items():
