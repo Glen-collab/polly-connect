@@ -1563,11 +1563,15 @@ async def messages_page(request: Request):
     db = request.app.state.db
     messages = db.get_messages_for(tenant_id=session["tenant_id"])
     family_members = db.get_family_members(tenant_id=session["tenant_id"])
+    # Add the owner to the recipient list so family members can message them
+    owner = db.get_or_create_user(tenant_id=session["tenant_id"])
+    owner_name = owner.get("familiar_name") or owner.get("name")
     return templates.TemplateResponse("messages.html", {
         "request": request,
         "session": session,
         "messages": messages,
         "family_members": family_members,
+        "owner_name": owner_name,
     })
 
 
