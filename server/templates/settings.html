@@ -329,8 +329,23 @@ setTimeout(function() {
 <div class="bg-white rounded-lg shadow p-4 sm:p-5 mb-4">
     <h2 class="text-base sm:text-lg font-semibold mb-3">Snooze Polly</h2>
     <p class="text-xs sm:text-sm text-gray-500 mb-3">
-        Temporarily quiet all bird sounds — great for nap time. Polly will still respond to voice commands.
+        Temporarily quiet bird sounds. Polly will still respond to voice commands.
     </p>
+    {% if has_multiple_devices %}
+    <div class="flex flex-wrap gap-2 mb-3 border-b pb-3">
+        <button type="button" onclick="switchSnoozeDevice('')"
+                id="snooze-tab-all" class="px-3 py-1 rounded-full text-sm font-medium bg-emerald-600 text-white">
+            All Devices
+        </button>
+        {% for dev in devices %}
+        <button type="button" onclick="switchSnoozeDevice('{{ dev.device_id }}')"
+                id="snooze-tab-{{ dev.device_id }}" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">
+            {{ dev.name or dev.device_id }}
+        </button>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Status banner -->
     {% if snooze_status == 'snoozed' %}
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
@@ -338,7 +353,7 @@ setTimeout(function() {
     </div>
     {% elif snooze_status == 'quiet_hours' %}
     <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-3">
-        <p class="text-sm text-indigo-800 font-medium">Polly is sleeping (quiet hours: 9 PM – 7 AM)</p>
+        <p class="text-sm text-indigo-800 font-medium">Polly is sleeping (quiet hours)</p>
     </div>
     {% else %}
     <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-3">
@@ -349,6 +364,7 @@ setTimeout(function() {
     <!-- Actions -->
     {% if is_snoozed %}
     <form method="POST" action="/web/settings/squawk-unsnooze">
+        <input type="hidden" name="device_id" class="snooze-device-field" value="">
         <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
             Wake Up Polly
         </button>
@@ -356,14 +372,17 @@ setTimeout(function() {
     {% else %}
     <div class="flex flex-wrap gap-2">
         <form method="POST" action="/web/settings/squawk-snooze">
+            <input type="hidden" name="device_id" class="snooze-device-field" value="">
             <input type="hidden" name="duration" value="30">
             <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 30 min</button>
         </form>
         <form method="POST" action="/web/settings/squawk-snooze">
+            <input type="hidden" name="device_id" class="snooze-device-field" value="">
             <input type="hidden" name="duration" value="60">
             <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 1 hour</button>
         </form>
         <form method="POST" action="/web/settings/squawk-snooze">
+            <input type="hidden" name="device_id" class="snooze-device-field" value="">
             <input type="hidden" name="duration" value="120">
             <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 2 hours</button>
         </form>
@@ -536,6 +555,20 @@ function switchSoundDevice(deviceId) {
     } else {
         btn.textContent = 'Save Sounds (All Devices)';
     }
+}
+
+function switchSnoozeDevice(deviceId) {
+    // Update all snooze form hidden fields
+    document.querySelectorAll('.snooze-device-field').forEach(function(f) {
+        f.value = deviceId;
+    });
+    // Highlight tab
+    var tabs = document.querySelectorAll('[id^="snooze-tab-"]');
+    tabs.forEach(function(t) {
+        t.className = 'px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200';
+    });
+    var active = document.getElementById('snooze-tab-' + (deviceId || 'all'));
+    if (active) active.className = 'px-3 py-1 rounded-full text-sm font-medium bg-emerald-600 text-white';
 }
 
 function switchPrefsDevice(deviceId) {
