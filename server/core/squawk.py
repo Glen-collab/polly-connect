@@ -103,7 +103,8 @@ def _convert_to_16k_mono_from_pcm(wav_bytes: bytes, volume: float) -> bytes:
 
 
 class SquawkManager:
-    def __init__(self, sounds_dir: str):
+    def __init__(self, sounds_dir: str, db=None):
+        self._db = db
         self.squawks: List[bytes] = []       # short squawk WAVs (16kHz mono, default volume)
         self.chatter: List[bytes] = []       # long chatter WAVs (16kHz mono, default volume)
         self.ambient: List[bytes] = []       # ambient bird clips (for button mode only)
@@ -323,10 +324,21 @@ class SquawkManager:
 
         # Handle quiet hours override from "Wake Up Polly"
         if self._quiet_override.get(device_id):
-            if not in_quiet:
-                # Quiet hours ended naturally — clear the override
+            if in_quiet:
+                return False  # Override active, still in quiet hours — stay awake
+            else:
+                # Quiet hours ended naturally — clear override everywhere
                 self._quiet_override.pop(device_id, None)
-            return False  # Override active — not quiet
+                logger.info(f"Quiet override auto-cleared (quiet hours ended) → {device_id}")
+                # Also clear in DB so reconnects don't re-load it
+                try:
+                    if self._db:
+                        conn = self._db._get_connection()
+                        conn.execute("UPDATE user_profiles SET squawk_quiet_override = 0 WHERE tenant_id = (SELECT tenant_id FROM devices WHERE device_id = ? LIMIT 1)", (device_id,))
+                        conn.execute("UPDATE devices SET dev_quiet_override = 0 WHERE device_id = ?", (device_id,))
+                        conn.commit()
+                except Exception:
+                    pass
 
         return in_quiet
 

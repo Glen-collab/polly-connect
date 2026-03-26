@@ -151,7 +151,7 @@ async def lifespan(app: FastAPI):
 
     # Squawk / ambient parrot sounds
     sounds_dir = os.path.join(os.path.dirname(__file__), "static", "sounds")
-    app.state.squawk = SquawkManager(sounds_dir)
+    app.state.squawk = SquawkManager(sounds_dir, db=app.state.db)
 
     # Start medication reminder background task
     await app.state.med_scheduler.start()
