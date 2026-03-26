@@ -1944,6 +1944,7 @@ async def squawk_snooze(request: Request, duration: int = Form(30),
                 conn.close()
         if squawk_mgr:
             squawk_mgr.snooze(device_id, duration)
+        return RedirectResponse(f"/web/settings?snoozed={device_id}", status_code=303)
     else:
         # Tenant-wide snooze (all devices)
         conn = db._get_connection()
@@ -1985,6 +1986,7 @@ async def squawk_unsnooze(request: Request, device_id: str = Form("")):
                                   squawk_quiet_override=1)
         if squawk_mgr:
             squawk_mgr.unsnooze(device_id)
+        return RedirectResponse(f"/web/settings?woke={device_id}", status_code=303)
     else:
         # Tenant-wide unsnooze
         conn = db._get_connection()

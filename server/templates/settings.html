@@ -5,6 +5,21 @@
 <a href="/web/hub/settings" class="text-emerald-600 hover:underline text-sm">&larr; Settings</a>
 <h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 mt-1">Settings</h1>
 
+{% if request.query_params.get('snoozed') or request.query_params.get('woke') %}
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4 text-sm text-emerald-800 font-medium" id="snooze-banner">
+    {% if request.query_params.get('snoozed') %}Snoozed!{% else %}Woke up!{% endif %}
+</div>
+<script>
+setTimeout(function() { var b=document.getElementById('snooze-banner'); if(b){b.style.transition='opacity 0.5s';b.style.opacity='0';setTimeout(function(){b.remove();},500);} }, 3000);
+(function() {
+    var devId = '{{ request.query_params.get("snoozed") or request.query_params.get("woke") }}';
+    if (devId && typeof switchSnoozeDevice === 'function') {
+        switchSnoozeDevice(devId);
+    }
+})();
+</script>
+{% endif %}
+
 {% if request.query_params.get('saved') %}
 <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4 text-sm text-emerald-800 font-medium" id="saved-banner">
     Settings saved!
