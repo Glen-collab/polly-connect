@@ -256,13 +256,29 @@ class BookBuilder:
         outline = self.generate_chapter_outline(speaker, tenant_id=tenant_id)
         ready_chapters = [c for c in outline if c["status"] == "ready"]
 
+        # Get actual page count if available (saved during PDF export)
+        actual_pages = 0
+        if tenant_id:
+            try:
+                conn = self.db._get_connection()
+                row = conn.execute(
+                    "SELECT book_page_count FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                    (tenant_id,)
+                ).fetchone()
+                if row and row[0]:
+                    actual_pages = row[0]
+            except Exception:
+                pass
+
+        est_pages = actual_pages if actual_pages else len(memories) * 2
+
         return {
             "total_memories": len(memories),
             "total_chapters_outlined": len(outline),
             "chapters_ready": len(ready_chapters),
-            "estimated_pages": len(memories) * 2,  # ~2 pages per memory
+            "estimated_pages": est_pages,
             "target_pages": 175,
-            "percent_complete": min(100, int((len(memories) / 90) * 100)) if memories else 0,
+            "percent_complete": min(100, int((est_pages / 175) * 100)) if est_pages else 0,
         }
 
     async def generate_chapter_draft(self, chapter: Dict,
