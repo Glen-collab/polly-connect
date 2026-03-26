@@ -362,15 +362,7 @@ setTimeout(function() {
     </div>
     {% endif %}
 
-    <!-- Actions -->
-    {% if is_snoozed %}
-    <form method="POST" action="/web/settings/squawk-unsnooze">
-        <input type="hidden" name="device_id" class="snooze-device-field" value="">
-        <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
-            Wake Up Polly
-        </button>
-    </form>
-    {% else %}
+    <!-- Actions — always show both snooze and wake -->
     <div class="flex flex-wrap gap-2">
         <form method="POST" action="/web/settings/squawk-snooze">
             <input type="hidden" name="device_id" class="snooze-device-field" value="">
@@ -391,8 +383,11 @@ setTimeout(function() {
             <input type="hidden" name="duration" value="480">
             <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 8 hours</button>
         </form>
+        <form method="POST" action="/web/settings/squawk-unsnooze">
+            <input type="hidden" name="device_id" class="snooze-device-field" value="">
+            <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">Wake Up</button>
+        </form>
     </div>
-    {% endif %}
 </div>
 
 <!-- Family Access Code (always open) -->
