@@ -304,4 +304,4 @@ async def stripe_webhook(request: Request):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG,
-                ws="wsproto", ws_ping_interval=15, ws_ping_timeout=30)
+                ws="wsproto", ws_ping_interval=None, ws_ping_timeout=None)
