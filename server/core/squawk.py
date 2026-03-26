@@ -211,8 +211,8 @@ class SquawkManager:
         self._message_nag_enabled[device_id] = bool(message_nag_enabled)
 
         # Update intervals
-        self._squawk_interval[device_id] = squawk_interval or DEFAULT_SQUAWK_MINUTES
-        self._chatter_interval[device_id] = chatter_interval or DEFAULT_CHATTER_MINUTES
+        self._squawk_interval[device_id] = squawk_interval if squawk_interval is not None else DEFAULT_SQUAWK_MINUTES
+        self._chatter_interval[device_id] = chatter_interval if chatter_interval is not None else DEFAULT_CHATTER_MINUTES
 
         # Only schedule if no existing schedule (don't reset on reconnect!)
         now = time.time()
