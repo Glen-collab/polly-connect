@@ -1748,8 +1748,10 @@ async def settings_save(request: Request):
     section = form.get("_section", "")
     if section == "prefs":
         memory_care_mode = form.get("memory_care_mode", "")
+        kid_mode = form.get("kid_mode", "")
     else:
         memory_care_mode = "1" if user.get("memory_care_mode") else ""
+        kid_mode = "1" if user.get("kid_mode") else ""
     squawk_interval = int(form.get("squawk_interval", user.get("squawk_interval") or 10))
     chatter_interval = int(form.get("chatter_interval", user.get("chatter_interval") or 45))
     quiet_hours_start = int(form.get("quiet_hours_start",
@@ -1803,7 +1805,7 @@ async def settings_save(request: Request):
         conn.execute("""
             UPDATE user_profiles SET name = ?, familiar_name = ?,
             bible_topic_preference = ?, music_genre_preference = ?,
-            memory_care_mode = ?, squawk_interval = ?, chatter_interval = ?,
+            memory_care_mode = ?, kid_mode = ?, squawk_interval = ?, chatter_interval = ?,
             quiet_hours_start = ?, quiet_hours_end = ?,
             location_city = ?, location_lat = ?, location_lon = ?,
             squawk_volume = ?, voice_volume = ?, blessing_volume = ?, rms_threshold = ?,
@@ -1812,7 +1814,7 @@ async def settings_save(request: Request):
             WHERE id = ?
         """, (name, familiar_name or None, bible_topic_preference or None,
               music_genre_preference or None, 1 if memory_care_mode else 0,
-              squawk_interval, chatter_interval,
+              1 if kid_mode else 0, squawk_interval, chatter_interval,
               quiet_hours_start, quiet_hours_end,
               location_city, location_lat, location_lon,
               squawk_volume, voice_volume, blessing_volume, rms_threshold,

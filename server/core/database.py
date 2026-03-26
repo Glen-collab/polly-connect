@@ -416,6 +416,7 @@ class PollyDB:
                 "rms_threshold": "ALTER TABLE user_profiles ADD COLUMN rms_threshold INTEGER DEFAULT 200",
                 "voice_volume": "ALTER TABLE user_profiles ADD COLUMN voice_volume INTEGER DEFAULT 100",
                 "blessing_volume": "ALTER TABLE user_profiles ADD COLUMN blessing_volume INTEGER DEFAULT 80",
+                "kid_mode": "ALTER TABLE user_profiles ADD COLUMN kid_mode INTEGER DEFAULT 0",
                 "nostalgia_profile": "ALTER TABLE user_profiles ADD COLUMN nostalgia_profile TEXT",
                 "hometown": "ALTER TABLE user_profiles ADD COLUMN hometown TEXT",
                 "birth_year": "ALTER TABLE user_profiles ADD COLUMN birth_year INTEGER",
