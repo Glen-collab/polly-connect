@@ -377,32 +377,15 @@ setTimeout(function() {
     </div>
     {% endif %}
 
-    <!-- Actions — always show both snooze and wake -->
+    <!-- Actions — AJAX buttons, no page reload -->
     <div class="flex flex-wrap gap-2">
-        <form method="POST" action="/web/settings/squawk-snooze">
-            <input type="hidden" name="device_id" class="snooze-device-field" value="">
-            <input type="hidden" name="duration" value="30">
-            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 30 min</button>
-        </form>
-        <form method="POST" action="/web/settings/squawk-snooze">
-            <input type="hidden" name="device_id" class="snooze-device-field" value="">
-            <input type="hidden" name="duration" value="60">
-            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 1 hour</button>
-        </form>
-        <form method="POST" action="/web/settings/squawk-snooze">
-            <input type="hidden" name="device_id" class="snooze-device-field" value="">
-            <input type="hidden" name="duration" value="120">
-            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 2 hours</button>
-        </form>
-        <form method="POST" action="/web/settings/squawk-snooze">
-            <input type="hidden" name="duration" value="480">
-            <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 8 hours</button>
-        </form>
-        <form method="POST" action="/web/settings/squawk-unsnooze">
-            <input type="hidden" name="device_id" class="snooze-device-field" value="">
-            <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">Wake Up</button>
-        </form>
+        <button onclick="doSnooze(30)" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 30 min</button>
+        <button onclick="doSnooze(60)" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 1 hour</button>
+        <button onclick="doSnooze(120)" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 2 hours</button>
+        <button onclick="doSnooze(480)" class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 text-sm">Snooze 8 hours</button>
+        <button onclick="doWake()" class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">Wake Up</button>
     </div>
+    <p id="snooze-feedback" class="text-sm font-medium mt-2" style="display:none;"></p>
 </div>
 
 <!-- Family Access Code (always open) -->
@@ -568,18 +551,55 @@ function switchSoundDevice(deviceId) {
     }
 }
 
+var _snoozeDeviceId = '';
+
 function switchSnoozeDevice(deviceId) {
-    // Update all snooze form hidden fields
-    document.querySelectorAll('.snooze-device-field').forEach(function(f) {
-        f.value = deviceId;
-    });
-    // Highlight tab
+    _snoozeDeviceId = deviceId;
     var tabs = document.querySelectorAll('[id^="snooze-tab-"]');
     tabs.forEach(function(t) {
         t.className = 'px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200';
     });
     var active = document.getElementById('snooze-tab-' + (deviceId || 'all'));
     if (active) active.className = 'px-3 py-1 rounded-full text-sm font-medium bg-emerald-600 text-white';
+}
+
+function doSnooze(duration) {
+    var body = new URLSearchParams();
+    body.append('duration', duration);
+    if (_snoozeDeviceId) body.append('device_id', _snoozeDeviceId);
+    fetch('/web/settings/squawk-snooze', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
+        .then(function() {
+            var fb = document.getElementById('snooze-feedback');
+            var label = _snoozeDeviceId ? document.getElementById('snooze-tab-' + _snoozeDeviceId).textContent.trim() : 'All devices';
+            fb.textContent = label + ' snoozed for ' + duration + ' min';
+            fb.className = 'text-sm font-medium mt-2 text-amber-700';
+            fb.style.display = 'block';
+            // Update zzz on tab
+            if (_snoozeDeviceId) {
+                var tab = document.getElementById('snooze-tab-' + _snoozeDeviceId);
+                if (tab && tab.textContent.indexOf('zzz') === -1) tab.innerHTML += ' <span class="text-amber-500">zzz</span>';
+            }
+            setTimeout(function() { fb.style.display = 'none'; }, 3000);
+        });
+}
+
+function doWake() {
+    var body = new URLSearchParams();
+    if (_snoozeDeviceId) body.append('device_id', _snoozeDeviceId);
+    fetch('/web/settings/squawk-unsnooze', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
+        .then(function() {
+            var fb = document.getElementById('snooze-feedback');
+            var label = _snoozeDeviceId ? document.getElementById('snooze-tab-' + _snoozeDeviceId).textContent.replace('zzz','').trim() : 'All devices';
+            fb.textContent = label + ' is awake!';
+            fb.className = 'text-sm font-medium mt-2 text-emerald-700';
+            fb.style.display = 'block';
+            // Remove zzz from tab
+            if (_snoozeDeviceId) {
+                var tab = document.getElementById('snooze-tab-' + _snoozeDeviceId);
+                if (tab) tab.innerHTML = tab.innerHTML.replace(/<span.*?zzz<\/span>/g, '').trim();
+            }
+            setTimeout(function() { fb.style.display = 'none'; }, 3000);
+        });
 }
 
 function switchPrefsDevice(deviceId) {
