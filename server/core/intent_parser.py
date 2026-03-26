@@ -238,8 +238,10 @@ class IntentParser:
             "what did i miss", "anything on the board",
         ]
         self._clear_messages_phrases = [
-            "clear the board", "clear messages", "clear the message board",
-            "delete messages", "erase the board", "wipe the board",
+            "clear the board", "clear messages", "clear message",
+            "clear the message board", "clear the messages",
+            "delete messages", "delete message", "delete the messages",
+            "erase the board", "wipe the board",
             "delete all messages", "clear all messages", "remove all messages",
             "get rid of the messages", "erase messages", "wipe messages",
             "clean the board", "empty the board",
