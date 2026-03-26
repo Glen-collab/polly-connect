@@ -770,10 +770,20 @@ class IntentParser:
 
     def _is_leave_message(self, text: str) -> Optional[Dict]:
         """Detect 'tell dad I'm going to the store' or 'leave a message for mom'."""
+        # Map "my wife/husband/etc" to relationship words the family tree might have
+        relationship_map = {
+            "my wife": "wife", "my husband": "husband",
+            "my mom": "mom", "my mother": "mother", "my dad": "dad", "my father": "father",
+            "my son": "son", "my daughter": "daughter",
+            "my brother": "brother", "my sister": "sister",
+            "my grandma": "grandma", "my grandpa": "grandpa",
+            "my nana": "nana", "my papa": "papa",
+        }
+
         patterns = [
-            r"\b(?:tell|let) (\w+) (?:that |know )?(.+)",
-            r"\bleave (?:a )?message for (\w+)[,:]?\s*(.+)",
-            r"\bmessage for (\w+)[,:]?\s*(.+)",
+            r"\b(?:tell|let) (my \w+|\w+) (?:that |know )?(.+)",
+            r"\bleave (?:a )?message for (my \w+|\w+)[,:]?\s*(.+)",
+            r"\bmessage for (my \w+|\w+)[,:]?\s*(.+)",
         ]
         for pattern in patterns:
             match = re.search(pattern, text)
@@ -783,6 +793,18 @@ class IntentParser:
                 # Filter out non-person phrases like "tell me a joke"
                 if person.lower() in ("me", "us", "everyone", "a"):
                     continue
+                # Resolve "my wife" etc to a name from family tree
+                person_lower = person.lower()
+                if person_lower in relationship_map:
+                    rel = relationship_map[person_lower]
+                    # Look up in family names
+                    for fn in self._family_names:
+                        if fn.lower() == rel:
+                            person = fn
+                            break
+                    else:
+                        # No match in tree — use the relationship word directly
+                        person = rel.title()
                 if message:
                     return {"person": person, "message": message}
         return None
