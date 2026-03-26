@@ -1928,12 +1928,20 @@ async def squawk_snooze(request: Request, duration: int = Form(30),
 
     logger.info(f"Snooze request: duration={duration}, device_id={repr(device_id)}")
     if device_id:
-        # Per-device snooze
+        # Per-device snooze — clear tenant-level so it doesn't interfere
         device = db.get_device(device_id)
         if not device or device.get("tenant_id") != tenant_id:
             return RedirectResponse("/web/settings", status_code=303)
         db.update_device_settings(device_id, squawk_snoozed_until=snoozed_until,
                                   squawk_quiet_override=0)
+        # Clear tenant-level snooze so per-device takes priority
+        conn = db._get_connection()
+        try:
+            conn.execute("UPDATE user_profiles SET squawk_snoozed_until = NULL WHERE tenant_id = ?", (tenant_id,))
+            conn.commit()
+        finally:
+            if not db._conn:
+                conn.close()
         if squawk_mgr:
             squawk_mgr.snooze(device_id, duration)
     else:
@@ -1956,12 +1964,14 @@ async def squawk_snooze(request: Request, duration: int = Form(30),
 
 
 @router.post("/settings/squawk-unsnooze")
-async def squawk_unsnooze(request: Request, device_id: str = Form(None)):
+async def squawk_unsnooze(request: Request, device_id: str = Form("")):
+    device_id = device_id.strip() if device_id else None
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
         return redirect
 
+    logger.info(f"Unsnooze request: device_id={repr(device_id)}")
     tenant_id = session["tenant_id"]
     db = request.app.state.db
     squawk_mgr = getattr(request.app.state, "squawk", None)
