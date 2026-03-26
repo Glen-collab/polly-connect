@@ -1907,7 +1907,10 @@ async def pronunciation_delete(request: Request, pronunciation_id: int = Form(..
 
 @router.post("/settings/squawk-snooze")
 async def squawk_snooze(request: Request, duration: int = Form(30),
-                        device_id: str = Form(None)):
+                        device_id: str = Form("")):
+    # Convert empty string to None for clean logic
+    device_id = device_id.strip() if device_id else None
+    _orig_device_id = device_id  # keep for logging
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -1919,6 +1922,7 @@ async def squawk_snooze(request: Request, duration: int = Form(30),
     squawk_mgr = getattr(request.app.state, "squawk", None)
     snoozed_until = (datetime.utcnow() + timedelta(minutes=duration)).isoformat()
 
+    logger.info(f"Snooze request: duration={duration}, device_id={repr(device_id)}")
     if device_id:
         # Per-device snooze
         device = db.get_device(device_id)
