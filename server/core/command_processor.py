@@ -224,8 +224,9 @@ class CommandProcessor:
             person = intent_result.get("person", "")
             message = intent_result.get("message", "")
             if person and message:
+                speaker = state.speaker_name or self.db.get_owner_name(tenant_id=tid) or "someone"
                 self.db.save_message(
-                    from_name="someone", to_name=person,
+                    from_name=speaker, to_name=person,
                     message=message, tenant_id=tid
                 )
                 resp = f"Got it. I'll let {person} know: {message}."
@@ -291,14 +292,18 @@ class CommandProcessor:
             if messages:
                 parts = []
                 for m in messages[:5]:
-                    name = m['from_name'].title()
+                    name = m['from_name'].title() if m['from_name'] and m['from_name'] != 'someone' else None
                     if m["to_name"]:
-                        # Direct message — read as-is
-                        parts.append(f"{name} says to {m['to_name'].title()}: {m['message']}")
+                        if name:
+                            parts.append(f"{name} says to {m['to_name'].title()}: {m['message']}")
+                        else:
+                            parts.append(f"Message for {m['to_name'].title()}: {m['message']}")
                     else:
-                        # Status update — add natural preposition
-                        msg = self._natural_status(m['message'])
-                        parts.append(f"{name} is {msg}")
+                        if name:
+                            msg = self._natural_status(m['message'])
+                            parts.append(f"{name} is {msg}")
+                        else:
+                            parts.append(m['message'])
                 resp = f"You have {len(messages)} message{'s' if len(messages) > 1 else ''} on the board. " + ". ".join(parts) + "."
                 self._last_response[device_id] = resp
                 return resp
