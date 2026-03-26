@@ -253,18 +253,16 @@ class BookBuilder:
     def get_book_progress(self, speaker: str = None, tenant_id: int = None) -> Dict:
         """Get overall book-building progress stats."""
         memories = self.db.get_memories(speaker=speaker, limit=9999, tenant_id=tenant_id)
-        verified = [m for m in memories if m.get("verification_status") == "verified"]
         outline = self.generate_chapter_outline(speaker, tenant_id=tenant_id)
         ready_chapters = [c for c in outline if c["status"] == "ready"]
 
         return {
             "total_memories": len(memories),
-            "verified_memories": len(verified),
             "total_chapters_outlined": len(outline),
             "chapters_ready": len(ready_chapters),
-            "estimated_pages": len(verified) * 2,  # ~2 pages per memory
+            "estimated_pages": len(memories) * 2,  # ~2 pages per memory
             "target_pages": 175,
-            "percent_complete": min(100, int((len(verified) / 90) * 100)) if verified else 0,
+            "percent_complete": min(100, int((len(memories) / 90) * 100)) if memories else 0,
         }
 
     async def generate_chapter_draft(self, chapter: Dict,
