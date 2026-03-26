@@ -6,9 +6,27 @@
 <h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 mt-1">Settings</h1>
 
 {% if request.query_params.get('saved') %}
-<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4 text-sm text-emerald-800 font-medium">
-    Settings saved successfully!
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4 text-sm text-emerald-800 font-medium" id="saved-banner">
+    Settings saved!
 </div>
+<script>
+// Auto-fade the banner after 3 seconds
+setTimeout(function() {
+    var b = document.getElementById('saved-banner');
+    if (b) { b.style.transition = 'opacity 0.5s'; b.style.opacity = '0'; setTimeout(function(){ b.remove(); }, 500); }
+}, 3000);
+// Auto-open the section that was just saved
+(function() {
+    var saved = '{{ request.query_params.get("saved") }}';
+    var sectionMap = {'sounds': 'sounds', 'prefs': 'prefs', 'voice': 'voice'};
+    if (sectionMap[saved]) {
+        var body = document.getElementById(saved + '-body');
+        var arrow = document.getElementById(saved + '-arrow');
+        if (body) body.classList.remove('hidden');
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+    }
+})();
+</script>
 {% endif %}
 
 <!-- User Profile -->

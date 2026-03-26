@@ -1875,7 +1875,9 @@ async def settings_save(request: Request):
                 state.voice_volume = voice_volume
                 logger.info(f"Voice volume updated to {voice_volume}% for device {dev_id}")
 
-    return RedirectResponse("/web/settings?saved=1", status_code=303)
+    # Redirect back with saved flag + section to keep accordion open
+    section_hash = f"#{section}" if section else ""
+    return RedirectResponse(f"/web/settings?saved={section or '1'}{section_hash}", status_code=303)
 
 
 @router.post("/settings/pronunciation/add")
