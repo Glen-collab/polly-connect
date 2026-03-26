@@ -76,17 +76,16 @@ async def continuous_stream(websocket: WebSocket):
     db = app.state.db
     transcriber = app.state.transcriber
     tts = app.state.tts
-    # Create a per-connection wake word detector (model has internal state that
-    # gets corrupted when multiple audio streams are interleaved into one instance)
+    # Per-device wake word detector (model has internal state that gets corrupted
+    # when multiple audio streams are interleaved). Cache per device_id to avoid
+    # loading a new model on every reconnect (saves ~500MB RAM).
     from core.wakeword import WakeWordDetector
     _shared_detector = app.state.wake_word_detector
-    if _shared_detector.ready and _shared_detector.model_path:
-        detector = WakeWordDetector(
-            model_path=_shared_detector.model_path,
-            threshold=_shared_detector.threshold,
-        )
-    else:
-        detector = _shared_detector
+    if not hasattr(app.state, '_device_detectors'):
+        app.state._device_detectors = {}
+    # device_id not known yet — will be set after connect message. Use shared for now,
+    # swap to per-device after we know the device_id.
+    detector = _shared_detector
     cmd = app.state.cmd
 
     if not detector.ready:
@@ -188,6 +187,19 @@ async def continuous_stream(websocket: WebSocket):
                             db.update_device_firmware_info(db_device_id, fw_version, fw_variant)
                             logger.info(f"Device {device_id} firmware: v{fw_version} ({fw_variant})")
                         logger.info(f"Continuous stream device: {device_id} (tenant={device_info['tenant_id']})")
+
+                        # Swap to per-device wake word detector (cached, reused on reconnect)
+                        if _shared_detector.ready and _shared_detector.model_path:
+                            if device_id not in app.state._device_detectors:
+                                app.state._device_detectors[device_id] = WakeWordDetector(
+                                    model_path=_shared_detector.model_path,
+                                    threshold=_shared_detector.threshold,
+                                )
+                                logger.info(f"Created wake word detector for {device_id}")
+                            else:
+                                app.state._device_detectors[device_id].reset()
+                            detector = app.state._device_detectors[device_id]
+
                         # Load voice volume + default speaker from user profile
                         try:
                             user_profile = db.get_or_create_user(tenant_id=tenant_id)
@@ -209,6 +221,17 @@ async def continuous_stream(websocket: WebSocket):
                         conv_state.reset()
                         conv_state.tenant_id = 1
                         logger.info(f"Continuous stream device: {device_id} (global key, tenant=1)")
+
+                        # Swap to per-device wake word detector
+                        if _shared_detector.ready and _shared_detector.model_path:
+                            if device_id not in app.state._device_detectors:
+                                app.state._device_detectors[device_id] = WakeWordDetector(
+                                    model_path=_shared_detector.model_path,
+                                    threshold=_shared_detector.threshold,
+                                )
+                            else:
+                                app.state._device_detectors[device_id].reset()
+                            detector = app.state._device_detectors[device_id]
 
                     # Register for medication reminders
                     if med_scheduler:
