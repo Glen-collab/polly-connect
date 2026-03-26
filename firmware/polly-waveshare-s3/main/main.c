@@ -1355,24 +1355,8 @@ static void wifi_provision_init(void)
         wifi_cred_t creds[WIFI_MAX_SAVED] = {0};
         int count = wifi_nvs_load_all(creds, WIFI_MAX_SAVED);
 
-        // Always include hardcoded home network as fallback
-        bool have_hardcoded = false;
-        for (int i = 0; i < count; i++) {
-            if (strcmp(creds[i].ssid, WIFI_SSID) == 0) { have_hardcoded = true; break; }
-        }
-        if (!have_hardcoded && count < WIFI_MAX_SAVED) {
-            strncpy(creds[count].ssid, WIFI_SSID, sizeof(creds[count].ssid) - 1);
-            strncpy(creds[count].pass, WIFI_PASSWORD, sizeof(creds[count].pass) - 1);
-            count++;
-        }
-
-        if (wifi_try_saved_networks(creds, count)) {
-            // Save hardcoded if it was the one that connected (ensures it's in NVS)
-            wifi_config_t current = {0};
-            esp_wifi_get_config(WIFI_IF_STA, &current);
-            if (strcmp((char *)current.sta.ssid, WIFI_SSID) == 0) {
-                wifi_nvs_save(WIFI_SSID, WIFI_PASSWORD);
-            }
+        // Try saved networks only (no hardcoded fallback — forces captive portal on fresh devices)
+        if (count > 0 && wifi_try_saved_networks(creds, count)) {
 
             // WiFi connected — provision device if needed
             if (!device_provisioned) {
