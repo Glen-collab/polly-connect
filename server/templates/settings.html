@@ -519,7 +519,36 @@ var deviceSettings = {
     {% endfor %}
 };
 
+var _currentSoundDevice = '';
+
+function _saveSoundSettings(devId) {
+    // Save current form values to deviceSettings cache AND to server via AJAX
+    var s = deviceSettings[devId] || deviceSettings[''];
+    s.squawk_interval = parseInt(document.getElementById('sounds-squawk-interval').value);
+    s.chatter_interval = parseInt(document.getElementById('sounds-chatter-interval').value);
+    s.squawk_volume = parseInt(document.getElementById('sounds-squawk-volume').value);
+    s.quiet_hours_start = parseInt(document.getElementById('sounds-quiet-start').value);
+    s.quiet_hours_end = parseInt(document.getElementById('sounds-quiet-end').value);
+
+    // Auto-save to server
+    var body = new URLSearchParams();
+    body.append('_section', 'sounds');
+    body.append('squawk_interval', s.squawk_interval);
+    body.append('chatter_interval', s.chatter_interval);
+    body.append('squawk_volume', s.squawk_volume);
+    body.append('quiet_hours_start', s.quiet_hours_start);
+    body.append('quiet_hours_end', s.quiet_hours_end);
+    if (devId) body.append('device_id', devId);
+    fetch('/web/settings', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
+}
+
 function switchSoundDevice(deviceId) {
+    // Auto-save current device before switching
+    if (_currentSoundDevice !== deviceId) {
+        _saveSoundSettings(_currentSoundDevice);
+    }
+    _currentSoundDevice = deviceId;
+
     // Update hidden field
     document.getElementById('sounds-device-id').value = deviceId;
 
