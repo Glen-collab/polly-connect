@@ -60,6 +60,12 @@
                 <p class="font-semibold text-gray-800">{{ photo.location }}</p>
                 <p class="text-xs text-gray-500">{{ photo.item_count }} item{{ 's' if photo.item_count != 1 else '' }} indexed &middot; {{ photo.created_at }}</p>
                 <p class="text-xs text-gray-400 mt-1 truncate">{{ photo.description }}</p>
+                {% if session.role != 'family' %}
+                <form method="POST" action="/web/memory/photo-index/{{ photo.id }}/delete" class="mt-2"
+                      onsubmit="return confirm('Delete this indexed photo?')">
+                    <button type="submit" class="text-xs text-red-400 hover:text-red-600">Delete</button>
+                </form>
+                {% endif %}
             </div>
         </div>
     </div>

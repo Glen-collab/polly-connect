@@ -995,6 +995,8 @@ async def memory_photo_index_upload(request: Request,
         )
         raw = resp.choices[0].message.content or ""
         description = raw
+        import logging
+        logging.getLogger(__name__).info(f"Photo index GPT response: {raw[:500]}")
 
         # Parse items from GPT response
         for line in raw.split("\n"):
@@ -1046,6 +1048,33 @@ async def memory_photo_index_upload(request: Request,
         "result": {"item_count": len(indexed_items), "item_list": indexed_items},
         "error": None,
     })
+
+
+@router.post("/memory/photo-index/{photo_id}/delete")
+async def memory_photo_index_delete(request: Request, photo_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    conn = db._get_connection()
+    try:
+        # Get filename to delete from disk
+        row = conn.execute(
+            "SELECT filename FROM photo_indexes WHERE id = ? AND tenant_id = ?",
+            (photo_id, tid)
+        ).fetchone()
+        if row:
+            filepath = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads", row[0])
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            conn.execute("DELETE FROM photo_indexes WHERE id = ? AND tenant_id = ?", (photo_id, tid))
+            conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    return RedirectResponse("/web/memory/photo-index", status_code=303)
 
 
 @router.get("/stories", response_class=HTMLResponse)
