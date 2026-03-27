@@ -966,7 +966,8 @@ async def memory_photo_index_upload(request: Request,
     # Send to GPT-4 Vision to identify items
     import base64
     b64 = base64.b64encode(photo_data).decode()
-    content_type = photo.content_type or "image/jpeg"
+    # Force image/jpeg for phone camera uploads (some send octet-stream)
+    content_type = "image/jpeg"
 
     indexed_items = []
     description = ""
@@ -974,7 +975,7 @@ async def memory_photo_index_upload(request: Request,
         import openai
         client = openai.OpenAI()
         resp = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-2024-11-20",
             messages=[{
                 "role": "user",
                 "content": [
