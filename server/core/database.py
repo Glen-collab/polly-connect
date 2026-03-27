@@ -547,6 +547,7 @@ class PollyDB:
                 "deceased_year": "ALTER TABLE family_members ADD COLUMN deceased_year INTEGER",
                 "access_code": "ALTER TABLE family_members ADD COLUMN access_code TEXT",
                 "code_created_at": "ALTER TABLE family_members ADD COLUMN code_created_at TIMESTAMP",
+                "is_minor": "ALTER TABLE family_members ADD COLUMN is_minor INTEGER DEFAULT 0",
             }
             for col, sql in fm_ext.items():
                 if col not in cols:
@@ -1798,7 +1799,8 @@ class PollyDB:
                              deceased: int = None, spouse_name: str = None,
                              bio: str = None, added_by: str = None,
                              birth_year: int = None,
-                             deceased_year: int = None) -> bool:
+                             deceased_year: int = None,
+                             is_minor: int = None) -> bool:
         conn = self._get_connection()
         try:
             updates = []
@@ -1838,6 +1840,9 @@ class PollyDB:
             if deceased_year is not None:
                 updates.append("deceased_year = ?")
                 params.append(deceased_year if deceased_year > 0 else None)
+            if is_minor is not None:
+                updates.append("is_minor = ?")
+                params.append(is_minor)
             if not updates:
                 return False
             params.append(member_id)

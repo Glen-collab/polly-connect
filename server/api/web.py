@@ -1056,7 +1056,9 @@ async def stories_list(request: Request):
         return redirect
 
     db = request.app.state.db
-    stories = db.get_stories(limit=50, tenant_id=session["tenant_id"], verified_only=False)
+    # Family role only sees verified stories; owner/caretaker sees all for management
+    verified_filter = session.get("role") == "family"
+    stories = db.get_stories(limit=50, tenant_id=session["tenant_id"], verified_only=verified_filter)
     return templates.TemplateResponse("stories.html", {
         "request": request,
         "session": session,
@@ -2853,7 +2855,8 @@ async def family_tree_add(request: Request,
                            bio: str = Form(""),
                            deceased: str = Form(""),
                            birth_year: str = Form(""),
-                           deceased_year: str = Form("")):
+                           deceased_year: str = Form(""),
+                           is_minor: str = Form("")):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -2892,6 +2895,7 @@ async def family_tree_add(request: Request,
         added_by=added_by_name,
         birth_year=by or 0,
         deceased_year=dy or 0,
+        is_minor=1 if is_minor else 0,
     )
 
     return RedirectResponse("/web/family-tree", status_code=303)
@@ -2906,7 +2910,8 @@ async def family_tree_edit(request: Request, member_id: int,
                             bio: str = Form(""),
                             deceased: str = Form(""),
                             birth_year: str = Form(""),
-                            deceased_year: str = Form("")):
+                            deceased_year: str = Form(""),
+                            is_minor: str = Form("")):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -2946,6 +2951,7 @@ async def family_tree_edit(request: Request, member_id: int,
         deceased=1 if deceased else 0,
         birth_year=by or 0,
         deceased_year=dy or 0,
+        is_minor=1 if is_minor else 0,
     )
 
     return RedirectResponse("/web/family-tree", status_code=303)

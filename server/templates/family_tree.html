@@ -66,6 +66,12 @@
             </div>
             <div class="flex items-end pb-1">
                 <label class="flex items-center gap-2 text-sm text-gray-600">
+                    <input type="checkbox" name="is_minor" value="1" class="rounded">
+                    Minor (under 18)
+                </label>
+            </div>
+            <div class="flex items-end pb-1">
+                <label class="flex items-center gap-2 text-sm text-gray-600">
                     <input type="checkbox" name="deceased" value="1" class="rounded" onchange="this.closest('.grid').querySelector('[name=deceased_year]').closest('div').classList.toggle('hidden', !this.checked)">
                     Deceased
                 </label>
@@ -106,7 +112,7 @@
                  onclick="showPhotos({{ m.id }})">
                 <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}</p>
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
-                {% if m.bio %}
+                {% if m.bio and not (session.role == 'family' and m.is_minor) %}
                 <p class="text-xs text-gray-400 mt-0.5 truncate">{{ m.bio[:30] }}{% if m.bio|length > 30 %}...{% endif %}</p>
                 {% endif %}
                 {% if session.role == 'family' and not session.family_member_id and not m.access_code and not m.deceased %}
@@ -223,6 +229,12 @@
                 </div>
                 <div>
                     <label class="flex items-center gap-2 text-sm text-gray-600">
+                        <input type="checkbox" name="is_minor" id="edit-is-minor" value="1" class="rounded">
+                        Minor (under 18)
+                    </label>
+                </div>
+                <div>
+                    <label class="flex items-center gap-2 text-sm text-gray-600">
                         <input type="checkbox" name="deceased" id="edit-deceased" value="1" class="rounded"
                                onchange="document.getElementById('edit-deceased-year-row').classList.toggle('hidden', !this.checked)">
                         Deceased
@@ -249,7 +261,7 @@ var userRole = "{{ session.role or 'owner' }}";
 var userName = "{{ session.name or '' }}";
 var memberData = {
 {% for m in members %}
-{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}", birth_year: {{ m.birth_year or 0 }}, deceased_year: {{ m.deceased_year or 0 }}, parent_name: "{% for p in members %}{% if p.id == m.parent_member_id %}{{ p.name | replace('"', '\\"') }}{% endif %}{% endfor %}" },
+{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, is_minor: {{ m.is_minor or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}", birth_year: {{ m.birth_year or 0 }}, deceased_year: {{ m.deceased_year or 0 }}, parent_name: "{% for p in members %}{% if p.id == m.parent_member_id %}{{ p.name | replace('"', '\\"') }}{% endif %}{% endfor %}" },
 {% endfor %}
 };
 
@@ -268,6 +280,7 @@ function editMember(id) {
     document.getElementById('edit-spouse').value = m.spouse;
     document.getElementById('edit-birth-year').value = m.birth_year > 0 ? m.birth_year : '';
     document.getElementById('edit-bio').value = m.bio;
+    document.getElementById('edit-is-minor').checked = m.is_minor == 1;
     document.getElementById('edit-deceased').checked = m.deceased == 1;
     document.getElementById('edit-deceased-year').value = m.deceased_year > 0 ? m.deceased_year : '';
     document.getElementById('edit-deceased-year-row').classList.toggle('hidden', m.deceased != 1);
@@ -301,17 +314,23 @@ function showPhotos(memberId) {
         var html = '';
 
         // Bio & details section
+        // If family role viewing a minor, hide birth year and bio
+        var isFamily = userRole === 'family';
+        var hideDetails = isFamily && m && m.is_minor;
         if (m) {
             var details = [];
-            if (m.spouse) details.push('Married to ' + m.spouse);
-            if (m.birth_year > 0 && m.deceased_year > 0) details.push(m.birth_year + ' – ' + m.deceased_year);
-            else if (m.birth_year > 0) details.push('Born ' + m.birth_year);
-            else if (m.deceased_year > 0) details.push('Passed ' + m.deceased_year);
+            if (!hideDetails) {
+                if (m.spouse) details.push('Married to ' + m.spouse);
+                if (m.birth_year > 0 && m.deceased_year > 0) details.push(m.birth_year + ' – ' + m.deceased_year);
+                else if (m.birth_year > 0) details.push('Born ' + m.birth_year);
+                else if (m.deceased_year > 0) details.push('Passed ' + m.deceased_year);
+            }
             if (m.parent_name) details.push('Via ' + m.parent_name);
 
-            if (m.bio || details.length > 0) {
+            var bioText = hideDetails ? '' : m.bio;
+            if (bioText || details.length > 0) {
                 html += '<div class="bg-gray-50 rounded-lg p-3 mb-4">';
-                if (m.bio) html += '<p class="text-sm text-gray-700">' + m.bio + '</p>';
+                if (bioText) html += '<p class="text-sm text-gray-700">' + bioText + '</p>';
                 if (details.length > 0) html += '<p class="text-xs text-gray-500 mt-1">' + details.join(' · ') + '</p>';
                 html += '</div>';
             }
