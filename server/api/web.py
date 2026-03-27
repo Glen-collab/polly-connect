@@ -1043,7 +1043,7 @@ async def memory_photo_index_upload(request: Request,
         "request": request,
         "session": session,
         "indexed_photos": indexed_photos,
-        "result": {"item_count": len(indexed_items), "items": indexed_items},
+        "result": {"item_count": len(indexed_items), "item_list": indexed_items},
         "error": None,
     })
 

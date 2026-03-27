@@ -11,9 +11,9 @@
 {% if result %}
 <div class="bg-emerald-50 border border-emerald-300 rounded-lg p-4 mb-6 max-w-lg mx-auto">
     <h3 class="font-bold text-emerald-800 mb-2">Indexed {{ result.item_count }} item{{ 's' if result.item_count != 1 else '' }} from photo</h3>
-    {% if result.items %}
+    {% if result.item_list %}
     <ul class="text-sm text-emerald-700 space-y-1">
-        {% for it in result.items %}
+        {% for it in result.item_list %}
         <li>&bull; <span class="font-medium">{{ it.item }}</span> &mdash; {{ it.location }}</li>
         {% endfor %}
     </ul>
