@@ -243,9 +243,10 @@ setTimeout(function() {
                     </select>
                 </div>
             </div>
-            <button type="submit" id="sounds-save-btn" class="mt-4 bg-emerald-600 text-white px-5 py-2 rounded hover:bg-emerald-700 text-sm font-medium">
+            <button type="button" id="sounds-save-btn" onclick="saveAllSounds()" class="mt-4 bg-emerald-600 text-white px-5 py-2 rounded hover:bg-emerald-700 text-sm font-medium">
                 Save Sounds
             </button>
+            <span id="sounds-save-feedback" class="ml-2 text-sm font-medium" style="display:none;"></span>
         </form>
     </div>
 </div>
@@ -583,6 +584,15 @@ function switchSoundDevice(deviceId) {
     document.getElementById('vol-label').textContent = s.squawk_volume + '%';
     document.getElementById('sounds-quiet-start').value = s.quiet_hours_start;
     document.getElementById('sounds-quiet-end').value = s.quiet_hours_end;
+
+function saveAllSounds() {
+    _saveSoundSettings(_currentSoundDevice);
+    var fb = document.getElementById('sounds-save-feedback');
+    fb.textContent = 'Saved!';
+    fb.className = 'ml-2 text-sm font-medium text-emerald-700';
+    fb.style.display = 'inline';
+    setTimeout(function() { fb.style.display = 'none'; }, 3000);
+}
 
     // Update save button label
     var btn = document.getElementById('sounds-save-btn');
