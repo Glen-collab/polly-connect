@@ -586,22 +586,38 @@ function switchSoundDevice(deviceId) {
     document.getElementById('sounds-quiet-end').value = s.quiet_hours_end;
 
 function saveAllSounds() {
-    _saveSoundSettings(_currentSoundDevice);
+    // First save current form values to the current device's cache
+    var s = deviceSettings[_currentSoundDevice] || deviceSettings[''];
+    s.squawk_interval = parseInt(document.getElementById('sounds-squawk-interval').value);
+    s.chatter_interval = parseInt(document.getElementById('sounds-chatter-interval').value);
+    s.squawk_volume = parseInt(document.getElementById('sounds-squawk-volume').value);
+    s.quiet_hours_start = parseInt(document.getElementById('sounds-quiet-start').value);
+    s.quiet_hours_end = parseInt(document.getElementById('sounds-quiet-end').value);
+
+    // Save EVERY device that has settings
+    var saves = 0;
+    for (var devId in deviceSettings) {
+        var ds = deviceSettings[devId];
+        var body = new URLSearchParams();
+        body.append('_section', 'sounds');
+        body.append('squawk_interval', ds.squawk_interval);
+        body.append('chatter_interval', ds.chatter_interval);
+        body.append('squawk_volume', ds.squawk_volume);
+        body.append('quiet_hours_start', ds.quiet_hours_start);
+        body.append('quiet_hours_end', ds.quiet_hours_end);
+        if (devId) body.append('device_id', devId);
+        fetch('/web/settings', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
+        saves++;
+    }
     var fb = document.getElementById('sounds-save-feedback');
-    fb.textContent = 'Saved!';
+    fb.textContent = 'All saved!';
     fb.className = 'ml-2 text-sm font-medium text-emerald-700';
     fb.style.display = 'inline';
     setTimeout(function() { fb.style.display = 'none'; }, 3000);
 }
 
-    // Update save button label
-    var btn = document.getElementById('sounds-save-btn');
-    if (deviceId) {
-        var tabEl = document.getElementById('sound-tab-' + deviceId);
-        btn.textContent = 'Save for ' + (tabEl ? tabEl.textContent.trim() : 'Device');
-    } else {
-        btn.textContent = 'Save Sounds (All Devices)';
-    }
+    // Button always says Save — saves everything
+    document.getElementById('sounds-save-btn').textContent = 'Save';
 }
 
 var _snoozeDeviceId = '';
