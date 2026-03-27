@@ -979,11 +979,12 @@ async def memory_photo_index_upload(request: Request,
                 "role": "user",
                 "content": [
                     {"type": "text", "text": (
-                        f"This is a photo of: {location.strip()}. "
-                        "List every identifiable item you can see and its specific location within the photo. "
-                        "Format each item on its own line as: ITEM: item name | LOCATION: where in the space "
+                        f"You are a helpful home inventory assistant. This is a photo of: {location.strip()}. "
+                        "Please list every visible physical object/item and where it is in the space. "
+                        "You MUST format each item on its own line exactly as: ITEM: item name | LOCATION: position "
                         "(e.g. 'ITEM: cordless drill | LOCATION: top shelf left side'). "
-                        "Be specific about positions. Only list physical items, not the space itself."
+                        "Be specific about positions. List items only, not the room/space itself. "
+                        "If the image is unclear, do your best to identify what you can see."
                     )},
                     {"type": "image_url", "image_url": {
                         "url": f"data:{content_type};base64,{b64}",
