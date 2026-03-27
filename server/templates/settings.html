@@ -500,16 +500,16 @@ function toggleSection(id) {
 // Per-device settings data
 var deviceSettings = {
     '': {
-        squawk_interval: {{ user.squawk_interval or 10 }},
-        chatter_interval: {{ user.chatter_interval or 45 }},
+        squawk_interval: {{ user.squawk_interval if user.squawk_interval is not none else 10 }},
+        chatter_interval: {{ user.chatter_interval if user.chatter_interval is not none else 45 }},
         squawk_volume: {{ user.squawk_volume if user.squawk_volume is not none else 30 }},
         quiet_hours_start: {{ user.quiet_hours_start if user.quiet_hours_start is not none else 21 }},
         quiet_hours_end: {{ user.quiet_hours_end if user.quiet_hours_end is not none else 7 }}
     },
     {% for dev in devices %}
     '{{ dev.device_id }}': {
-        squawk_interval: {{ dev.settings.squawk_interval or 10 }},
-        chatter_interval: {{ dev.settings.chatter_interval or 45 }},
+        squawk_interval: {{ dev.settings.squawk_interval if dev.settings.squawk_interval is not none else 10 }},
+        chatter_interval: {{ dev.settings.chatter_interval if dev.settings.chatter_interval is not none else 45 }},
         squawk_volume: {{ dev.settings.squawk_volume if dev.settings.squawk_volume is not none else 30 }},
         quiet_hours_start: {{ dev.settings.quiet_hours_start if dev.settings.quiet_hours_start is not none else 21 }},
         quiet_hours_end: {{ dev.settings.quiet_hours_end if dev.settings.quiet_hours_end is not none else 7 }},
