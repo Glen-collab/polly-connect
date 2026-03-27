@@ -559,6 +559,10 @@ function switchSoundDevice(deviceId) {
     document.getElementById('sounds-quiet-start').value = s.quiet_hours_start;
     document.getElementById('sounds-quiet-end').value = s.quiet_hours_end;
 
+    // Button always says Save
+    document.getElementById('sounds-save-btn').textContent = 'Save';
+}
+
 function saveAllSounds() {
     // Cache whatever is on screen right now
     _cacheCurrentForm();
@@ -588,10 +592,6 @@ function saveAllSounds() {
     fb.className = 'ml-2 text-sm font-medium text-emerald-700';
     fb.style.display = 'inline';
     setTimeout(function() { fb.style.display = 'none'; }, 3000);
-}
-
-    // Button always says Save — saves everything
-    document.getElementById('sounds-save-btn').textContent = 'Save';
 }
 
 var _snoozeDeviceId = '';
