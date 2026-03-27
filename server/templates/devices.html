@@ -38,15 +38,19 @@
 {% if not session.is_admin %}
 <div class="bg-white rounded-lg shadow-md p-4 mb-6">
     <h2 class="text-lg font-semibold mb-2">Claim a Device</h2>
-    <p class="text-sm text-gray-500 mb-3">Enter the 6-digit code from the sticker on your Polly device.</p>
-    <form method="POST" action="/web/devices/claim" class="flex flex-col sm:flex-row gap-3">
-        <input type="text" name="claim_code" required
-               inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-               placeholder="000000"
-               class="flex-1 border rounded-lg px-4 py-3 text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-               style="max-width: 200px;">
+    <p class="text-sm text-gray-500 mb-3">Enter the 6-digit code from the card that came with your Polly device.</p>
+    <form method="POST" action="/web/devices/claim" class="flex flex-col gap-3">
+        <div class="flex flex-col sm:flex-row gap-3">
+            <input type="text" name="claim_code" required
+                   inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                   placeholder="000000"
+                   class="border rounded-lg px-4 py-3 text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                   style="max-width: 200px;">
+            <input type="text" name="device_name" placeholder="Name your Polly (e.g. Grandma's Polly)"
+                   class="flex-1 border rounded-lg px-3 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+        </div>
         <button type="submit"
-                class="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 font-medium whitespace-nowrap">
+                class="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 font-medium whitespace-nowrap w-full sm:w-auto">
             Claim Device
         </button>
     </form>
@@ -58,7 +62,7 @@
 <div class="bg-white rounded-lg shadow-md p-4 mb-6">
     <h2 class="text-lg font-semibold mb-3">Add New Device</h2>
     <form method="POST" action="/web/devices/add" class="flex flex-col sm:flex-row gap-3">
-        <input type="text" name="device_name" required placeholder="Device name (e.g. Grandma's Polly)"
+        <input type="text" name="device_name" placeholder="Name (optional — auto-generated if blank)"
                class="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
         <button type="submit"
                 class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium whitespace-nowrap">

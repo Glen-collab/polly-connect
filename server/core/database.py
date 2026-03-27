@@ -1234,8 +1234,8 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def claim_device(self, claim_code: str, new_tenant_id: int) -> Optional[Dict]:
-        """Claim a device by its 6-digit code. Transfers to new tenant."""
+    def claim_device(self, claim_code: str, new_tenant_id: int, device_name: str = None) -> Optional[Dict]:
+        """Claim a device by its 6-digit code. Transfers to new tenant. Optionally rename."""
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
@@ -1245,11 +1245,18 @@ class PollyDB:
             ).fetchone()
             if not device:
                 return None
-            conn.execute("""
-                UPDATE devices SET tenant_id = ?, claimed_at = CURRENT_TIMESTAMP,
-                claim_code = NULL
-                WHERE device_id = ?
-            """, (new_tenant_id, device["device_id"]))
+            if device_name:
+                conn.execute("""
+                    UPDATE devices SET tenant_id = ?, claimed_at = CURRENT_TIMESTAMP,
+                    claim_code = NULL, name = ?
+                    WHERE device_id = ?
+                """, (new_tenant_id, device_name, device["device_id"]))
+            else:
+                conn.execute("""
+                    UPDATE devices SET tenant_id = ?, claimed_at = CURRENT_TIMESTAMP,
+                    claim_code = NULL
+                    WHERE device_id = ?
+                """, (new_tenant_id, device["device_id"]))
             conn.commit()
             result = conn.execute(
                 "SELECT * FROM devices WHERE device_id = ?", (device["device_id"],)

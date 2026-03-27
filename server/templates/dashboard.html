@@ -35,12 +35,17 @@
         <p class="text-xs text-red-700">{{ claim_error }}</p>
     </div>
     {% endif %}
-    <form method="POST" action="/web/devices/claim" class="flex gap-3">
-        <input type="text" name="claim_code" required maxlength="6" pattern="[0-9]{6}"
-               placeholder="000000" inputmode="numeric"
-               class="flex-1 min-w-0 border-2 border-amber-300 rounded-lg px-3 py-2 text-center text-lg font-mono font-bold tracking-widest focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+    <form method="POST" action="/web/devices/claim" class="flex flex-col gap-3">
+        <div class="flex gap-3">
+            <input type="text" name="claim_code" required maxlength="6" pattern="[0-9]{6}"
+                   placeholder="000000" inputmode="numeric"
+                   class="border-2 border-amber-300 rounded-lg px-3 py-2 text-center text-lg font-mono font-bold tracking-widest focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                   style="max-width: 160px;">
+            <input type="text" name="device_name" placeholder="Name your Polly"
+                   class="flex-1 min-w-0 border-2 border-amber-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+        </div>
         <button type="submit"
-                class="bg-amber-500 text-white px-5 py-2 rounded-lg hover:bg-amber-600 font-medium text-sm whitespace-nowrap">
+                class="bg-amber-500 text-white px-5 py-2 rounded-lg hover:bg-amber-600 font-medium text-sm whitespace-nowrap w-full sm:w-auto">
             Claim Device
         </button>
     </form>

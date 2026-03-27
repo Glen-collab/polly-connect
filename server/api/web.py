@@ -629,8 +629,9 @@ async def welcome_save(request: Request):
 
     # Claim device if code provided
     claim_code = form.get("claim_code", "").strip()
+    claim_name = form.get("device_name", "").strip()
     if claim_code and len(claim_code) == 6 and claim_code.isdigit():
-        device = db.claim_device(claim_code, tid)
+        device = db.claim_device(claim_code, tid, device_name=claim_name or None)
         if not device:
             # Code invalid — still save profile but show error on dashboard
             return RedirectResponse("/web/dashboard?claim_error=Invalid+or+already+claimed+code", status_code=303)
@@ -3493,7 +3494,7 @@ async def devices_page(request: Request):
 
 
 @router.post("/devices/add")
-async def device_add(request: Request, device_name: str = Form(...)):
+async def device_add(request: Request, device_name: str = Form("")):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -3506,12 +3507,17 @@ async def device_add(request: Request, device_name: str = Form(...)):
     device_id = f"polly-{uuid.uuid4().hex[:8]}"
     api_key = generate_api_key()
 
+    # Auto-generate name if not provided (admin flow)
+    name = device_name.strip() if device_name else ""
+    if not name:
+        name = f"Polly-{device_id[-4:]}"
+
     if session.get("is_admin"):
         # Admin-created devices are unassigned until customer claims
-        db.register_device(device_id, None, name=device_name, api_key=api_key)
+        db.register_device(device_id, None, name=name, api_key=api_key)
         claim_code = db.generate_claim_code(device_id)
     else:
-        db.register_device(device_id, tid, name=device_name, api_key=api_key)
+        db.register_device(device_id, tid, name=name, api_key=api_key)
         claim_code = None
 
     redirect_url = f"/web/devices?new_device_id={device_id}"
@@ -3566,7 +3572,8 @@ async def device_delete(request: Request, device_id: str):
 
 
 @router.post("/devices/claim")
-async def device_claim(request: Request, claim_code: str = Form(...)):
+async def device_claim(request: Request, claim_code: str = Form(...),
+                       device_name: str = Form("")):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -3575,6 +3582,7 @@ async def device_claim(request: Request, claim_code: str = Form(...)):
     db = request.app.state.db
     tid = session["tenant_id"]
     code = claim_code.strip()
+    custom_name = device_name.strip() if device_name else ""
 
     # Detect if claim came from dashboard vs devices page
     referer = request.headers.get("referer", "")
@@ -3596,7 +3604,7 @@ async def device_claim(request: Request, claim_code: str = Form(...)):
             f"{redirect_base}?claim_error=Device+limit+reached+({limits['max_devices']}+for+{sub['tier']}+plan).+Upgrade+to+add+more.",
             status_code=303)
 
-    device = db.claim_device(code, tid)
+    device = db.claim_device(code, tid, device_name=custom_name or None)
     if not device:
         return RedirectResponse(
             f"{redirect_base}?claim_error=Invalid+or+already+claimed+code",

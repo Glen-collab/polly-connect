@@ -59,6 +59,9 @@
                    class="w-full border rounded-lg px-4 py-3 text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                    placeholder="000000"
                    style="max-width: 200px; margin: 0 auto; display: block;">
+            <input type="text" name="device_name" placeholder="Name your Polly (e.g. Grandma's Polly)"
+                   class="w-full border rounded-lg px-4 py-3 mt-3 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                   style="max-width: 320px; margin: 0.75rem auto 0; display: block;">
             <p class="text-xs text-gray-400 mt-2 text-center">Don't have a code yet? No problem — you can add it later in Settings &rarr; Devices</p>
             {% if claim_error %}
             <p class="text-sm text-red-600 font-medium mt-2 text-center">{{ claim_error }}</p>
