@@ -288,7 +288,7 @@ class CommandProcessor:
                 return "Sure, I can post that to the message board. Who is this?"
 
         elif intent == "check_messages":
-            messages = self.db.get_messages_for(tenant_id=tid)
+            messages = self.db.get_messages_for(tenant_id=tid, device_id=device_id)
             if messages:
                 parts = []
                 for m in messages[:5]:
@@ -310,14 +310,16 @@ class CommandProcessor:
             return "The message board is clear. No messages right now."
 
         elif intent == "clear_messages":
-            messages = self.db.get_messages_for(tenant_id=tid)
+            messages = self.db.get_messages_for(tenant_id=tid, device_id=device_id)
             if messages:
                 conn = self.db._get_connection()
                 try:
-                    if tid:
-                        conn.execute("DELETE FROM family_messages WHERE tenant_id = ?", (tid,))
-                    else:
-                        conn.execute("DELETE FROM family_messages")
+                    msg_ids = [m["id"] for m in messages]
+                    placeholders = ",".join("?" * len(msg_ids))
+                    conn.execute(
+                        f"DELETE FROM family_messages WHERE id IN ({placeholders})",
+                        msg_ids
+                    )
                     conn.commit()
                 finally:
                     if not self.db._conn:

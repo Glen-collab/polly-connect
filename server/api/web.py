@@ -1562,10 +1562,12 @@ async def messages_page(request: Request):
     if redirect:
         return redirect
     db = request.app.state.db
-    messages = db.get_messages_for(tenant_id=session["tenant_id"])
-    family_members = db.get_family_members(tenant_id=session["tenant_id"])
+    tid = session["tenant_id"]
+    messages = db.get_messages_for(tenant_id=tid)
+    family_members = db.get_family_members(tenant_id=tid)
+    devices = db.get_devices_by_tenant(tid)
     # Add the owner to the recipient list so family members can message them
-    owner = db.get_or_create_user(tenant_id=session["tenant_id"])
+    owner = db.get_or_create_user(tenant_id=tid)
     owner_name = owner.get("familiar_name") or owner.get("name")
     return templates.TemplateResponse("messages.html", {
         "request": request,
@@ -1573,11 +1575,14 @@ async def messages_page(request: Request):
         "messages": messages,
         "family_members": family_members,
         "owner_name": owner_name,
+        "devices": devices,
     })
 
 
 @router.post("/messages/send")
-async def messages_send(request: Request, from_name: str = Form(...), to_name: str = Form(""), message: str = Form(...)):
+async def messages_send(request: Request, from_name: str = Form(...),
+                        to_name: str = Form(""), message: str = Form(...),
+                        device_id: str = Form("")):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -1588,6 +1593,7 @@ async def messages_send(request: Request, from_name: str = Form(...), to_name: s
         message=message,
         to_name=to_name if to_name else None,
         tenant_id=session["tenant_id"],
+        device_id=device_id if device_id else None,
     )
     return RedirectResponse("/web/messages", status_code=303)
 

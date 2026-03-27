@@ -293,6 +293,11 @@ class PollyDB:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_family_messages_tenant ON family_messages(tenant_id)")
 
+            # ── family_messages migrations ──
+            msg_cols = {row[1] for row in conn.execute("PRAGMA table_info(family_messages)").fetchall()}
+            if "device_id" not in msg_cols:
+                conn.execute("ALTER TABLE family_messages ADD COLUMN device_id TEXT")
+
             # ── Multi-tenant tables ──
 
             conn.execute("""
@@ -3078,13 +3083,15 @@ class PollyDB:
     # ── Family Message Board ──
 
     def save_message(self, from_name: str, message: str, to_name: str = None,
-                     tenant_id: int = None, expire_hours: int = 24) -> int:
+                     tenant_id: int = None, expire_hours: int = 24,
+                     device_id: str = None) -> int:
+        """Save a message. device_id=None means all devices."""
         conn = self._get_connection()
         try:
             cursor = conn.execute(
-                """INSERT INTO family_messages (tenant_id, from_name, to_name, message, expires_at)
-                   VALUES (?, ?, ?, ?, datetime('now', ?))""",
-                (tenant_id, from_name, to_name, message, f"+{expire_hours} hours")
+                """INSERT INTO family_messages (tenant_id, from_name, to_name, message, expires_at, device_id)
+                   VALUES (?, ?, ?, ?, datetime('now', ?), ?)""",
+                (tenant_id, from_name, to_name, message, f"+{expire_hours} hours", device_id)
             )
             conn.commit()
             return cursor.lastrowid
@@ -3092,30 +3099,35 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def get_messages_for(self, name: str = None, tenant_id: int = None) -> list:
-        """Get unread/active messages, optionally filtered by recipient."""
+    def get_messages_for(self, name: str = None, tenant_id: int = None,
+                         device_id: str = None) -> list:
+        """Get unread/active messages, optionally filtered by recipient and device.
+        device_id: if provided, returns messages for that device + all-device messages (NULL).
+        If not provided, returns all messages (for web portal display)."""
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
             t_clause = " AND tenant_id = ?" if tenant_id else ""
             t_params = (tenant_id,) if tenant_id else ()
+            d_clause = " AND (device_id IS NULL OR device_id = ?)" if device_id else ""
+            d_params = (device_id,) if device_id else ()
             if name:
                 name_lower = name.lower()
                 results = conn.execute(
                     f"""SELECT * FROM family_messages
                         WHERE (to_name IS NULL OR LOWER(to_name) = ?)
                         AND expires_at > datetime('now')
-                        {t_clause}
+                        {t_clause}{d_clause}
                         ORDER BY created_at DESC""",
-                    (name_lower,) + t_params
+                    (name_lower,) + t_params + d_params
                 ).fetchall()
             else:
                 results = conn.execute(
                     f"""SELECT * FROM family_messages
                         WHERE expires_at > datetime('now')
-                        {t_clause}
+                        {t_clause}{d_clause}
                         ORDER BY created_at DESC""",
-                    t_params
+                    t_params + d_params
                 ).fetchall()
             return [dict(r) for r in results]
         finally:
