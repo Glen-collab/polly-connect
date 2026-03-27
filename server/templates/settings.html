@@ -522,45 +522,19 @@ var deviceSettings = {
 
 var _currentSoundDevice = '';
 
-function _saveSoundSettings(devId) {
-    // Save current form values to deviceSettings cache AND to server via AJAX
-    var s = deviceSettings[devId] || deviceSettings[''];
+function _cacheCurrentForm() {
+    // Save current form values to the current device's JS cache (NOT to server)
+    var s = deviceSettings[_currentSoundDevice] || deviceSettings[''];
     s.squawk_interval = parseInt(document.getElementById('sounds-squawk-interval').value);
     s.chatter_interval = parseInt(document.getElementById('sounds-chatter-interval').value);
     s.squawk_volume = parseInt(document.getElementById('sounds-squawk-volume').value);
     s.quiet_hours_start = parseInt(document.getElementById('sounds-quiet-start').value);
     s.quiet_hours_end = parseInt(document.getElementById('sounds-quiet-end').value);
-
-    // Auto-save to server
-    var body = new URLSearchParams();
-    body.append('_section', 'sounds');
-    body.append('squawk_interval', s.squawk_interval);
-    body.append('chatter_interval', s.chatter_interval);
-    body.append('squawk_volume', s.squawk_volume);
-    body.append('quiet_hours_start', s.quiet_hours_start);
-    body.append('quiet_hours_end', s.quiet_hours_end);
-    if (devId) body.append('device_id', devId);
-    fetch('/web/settings', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
-
-    // If saving All Devices, update all device caches too
-    if (!devId) {
-        for (var k in deviceSettings) {
-            if (k !== '') {
-                deviceSettings[k].squawk_interval = s.squawk_interval;
-                deviceSettings[k].chatter_interval = s.chatter_interval;
-                deviceSettings[k].squawk_volume = s.squawk_volume;
-                deviceSettings[k].quiet_hours_start = s.quiet_hours_start;
-                deviceSettings[k].quiet_hours_end = s.quiet_hours_end;
-            }
-        }
-    }
 }
 
 function switchSoundDevice(deviceId) {
-    // Auto-save current device before switching
-    if (_currentSoundDevice !== deviceId) {
-        _saveSoundSettings(_currentSoundDevice);
-    }
+    // Cache current form values before switching (in memory only, not saved to server)
+    _cacheCurrentForm();
     _currentSoundDevice = deviceId;
 
     // Update hidden field
@@ -586,16 +560,10 @@ function switchSoundDevice(deviceId) {
     document.getElementById('sounds-quiet-end').value = s.quiet_hours_end;
 
 function saveAllSounds() {
-    // First save current form values to the current device's cache
-    var s = deviceSettings[_currentSoundDevice] || deviceSettings[''];
-    s.squawk_interval = parseInt(document.getElementById('sounds-squawk-interval').value);
-    s.chatter_interval = parseInt(document.getElementById('sounds-chatter-interval').value);
-    s.squawk_volume = parseInt(document.getElementById('sounds-squawk-volume').value);
-    s.quiet_hours_start = parseInt(document.getElementById('sounds-quiet-start').value);
-    s.quiet_hours_end = parseInt(document.getElementById('sounds-quiet-end').value);
+    // Cache current form into current device's JS cache
+    _cacheCurrentForm();
 
-    // Save EVERY device that has settings
-    var saves = 0;
+    // Save each device individually to the server
     for (var devId in deviceSettings) {
         var ds = deviceSettings[devId];
         var body = new URLSearchParams();
@@ -607,7 +575,6 @@ function saveAllSounds() {
         body.append('quiet_hours_end', ds.quiet_hours_end);
         if (devId) body.append('device_id', devId);
         fetch('/web/settings', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
-        saves++;
     }
     var fb = document.getElementById('sounds-save-feedback');
     fb.textContent = 'All saved!';
