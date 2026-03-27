@@ -1946,11 +1946,15 @@ async def squawk_snooze(request: Request, duration: int = Form(30),
             squawk_mgr.snooze(device_id, duration)
         return RedirectResponse(f"/web/settings?snoozed={device_id}", status_code=303)
     else:
-        # Tenant-wide snooze (all devices)
+        # Tenant-wide snooze (all devices) — update tenant AND all device overrides
         conn = db._get_connection()
         try:
             conn.execute(
                 "UPDATE user_profiles SET squawk_snoozed_until = ?, squawk_quiet_override = 0 WHERE tenant_id = ?",
+                (snoozed_until, tenant_id)
+            )
+            conn.execute(
+                "UPDATE devices SET dev_snoozed_until = ?, dev_quiet_override = 0 WHERE tenant_id = ?",
                 (snoozed_until, tenant_id)
             )
             conn.commit()
@@ -1988,11 +1992,15 @@ async def squawk_unsnooze(request: Request, device_id: str = Form("")):
             squawk_mgr.unsnooze(device_id)
         return RedirectResponse(f"/web/settings?woke={device_id}", status_code=303)
     else:
-        # Tenant-wide unsnooze
+        # Tenant-wide unsnooze — clear tenant AND all device overrides
         conn = db._get_connection()
         try:
             conn.execute(
                 "UPDATE user_profiles SET squawk_snoozed_until = NULL, squawk_quiet_override = 1 WHERE tenant_id = ?",
+                (tenant_id,)
+            )
+            conn.execute(
+                "UPDATE devices SET dev_snoozed_until = NULL, dev_quiet_override = 1 WHERE tenant_id = ?",
                 (tenant_id,)
             )
             conn.commit()

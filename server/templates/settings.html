@@ -574,10 +574,17 @@ function doSnooze(duration) {
             fb.textContent = label + ' snoozed for ' + duration + ' min';
             fb.className = 'text-sm font-medium mt-2 text-amber-700';
             fb.style.display = 'block';
-            // Update zzz on tab
+            // Update zzz on tabs
             if (_snoozeDeviceId) {
                 var tab = document.getElementById('snooze-tab-' + _snoozeDeviceId);
                 if (tab && tab.textContent.indexOf('zzz') === -1) tab.innerHTML += ' <span class="text-amber-500">zzz</span>';
+            } else {
+                // All devices — add zzz to every device tab
+                document.querySelectorAll('[id^="snooze-tab-"]').forEach(function(t) {
+                    if (t.id !== 'snooze-tab-all' && t.textContent.indexOf('zzz') === -1) {
+                        t.innerHTML += ' <span class="text-amber-500">zzz</span>';
+                    }
+                });
             }
             setTimeout(function() { fb.style.display = 'none'; }, 3000);
         });
@@ -593,10 +600,15 @@ function doWake() {
             fb.textContent = label + ' is awake!';
             fb.className = 'text-sm font-medium mt-2 text-emerald-700';
             fb.style.display = 'block';
-            // Remove zzz from tab
+            // Remove zzz from tabs
             if (_snoozeDeviceId) {
                 var tab = document.getElementById('snooze-tab-' + _snoozeDeviceId);
                 if (tab) tab.innerHTML = tab.innerHTML.replace(/<span.*?zzz<\/span>/g, '').trim();
+            } else {
+                // All devices — clear all zzz
+                document.querySelectorAll('[id^="snooze-tab-"]').forEach(function(t) {
+                    t.innerHTML = t.innerHTML.replace(/<span.*?zzz<\/span>/g, '').trim();
+                });
             }
             setTimeout(function() { fb.style.display = 'none'; }, 3000);
         });
