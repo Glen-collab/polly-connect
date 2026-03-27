@@ -3586,6 +3586,16 @@ async def device_claim(request: Request, claim_code: str = Form(...)):
             f"{redirect_base}?claim_error=Please+enter+a+valid+6-digit+claim+code",
             status_code=303)
 
+    # Check device limit for subscription tier
+    from core.subscription import get_subscription, get_tier_limits
+    sub = get_subscription(db, tid)
+    limits = get_tier_limits(sub["tier"])
+    current_devices = len(db.get_devices_by_tenant(tid))
+    if current_devices >= limits["max_devices"]:
+        return RedirectResponse(
+            f"{redirect_base}?claim_error=Device+limit+reached+({limits['max_devices']}+for+{sub['tier']}+plan).+Upgrade+to+add+more.",
+            status_code=303)
+
     device = db.claim_device(code, tid)
     if not device:
         return RedirectResponse(
