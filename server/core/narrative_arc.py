@@ -186,7 +186,7 @@ class NarrativeArc:
                              tenant_id: int = None) -> Dict[str, int]:
         """Get count of memories in each Jungian bucket for a speaker."""
         coverage = {b.value: 0 for b in JungianBucket}
-        memories = self.db.get_memories(speaker=speaker, tenant_id=tenant_id)
+        memories = self.db.get_memories(speaker=speaker, tenant_id=tenant_id, verification_status="verified")
         for mem in memories:
             bucket = mem.get("bucket", "ordinary_world")
             if bucket in coverage:
@@ -197,7 +197,7 @@ class NarrativeArc:
                                 tenant_id: int = None) -> Dict[str, int]:
         """Get count of memories in each life phase."""
         coverage = {p.value: 0 for p in LifePhase}
-        memories = self.db.get_memories(speaker=speaker, tenant_id=tenant_id)
+        memories = self.db.get_memories(speaker=speaker, tenant_id=tenant_id, verification_status="verified")
         for mem in memories:
             phase = mem.get("life_phase", "unknown")
             if phase in coverage:

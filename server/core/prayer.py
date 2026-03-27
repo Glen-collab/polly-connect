@@ -295,7 +295,7 @@ class PrayerService:
 
             # Story snippets — only for purpose/grief/joy
             if category["key"] in ("purpose", "grief", "joy"):
-                stories = self.db.get_stories(tenant_id=tenant_id, limit=10)
+                stories = self.db.get_stories(tenant_id=tenant_id, limit=10, verified_only=True)
                 for s in stories[:3]:
                     text = s.get("corrected_transcript") or s.get("transcript", "")
                     if text and len(text) > 20:

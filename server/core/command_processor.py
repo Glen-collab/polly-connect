@@ -656,7 +656,7 @@ class CommandProcessor:
             if not stories:
                 # No match — fall back to a random story with a friendly redirect
                 import random as _rnd
-                all_stories = self.db.get_stories(tenant_id=tid, limit=50)
+                all_stories = self.db.get_stories(tenant_id=tid, limit=50, verified_only=True)
                 if not all_stories:
                     return f"I don't have any stories about {query} yet. Maybe you could tell me one?"
                 stories = all_stories
@@ -673,7 +673,7 @@ class CommandProcessor:
                 query = None  # treat as general from here on
         else:
             # General "read me a story" — pull stories, sorted least-recently-narrated first
-            all_stories = self.db.get_stories(tenant_id=tid, limit=50)
+            all_stories = self.db.get_stories(tenant_id=tid, limit=50, verified_only=True)
             if not all_stories:
                 return "I don't have any stories recorded yet. Want to tell me one?"
 

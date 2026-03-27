@@ -1617,12 +1617,14 @@ class PollyDB:
                 conn.close()
 
     def get_stories(self, user_id: int = None, limit: int = 50,
-                    tenant_id: int = None) -> List[Dict]:
+                    tenant_id: int = None, verified_only: bool = True) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
             query = "SELECT * FROM stories WHERE 1=1"
             params = []
+            if verified_only:
+                query += " AND verified = 1"
             if user_id:
                 query += " AND user_id = ?"
                 params.append(user_id)
@@ -1887,7 +1889,7 @@ class PollyDB:
                 SELECT s.* FROM stories s
                 LEFT JOIN story_tags st ON s.id = st.story_id
                 WHERE (s.speaker_name LIKE ? OR s.transcript LIKE ?
-                   OR st.tag_value LIKE ?){t_clause}
+                   OR st.tag_value LIKE ?) AND s.verified = 1{t_clause}
                 GROUP BY s.id ORDER BY s.created_at DESC LIMIT ?
             """, (f"%{query_norm}%", f"%{query_norm}%", f"%{query_norm}%") + t_params + (limit,)).fetchall()
             return [dict(r) for r in results]

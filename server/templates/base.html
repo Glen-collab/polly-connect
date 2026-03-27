@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#059669">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- Removed apple-mobile-web-app-capable and status-bar-style to avoid install prompts -->
     <meta name="apple-mobile-web-app-title" content="Polly">
     <meta name="csrf-token" content="{{ csrf_token(request) }}">
     <link rel="manifest" href="/static/manifest.json">
@@ -176,13 +175,7 @@
     </footer>
 
     <script>
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/static/sw.js').then(function(reg) {
-            console.log('SW registered, scope:', reg.scope);
-        }).catch(function(err) {
-            console.log('SW registration failed:', err);
-        });
-    }
+    // Service worker registration removed to avoid install prompts for visitors
     // CSRF protection: set token as cookie + header for all requests
     var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     (function() {

@@ -1056,7 +1056,7 @@ async def stories_list(request: Request):
         return redirect
 
     db = request.app.state.db
-    stories = db.get_stories(limit=50, tenant_id=session["tenant_id"])
+    stories = db.get_stories(limit=50, tenant_id=session["tenant_id"], verified_only=False)
     return templates.TemplateResponse("stories.html", {
         "request": request,
         "session": session,
@@ -2203,7 +2203,7 @@ async def photos_page(request: Request):
     db = request.app.state.db
     tid = session["tenant_id"]
     photos = db.get_photos(limit=100, tenant_id=tid)
-    stories = db.get_stories(limit=200, tenant_id=tid)
+    stories = db.get_stories(limit=200, tenant_id=tid, verified_only=False)
 
     # Parse tags JSON and attach all stories for each photo
     conn = db._get_connection()
@@ -2682,7 +2682,7 @@ async def photo_edit_page(request: Request, photo_id: int):
     except (json.JSONDecodeError, TypeError):
         tag_list = []
 
-    stories = db.get_stories(limit=200, tenant_id=tid)
+    stories = db.get_stories(limit=200, tenant_id=tid, verified_only=False)
     family_members = db.get_family_members(tenant_id=tid)
 
     return templates.TemplateResponse("photo_edit.html", {

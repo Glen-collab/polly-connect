@@ -88,7 +88,7 @@ class BookBuilder:
         return None
 
     def generate_chapter_outline(self, speaker: str = None,
-                                  verified_only: bool = False,
+                                  verified_only: bool = True,
                                   tenant_id: int = None) -> List[Dict]:
         """
         Generate a chapter outline from available memories.
