@@ -327,11 +327,18 @@ class SquawkManager:
             if in_quiet:
                 return False  # Override active, still in quiet hours — stay awake
             else:
-                # Quiet hours ended naturally — clear override everywhere
+                # Quiet hours ended naturally — clear override in memory and DB
                 self._quiet_override.pop(device_id, None)
                 logger.info(f"Quiet override auto-cleared (quiet hours ended) → {device_id}")
-                # DB clear handled by settings page, not scheduler
-                pass
+                try:
+                    if self._db:
+                        conn = self._db._get_connection()
+                        conn.execute("UPDATE devices SET dev_quiet_override = 0 WHERE device_id = ?", (device_id,))
+                        conn.commit()
+                        if not self._db._conn:
+                            conn.close()
+                except Exception as e:
+                    logger.warning(f"Failed to clear DB quiet override: {e}")
 
         return in_quiet
 
