@@ -513,7 +513,8 @@ var deviceSettings = {
         squawk_volume: {{ dev.settings.squawk_volume if dev.settings.squawk_volume is not none else 30 }},
         quiet_hours_start: {{ dev.settings.quiet_hours_start if dev.settings.quiet_hours_start is not none else 21 }},
         quiet_hours_end: {{ dev.settings.quiet_hours_end if dev.settings.quiet_hours_end is not none else 7 }},
-        kid_mode: {{ dev.settings.kid_mode if dev.settings.kid_mode is not none else 0 }}
+        kid_mode: {{ dev.settings.kid_mode if dev.settings.kid_mode is not none else 0 }},
+        snoozed_until: '{{ dev.settings.squawk_snoozed_until or "" }}'
     },
     {% endfor %}
 };
@@ -561,6 +562,24 @@ function switchSnoozeDevice(deviceId) {
     });
     var active = document.getElementById('snooze-tab-' + (deviceId || 'all'));
     if (active) active.className = 'px-3 py-1 rounded-full text-sm font-medium bg-emerald-600 text-white';
+
+    // Show countdown if device is snoozed
+    var fb = document.getElementById('snooze-feedback');
+    if (deviceId && deviceSettings[deviceId]) {
+        var until = deviceSettings[deviceId].snoozed_until;
+        if (until) {
+            var end = new Date(until + 'Z');  // UTC
+            var now = new Date();
+            var mins = Math.round((end - now) / 60000);
+            if (mins > 0) {
+                fb.textContent = (active ? active.textContent.replace('zzz','').trim() : deviceId) + ' — ' + mins + ' min remaining';
+                fb.className = 'text-sm font-medium mt-2 text-amber-700';
+                fb.style.display = 'block';
+                return;
+            }
+        }
+    }
+    fb.style.display = 'none';
 }
 
 function doSnooze(duration) {
@@ -570,10 +589,17 @@ function doSnooze(duration) {
     fetch('/web/settings/squawk-snooze', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
         .then(function() {
             var fb = document.getElementById('snooze-feedback');
-            var label = _snoozeDeviceId ? document.getElementById('snooze-tab-' + _snoozeDeviceId).textContent.trim() : 'All devices';
+            var label = _snoozeDeviceId ? document.getElementById('snooze-tab-' + _snoozeDeviceId).textContent.replace('zzz','').trim() : 'All devices';
             fb.textContent = label + ' snoozed for ' + duration + ' min';
             fb.className = 'text-sm font-medium mt-2 text-amber-700';
             fb.style.display = 'block';
+            // Store snoozed_until locally for countdown
+            var futureTime = new Date(Date.now() + duration * 60000).toISOString().replace('Z','');
+            if (_snoozeDeviceId && deviceSettings[_snoozeDeviceId]) {
+                deviceSettings[_snoozeDeviceId].snoozed_until = futureTime;
+            } else {
+                for (var k in deviceSettings) { if (deviceSettings[k].snoozed_until !== undefined) deviceSettings[k].snoozed_until = futureTime; }
+            }
             // Update zzz on tabs
             if (_snoozeDeviceId) {
                 var tab = document.getElementById('snooze-tab-' + _snoozeDeviceId);
