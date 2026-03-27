@@ -560,24 +560,31 @@ function switchSoundDevice(deviceId) {
     document.getElementById('sounds-quiet-end').value = s.quiet_hours_end;
 
 function saveAllSounds() {
-    // Cache current form into current device's JS cache
+    // Cache whatever is on screen right now
     _cacheCurrentForm();
 
-    // Save each device individually to the server
+    // Debug — log what we're saving
+    console.log('Saving all devices:', JSON.stringify(deviceSettings));
+
+    // Save each device individually
+    var count = 0;
     for (var devId in deviceSettings) {
         var ds = deviceSettings[devId];
-        var body = new URLSearchParams();
-        body.append('_section', 'sounds');
-        body.append('squawk_interval', ds.squawk_interval);
-        body.append('chatter_interval', ds.chatter_interval);
-        body.append('squawk_volume', ds.squawk_volume);
-        body.append('quiet_hours_start', ds.quiet_hours_start);
-        body.append('quiet_hours_end', ds.quiet_hours_end);
-        if (devId) body.append('device_id', devId);
-        fetch('/web/settings', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
+        (function(id, settings) {
+            var body = new URLSearchParams();
+            body.append('_section', 'sounds');
+            body.append('squawk_interval', settings.squawk_interval);
+            body.append('chatter_interval', settings.chatter_interval);
+            body.append('squawk_volume', settings.squawk_volume);
+            body.append('quiet_hours_start', settings.quiet_hours_start);
+            body.append('quiet_hours_end', settings.quiet_hours_end);
+            if (id) body.append('device_id', id);
+            fetch('/web/settings', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
+        })(devId, ds);
+        count++;
     }
     var fb = document.getElementById('sounds-save-feedback');
-    fb.textContent = 'All saved!';
+    fb.textContent = count + ' devices saved!';
     fb.className = 'ml-2 text-sm font-medium text-emerald-700';
     fb.style.display = 'inline';
     setTimeout(function() { fb.style.display = 'none'; }, 3000);
