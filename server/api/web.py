@@ -1832,6 +1832,7 @@ async def settings_save(request: Request):
     # Per-device sound settings override
     target_device = form.get("device_id", "").strip()
     squawk_mgr = getattr(request.app.state, "squawk", None)
+    logger.info(f"Settings save: section={section}, device={target_device}, quiet_end={quiet_hours_end}, chatter={chatter_interval}")
     if target_device and section == "sounds":
         # Verify device belongs to this tenant
         target_dev = db.get_device(target_device)
