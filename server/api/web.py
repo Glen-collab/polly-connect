@@ -1847,8 +1847,16 @@ async def settings_save(request: Request):
                 squawk_mgr.update_intervals(target_device, squawk_interval, chatter_interval,
                                             quiet_hours_start, quiet_hours_end,
                                             squawk_volume=squawk_volume)
-    else:
-        # Update live squawk manager for all connected devices (tenant-wide)
+    elif section == "sounds":
+        # All Devices — update tenant profile AND all per-device overrides
+        devices = db.get_devices_by_tenant(session["tenant_id"])
+        for dev in devices:
+            db.update_device_settings(dev["device_id"],
+                                      squawk_interval=squawk_interval,
+                                      chatter_interval=chatter_interval,
+                                      quiet_hours_start=quiet_hours_start,
+                                      quiet_hours_end=quiet_hours_end,
+                                      squawk_volume=squawk_volume)
         if squawk_mgr:
             for dev_id in list(squawk_mgr._active_devices.keys()):
                 squawk_mgr.update_intervals(dev_id, squawk_interval, chatter_interval,

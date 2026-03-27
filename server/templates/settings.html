@@ -540,6 +540,19 @@ function _saveSoundSettings(devId) {
     body.append('quiet_hours_end', s.quiet_hours_end);
     if (devId) body.append('device_id', devId);
     fetch('/web/settings', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
+
+    // If saving All Devices, update all device caches too
+    if (!devId) {
+        for (var k in deviceSettings) {
+            if (k !== '') {
+                deviceSettings[k].squawk_interval = s.squawk_interval;
+                deviceSettings[k].chatter_interval = s.chatter_interval;
+                deviceSettings[k].squawk_volume = s.squawk_volume;
+                deviceSettings[k].quiet_hours_start = s.quiet_hours_start;
+                deviceSettings[k].quiet_hours_end = s.quiet_hours_end;
+            }
+        }
+    }
 }
 
 function switchSoundDevice(deviceId) {
