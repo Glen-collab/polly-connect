@@ -770,6 +770,16 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def get_all_tenants(self) -> List[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute("SELECT * FROM tenants ORDER BY name").fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
     # ── Account management ──
 
     def create_account(self, email: str, password_hash: str, name: str,

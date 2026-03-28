@@ -61,11 +61,21 @@
 {% if session.is_admin %}
 <div class="bg-white rounded-lg shadow-md p-4 mb-6">
     <h2 class="text-lg font-semibold mb-3">Add New Device</h2>
-    <form method="POST" action="/web/devices/add" class="flex flex-col sm:flex-row gap-3">
-        <input type="text" name="device_name" placeholder="Name (optional — auto-generated if blank)"
-               class="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+    <form method="POST" action="/web/devices/add" class="flex flex-col gap-3">
+        <div class="flex flex-col sm:flex-row gap-3">
+            <input type="text" name="device_name" placeholder="Name (optional — auto-generated if blank)"
+                   class="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+            {% if tenants %}
+            <select name="assign_tenant" class="border rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-emerald-500">
+                <option value="">-- Unassigned (customer claims later) --</option>
+                {% for t in tenants %}
+                <option value="{{ t.id }}">{{ t.name }} (Tenant {{ t.id }})</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+        </div>
         <button type="submit"
-                class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium whitespace-nowrap">
+                class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium whitespace-nowrap w-full sm:w-auto">
             Add Device
         </button>
     </form>

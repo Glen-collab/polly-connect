@@ -3525,6 +3525,9 @@ async def devices_page(request: Request):
     claim_error = request.query_params.get("claim_error")
     claim_success = request.query_params.get("claim_success")
 
+    # Admin gets tenant list for pre-assigning devices
+    tenants = db.get_all_tenants() if session.get("is_admin") else []
+
     return templates.TemplateResponse("devices.html", {
         "request": request,
         "session": session,
@@ -3533,11 +3536,13 @@ async def devices_page(request: Request):
         "new_claim_code": new_claim_code,
         "claim_error": claim_error,
         "claim_success": claim_success,
+        "tenants": tenants,
     })
 
 
 @router.post("/devices/add")
-async def device_add(request: Request, device_name: str = Form("")):
+async def device_add(request: Request, device_name: str = Form(""),
+                     assign_tenant: str = Form("")):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -3556,9 +3561,21 @@ async def device_add(request: Request, device_name: str = Form("")):
         name = f"Polly-{device_id[-4:]}"
 
     if session.get("is_admin"):
-        # Admin-created devices are unassigned until customer claims
-        db.register_device(device_id, None, name=name, api_key=api_key)
+        # Admin can pre-assign to a tenant or leave unassigned
+        pre_tenant = int(assign_tenant) if assign_tenant else None
+        db.register_device(device_id, pre_tenant, name=name, api_key=api_key)
         claim_code = db.generate_claim_code(device_id)
+        # If pre-assigned, mark as claimed so it works immediately after provisioning
+        if pre_tenant:
+            conn = db._get_connection()
+            try:
+                conn.execute(
+                    "UPDATE devices SET claimed_at = CURRENT_TIMESTAMP WHERE device_id = ?",
+                    (device_id,))
+                conn.commit()
+            finally:
+                if not db._conn:
+                    conn.close()
     else:
         db.register_device(device_id, tid, name=name, api_key=api_key)
         claim_code = None
