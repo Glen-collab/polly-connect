@@ -5215,6 +5215,17 @@ async def admin_provision_submit(request: Request,
     db.register_device(device_id, tenant_id, name=dev_name, api_key=api_key)
     claim_code = db.generate_claim_code(device_id)
 
+    # Use claim code as the family code too (one code for everything)
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "UPDATE tenants SET family_code = ?, family_code_created_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (claim_code, tenant_id))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
     # Mark as claimed
     conn = db._get_connection()
     try:
@@ -5283,6 +5294,8 @@ async def admin_dashboard(request: Request):
             "Training data ready in wake-word/. See WAKE_WORD_STATUS.md."
         )
 
+    tenants = db.get_all_tenants()
+
     return templates.TemplateResponse("admin.html", {
         "request": request,
         "session": session,
@@ -5290,6 +5303,7 @@ async def admin_dashboard(request: Request):
         "devices": devices,
         "intents": intents,
         "errors": errors,
+        "tenants": tenants,
     })
 
 

@@ -59,6 +59,50 @@
     </div>
 </div>
 
+<!-- Tenants / Customers -->
+<div class="bg-white rounded-xl shadow mb-8">
+    <div class="px-5 py-4 border-b border-gray-100">
+        <h2 class="text-xl font-semibold text-gray-800">Customers</h2>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-600 text-left">
+                <tr>
+                    <th class="px-5 py-3 font-medium">Household</th>
+                    <th class="px-5 py-3 font-medium">Tenant ID</th>
+                    <th class="px-5 py-3 font-medium">Family Code</th>
+                    <th class="px-5 py-3 font-medium">Tier</th>
+                    <th class="px-5 py-3 font-medium">Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tenants %}
+                <tr class="border-t hover:bg-gray-50">
+                    <td class="px-5 py-3 font-medium">{{ t.name }}</td>
+                    <td class="px-5 py-3 text-gray-500">{{ t.id }}</td>
+                    <td class="px-5 py-3">
+                        {% if t.family_code %}
+                        <span class="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded">{{ t.family_code }}</span>
+                        {% else %}
+                        <span class="text-gray-400">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-5 py-3">
+                        <span class="text-xs px-2 py-1 rounded-full
+                            {% if t.subscription_tier == 'legacy' %}bg-purple-100 text-purple-700
+                            {% elif t.subscription_tier == 'trial' %}bg-amber-100 text-amber-700
+                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                            {{ t.subscription_tier or 'none' }}
+                        </span>
+                    </td>
+                    <td class="px-5 py-3 text-gray-500 text-xs">{{ t.created_at or '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- Device table -->
 <div class="bg-white rounded-xl shadow mb-8">
     <div class="px-5 py-4 border-b border-gray-100">
