@@ -801,7 +801,7 @@ class PollyDB:
     # ── Connected families (cross-tenant) ──
 
     def send_friend_request(self, tenant_id: int, target_family_code: str) -> Optional[Dict]:
-        """Send a friend request by entering another family's code. Returns info or None."""
+        """Connect two families by code. Auto-accepts (code + name = trust). Bidirectional."""
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
@@ -814,7 +814,7 @@ class PollyDB:
             if target_tid == tenant_id:
                 return None  # Can't connect to yourself
 
-            # Check if already connected or pending in either direction
+            # Check if already connected in either direction
             existing = conn.execute(
                 "SELECT 1 FROM connected_families WHERE "
                 "(tenant_id = ? AND connected_tenant_id = ?) OR "
@@ -824,14 +824,17 @@ class PollyDB:
             if existing:
                 return None
 
-            # Get sender's name
+            # Get both tenant names
             my_tenant = conn.execute("SELECT name FROM tenants WHERE id = ?", (tenant_id,)).fetchone()
             my_name = my_tenant["name"] if my_tenant else "Unknown"
             target_name = target["name"]
 
-            # Insert pending request (from requester TO target)
+            # Auto-accept: create both directions immediately
             conn.execute(
-                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'pending')",
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'accepted')",
+                (tenant_id, target_tid, target_name))
+            conn.execute(
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'accepted')",
                 (target_tid, tenant_id, my_name))
             conn.commit()
             return {"connected_tenant_id": target_tid, "connected_tenant_name": target_name}
