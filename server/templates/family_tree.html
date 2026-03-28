@@ -133,6 +133,91 @@
     {% endif %}
 </div>
 
+{% if session.role != 'family' %}
+<!-- Connected Friends -->
+{% if request.query_params.get('req_sent') %}
+<div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4 mt-4 max-w-lg mx-auto text-center">
+    <p class="text-sm text-emerald-800 font-medium">Friend request sent to {{ request.query_params.get('req_sent') }}!</p>
+</div>
+{% endif %}
+{% if request.query_params.get('req_error') %}
+<div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-4 mt-4 max-w-lg mx-auto text-center">
+    <p class="text-sm text-red-800 font-medium">{{ request.query_params.get('req_error') }}</p>
+</div>
+{% endif %}
+
+{% if pending_requests %}
+<!-- Pending Friend Requests -->
+<div class="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 mb-4 mt-4 max-w-lg mx-auto">
+    <h3 class="text-base font-bold text-amber-800 mb-3">Friend Requests</h3>
+    {% for req in pending_requests %}
+    <div class="flex items-center justify-between bg-white rounded-lg px-4 py-3 mb-2">
+        <span class="text-sm font-medium text-gray-800">{{ req.connected_tenant_name }}</span>
+        <div class="flex gap-2">
+            <form method="POST" action="/web/settings/connections/{{ req.connected_tenant_id }}/accept">
+                <button type="submit" class="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-emerald-700">Accept</button>
+            </form>
+            <form method="POST" action="/web/settings/connections/{{ req.connected_tenant_id }}/decline"
+                  onsubmit="return confirm('Decline request from {{ req.connected_tenant_name }}?')">
+                <button type="submit" class="bg-gray-200 text-gray-600 px-3 py-1 rounded text-xs font-medium hover:bg-gray-300">Decline</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if connected_families %}
+<!-- Connected Friends Section -->
+<div class="mt-6 mb-4">
+    <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-3 text-center">Connected Friends</h3>
+    <div class="flex flex-wrap justify-center gap-3">
+        {% for cf in connected_families %}
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 pb-5 text-center w-[140px] h-[100px] flex flex-col justify-center relative cursor-pointer hover:shadow-md transition"
+             onclick="showConnectedModal('{{ cf.connected_tenant_name }}', {{ cf.connected_tenant_id }})">
+            <p class="font-medium text-sm text-gray-800">{{ cf.connected_tenant_name }}</p>
+            <p class="text-xs text-blue-600">Friend</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Connect with a friend -->
+<div class="mt-4 mb-6 max-w-sm mx-auto">
+    <form method="POST" action="/web/settings/connections/add" class="flex gap-2">
+        <input type="text" name="family_code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+               placeholder="Friend's 6-digit code"
+               class="flex-1 border rounded-lg px-3 py-2 text-sm text-center font-mono tracking-widest focus:ring-2 focus:ring-blue-500">
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">
+            Add Friend
+        </button>
+    </form>
+</div>
+{% endif %}
+
+<!-- Connected friend modal (send message) -->
+<div id="connected-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full sm:max-w-md sm:rounded-lg rounded-t-2xl p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 id="connected-modal-name" class="text-lg font-semibold"></h2>
+            <button onclick="closeConnectedModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <form method="POST" action="/web/messages/send-connected">
+            <input type="hidden" name="connected_tenant_id" id="connected-modal-tid">
+            <textarea name="message" required rows="3" placeholder="Type your message..."
+                      class="w-full border rounded-lg px-3 py-2 text-sm resize-y mb-3"></textarea>
+            <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm">
+                Send to Their Polly
+            </button>
+        </form>
+        <form method="POST" id="connected-modal-disconnect" class="mt-3 text-center"
+              onsubmit="return confirm('Disconnect from this friend?')">
+            <button type="submit" class="text-xs text-red-400 hover:text-red-600">Disconnect</button>
+        </form>
+    </div>
+</div>
+
 <!-- Photo modal -->
 <div id="photo-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-white w-full sm:max-w-2xl sm:rounded-lg rounded-t-2xl max-h-[85vh] overflow-auto">
@@ -359,6 +444,19 @@ function showPhotos(memberId) {
 
 function closePhotos() {
     document.getElementById('photo-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function showConnectedModal(name, tid) {
+    document.getElementById('connected-modal-name').textContent = name;
+    document.getElementById('connected-modal-tid').value = tid;
+    document.getElementById('connected-modal-disconnect').action = '/web/settings/connections/' + tid + '/remove';
+    document.getElementById('connected-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeConnectedModal() {
+    document.getElementById('connected-modal').classList.add('hidden');
     document.body.style.overflow = '';
 }
 </script>

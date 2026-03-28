@@ -306,10 +306,15 @@ class PollyDB:
                     connected_tenant_id INTEGER NOT NULL,
                     connected_tenant_name TEXT NOT NULL,
                     nickname TEXT,
+                    status TEXT DEFAULT 'accepted',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(tenant_id, connected_tenant_id)
                 )
             """)
+            # Migration: add status column if missing
+            cf_cols = {row[1] for row in conn.execute("PRAGMA table_info(connected_families)").fetchall()}
+            if "status" not in cf_cols:
+                conn.execute("ALTER TABLE connected_families ADD COLUMN status TEXT DEFAULT 'accepted'")
 
             # ── Multi-tenant tables ──
 
@@ -795,12 +800,11 @@ class PollyDB:
 
     # ── Connected families (cross-tenant) ──
 
-    def connect_families(self, tenant_id: int, target_family_code: str) -> Optional[Dict]:
-        """Connect two families by entering the target's family code. Creates bidirectional link."""
+    def send_friend_request(self, tenant_id: int, target_family_code: str) -> Optional[Dict]:
+        """Send a friend request by entering another family's code. Returns info or None."""
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
-            # Find target tenant by family code
             target = conn.execute(
                 "SELECT * FROM tenants WHERE family_code = ?", (target_family_code,)
             ).fetchone()
@@ -810,28 +814,69 @@ class PollyDB:
             if target_tid == tenant_id:
                 return None  # Can't connect to yourself
 
-            # Check if already connected
+            # Check if already connected or pending in either direction
             existing = conn.execute(
-                "SELECT 1 FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ?",
-                (tenant_id, target_tid)
+                "SELECT 1 FROM connected_families WHERE "
+                "(tenant_id = ? AND connected_tenant_id = ?) OR "
+                "(tenant_id = ? AND connected_tenant_id = ?)",
+                (tenant_id, target_tid, target_tid, tenant_id)
             ).fetchone()
             if existing:
                 return None
 
-            # Get both tenant names
+            # Get sender's name
             my_tenant = conn.execute("SELECT name FROM tenants WHERE id = ?", (tenant_id,)).fetchone()
             my_name = my_tenant["name"] if my_tenant else "Unknown"
             target_name = target["name"]
 
-            # Insert both directions
+            # Insert pending request (from requester TO target)
             conn.execute(
-                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name) VALUES (?, ?, ?)",
-                (tenant_id, target_tid, target_name))
-            conn.execute(
-                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name) VALUES (?, ?, ?)",
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'pending')",
                 (target_tid, tenant_id, my_name))
             conn.commit()
             return {"connected_tenant_id": target_tid, "connected_tenant_name": target_name}
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def accept_friend_request(self, tenant_id: int, requester_tenant_id: int) -> bool:
+        """Accept a pending friend request. Creates bidirectional connection."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            # Find the pending request
+            pending = conn.execute(
+                "SELECT * FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'pending'",
+                (tenant_id, requester_tenant_id)
+            ).fetchone()
+            if not pending:
+                return False
+
+            # Update to accepted
+            conn.execute(
+                "UPDATE connected_families SET status = 'accepted' WHERE id = ?",
+                (pending["id"],))
+
+            # Create reverse direction
+            my_tenant = conn.execute("SELECT name FROM tenants WHERE id = ?", (tenant_id,)).fetchone()
+            my_name = my_tenant["name"] if my_tenant else "Unknown"
+            conn.execute(
+                "INSERT OR IGNORE INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'accepted')",
+                (requester_tenant_id, tenant_id, my_name))
+            conn.commit()
+            return True
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def decline_friend_request(self, tenant_id: int, requester_tenant_id: int):
+        """Decline/delete a pending friend request."""
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "DELETE FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'pending'",
+                (tenant_id, requester_tenant_id))
+            conn.commit()
         finally:
             if not self._conn:
                 conn.close()
@@ -852,12 +897,26 @@ class PollyDB:
                 conn.close()
 
     def get_connected_families(self, tenant_id: int) -> List[Dict]:
-        """Get all families connected to this tenant."""
+        """Get accepted connections for this tenant."""
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
             results = conn.execute(
-                "SELECT * FROM connected_families WHERE tenant_id = ? ORDER BY connected_tenant_name",
+                "SELECT * FROM connected_families WHERE tenant_id = ? AND status = 'accepted' ORDER BY connected_tenant_name",
+                (tenant_id,)
+            ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_pending_friend_requests(self, tenant_id: int) -> List[Dict]:
+        """Get pending friend requests sent TO this tenant."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM connected_families WHERE tenant_id = ? AND status = 'pending' ORDER BY created_at DESC",
                 (tenant_id,)
             ).fetchall()
             return [dict(r) for r in results]

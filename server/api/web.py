@@ -2704,14 +2704,36 @@ async def connections_add(request: Request, family_code: str = Form(...)):
         return redirect
     db = request.app.state.db
     code = family_code.strip()
-    result = db.connect_families(session["tenant_id"], code)
+    result = db.send_friend_request(session["tenant_id"], code)
     if result:
         return RedirectResponse(
-            f"/web/settings?conn_success=Connected+to+{result['connected_tenant_name']}",
+            f"/web/family-tree?req_sent={result['connected_tenant_name']}",
             status_code=303)
     return RedirectResponse(
-        "/web/settings?conn_error=Invalid+code,+already+connected,+or+that's+your+own+code",
+        "/web/family-tree?req_error=Invalid+code,+already+connected,+or+that's+your+own+code",
         status_code=303)
+
+
+@router.post("/settings/connections/{connected_tenant_id}/accept")
+async def connections_accept(request: Request, connected_tenant_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    db.accept_friend_request(session["tenant_id"], connected_tenant_id)
+    return RedirectResponse("/web/family-tree", status_code=303)
+
+
+@router.post("/settings/connections/{connected_tenant_id}/decline")
+async def connections_decline(request: Request, connected_tenant_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    db.decline_friend_request(session["tenant_id"], connected_tenant_id)
+    return RedirectResponse("/web/family-tree", status_code=303)
 
 
 @router.post("/settings/connections/{connected_tenant_id}/remove")
@@ -2722,7 +2744,7 @@ async def connections_remove(request: Request, connected_tenant_id: int):
         return redirect
     db = request.app.state.db
     db.disconnect_family(session["tenant_id"], connected_tenant_id)
-    return RedirectResponse("/web/settings", status_code=303)
+    return RedirectResponse("/web/family-tree", status_code=303)
 
 
 @router.post("/settings/security-questions")
@@ -2932,6 +2954,13 @@ async def family_tree_page(request: Request):
             tree[gen] = []
         tree[gen].append(m)
 
+    # Connected families and pending requests (owner only)
+    connected_families = []
+    pending_requests = []
+    if session.get("role") != "family":
+        connected_families = db.get_connected_families(tid)
+        pending_requests = db.get_pending_friend_requests(tid)
+
     return templates.TemplateResponse("family_tree.html", {
         "request": request,
         "session": session,
@@ -2939,6 +2968,8 @@ async def family_tree_page(request: Request):
         "tree": tree,
         "owner_name": owner_name,
         "relationship_choices": RELATIONSHIP_CHOICES,
+        "connected_families": connected_families,
+        "pending_requests": pending_requests,
     })
 
 
