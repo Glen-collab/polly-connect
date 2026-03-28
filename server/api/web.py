@@ -2959,6 +2959,15 @@ async def family_tree_page(request: Request):
         connected_families = db.get_connected_families(tid)
         pending_requests = db.get_pending_friend_requests(tid)
 
+    # Build set of connected tenant IDs for template
+    connected_tenant_ids = {cf["connected_tenant_id"] for cf in connected_families}
+    # Map connected tenant names (lowercase first name) for card matching
+    connected_names = set()
+    for cf in connected_families:
+        first = cf["connected_tenant_name"].strip().split()[0].lower() if cf["connected_tenant_name"] else ""
+        if first:
+            connected_names.add(first)
+
     return templates.TemplateResponse("family_tree.html", {
         "request": request,
         "session": session,
@@ -2968,6 +2977,7 @@ async def family_tree_page(request: Request):
         "relationship_choices": RELATIONSHIP_CHOICES,
         "connected_families": connected_families,
         "pending_requests": pending_requests,
+        "connected_names": connected_names,
     })
 
 

@@ -101,7 +101,7 @@
             {% for m in tree[gen_num] %}
             <div class="{{ card_class }} rounded-lg p-3 pb-5 text-center w-[140px] h-[100px] flex flex-col justify-center relative cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
                  onclick="showPhotos({{ m.id }})">
-                <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}</p>
+                <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}{% if m.name.split()[0]|lower in connected_names %} <span class="text-xs" title="Has a Polly">&#x1F99C;</span>{% endif %}</p>
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
                 {% if m.bio and not (session.role == 'family' and m.is_minor) %}
                 <p class="text-xs text-gray-400 mt-0.5 truncate">{{ m.bio[:30] }}{% if m.bio|length > 30 %}...{% endif %}</p>
