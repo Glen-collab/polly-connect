@@ -1609,39 +1609,40 @@ async def messages_page(request: Request):
         "owner_name": owner_name,
         "devices": devices,
         "connected_families": connected_families,
-        "viewing_connected": None,
     })
 
 
-@router.get("/messages/connected/{connected_tenant_id}", response_class=HTMLResponse)
-async def messages_connected(request: Request, connected_tenant_id: int):
-    """Read-only view of a connected family's message board."""
+@router.post("/messages/send-connected")
+async def messages_send_connected(request: Request,
+                                   connected_tenant_id: str = Form(...),
+                                   message: str = Form(...)):
+    """Send a message to a connected family's Polly."""
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
         return redirect
     db = request.app.state.db
     tid = session["tenant_id"]
+    target_tid = int(connected_tenant_id)
 
-    # Verify connection exists
+    # Verify connection
     connections = db.get_connected_families(tid)
-    connected = next((c for c in connections if c["connected_tenant_id"] == connected_tenant_id), None)
+    connected = next((c for c in connections if c["connected_tenant_id"] == target_tid), None)
     if not connected:
         return RedirectResponse("/web/messages", status_code=303)
 
-    messages = db.get_messages_for(tenant_id=connected_tenant_id)
-    all_connections = connections
+    # Get sender's household name
+    my_tenant = db.get_tenant(tid)
+    from_name = my_tenant["name"] if my_tenant else "A friend"
 
-    return templates.TemplateResponse("messages.html", {
-        "request": request,
-        "session": session,
-        "messages": messages,
-        "family_members": [],
-        "owner_name": None,
-        "devices": [],
-        "connected_families": all_connections,
-        "viewing_connected": connected,
-    })
+    # Save message on the TARGET tenant's board
+    db.save_message(
+        from_name=from_name,
+        message=message.strip(),
+        tenant_id=target_tid,
+    )
+
+    return RedirectResponse("/web/messages?sent=1", status_code=303)
 
 
 @router.post("/messages/send")
