@@ -17,6 +17,9 @@
 </div>
 {% endif %}
 
+{% if session.is_admin %}
+<!-- ══════════ ADMIN VIEW ══════════ -->
+
 {% if new_claim_code %}
 <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-6">
     <h3 class="font-bold text-yellow-800 mb-2">New Device Created</h3>
@@ -34,31 +37,7 @@
 </div>
 {% endif %}
 
-<!-- Claim a Device (non-admin users) -->
-{% if not session.is_admin %}
-<div class="bg-white rounded-lg shadow-md p-4 mb-6">
-    <h2 class="text-lg font-semibold mb-2">Claim a Device</h2>
-    <p class="text-sm text-gray-500 mb-3">Enter the 6-digit code from the card that came with your Polly device.</p>
-    <form method="POST" action="/web/devices/claim" class="flex flex-col gap-3">
-        <div class="flex flex-col sm:flex-row gap-3">
-            <input type="text" name="claim_code" required
-                   inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-                   placeholder="000000"
-                   class="border rounded-lg px-4 py-3 text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                   style="max-width: 200px;">
-            <input type="text" name="device_name" placeholder="Name your Polly (e.g. Grandma's Polly)"
-                   class="flex-1 border rounded-lg px-3 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
-        </div>
-        <button type="submit"
-                class="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 font-medium whitespace-nowrap w-full sm:w-auto">
-            Claim Device
-        </button>
-    </form>
-</div>
-{% endif %}
-
-<!-- Add Device (admin only) -->
-{% if session.is_admin %}
+<!-- Add Device -->
 <div class="bg-white rounded-lg shadow-md p-4 mb-6">
     <h2 class="text-lg font-semibold mb-3">Add New Device</h2>
     <form method="POST" action="/web/devices/add" class="flex flex-col gap-3">
@@ -80,23 +59,18 @@
         </button>
     </form>
 </div>
-{% endif %}
 
-<!-- Device List -->
+<!-- Admin Device Table -->
 <div class="bg-white rounded-lg shadow-md overflow-hidden">
     <table class="w-full text-sm">
         <thead class="bg-gray-50">
             <tr>
                 <th class="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-                {% if session.is_admin %}
                 <th class="text-left px-4 py-3 font-medium text-gray-600">Owner</th>
-                {% endif %}
                 <th class="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Device ID</th>
                 <th class="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">Last Seen</th>
                 <th class="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                {% if session.is_admin %}
                 <th class="text-left px-4 py-3 font-medium text-gray-600">Claim Code</th>
-                {% endif %}
                 <th class="px-4 py-3"></th>
             </tr>
         </thead>
@@ -104,7 +78,6 @@
             {% for device in devices %}
             <tr class="border-t">
                 <td class="px-4 py-3 font-medium">{{ device.name or 'Unnamed' }}</td>
-                {% if session.is_admin %}
                 <td class="px-4 py-3 text-sm">
                     {% if device.tenant_id %}
                     <span class="text-gray-700">{{ device.tenant_name or 'Unknown' }}</span>
@@ -112,7 +85,6 @@
                     <span class="text-orange-500 font-medium">Unclaimed</span>
                     {% endif %}
                 </td>
-                {% endif %}
                 <td class="px-4 py-3 text-gray-500 font-mono text-xs hidden sm:table-cell">{{ device.device_id }}</td>
                 <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ device.last_seen or 'Never' }}</td>
                 <td class="px-4 py-3">
@@ -120,15 +92,12 @@
                     <span class="inline-block bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-full">Claimed</span>
                     {% elif device.tenant_id and device.api_key_hash %}
                     <span class="inline-block bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Assigned</span>
-                    {% elif device.api_key_hash %}
-                    <span class="inline-block bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full">Configured</span>
                     {% elif device.claim_code %}
                     <span class="inline-block bg-orange-100 text-orange-700 text-xs px-2 py-1 rounded-full">Awaiting Claim</span>
                     {% else %}
                     <span class="inline-block bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">No Key</span>
                     {% endif %}
                 </td>
-                {% if session.is_admin %}
                 <td class="px-4 py-3">
                     {% if device.claim_code %}
                     <span class="font-mono text-sm font-bold text-yellow-700 bg-yellow-50 px-2 py-1 rounded">{{ device.claim_code }}</span>
@@ -136,10 +105,9 @@
                     <a href="/web/devices/{{ device.device_id }}/setup-card" target="_blank"
                        class="ml-2 text-emerald-600 hover:text-emerald-800 text-xs font-medium">Print</a>
                     {% else %}
-                    <span class="text-xs text-gray-400">—</span>
+                    <span class="text-xs text-gray-400">&mdash;</span>
                     {% endif %}
                 </td>
-                {% endif %}
                 <td class="px-4 py-3 text-right">
                     <form method="POST" action="/web/devices/{{ device.device_id }}/delete"
                           onsubmit="return confirmDeleteDevice('{{ device.name or device.device_id }}')">
@@ -150,12 +118,59 @@
             {% endfor %}
             {% if not devices %}
             <tr class="border-t">
-                <td colspan="{% if session.is_admin %}7{% else %}5{% endif %}" class="px-4 py-8 text-center text-gray-400">No devices registered yet</td>
+                <td colspan="7" class="px-4 py-8 text-center text-gray-400">No devices registered yet</td>
             </tr>
             {% endif %}
         </tbody>
     </table>
 </div>
+
+{% else %}
+<!-- ══════════ CUSTOMER VIEW ══════════ -->
+
+{% if devices %}
+<div class="space-y-3 max-w-lg">
+    {% for device in devices %}
+    <div class="bg-white rounded-lg shadow-md p-4 flex items-center justify-between">
+        <div>
+            <p class="font-semibold text-gray-800">{{ device.name or 'My Polly' }}</p>
+            {% if device.last_seen %}
+            <p class="text-xs text-gray-400 mt-1">Last seen: {{ device.last_seen }}</p>
+            {% endif %}
+        </div>
+        <span class="inline-block bg-emerald-100 text-emerald-700 text-xs px-3 py-1 rounded-full font-medium">Connected</span>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg shadow-md p-6 text-center max-w-lg">
+    <p class="text-gray-500 mb-4">No devices connected to your account yet.</p>
+    <p class="text-sm text-gray-400">If you have a claim code from your setup card, enter it below.</p>
+</div>
+{% endif %}
+
+<!-- Claim form (only shows if they need to add a device manually) -->
+<div class="bg-white rounded-lg shadow-md p-4 mt-4 max-w-lg">
+    <h2 class="text-base font-semibold mb-2">Have a claim code?</h2>
+    <p class="text-xs text-gray-400 mb-3">Enter the 6-digit code from the card that came with your Polly device.</p>
+    <form method="POST" action="/web/devices/claim" class="flex flex-col gap-3">
+        <div class="flex flex-col sm:flex-row gap-3">
+            <input type="text" name="claim_code" required
+                   inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                   placeholder="000000"
+                   class="border rounded-lg px-4 py-3 text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                   style="max-width: 200px;">
+            <input type="text" name="device_name" placeholder="Name your Polly"
+                   class="flex-1 border rounded-lg px-3 py-3 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+        </div>
+        <button type="submit"
+                class="bg-emerald-600 text-white px-6 py-3 rounded-lg hover:bg-emerald-700 font-medium w-full sm:w-auto">
+            Claim Device
+        </button>
+    </form>
+</div>
+
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
