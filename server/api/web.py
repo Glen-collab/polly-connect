@@ -1749,8 +1749,6 @@ async def settings_page(request: Request):
             dev["settings"] = {}
     has_multiple_devices = len(tenant_devices) > 1
 
-    connected_families = db.get_connected_families(tid)
-
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "session": session,
@@ -1764,7 +1762,6 @@ async def settings_page(request: Request):
         "devices": tenant_devices,
         "has_multiple_devices": has_multiple_devices,
         "ambient_active": _check_ambient_active(request),
-        "connected_families": connected_families,
     })
 
 
@@ -2669,14 +2666,43 @@ async def family_code_revoke(request: Request):
 
 
 @router.post("/settings/connections/add")
-async def connections_add(request: Request, family_code: str = Form(...)):
+async def connections_add(request: Request, family_code: str = Form(...),
+                          member_id: str = Form("")):
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
         return redirect
     db = request.app.state.db
+    tid = session["tenant_id"]
     code = family_code.strip()
-    result = db.send_friend_request(session["tenant_id"], code)
+
+    # If member_id provided, verify the code matches that person's name
+    if member_id:
+        member = db.get_family_member_by_id(int(member_id))
+        if not member or member.get("tenant_id") != tid:
+            return RedirectResponse("/web/family-tree?req_error=Member+not+found", status_code=303)
+
+        # Look up the tenant behind this code
+        target_tenant = db.validate_family_code(code)
+        if not target_tenant:
+            return RedirectResponse(f"/web/family-tree?req_error=Invalid+code", status_code=303)
+
+        # Check if the target tenant's owner name matches the family member's name (fuzzy first name)
+        target_tid = target_tenant["tenant"]["id"]
+        target_user = db.get_or_create_user(tenant_id=target_tid)
+        target_name = (target_user.get("name") or "").strip().lower()
+        member_name = (member.get("name") or "").strip().lower()
+
+        # Match on first name
+        target_first = target_name.split()[0] if target_name else ""
+        member_first = member_name.split()[0] if member_name else ""
+
+        if not target_first or not member_first or target_first != member_first:
+            return RedirectResponse(
+                f"/web/family-tree?req_error=That+code+doesn't+match+{member['name']}",
+                status_code=303)
+
+    result = db.send_friend_request(tid, code)
     if result:
         return RedirectResponse(
             f"/web/family-tree?req_sent={result['connected_tenant_name']}",

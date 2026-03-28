@@ -183,17 +183,6 @@
 </div>
 {% endif %}
 
-<!-- Connect with a friend -->
-<div class="mt-4 mb-6 max-w-sm mx-auto">
-    <form method="POST" action="/web/settings/connections/add" class="flex gap-2">
-        <input type="text" name="family_code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
-               placeholder="Friend's 6-digit code"
-               class="flex-1 border rounded-lg px-3 py-2 text-sm text-center font-mono tracking-widest focus:ring-2 focus:ring-blue-500">
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">
-            Add Friend
-        </button>
-    </form>
-</div>
 {% endif %}
 
 <!-- Connected friend modal (send message) -->
@@ -388,6 +377,31 @@ function showPhotos(memberId) {
                 html += '<div class="bg-gray-50 rounded-lg p-3 mb-4">';
                 if (bioText) html += '<p class="text-sm text-gray-700">' + bioText + '</p>';
                 if (details.length > 0) html += '<p class="text-xs text-gray-500 mt-1">' + details.join(' · ') + '</p>';
+                html += '</div>';
+            }
+        }
+
+        // Connect their Polly section (owner only, non-deceased, not already connected)
+        if (m && !m.deceased && userRole !== 'family') {
+            // Check if this member is already a connected friend
+            var alreadyConnected = false;
+            {% if connected_families %}
+            var connectedNames = [{% for cf in connected_families %}'{{ cf.connected_tenant_name|lower }}'{% if not loop.last %},{% endif %}{% endfor %}];
+            if (connectedNames.some(function(n) { return n.indexOf(data.member_name.toLowerCase().split(' ')[0]) >= 0; })) {
+                alreadyConnected = true;
+            }
+            {% endif %}
+            if (!alreadyConnected) {
+                html += '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4">';
+                html += '<button type="button" onclick="document.getElementById(\'polly-link-' + memberId + '\').classList.toggle(\'hidden\')" class="text-sm text-blue-600 font-medium hover:text-blue-800 w-full text-left">Connect ' + data.member_name + '\'s Polly</button>';
+                html += '<div id="polly-link-' + memberId + '" class="hidden mt-2">';
+                html += '<p class="text-xs text-gray-500 mb-2">If ' + data.member_name + ' has a Polly device, enter their 6-digit code to connect.</p>';
+                html += '<form method="POST" action="/web/settings/connections/add" class="flex gap-2">';
+                html += '<input type="hidden" name="member_id" value="' + memberId + '">';
+                html += '<input type="text" name="family_code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="000000" class="border rounded-lg px-3 py-2 text-sm text-center font-mono tracking-widest focus:ring-2 focus:ring-blue-500" style="max-width:140px;">';
+                html += '<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Connect</button>';
+                html += '</form>';
+                html += '</div>';
                 html += '</div>';
             }
         }
