@@ -1596,6 +1596,11 @@ async def messages_page(request: Request):
     # Add the owner to the recipient list so family members can message them
     owner = db.get_or_create_user(tenant_id=tid)
     owner_name = owner.get("familiar_name") or owner.get("name")
+    # Connected families (owner only, not family role)
+    connected_families = []
+    if session.get("role") != "family":
+        connected_families = db.get_connected_families(tid)
+
     return templates.TemplateResponse("messages.html", {
         "request": request,
         "session": session,
@@ -1603,6 +1608,39 @@ async def messages_page(request: Request):
         "family_members": family_members,
         "owner_name": owner_name,
         "devices": devices,
+        "connected_families": connected_families,
+        "viewing_connected": None,
+    })
+
+
+@router.get("/messages/connected/{connected_tenant_id}", response_class=HTMLResponse)
+async def messages_connected(request: Request, connected_tenant_id: int):
+    """Read-only view of a connected family's message board."""
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Verify connection exists
+    connections = db.get_connected_families(tid)
+    connected = next((c for c in connections if c["connected_tenant_id"] == connected_tenant_id), None)
+    if not connected:
+        return RedirectResponse("/web/messages", status_code=303)
+
+    messages = db.get_messages_for(tenant_id=connected_tenant_id)
+    all_connections = connections
+
+    return templates.TemplateResponse("messages.html", {
+        "request": request,
+        "session": session,
+        "messages": messages,
+        "family_members": [],
+        "owner_name": None,
+        "devices": [],
+        "connected_families": all_connections,
+        "viewing_connected": connected,
     })
 
 
@@ -1738,6 +1776,8 @@ async def settings_page(request: Request):
             dev["settings"] = {}
     has_multiple_devices = len(tenant_devices) > 1
 
+    connected_families = db.get_connected_families(tid)
+
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "session": session,
@@ -1751,6 +1791,7 @@ async def settings_page(request: Request):
         "devices": tenant_devices,
         "has_multiple_devices": has_multiple_devices,
         "ambient_active": _check_ambient_active(request),
+        "connected_families": connected_families,
     })
 
 
@@ -2651,6 +2692,35 @@ async def family_code_revoke(request: Request):
 
     db = request.app.state.db
     db.revoke_family_code(session["tenant_id"])
+    return RedirectResponse("/web/settings", status_code=303)
+
+
+@router.post("/settings/connections/add")
+async def connections_add(request: Request, family_code: str = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    code = family_code.strip()
+    result = db.connect_families(session["tenant_id"], code)
+    if result:
+        return RedirectResponse(
+            f"/web/settings?conn_success=Connected+to+{result['connected_tenant_name']}",
+            status_code=303)
+    return RedirectResponse(
+        "/web/settings?conn_error=Invalid+code,+already+connected,+or+that's+your+own+code",
+        status_code=303)
+
+
+@router.post("/settings/connections/{connected_tenant_id}/remove")
+async def connections_remove(request: Request, connected_tenant_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    db.disconnect_family(session["tenant_id"], connected_tenant_id)
     return RedirectResponse("/web/settings", status_code=303)
 
 

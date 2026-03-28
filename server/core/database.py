@@ -298,6 +298,19 @@ class PollyDB:
             if "device_id" not in msg_cols:
                 conn.execute("ALTER TABLE family_messages ADD COLUMN device_id TEXT")
 
+            # ── Connected families (cross-tenant message board access) ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS connected_families (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER NOT NULL,
+                    connected_tenant_id INTEGER NOT NULL,
+                    connected_tenant_name TEXT NOT NULL,
+                    nickname TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(tenant_id, connected_tenant_id)
+                )
+            """)
+
             # ── Multi-tenant tables ──
 
             conn.execute("""
@@ -775,6 +788,78 @@ class PollyDB:
         try:
             conn.row_factory = sqlite3.Row
             results = conn.execute("SELECT * FROM tenants ORDER BY name").fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Connected families (cross-tenant) ──
+
+    def connect_families(self, tenant_id: int, target_family_code: str) -> Optional[Dict]:
+        """Connect two families by entering the target's family code. Creates bidirectional link."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            # Find target tenant by family code
+            target = conn.execute(
+                "SELECT * FROM tenants WHERE family_code = ?", (target_family_code,)
+            ).fetchone()
+            if not target:
+                return None
+            target_tid = target["id"]
+            if target_tid == tenant_id:
+                return None  # Can't connect to yourself
+
+            # Check if already connected
+            existing = conn.execute(
+                "SELECT 1 FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ?",
+                (tenant_id, target_tid)
+            ).fetchone()
+            if existing:
+                return None
+
+            # Get both tenant names
+            my_tenant = conn.execute("SELECT name FROM tenants WHERE id = ?", (tenant_id,)).fetchone()
+            my_name = my_tenant["name"] if my_tenant else "Unknown"
+            target_name = target["name"]
+
+            # Insert both directions
+            conn.execute(
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name) VALUES (?, ?, ?)",
+                (tenant_id, target_tid, target_name))
+            conn.execute(
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name) VALUES (?, ?, ?)",
+                (target_tid, tenant_id, my_name))
+            conn.commit()
+            return {"connected_tenant_id": target_tid, "connected_tenant_name": target_name}
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def disconnect_family(self, tenant_id: int, connected_tenant_id: int):
+        """Remove a family connection (both directions)."""
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "DELETE FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ?",
+                (tenant_id, connected_tenant_id))
+            conn.execute(
+                "DELETE FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ?",
+                (connected_tenant_id, tenant_id))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_connected_families(self, tenant_id: int) -> List[Dict]:
+        """Get all families connected to this tenant."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM connected_families WHERE tenant_id = ? ORDER BY connected_tenant_name",
+                (tenant_id,)
+            ).fetchall()
             return [dict(r) for r in results]
         finally:
             if not self._conn:

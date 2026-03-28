@@ -3,8 +3,32 @@
 
 {% block content %}
 <a href="/web/hub/family" class="text-emerald-600 hover:underline text-sm">&larr; Family</a>
-<h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 mt-1">Message Board 🦜</h1>
+<h1 class="text-xl sm:text-2xl font-bold mb-4 mt-1">Message Board</h1>
 
+{% if connected_families %}
+<!-- Family tabs -->
+<div class="flex gap-1 mb-4 overflow-x-auto">
+    <a href="/web/messages"
+       class="px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap
+              {% if not viewing_connected %}bg-emerald-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+        Your Board
+    </a>
+    {% for cf in connected_families %}
+    <a href="/web/messages/connected/{{ cf.connected_tenant_id }}"
+       class="px-4 py-2 rounded-t-lg text-sm font-medium whitespace-nowrap
+              {% if viewing_connected and viewing_connected.connected_tenant_id == cf.connected_tenant_id %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+        {{ cf.connected_tenant_name }}
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if viewing_connected %}
+<!-- Read-only connected family board -->
+<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+    <p class="text-sm text-blue-800 font-medium">Viewing {{ viewing_connected.connected_tenant_name }}'s message board (read-only)</p>
+</div>
+{% else %}
 <!-- Send Message Form -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <h2 class="text-base sm:text-lg font-semibold mb-3">Leave a Message</h2>
@@ -51,6 +75,7 @@
         </button>
     </form>
 </div>
+{% endif %}
 
 <!-- Active Messages -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6">
@@ -91,12 +116,14 @@
                         {% endif %}
                     </div>
                 </div>
+                {% if not viewing_connected %}
                 <form method="POST" action="/web/messages/{{ msg.id }}/delete" class="ml-2 flex-shrink-0">
                     <button type="submit" onclick="return confirm('Delete this message?')"
                             class="text-red-400 hover:text-red-600 text-lg leading-none p-1" title="Delete message">
                         &times;
                     </button>
                 </form>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
@@ -106,7 +133,7 @@
     {% endif %}
 </div>
 
-{% if session.role != 'family' and messages|length > 0 %}
+{% if session.role != 'family' and messages|length > 0 and not viewing_connected %}
 <!-- Clear All (owner only) -->
 <div class="mt-4 text-center">
     <form method="POST" action="/web/messages/clear-all">

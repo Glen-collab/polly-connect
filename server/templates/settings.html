@@ -481,6 +481,52 @@ setTimeout(function() {
         </div>
     </div>
 </div>
+
+<!-- Connected Families -->
+<div class="bg-white rounded-lg shadow p-4 sm:p-5 mb-4">
+    <h2 class="text-base sm:text-lg font-semibold mb-3">Connected Families</h2>
+    <p class="text-xs sm:text-sm text-gray-500 mb-4">
+        Connect with other Polly families to see each other's message boards.
+    </p>
+
+    {% if request.query_params.get('conn_success') %}
+    <div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4">
+        <p class="text-sm text-emerald-800 font-medium">{{ request.query_params.get('conn_success') }}</p>
+    </div>
+    {% endif %}
+    {% if request.query_params.get('conn_error') %}
+    <div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-4">
+        <p class="text-sm text-red-800 font-medium">{{ request.query_params.get('conn_error') }}</p>
+    </div>
+    {% endif %}
+
+    {% if connected_families %}
+    <div class="space-y-2 mb-4">
+        {% for cf in connected_families %}
+        <div class="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
+            <span class="text-sm font-medium text-gray-800">{{ cf.connected_tenant_name }}</span>
+            <form method="POST" action="/web/settings/connections/{{ cf.connected_tenant_id }}/remove"
+                  onsubmit="return confirm('Disconnect from {{ cf.connected_tenant_name }}?')">
+                <button type="submit" class="text-xs text-red-400 hover:text-red-600">Disconnect</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-gray-400 mb-4">No connected families yet.</p>
+    {% endif %}
+
+    <form method="POST" action="/web/settings/connections/add" class="flex flex-col sm:flex-row gap-2">
+        <input type="text" name="family_code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+               placeholder="Enter their 6-digit family code"
+               class="border rounded-lg px-3 py-2 text-sm text-center font-mono tracking-widest focus:ring-2 focus:ring-emerald-500"
+               style="max-width: 220px;">
+        <button type="submit"
+                class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium">
+            Connect
+        </button>
+    </form>
+</div>
 {% endblock %}
 
 {% block scripts %}
