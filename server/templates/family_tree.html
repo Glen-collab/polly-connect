@@ -392,23 +392,6 @@ function showPhotos(memberId) {
             }
         }
 
-        // Send Message section (inline in modal)
-        if (m && !m.deceased) {
-            html += '<div class="border rounded-lg p-3 mb-4">';
-            html += '<div id="msg-form-' + memberId + '">';
-            html += '<button type="button" onclick="document.getElementById(\'msg-input-' + memberId + '\').classList.toggle(\'hidden\')" class="text-sm text-blue-600 font-medium hover:text-blue-800 w-full text-left">Send ' + data.member_name + ' a message</button>';
-            html += '<div id="msg-input-' + memberId + '" class="hidden mt-2">';
-            html += '<form method="POST" action="/web/messages/send">';
-            html += '<input type="hidden" name="from_name" value="{{ session.name }}">';
-            html += '<input type="hidden" name="to_name" value="' + data.member_name + '">';
-            html += '<textarea name="message" required rows="2" placeholder="Type your message..." class="w-full border rounded px-3 py-2 text-sm resize-y mb-2"></textarea>';
-            html += '<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 w-full">Send Message</button>';
-            html += '</form>';
-            html += '</div>';
-            html += '</div>';
-            html += '</div>';
-        }
-
         // Photos section
         if (!data.photos || data.photos.length === 0) {
             html += '<div class="text-center py-8">' +
