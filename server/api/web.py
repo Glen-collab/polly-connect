@@ -5107,6 +5107,146 @@ async def billing_portal(request: Request):
     )
 
 
+# ── Admin Provisioning (one-click device setup) ──
+
+@router.get("/admin/provision", response_class=HTMLResponse)
+async def admin_provision_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_admin(session)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse("admin_provision.html", {
+        "request": request, "session": session,
+        "result": None, "error": None,
+    })
+
+
+@router.post("/admin/provision")
+async def admin_provision_submit(request: Request,
+                                  owner_name: str = Form(...),
+                                  familiar_name: str = Form(""),
+                                  household_name: str = Form(...),
+                                  email: str = Form(...),
+                                  hometown: str = Form(""),
+                                  location_city: str = Form(""),
+                                  birth_year: str = Form(""),
+                                  device_name: str = Form(""),
+                                  tier: str = Form("legacy")):
+    session = await get_web_session(request)
+    redirect = require_admin(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    email = email.strip().lower()
+
+    # Check if email already exists
+    if db.get_account_by_email(email):
+        return templates.TemplateResponse("admin_provision.html", {
+            "request": request, "session": session, "result": None,
+            "error": f"Account with email {email} already exists.",
+        })
+
+    # 1. Create tenant
+    tenant_id = db.create_tenant(household_name.strip())
+
+    # 2. Set subscription tier
+    from core.subscription import start_trial
+    if tier == "legacy":
+        # Set legacy tier directly
+        conn = db._get_connection()
+        try:
+            conn.execute(
+                "UPDATE tenants SET subscription_tier = 'legacy', subscription_status = 'active' WHERE id = ?",
+                (tenant_id,))
+            conn.commit()
+        finally:
+            if not db._conn:
+                conn.close()
+    else:
+        start_trial(db, tenant_id, days=30)
+
+    # 3. Generate temp password
+    import secrets, string
+    temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+    pw_hash = hash_password(temp_password)
+
+    # 4. Create account
+    account_id = db.create_account(email, pw_hash, owner_name.strip(), tenant_id, role="owner")
+
+    # 5. Create user profile with all info pre-filled
+    user = db.get_or_create_user(name=owner_name.strip(), tenant_id=tenant_id)
+
+    # Parse birth year
+    birth_year_int = None
+    if birth_year and birth_year.strip().isdigit():
+        birth_year_int = max(1800, min(2026, int(birth_year.strip())))
+
+    # Geocode location
+    location_lat = None
+    location_lon = None
+    if location_city.strip():
+        coords = _geocode_city(location_city.strip())
+        if coords:
+            location_lat, location_lon = coords
+
+    # Update profile with all details + mark setup complete
+    conn = db._get_connection()
+    try:
+        conn.execute("""
+            UPDATE user_profiles SET name = ?, familiar_name = ?,
+            hometown = ?, birth_year = ?,
+            location_city = ?, location_lat = ?, location_lon = ?,
+            setup_complete = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (owner_name.strip(), familiar_name.strip() or None,
+              hometown.strip() or None, birth_year_int,
+              location_city.strip() or None, location_lat, location_lon,
+              user["id"]))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    # 6. Create device + pre-assign to tenant
+    device_id = f"polly-{uuid.uuid4().hex[:8]}"
+    api_key = generate_api_key()
+    dev_name = device_name.strip() if device_name.strip() else f"{familiar_name.strip() or owner_name.strip()}'s Polly"
+    db.register_device(device_id, tenant_id, name=dev_name, api_key=api_key)
+    claim_code = db.generate_claim_code(device_id)
+
+    # Mark as claimed
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "UPDATE devices SET claimed_at = CURRENT_TIMESTAMP WHERE device_id = ?",
+            (device_id,))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    result = {
+        "owner_name": owner_name.strip(),
+        "familiar_name": familiar_name.strip(),
+        "household_name": household_name.strip(),
+        "email": email,
+        "temp_password": temp_password,
+        "device_name": dev_name,
+        "device_id": device_id,
+        "claim_code": claim_code,
+        "tenant_id": tenant_id,
+        "tier": tier,
+        "location_city": location_city.strip(),
+        "hometown": hometown.strip(),
+    }
+
+    return templates.TemplateResponse("admin_provision.html", {
+        "request": request, "session": session,
+        "result": result, "error": None,
+    })
+
+
 # ── Admin Dashboard (cross-tenant) ──
 
 @router.get("/admin", response_class=HTMLResponse)

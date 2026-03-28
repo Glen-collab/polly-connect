@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Provision New Customer - Polly Connect{% endblock %}
+
+{% block content %}
+<a href="/web/admin" class="text-emerald-600 hover:underline text-sm">&larr; Admin Dashboard</a>
+<h1 class="text-xl sm:text-2xl font-bold mb-4 mt-1">Provision New Customer</h1>
+<p class="text-sm text-gray-500 mb-6">One form creates everything: tenant, account, profile, device. Customer gets a plug-and-play experience.</p>
+
+{% if error %}
+<div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-4 max-w-lg mx-auto">
+    <p class="text-red-800 text-sm font-medium">{{ error }}</p>
+</div>
+{% endif %}
+
+{% if result %}
+<!-- Success Card -->
+<div class="bg-emerald-50 border-2 border-emerald-400 rounded-lg p-6 mb-6 max-w-lg mx-auto">
+    <h2 class="text-lg font-bold text-emerald-800 mb-4">Customer Provisioned!</h2>
+
+    <div class="space-y-2 text-sm">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Owner:</span>
+            <span class="font-medium">{{ result.owner_name }}{% if result.familiar_name %} ("{{ result.familiar_name }}"){% endif %}</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Household:</span>
+            <span class="font-medium">{{ result.household_name }}</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Email:</span>
+            <span class="font-medium">{{ result.email }}</span>
+        </div>
+        <div class="flex justify-between border-t pt-2">
+            <span class="text-gray-600">Temp Password:</span>
+            <span class="font-bold font-mono text-emerald-700">{{ result.temp_password }}</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Device:</span>
+            <span class="font-medium">{{ result.device_name }}</span>
+        </div>
+        <div class="flex justify-between border-t pt-2">
+            <span class="text-gray-600">Claim Code:</span>
+            <span class="font-bold font-mono text-2xl text-emerald-700 tracking-widest">{{ result.claim_code }}</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Tier:</span>
+            <span class="font-medium">{{ result.tier }}</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Tenant ID:</span>
+            <span class="font-medium">{{ result.tenant_id }}</span>
+        </div>
+        {% if result.hometown %}
+        <div class="flex justify-between">
+            <span class="text-gray-600">Hometown:</span>
+            <span class="font-medium">{{ result.hometown }}</span>
+        </div>
+        {% endif %}
+        {% if result.location_city %}
+        <div class="flex justify-between">
+            <span class="text-gray-600">Weather Location:</span>
+            <span class="font-medium">{{ result.location_city }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="mt-4 pt-3 border-t border-emerald-300">
+        <p class="text-xs text-emerald-700 font-medium mb-2">What to include in the box:</p>
+        <ul class="text-xs text-emerald-600 space-y-1">
+            <li>1. Setup card with claim code: <span class="font-mono font-bold">{{ result.claim_code }}</span></li>
+            <li>2. Login card: <span class="font-mono">{{ result.email }}</span> / <span class="font-mono">{{ result.temp_password }}</span></li>
+            <li>3. Polly device + USB-C cable</li>
+        </ul>
+    </div>
+
+    <div class="mt-4 flex gap-2">
+        <a href="/web/devices/{{ result.device_id }}/setup-card" target="_blank"
+           class="flex-1 text-center bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 text-sm font-medium">
+            Print Setup Card
+        </a>
+        <a href="/web/admin/provision"
+           class="flex-1 text-center bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm font-medium">
+            Provision Another
+        </a>
+    </div>
+</div>
+{% endif %}
+
+{% if not result %}
+<!-- Provisioning Form -->
+<div class="bg-white rounded-lg shadow-md p-6 max-w-lg mx-auto">
+    <form method="POST" action="/web/admin/provision" class="space-y-4">
+
+        <h2 class="text-base font-semibold text-gray-800 border-b pb-2">Who is Polly for?</h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Owner's Full Name *</label>
+                <input type="text" name="owner_name" required placeholder="e.g. Evelyn Rogers"
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">What should Polly call them?</label>
+                <input type="text" name="familiar_name" placeholder="e.g. Grandma, Dad, Evelyn"
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Household Name *</label>
+            <input type="text" name="household_name" required placeholder="e.g. The Rogers Family"
+                   class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <h2 class="text-base font-semibold text-gray-800 border-b pb-2 pt-2">Account</h2>
+
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Email * <span class="text-gray-400">(for login)</span></label>
+            <input type="email" name="email" required placeholder="evelyn@example.com"
+                   class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Subscription Tier</label>
+            <select name="tier" class="w-full border rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-emerald-500">
+                <option value="legacy">Legacy (3 devices)</option>
+                <option value="trial">Trial (30 days free)</option>
+            </select>
+        </div>
+
+        <h2 class="text-base font-semibold text-gray-800 border-b pb-2 pt-2">Personalization</h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Hometown</label>
+                <input type="text" name="hometown" placeholder="e.g. Hartland, WI"
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+                <p class="text-xs text-gray-400 mt-1">For nostalgia prompts</p>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Current City/State</label>
+                <input type="text" name="location_city" placeholder="e.g. Milwaukee, WI"
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+                <p class="text-xs text-gray-400 mt-1">For weather reports</p>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Birth Year</label>
+            <input type="number" name="birth_year" min="1900" max="2026" placeholder="e.g. 1945"
+                   class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 max-w-[150px]">
+            <p class="text-xs text-gray-400 mt-1">For age-appropriate questions</p>
+        </div>
+
+        <h2 class="text-base font-semibold text-gray-800 border-b pb-2 pt-2">Device</h2>
+
+        <div>
+            <label class="block text-sm text-gray-600 mb-1">Device Name</label>
+            <input type="text" name="device_name" placeholder="Auto-generated if blank (e.g. Grandma's Polly)"
+                   class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <button type="submit"
+                class="w-full bg-emerald-600 text-white px-4 py-3 rounded-lg hover:bg-emerald-700 font-medium text-base mt-4">
+            Provision Customer
+        </button>
+    </form>
+</div>
+{% endif %}
+
+{% endblock %}
