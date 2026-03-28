@@ -15,7 +15,7 @@
  * Pin Map (Waveshare ESP32-S3-AUDIO-Board):
  *   I2C:  SDA=GPIO1, SCL=GPIO2
  *   I2S:  MCLK=GPIO0, BCLK=GPIO3, WS=GPIO4, DOUT=GPIO5, DIN=GPIO6
- *   LED:  GPIO48 (WS2812 RGB, used as simple on/off)
+ *   LED:  GPIO48 (WS2812 RGB — green=listening, white=thinking, blue=playing, red=disconnected)
  *
  * Codec I2C Addresses:
  *   ES8311 (DAC/speaker) = 0x18
@@ -43,6 +43,7 @@
 #include "driver/i2s_std.h"
 #include "driver/i2c.h"
 #include "driver/gpio.h"
+#include "led_strip.h"
 
 #include "esp_websocket_client.h"
 #include "cJSON.h"
@@ -390,18 +391,72 @@ static void es7210_init(void)
 }
 
 
-/* --- LED helpers --- */
+/* --- RGB LED (WS2812 on GPIO48) --- */
+
+static led_strip_handle_t led_strip = NULL;
+
+// LED states for visual feedback
+typedef enum {
+    LED_OFF = 0,        // Idle — waiting for wake word
+    LED_GREEN,          // Listening — wake word detected, recording
+    LED_WHITE_PULSE,    // Thinking — sent to server, waiting for response
+    LED_BLUE,           // Playing — speaking back
+    LED_RED,            // Disconnected / error
+    LED_RED_BLINK,      // Provisioning mode
+    LED_YELLOW,         // Story recording
+} led_state_t;
+
+static volatile led_state_t current_led_state = LED_OFF;
 
 static void led_init(void)
 {
-    gpio_reset_pin(LED_PIN);
-    gpio_set_direction(LED_PIN, GPIO_MODE_OUTPUT);
-    gpio_set_level(LED_PIN, 0);
+    led_strip_config_t strip_config = {
+        .strip_gpio_num = LED_PIN,
+        .max_leds = 1,
+        .led_model = LED_MODEL_WS2812,
+        .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB,
+        .flags.invert_out = false,
+    };
+    led_strip_rmt_config_t rmt_config = {
+        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .resolution_hz = 10 * 1000 * 1000, // 10MHz
+        .flags.with_dma = false,
+    };
+    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
+    led_strip_clear(led_strip);
 }
 
+static void led_rgb(uint8_t r, uint8_t g, uint8_t b)
+{
+    if (!led_strip) return;
+    led_strip_set_pixel(led_strip, 0, r, g, b);
+    led_strip_refresh(led_strip);
+}
+
+// Backwards compat: led_set(1) = green, led_set(0) = off
 static void led_set(int on)
 {
-    gpio_set_level(LED_PIN, on ? 1 : 0);
+    if (on) {
+        current_led_state = LED_GREEN;
+        led_rgb(0, 40, 0);
+    } else {
+        current_led_state = LED_OFF;
+        led_rgb(0, 0, 0);
+    }
+}
+
+static void led_state_set(led_state_t state)
+{
+    current_led_state = state;
+    switch (state) {
+        case LED_OFF:          led_rgb(0, 0, 0);      break;
+        case LED_GREEN:        led_rgb(0, 40, 0);     break;  // Listening
+        case LED_WHITE_PULSE:  led_rgb(30, 30, 30);   break;  // Thinking (solid, task blinks)
+        case LED_BLUE:         led_rgb(0, 0, 40);     break;  // Playing audio
+        case LED_RED:          led_rgb(40, 0, 0);     break;  // Disconnected
+        case LED_RED_BLINK:    led_rgb(40, 0, 0);     break;  // Provisioning
+        case LED_YELLOW:       led_rgb(40, 30, 0);    break;  // Story recording
+    }
 }
 
 
@@ -1181,14 +1236,15 @@ static void captive_portal_start(void)
     // Blink LED: slow blink = provisioning mode
     ESP_LOGI(TAG, "Waiting for WiFi credentials via captive portal...");
 
-    // Block until credentials submitted (blink LED while waiting)
+    // Block until credentials submitted (blink RED while waiting)
     while (xSemaphoreTake(provision_done_sem, pdMS_TO_TICKS(500)) != pdTRUE) {
         static bool led_on = false;
         led_on = !led_on;
-        led_set(led_on ? 1 : 0);
+        if (led_on) led_state_set(LED_RED_BLINK);
+        else led_rgb(0, 0, 0);
     }
 
-    led_set(1);
+    led_state_set(LED_GREEN);  // Green = credentials received
     ESP_LOGI(TAG, "Credentials received! Rebooting in 2 seconds...");
     vTaskDelay(pdMS_TO_TICKS(2000));
     esp_restart();
@@ -1436,6 +1492,7 @@ static void ws_handle_message(const char *json_str, int len)
         }
         // Pause mic streaming while we receive/play audio
         streaming_paused = true;
+        led_state_set(LED_WHITE_PULSE);  // White = thinking/processing
 
     } else if (strcmp(evt, "audio_chunk") == 0) {
         cJSON *audio = cJSON_GetObjectItem(root, "audio");
@@ -1477,18 +1534,18 @@ static void ws_handle_message(const char *json_str, int len)
     } else if (strcmp(evt, "story_record_started") == 0) {
         ESP_LOGI(TAG, "*** STORY RECORDING STARTED ***");
         story_recording = true;
-        led_set(1);
+        led_state_set(LED_YELLOW);
 
     } else if (strcmp(evt, "story_record_stopped") == 0) {
         ESP_LOGI(TAG, "*** STORY RECORDING STOPPED ***");
         story_recording = false;
-        led_set(0);
+        led_state_set(LED_OFF);
 
     } else if (strcmp(evt, "no_wake_word") == 0) {
         ESP_LOGI(TAG, "No wake phrase detected, resuming...");
         streaming_paused = false;
         wake_detected = false;
-        led_set(0);
+        led_state_set(LED_OFF);
 
     } else if (strcmp(evt, "pong") == 0) {
         // keepalive ack
@@ -1554,7 +1611,7 @@ static void ws_event_handler(void *arg, esp_event_base_t event_base,
             ESP_LOGW(TAG, "WebSocket disconnected");
             ws_connected = false;
             streaming_paused = false;  // Unstick mic loop
-            led_set(0);               // LED off to indicate disconnected
+            led_state_set(LED_RED);    // Red = disconnected
             break;
 
         case WEBSOCKET_EVENT_ERROR:
@@ -1682,16 +1739,17 @@ static void mic_stream_task(void *arg)
     const uint32_t PAUSED_REBOOT_MS = 45000;  // Reboot after 45s stuck paused (no response_complete)
 
     while (1) {
-        // Handle wake word detection — just LED, keep streaming
+        // Handle wake word detection — green = listening
         if (wake_detected) {
             wake_detected = false;
-            led_set(1);
+            led_state_set(LED_GREEN);
         }
 
         // Handle response playback
         if (response_complete) {
+            led_state_set(LED_BLUE);  // Blue = playing audio
             play_response_audio();
-            led_set(0);
+            led_state_set(LED_OFF);
             // Cooldown: drain mic buffer so residual speaker audio doesn't trigger wake word
             for (int i = 0; i < 30; i++) {  // ~2 seconds of draining
                 mic_read(audio_chunk, CHUNK_SAMPLES);
@@ -1748,7 +1806,7 @@ static void mic_stream_task(void *arg)
                     if (send_fail_count >= 5) {
                         ws_connected = false;
                         streaming_paused = false;
-                        led_set(0);
+                        led_state_set(LED_RED);
                         send_fail_count = 0;
                     }
                     vTaskDelay(pdMS_TO_TICKS(100));
@@ -2042,9 +2100,9 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "Running from partition: %s", running->label);
 
-    // Init LED
+    // Init RGB LED
     led_init();
-    led_set(1);
+    led_state_set(LED_WHITE_PULSE);  // White = booting up
 
     // Init I2C bus (must come before codec init)
     ESP_ERROR_CHECK(i2c_init());
@@ -2093,7 +2151,7 @@ void app_main(void)
     // Amp off until we need to play audio
     tca9555_amp_enable(false);
 
-    led_set(0);
+    led_state_set(LED_OFF);  // Ready — waiting for wake word
     ESP_LOGI(TAG, "Setup complete. Streaming audio to server...");
 
     // Start story button polling task (K1/+ via TCA9555 I/O expander)
