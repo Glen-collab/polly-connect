@@ -801,7 +801,8 @@ class PollyDB:
     # ── Connected families (cross-tenant) ──
 
     def send_friend_request(self, tenant_id: int, target_family_code: str) -> Optional[Dict]:
-        """Connect two families by code. Auto-accepts (code + name = trust). Bidirectional."""
+        """Connect to another family by code. Sender is instantly connected.
+        Target gets a pending request they must accept."""
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
@@ -814,7 +815,7 @@ class PollyDB:
             if target_tid == tenant_id:
                 return None  # Can't connect to yourself
 
-            # Check if already connected in either direction
+            # Check if already connected or pending in either direction
             existing = conn.execute(
                 "SELECT 1 FROM connected_families WHERE "
                 "(tenant_id = ? AND connected_tenant_id = ?) OR "
@@ -829,12 +830,13 @@ class PollyDB:
             my_name = my_tenant["name"] if my_tenant else "Unknown"
             target_name = target["name"]
 
-            # Auto-accept: create both directions immediately
+            # Sender side: instantly accepted (can message right away)
             conn.execute(
                 "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'accepted')",
                 (tenant_id, target_tid, target_name))
+            # Target side: pending (they need to accept)
             conn.execute(
-                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'accepted')",
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'pending')",
                 (target_tid, tenant_id, my_name))
             conn.commit()
             return {"connected_tenant_id": target_tid, "connected_tenant_name": target_name}
@@ -843,7 +845,7 @@ class PollyDB:
                 conn.close()
 
     def accept_friend_request(self, tenant_id: int, requester_tenant_id: int) -> bool:
-        """Accept a pending friend request. Creates bidirectional connection."""
+        """Accept a pending friend request. Updates to accepted and adds sender to accepter's family tree."""
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
@@ -860,12 +862,26 @@ class PollyDB:
                 "UPDATE connected_families SET status = 'accepted' WHERE id = ?",
                 (pending["id"],))
 
-            # Create reverse direction
-            my_tenant = conn.execute("SELECT name FROM tenants WHERE id = ?", (tenant_id,)).fetchone()
-            my_name = my_tenant["name"] if my_tenant else "Unknown"
-            conn.execute(
-                "INSERT OR IGNORE INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'accepted')",
-                (requester_tenant_id, tenant_id, my_name))
+            # Get the requester's owner name to add to accepter's family tree
+            requester_user = conn.execute(
+                "SELECT name FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                (requester_tenant_id,)
+            ).fetchone()
+            requester_name = requester_user["name"] if requester_user else pending["connected_tenant_name"]
+
+            # Add requester to accepter's family tree as "Friend" (if not already there)
+            existing_member = conn.execute(
+                "SELECT 1 FROM family_members WHERE LOWER(name) = ? AND tenant_id = ?",
+                (requester_name.lower(), tenant_id)
+            ).fetchone()
+            if not existing_member:
+                name_norm = requester_name.lower().strip()
+                conn.execute("""
+                    INSERT INTO family_members (name, name_normalized, relationship, relation_to_owner,
+                    generation, tenant_id, added_by)
+                    VALUES (?, ?, 'friend', 'friend', 0, ?, 'Polly Connect')
+                """, (requester_name, name_norm, tenant_id))
+
             conn.commit()
             return True
         finally:
@@ -873,12 +889,16 @@ class PollyDB:
                 conn.close()
 
     def decline_friend_request(self, tenant_id: int, requester_tenant_id: int):
-        """Decline/delete a pending friend request."""
+        """Decline a friend request. Removes both directions."""
         conn = self._get_connection()
         try:
+            # Remove both directions
             conn.execute(
-                "DELETE FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'pending'",
+                "DELETE FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ?",
                 (tenant_id, requester_tenant_id))
+            conn.execute(
+                "DELETE FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ?",
+                (requester_tenant_id, tenant_id))
             conn.commit()
         finally:
             if not self._conn:
