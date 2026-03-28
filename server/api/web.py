@@ -2962,13 +2962,19 @@ async def family_tree_page(request: Request):
     # Build set of connected tenant IDs for template
     connected_tenant_ids = {cf["connected_tenant_id"] for cf in connected_families}
     # Look up actual owner names for connected tenants (not household name)
+    # Also build a map: first_name -> {tenant_id, tenant_name} for message buttons
     connected_names = set()
+    connected_name_map = {}
     for cf in connected_families:
         cf_user = db.get_or_create_user(tenant_id=cf["connected_tenant_id"])
         cf_name = (cf_user.get("name") or cf["connected_tenant_name"]).strip().lower()
         first = cf_name.split()[0] if cf_name else ""
         if first:
             connected_names.add(first)
+            connected_name_map[first] = {
+                "tenant_id": cf["connected_tenant_id"],
+                "tenant_name": cf["connected_tenant_name"],
+            }
 
     return templates.TemplateResponse("family_tree.html", {
         "request": request,
@@ -2980,6 +2986,7 @@ async def family_tree_page(request: Request):
         "connected_families": connected_families,
         "pending_requests": pending_requests,
         "connected_names": connected_names,
+        "connected_name_map": connected_name_map,
     })
 
 
