@@ -2961,10 +2961,12 @@ async def family_tree_page(request: Request):
 
     # Build set of connected tenant IDs for template
     connected_tenant_ids = {cf["connected_tenant_id"] for cf in connected_families}
-    # Map connected tenant names (lowercase first name) for card matching
+    # Look up actual owner names for connected tenants (not household name)
     connected_names = set()
     for cf in connected_families:
-        first = cf["connected_tenant_name"].strip().split()[0].lower() if cf["connected_tenant_name"] else ""
+        cf_user = db.get_or_create_user(tenant_id=cf["connected_tenant_id"])
+        cf_name = (cf_user.get("name") or cf["connected_tenant_name"]).strip().lower()
+        first = cf_name.split()[0] if cf_name else ""
         if first:
             connected_names.add(first)
 
