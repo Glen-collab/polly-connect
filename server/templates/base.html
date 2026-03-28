@@ -71,15 +71,19 @@
                             <a href="/web/settings" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Preferences</a>
                             <a href="/web/devices" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Devices</a>
                             <a href="/web/setup" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Setup</a>
-                            {% if session.is_admin %}
-                            <a href="/web/firmware" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Firmware</a>
-                            {% endif %}
                         </div>
                     </div>
                     {% endif %}
 
                     {% if session.is_admin %}
-                    <a href="/web/admin" class="hover:underline">Admin</a>
+                    <div class="nav-item relative">
+                        <a href="/web/admin" class="hover:underline">Admin ▾</a>
+                        <div class="nav-dropdown bg-emerald-700 rounded-b-lg shadow-lg min-w-[180px]">
+                            <a href="/web/admin" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Dashboard</a>
+                            <a href="/web/admin/provision" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Provision Customer</a>
+                            <a href="/web/firmware" class="block px-4 py-2 hover:bg-emerald-600 text-sm">Firmware</a>
+                        </div>
+                    </div>
                     {% endif %}
 
                     <span class="text-emerald-200 text-xs">|</span>
@@ -154,9 +158,16 @@
                         <li><a href="/web/settings" class="hover:text-gray-800">Preferences</a></li>
                         <li><a href="/web/setup" class="hover:text-gray-800">Setup</a></li>
                         <li><a href="/web/devices" class="hover:text-gray-800">Devices</a></li>
-                        {% if session.is_admin %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if session.is_admin %}
+                <div>
+                    <a href="/web/admin" class="font-semibold text-gray-600 hover:underline">Admin</a>
+                    <ul class="mt-1 space-y-1 text-gray-500">
+                        <li><a href="/web/admin" class="hover:text-gray-800">Dashboard</a></li>
+                        <li><a href="/web/admin/provision" class="hover:text-gray-800">Provision Customer</a></li>
                         <li><a href="/web/firmware" class="hover:text-gray-800">Firmware</a></li>
-                        {% endif %}
                     </ul>
                 </div>
                 {% endif %}
