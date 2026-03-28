@@ -904,33 +904,10 @@ async def memory_items_delete(request: Request,
     return RedirectResponse("/web/memory/items?deleted=1", status_code=303)
 
 
-@router.get("/memory/photo-index", response_class=HTMLResponse)
+@router.get("/memory/photo-index")
 async def memory_photo_index_page(request: Request):
-    session = await get_web_session(request)
-    redirect = require_login(session)
-    if redirect:
-        return redirect
-    db = request.app.state.db
-    tid = session["tenant_id"]
-    conn = db._get_connection()
-    try:
-        import sqlite3 as _sq
-        conn.row_factory = _sq.Row
-        indexed_photos = [dict(r) for r in conn.execute(
-            "SELECT * FROM photo_indexes WHERE tenant_id = ? ORDER BY created_at DESC",
-            (tid,)
-        ).fetchall()]
-    finally:
-        if not db._conn:
-            conn.close()
-    error = request.query_params.get("error")
-    return templates.TemplateResponse("memory_photo_index.html", {
-        "request": request,
-        "session": session,
-        "indexed_photos": indexed_photos,
-        "result": None,
-        "error": error,
-    })
+    """Redirect old photo-index page to unified stored items."""
+    return RedirectResponse("/web/memory/items", status_code=302)
 
 
 @router.post("/memory/photo-index", response_class=HTMLResponse)
@@ -1037,13 +1014,8 @@ async def memory_photo_index_upload(request: Request,
         if not db._conn:
             conn.close()
 
-    return templates.TemplateResponse("memory_photo_index.html", {
-        "request": request,
-        "session": session,
-        "indexed_photos": indexed_photos,
-        "result": {"item_count": len(indexed_items), "item_list": indexed_items},
-        "error": None,
-    })
+    # Redirect to stored items page showing how many were saved
+    return RedirectResponse(f"/web/memory/items?saved={len(indexed_items)}", status_code=303)
 
 
 @router.post("/memory/photo-index/{photo_id}/delete")

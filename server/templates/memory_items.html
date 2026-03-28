@@ -20,8 +20,14 @@
 </div>
 {% endif %}
 
+{% if photo_error %}
+<div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-4 max-w-lg mx-auto">
+    <p class="text-red-800 text-sm font-medium">{{ photo_error }}</p>
+</div>
+{% endif %}
+
 <!-- Add Item Form -->
-<div class="bg-white rounded-lg shadow-md p-4 mb-6 max-w-lg mx-auto">
+<div class="bg-white rounded-lg shadow-md p-4 mb-4 max-w-lg mx-auto">
     <h2 class="text-lg font-semibold mb-3">Add an Item</h2>
     <form method="POST" action="/web/memory/items/add" class="space-y-3">
         <div class="flex flex-col sm:flex-row gap-3">
@@ -37,8 +43,36 @@
     </form>
 </div>
 
-<!-- Bulk Add Items -->
-<div class="bg-white rounded-lg shadow-md p-4 mb-6 max-w-lg mx-auto">
+<!-- Photo Index (collapsed) -->
+<div class="bg-white rounded-lg shadow-md p-4 mb-4 max-w-lg mx-auto">
+    <button type="button" onclick="document.getElementById('photo-index-body').classList.toggle('hidden'); document.getElementById('photo-arrow').classList.toggle('rotate-180')"
+            class="w-full flex items-center justify-between text-left">
+        <h2 class="text-lg font-semibold">Add Items from Photo</h2>
+        <svg id="photo-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div id="photo-index-body" class="hidden mt-3">
+        <p class="text-xs text-gray-500 mb-3">Take a photo of a space (garage, closet, shelf). Polly will identify items and remember where they are.</p>
+        <form method="POST" action="/web/memory/photo-index" enctype="multipart/form-data" class="space-y-3">
+            <div>
+                <input type="file" name="photo" accept="image/*" capture="environment" required
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500">
+            </div>
+            <div>
+                <input type="text" name="location" required placeholder="Location (e.g. garage workbench)"
+                       class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+            </div>
+            <button type="submit"
+                    class="w-full bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 font-medium text-sm">
+                Index This Photo
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Bulk Add Items (collapsed) -->
+<div class="bg-white rounded-lg shadow-md p-4 mb-4 max-w-lg mx-auto">
     <button type="button" onclick="document.getElementById('bulk-add-body').classList.toggle('hidden'); document.getElementById('bulk-add-arrow').classList.toggle('rotate-180')"
             class="w-full flex items-center justify-between text-left">
         <h2 class="text-lg font-semibold">Add Multiple Items</h2>
