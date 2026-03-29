@@ -108,9 +108,9 @@
                 {% endif %}
                 {% if m.name.split()[0]|lower in connected_name_map and session.role != 'family' %}
                 {% set cn = connected_name_map[m.name.split()[0]|lower] %}
-                <div class="absolute bottom-1 left-0 right-0 text-center" onclick="event.stopPropagation()">
+                <div class="absolute bottom-0 left-0 right-0 text-center pb-1" onclick="event.stopPropagation()">
                     <button type="button" onclick="showConnectedModal('{{ cn.tenant_name }}', {{ cn.tenant_id }})"
-                            class="text-xs text-blue-500 hover:text-blue-700 font-medium">Message</button>
+                            class="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full hover:bg-red-600 shadow-sm">Message</button>
                 </div>
                 {% endif %}
             </div>
