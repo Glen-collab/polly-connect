@@ -142,6 +142,11 @@
 
 {% if session.role != 'family' %}
 <!-- Connected Friends -->
+{% if request.query_params.get('msg_sent') %}
+<div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4 mt-4 max-w-lg mx-auto text-center">
+    <p class="text-sm text-emerald-800 font-medium">Message sent!</p>
+</div>
+{% endif %}
 {% if request.query_params.get('req_sent') %}
 <div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4 mt-4 max-w-lg mx-auto text-center">
     <p class="text-sm text-emerald-800 font-medium">Friend request sent to {{ request.query_params.get('req_sent') }}!</p>

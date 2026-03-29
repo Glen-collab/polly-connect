@@ -1614,6 +1614,10 @@ async def messages_send_connected(request: Request,
         tenant_id=target_tid,
     )
 
+    # Check where the request came from — stay on that page
+    referer = request.headers.get("referer", "")
+    if "family-tree" in referer:
+        return RedirectResponse("/web/family-tree?msg_sent=1", status_code=303)
     return RedirectResponse("/web/messages?sent=1", status_code=303)
 
 
