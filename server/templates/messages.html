@@ -58,33 +58,6 @@
     </form>
 </div>
 
-{% if connected_families %}
-<!-- Send to Connected Families -->
-<div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
-    <h2 class="text-base sm:text-lg font-semibold mb-3">Send to a Friend's Polly</h2>
-    <p class="text-xs text-gray-400 mb-3">Send a message that plays on their Polly device. They won't see your family board.</p>
-    <form method="POST" action="/web/messages/send-connected">
-        <div class="mb-3">
-            <label class="block text-sm text-gray-600 mb-1">Send to</label>
-            <select name="connected_tenant_id" required class="w-full border rounded px-3 py-2 text-sm bg-white">
-                {% for cf in connected_families %}
-                <option value="{{ cf.connected_tenant_id }}">{{ cf.connected_tenant_name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="mb-3">
-            <label class="block text-sm text-gray-600 mb-1">Message</label>
-            <textarea name="message" required rows="2"
-                      class="w-full border rounded px-3 py-2 text-sm resize-y"
-                      placeholder="Hey! Just checking in..."></textarea>
-        </div>
-        <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 text-sm w-full sm:w-auto">
-            Send to Their Polly
-        </button>
-    </form>
-</div>
-{% endif %}
-
 <!-- Active Messages -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6">
     <h2 class="text-base sm:text-lg font-semibold mb-3">Active Messages ({{ messages|length }})</h2>
