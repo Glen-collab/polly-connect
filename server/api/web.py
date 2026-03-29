@@ -1108,6 +1108,7 @@ async def story_edit_save(request: Request, story_id: int):
     question_text = form.get("question_text")
     qr_in_book = 1 if form.get("qr_in_book") else 0
     photo_in_book = 1 if form.get("photo_in_book") else 0
+    private = 1 if form.get("private") else 0
 
     db = request.app.state.db
     conn = db._get_connection()
@@ -1115,15 +1116,15 @@ async def story_edit_save(request: Request, story_id: int):
         if question_text is not None:
             conn.execute("""
                 UPDATE stories SET transcript = ?, speaker_name = ?, question_text = ?,
-                       qr_in_book = ?, photo_in_book = ?
+                       qr_in_book = ?, photo_in_book = ?, private = ?
                 WHERE id = ? AND tenant_id = ?
             """, (transcript, speaker_name or None, question_text or None,
-                  qr_in_book, photo_in_book, story_id, session["tenant_id"]))
+                  qr_in_book, photo_in_book, private, story_id, session["tenant_id"]))
         else:
             conn.execute("""
-                UPDATE stories SET transcript = ?, speaker_name = ?, qr_in_book = ?, photo_in_book = ?
+                UPDATE stories SET transcript = ?, speaker_name = ?, qr_in_book = ?, photo_in_book = ?, private = ?
                 WHERE id = ? AND tenant_id = ?
-            """, (transcript, speaker_name or None, qr_in_book, photo_in_book, story_id, session["tenant_id"]))
+            """, (transcript, speaker_name or None, qr_in_book, photo_in_book, private, story_id, session["tenant_id"]))
         conn.commit()
     finally:
         if not db._conn:

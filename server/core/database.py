@@ -464,6 +464,7 @@ class PollyDB:
                 "photo_id": "ALTER TABLE stories ADD COLUMN photo_id INTEGER REFERENCES photos(id)",
                 "qr_in_book": "ALTER TABLE stories ADD COLUMN qr_in_book INTEGER DEFAULT 1",
                 "photo_in_book": "ALTER TABLE stories ADD COLUMN photo_in_book INTEGER DEFAULT 1",
+                "private": "ALTER TABLE stories ADD COLUMN private INTEGER DEFAULT 0",
             }
             for col, sql in migrations.items():
                 if col not in cols:
@@ -1736,7 +1737,8 @@ class PollyDB:
                 conn.close()
 
     def get_stories(self, user_id: int = None, limit: int = 50,
-                    tenant_id: int = None, verified_only: bool = True) -> List[Dict]:
+                    tenant_id: int = None, verified_only: bool = True,
+                    exclude_private: bool = False) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
@@ -1744,6 +1746,8 @@ class PollyDB:
             params = []
             if verified_only:
                 query += " AND verified = 1"
+            if exclude_private:
+                query += " AND (private = 0 OR private IS NULL)"
             if user_id:
                 query += " AND user_id = ?"
                 params.append(user_id)

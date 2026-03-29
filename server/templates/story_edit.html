@@ -44,6 +44,12 @@
                    class="w-4 h-4 text-emerald-600 rounded">
             <label for="qr_in_book" class="text-sm text-gray-700">Include QR code in printed book</label>
         </div>
+        <div class="mb-4 flex items-center gap-2">
+            <input type="checkbox" name="private" id="private" value="1"
+                   {% if story.private %}checked{% endif %}
+                   class="w-4 h-4 text-amber-600 rounded">
+            <label for="private" class="text-sm text-gray-700">Private <span class="text-gray-400">(kept in book but Polly won't read aloud)</span></label>
+        </div>
         {% endif %}
 
         {% if story.photo_id %}
