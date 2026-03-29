@@ -97,8 +97,9 @@
                         {% endif %}
                     </div>
                     {% if msg.audio_filename %}
-                    <audio controls class="w-full mb-2" preload="none">
+                    <audio controls class="w-full mb-2" preload="metadata">
                         <source src="/static/recordings/{{ msg.audio_filename }}" type="audio/wav">
+                        <source src="/static/recordings/{{ msg.audio_filename }}" type="audio/mpeg">
                     </audio>
                     {% if session.role != 'family' %}
                     <form method="POST" action="/web/messages/{{ msg.id }}/save-to-stories" class="inline">

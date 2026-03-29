@@ -1654,30 +1654,31 @@ async def messages_send_voice(request: Request):
             my_tenant = db.get_tenant(tid)
             from_name = my_tenant["name"] if my_tenant else from_name
 
-    # Save audio file
+    # Save audio file — always convert through ffmpeg to ensure proper WAV format
+    import subprocess
     audio_data = await audio_file.read()
     filename = f"voicemsg_{uuid.uuid4().hex[:8]}.wav"
     recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
     os.makedirs(recordings_dir, exist_ok=True)
-
-    # Convert webm to wav if needed
     filepath = os.path.join(recordings_dir, filename)
-    if audio_file.content_type and "webm" in audio_file.content_type:
-        import subprocess
-        webm_path = filepath + ".webm"
-        with open(webm_path, "wb") as f:
-            f.write(audio_data)
-        try:
-            subprocess.run(["ffmpeg", "-y", "-i", webm_path, "-ar", "16000", "-ac", "1", filepath],
-                          capture_output=True, timeout=10)
-            os.remove(webm_path)
-        except Exception as e:
-            # Fallback: save raw
-            with open(filepath, "wb") as f:
-                f.write(audio_data)
-    else:
-        with open(filepath, "wb") as f:
-            f.write(audio_data)
+
+    # Save raw upload as temp file, convert to 16kHz mono WAV
+    raw_path = filepath + ".raw"
+    with open(raw_path, "wb") as f:
+        f.write(audio_data)
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-i", raw_path, "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le", filepath],
+            capture_output=True, timeout=15)
+        if result.returncode != 0:
+            import logging
+            logging.getLogger(__name__).error(f"ffmpeg voice msg error: {result.stderr.decode()[:300]}")
+        os.remove(raw_path)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"ffmpeg voice msg exception: {e}")
+        # Fallback: rename raw as wav (won't play properly but preserves data)
+        os.rename(raw_path, filepath)
 
     # Save message with audio
     msg_text = "Voice message"
