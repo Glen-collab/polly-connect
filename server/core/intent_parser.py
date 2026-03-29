@@ -640,7 +640,7 @@ class IntentParser:
         patterns = [
             r"(?:play|give)(?: me)? (?:a |the |my )?(?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
             r"(?:play|give)(?: me)? (?:a |the |my )?(?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?prayer recording",
-            r"(?:play|give)(?: me)? (?:a |the )?(?:(\w+)(?:'s|s))?\s*(?:recorded |voice )?(?:(\w+)\s+)?prayer",
+            r"(?:play)(?: me)? (?:a |the )?(?:(\w+)(?:'s|s))?\s*(?:recorded |voice )?(?:(\w+)\s+)?prayer",
             r"(?:can you |could you |i want )(?:play|hear|say)(?: me)? (?:a |the )?(?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
             r"let(?:'s| me) hear (?:(\w+)(?:'s|s))?\s*(?:(\w+)\s+)?blessing",
             r"(?:play|give)(?: me)? (?:a |the )?(\w+) blessing",
