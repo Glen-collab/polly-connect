@@ -291,6 +291,20 @@ class CommandProcessor:
         elif intent == "check_messages":
             messages = self.db.get_messages_for(tenant_id=tid, device_id=device_id)
             if messages:
+                # Check if the first message is a voice message — play the audio
+                first_voice = None
+                for m in messages:
+                    if m.get("audio_filename"):
+                        first_voice = m
+                        break
+
+                if first_voice:
+                    name = first_voice['from_name'].title() if first_voice['from_name'] else "Someone"
+                    intro = f"Voice message from {name}."
+                    self._last_response[device_id] = intro
+                    return f"__PLAY_PRAYER__{first_voice['audio_filename']}__INTRO__{intro}"
+
+                # Text messages
                 parts = []
                 for m in messages[:5]:
                     name = m['from_name'].title() if m['from_name'] and m['from_name'] != 'someone' else None
