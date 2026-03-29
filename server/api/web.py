@@ -1621,6 +1621,77 @@ async def messages_send_connected(request: Request,
     return RedirectResponse("/web/messages?sent=1", status_code=303)
 
 
+@router.post("/messages/send-voice")
+async def messages_send_voice(request: Request):
+    """Save a voice message (audio recording) to the message board."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    form = await request.form()
+    audio_file = form.get("audio")
+    from_name = form.get("from_name", session.get("name", "Someone"))
+    to_name = form.get("to_name", "")
+    target_tenant = form.get("connected_tenant_id", "")
+    device_id = form.get("device_id", "")
+
+    if not audio_file:
+        return JSONResponse({"error": "No audio"}, status_code=400)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Determine target tenant (cross-family or own board)
+    save_tenant = tid
+    if target_tenant:
+        target_tid = int(target_tenant)
+        connections = db.get_connected_families(tid)
+        connected = next((c for c in connections if c["connected_tenant_id"] == target_tid), None)
+        if connected:
+            save_tenant = target_tid
+            my_tenant = db.get_tenant(tid)
+            from_name = my_tenant["name"] if my_tenant else from_name
+
+    # Save audio file
+    audio_data = await audio_file.read()
+    filename = f"voicemsg_{uuid.uuid4().hex[:8]}.wav"
+    recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+    os.makedirs(recordings_dir, exist_ok=True)
+
+    # Convert webm to wav if needed
+    filepath = os.path.join(recordings_dir, filename)
+    if audio_file.content_type and "webm" in audio_file.content_type:
+        import subprocess
+        webm_path = filepath + ".webm"
+        with open(webm_path, "wb") as f:
+            f.write(audio_data)
+        try:
+            subprocess.run(["ffmpeg", "-y", "-i", webm_path, "-ar", "16000", "-ac", "1", filepath],
+                          capture_output=True, timeout=10)
+            os.remove(webm_path)
+        except Exception as e:
+            # Fallback: save raw
+            with open(filepath, "wb") as f:
+                f.write(audio_data)
+    else:
+        with open(filepath, "wb") as f:
+            f.write(audio_data)
+
+    # Save message with audio
+    msg_text = "Voice message"
+    db.save_message(
+        from_name=from_name,
+        message=msg_text,
+        to_name=to_name if to_name else None,
+        tenant_id=save_tenant,
+        device_id=device_id if device_id else None,
+        audio_filename=filename,
+    )
+
+    return JSONResponse({"ok": True, "filename": filename})
+
+
 @router.post("/messages/send")
 async def messages_send(request: Request, from_name: str = Form(...),
                         to_name: str = Form(""), message: str = Form(...),
@@ -1649,6 +1720,45 @@ async def messages_delete(request: Request, message_id: int):
     db = request.app.state.db
     db.delete_message(message_id, tenant_id=session["tenant_id"])
     return RedirectResponse("/web/messages", status_code=303)
+
+
+@router.post("/messages/{message_id}/save-to-stories")
+async def messages_save_to_stories(request: Request, message_id: int):
+    """Save a voice message as a story (with audio) for the legacy book."""
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    conn = db._get_connection()
+    try:
+        import sqlite3 as _sq
+        conn.row_factory = _sq.Row
+        msg = conn.execute(
+            "SELECT * FROM family_messages WHERE id = ? AND tenant_id = ?",
+            (message_id, tid)
+        ).fetchone()
+        if not msg or not msg["audio_filename"]:
+            return RedirectResponse("/web/messages", status_code=303)
+
+        # Save as a story with the audio file
+        speaker = msg["from_name"] or "Someone"
+        transcript = f"Voice message from {speaker}"
+        user = db.get_or_create_user(tenant_id=tid)
+        db.save_story(
+            user_id=user["id"],
+            transcript=transcript,
+            audio_s3_key=msg["audio_filename"],
+            speaker_name=speaker,
+            source="voice_message",
+            tenant_id=tid,
+        )
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return RedirectResponse("/web/messages?saved_story=1", status_code=303)
 
 
 @router.post("/messages/clear-all")

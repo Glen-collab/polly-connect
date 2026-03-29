@@ -56,6 +56,26 @@
             Send Message
         </button>
     </form>
+    <!-- Voice Message -->
+    <div class="mt-3 pt-3 border-t">
+        <button type="button" id="voice-msg-btn" onclick="toggleVoiceRecord()"
+                class="text-sm text-blue-600 font-medium hover:text-blue-800">
+            Record a Voice Message
+        </button>
+        <div id="voice-msg-panel" class="hidden mt-2">
+            <div class="flex items-center gap-3">
+                <button type="button" id="voice-rec-btn" onclick="startStopVoiceRec()"
+                        class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600">
+                    Hold to Record
+                </button>
+                <span id="voice-rec-status" class="text-xs text-gray-400"></span>
+            </div>
+            <audio id="voice-preview" controls class="hidden mt-2 w-full"></audio>
+            <button type="button" id="voice-send-btn" onclick="sendVoiceMsg()" class="hidden mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 w-full">
+                Send Voice Message
+            </button>
+        </div>
+    </div>
 </div>
 
 <!-- Active Messages -->
@@ -76,7 +96,18 @@
                         <span class="text-sm text-gray-500">Everyone</span>
                         {% endif %}
                     </div>
+                    {% if msg.audio_filename %}
+                    <audio controls class="w-full mb-2" preload="none">
+                        <source src="/static/recordings/{{ msg.audio_filename }}" type="audio/wav">
+                    </audio>
+                    {% if session.role != 'family' %}
+                    <form method="POST" action="/web/messages/{{ msg.id }}/save-to-stories" class="inline">
+                        <button type="submit" class="text-xs text-emerald-600 hover:text-emerald-800 font-medium">Save to Stories</button>
+                    </form>
+                    {% endif %}
+                    {% else %}
                     <p class="text-sm text-gray-700 whitespace-pre-wrap break-words mb-2">{{ msg.message }}</p>
+                    {% endif %}
                     <div class="flex flex-wrap items-center gap-3">
                         <p class="text-xs text-gray-400">
                             {% set created = msg.created_at %}
@@ -124,4 +155,72 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+var voiceStream = null;
+var voiceRecorder = null;
+var voiceChunks = [];
+var voiceBlob = null;
+
+function toggleVoiceRecord() {
+    document.getElementById('voice-msg-panel').classList.toggle('hidden');
+}
+
+function startStopVoiceRec() {
+    var btn = document.getElementById('voice-rec-btn');
+    var status = document.getElementById('voice-rec-status');
+    if (voiceRecorder && voiceRecorder.state === 'recording') {
+        voiceRecorder.stop();
+        btn.textContent = 'Record Again';
+        btn.classList.remove('animate-pulse');
+        status.textContent = 'Processing...';
+        return;
+    }
+    voiceChunks = [];
+    voiceBlob = null;
+    document.getElementById('voice-preview').classList.add('hidden');
+    document.getElementById('voice-send-btn').classList.add('hidden');
+    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    .then(function(stream) {
+        voiceStream = stream;
+        voiceRecorder = new MediaRecorder(stream);
+        voiceRecorder.ondataavailable = function(e) { voiceChunks.push(e.data); };
+        voiceRecorder.onstop = function() {
+            voiceBlob = new Blob(voiceChunks, { type: voiceRecorder.mimeType });
+            var url = URL.createObjectURL(voiceBlob);
+            var preview = document.getElementById('voice-preview');
+            preview.src = url;
+            preview.classList.remove('hidden');
+            document.getElementById('voice-send-btn').classList.remove('hidden');
+            status.textContent = 'Ready to send';
+            stream.getTracks().forEach(function(t) { t.stop(); });
+        };
+        voiceRecorder.start();
+        btn.textContent = 'Stop Recording';
+        btn.classList.add('animate-pulse');
+        status.textContent = 'Recording...';
+    })
+    .catch(function(e) {
+        status.textContent = 'Mic access denied';
+    });
+}
+
+function sendVoiceMsg() {
+    if (!voiceBlob) return;
+    var status = document.getElementById('voice-rec-status');
+    status.textContent = 'Sending...';
+    var fd = new FormData();
+    fd.append('audio', voiceBlob, 'voice_message.webm');
+    fd.append('from_name', '{{ session.name }}');
+    fetch('/web/messages/send-voice', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) { window.location.reload(); }
+        else { status.textContent = 'Error: ' + (data.error || 'unknown'); }
+    })
+    .catch(function(e) { status.textContent = 'Error: ' + e; });
+}
+</script>
 {% endblock %}

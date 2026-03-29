@@ -209,9 +209,27 @@
             <textarea name="message" required rows="3" placeholder="Type your message..."
                       class="w-full border rounded-lg px-3 py-2 text-sm resize-y mb-3"></textarea>
             <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm">
-                Send to Their Polly
+                Send Text Message
             </button>
         </form>
+        <div class="mt-3 pt-3 border-t">
+            <button type="button" onclick="toggleFriendVoice()" class="text-sm text-blue-600 font-medium hover:text-blue-800 w-full text-left">
+                Or Record a Voice Message
+            </button>
+            <div id="friend-voice-panel" class="hidden mt-2">
+                <div class="flex items-center gap-3">
+                    <button type="button" id="friend-rec-btn" onclick="startStopFriendRec()"
+                            class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600">
+                        Record
+                    </button>
+                    <span id="friend-rec-status" class="text-xs text-gray-400"></span>
+                </div>
+                <audio id="friend-preview" controls class="hidden mt-2 w-full"></audio>
+                <button type="button" id="friend-send-btn" onclick="sendFriendVoice()" class="hidden mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 w-full">
+                    Send Voice Message
+                </button>
+            </div>
+        </div>
         <form method="POST" id="connected-modal-disconnect" class="mt-3 text-center"
               onsubmit="return confirm('Disconnect from this friend?')">
             <button type="submit" class="text-xs text-red-400 hover:text-red-600">Disconnect</button>
@@ -466,7 +484,75 @@ function showConnectedModal(name, tid) {
 
 function closeConnectedModal() {
     document.getElementById('connected-modal').classList.add('hidden');
+    document.getElementById('friend-voice-panel').classList.add('hidden');
     document.body.style.overflow = '';
+}
+
+var friendRecorder = null;
+var friendChunks = [];
+var friendBlob = null;
+
+function toggleFriendVoice() {
+    document.getElementById('friend-voice-panel').classList.toggle('hidden');
+}
+
+function startStopFriendRec() {
+    var btn = document.getElementById('friend-rec-btn');
+    var status = document.getElementById('friend-rec-status');
+    if (friendRecorder && friendRecorder.state === 'recording') {
+        friendRecorder.stop();
+        btn.textContent = 'Record Again';
+        btn.classList.remove('animate-pulse');
+        status.textContent = 'Processing...';
+        return;
+    }
+    friendChunks = [];
+    friendBlob = null;
+    document.getElementById('friend-preview').classList.add('hidden');
+    document.getElementById('friend-send-btn').classList.add('hidden');
+    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    .then(function(stream) {
+        friendRecorder = new MediaRecorder(stream);
+        friendRecorder.ondataavailable = function(e) { friendChunks.push(e.data); };
+        friendRecorder.onstop = function() {
+            friendBlob = new Blob(friendChunks, { type: friendRecorder.mimeType });
+            var url = URL.createObjectURL(friendBlob);
+            var preview = document.getElementById('friend-preview');
+            preview.src = url;
+            preview.classList.remove('hidden');
+            document.getElementById('friend-send-btn').classList.remove('hidden');
+            status.textContent = 'Ready to send';
+            stream.getTracks().forEach(function(t) { t.stop(); });
+        };
+        friendRecorder.start();
+        btn.textContent = 'Stop';
+        btn.classList.add('animate-pulse');
+        status.textContent = 'Recording...';
+    })
+    .catch(function(e) { status.textContent = 'Mic access denied'; });
+}
+
+function sendFriendVoice() {
+    if (!friendBlob) return;
+    var status = document.getElementById('friend-rec-status');
+    var tid = document.getElementById('connected-modal-tid').value;
+    status.textContent = 'Sending...';
+    var fd = new FormData();
+    fd.append('audio', friendBlob, 'voice_message.webm');
+    fd.append('from_name', '{{ session.name }}');
+    fd.append('connected_tenant_id', tid);
+    fetch('/web/messages/send-voice', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            status.textContent = 'Sent!';
+            closeConnectedModal();
+            window.location.href = '/web/family-tree?msg_sent=1';
+        } else {
+            status.textContent = 'Error: ' + (data.error || 'unknown');
+        }
+    })
+    .catch(function(e) { status.textContent = 'Error: ' + e; });
 }
 </script>
 {% endblock %}

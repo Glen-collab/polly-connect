@@ -297,6 +297,8 @@ class PollyDB:
             msg_cols = {row[1] for row in conn.execute("PRAGMA table_info(family_messages)").fetchall()}
             if "device_id" not in msg_cols:
                 conn.execute("ALTER TABLE family_messages ADD COLUMN device_id TEXT")
+            if "audio_filename" not in msg_cols:
+                conn.execute("ALTER TABLE family_messages ADD COLUMN audio_filename TEXT")
 
             # ── Connected families (cross-tenant message board access) ──
             conn.execute("""
@@ -3200,14 +3202,14 @@ class PollyDB:
 
     def save_message(self, from_name: str, message: str, to_name: str = None,
                      tenant_id: int = None, expire_hours: int = 24,
-                     device_id: str = None) -> int:
-        """Save a message. device_id=None means all devices."""
+                     device_id: str = None, audio_filename: str = None) -> int:
+        """Save a message. device_id=None means all devices. audio_filename for voice messages."""
         conn = self._get_connection()
         try:
             cursor = conn.execute(
-                """INSERT INTO family_messages (tenant_id, from_name, to_name, message, expires_at, device_id)
-                   VALUES (?, ?, ?, ?, datetime('now', ?), ?)""",
-                (tenant_id, from_name, to_name, message, f"+{expire_hours} hours", device_id)
+                """INSERT INTO family_messages (tenant_id, from_name, to_name, message, expires_at, device_id, audio_filename)
+                   VALUES (?, ?, ?, ?, datetime('now', ?), ?, ?)""",
+                (tenant_id, from_name, to_name, message, f"+{expire_hours} hours", device_id, audio_filename)
             )
             conn.commit()
             return cursor.lastrowid
