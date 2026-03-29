@@ -197,13 +197,31 @@ static void led_set(int on)
     }
 }
 
+static void led_pulse_task(void *arg)
+{
+    // Smooth breathing effect: fade up and down while in WHITE_PULSE state
+    int brightness = 0;
+    int direction = 2;  // step size per tick
+    while (1) {
+        if (current_led_state != LED_WHITE_PULSE) {
+            vTaskDelay(pdMS_TO_TICKS(50));
+            continue;
+        }
+        brightness += direction;
+        if (brightness >= 40) { brightness = 40; direction = -2; }
+        if (brightness <= 3) { brightness = 3; direction = 2; }
+        led_rgb(brightness, brightness, brightness);
+        vTaskDelay(pdMS_TO_TICKS(30));  // ~33fps, smooth pulse
+    }
+}
+
 static void led_state_set(led_state_t state)
 {
     current_led_state = state;
     switch (state) {
         case LED_OFF:          led_rgb(0, 0, 0);      break;
         case LED_GREEN:        led_rgb(0, 40, 0);     break;
-        case LED_WHITE_PULSE:  led_rgb(30, 30, 30);   break;
+        case LED_WHITE_PULSE:  break;  // Pulse task handles this
         case LED_BLUE:         led_rgb(0, 0, 40);     break;
         case LED_RED:          led_rgb(40, 0, 0);     break;
         case LED_RED_BLINK:    led_rgb(40, 0, 0);     break;
@@ -1543,8 +1561,9 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "Running from partition: %s", running->label);
 
-    // Init RGB LED
+    // Init RGB LED + pulse task
     led_init();
+    xTaskCreate(led_pulse_task, "led_pulse", 2048, NULL, 1, NULL);
     led_state_set(LED_WHITE_PULSE);  // White = booting up
 
     // Init microphone
