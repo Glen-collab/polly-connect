@@ -183,9 +183,25 @@ class MedicationScheduler:
                 logger.error(f"Medication check error: {e}")
             await asyncio.sleep(60)
 
+    def _is_device_in_quiet_hours(self, device_id: str, tenant_id: int) -> bool:
+        """Check if a device is currently in quiet hours."""
+        try:
+            ds = self.db.get_device_settings(device_id, tenant_id)
+            quiet_start = ds.get("quiet_hours_start", 21)
+            quiet_end = ds.get("quiet_hours_end", 7)
+            now = _get_local_now()
+            hour = now.hour
+            if quiet_start > quiet_end:  # wraps midnight (e.g. 21-7)
+                return hour >= quiet_start or hour < quiet_end
+            else:
+                return quiet_start <= hour < quiet_end
+        except Exception:
+            return False
+
     async def _check_medications(self):
         """Check if any medications are due now (using configured timezone).
-        Batches multiple reminders at the same time into one announcement."""
+        Batches multiple reminders at the same time into one announcement.
+        Respects quiet hours — won't fire during quiet hours."""
         now = _get_local_now()
         current_time = now.strftime("%H:%M")
         current_day = now.strftime("%a").lower()
@@ -214,18 +230,23 @@ class MedicationScheduler:
                     due_by_key.setdefault(group_key, []).append((med, med_time))
 
         # Send one combined reminder per (tenant, device) group
-        for (tenant_id, device_id), med_list in due_by_key.items():
+        for (tenant_id, target_device), med_list in due_by_key.items():
+            # Skip if target device is in quiet hours
+            if target_device and self._is_device_in_quiet_hours(target_device, tenant_id):
+                logger.info(f"Skipping reminder for {target_device} — quiet hours")
+                continue
             if len(med_list) == 1:
                 await self._send_reminder(med_list[0][0], med_list[0][1], tenant_id)
             else:
-                await self._send_batch_reminder(med_list, tenant_id)
+                await self._send_batch_reminder(med_list, tenant_id, target_device=target_device)
 
         # Clean old dedup keys (keep only today's)
         old_keys = [k for k in self._last_reminded if not k.endswith(today_key)]
         for k in old_keys:
             del self._last_reminded[k]
 
-    async def _send_batch_reminder(self, med_list: list, tenant_id: int = None):
+    async def _send_batch_reminder(self, med_list: list, tenant_id: int = None,
+                                    target_device: str = None):
         """Combine multiple reminders at the same time into one announcement."""
         med_time = med_list[0][1]
         time_display = format_time_12hr(med_time)
@@ -267,6 +288,9 @@ class MedicationScheduler:
         sent_count = 0
         for device_id, info in list(self._websockets.items()):
             if tenant_id is not None and info["tenant_id"] != tenant_id:
+                continue
+            # If reminder is assigned to a specific device, only send to that one
+            if target_device and device_id != target_device:
                 continue
             ws = info["ws"]
             try:
