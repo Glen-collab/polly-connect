@@ -498,24 +498,7 @@ class CommandProcessor:
                 elif "blessing" in text_lower:
                     category = "blessing"
 
-                recordings = self.db.get_prayer_recordings(
-                    tid, category=category
-                )
-                if not recordings and category:
-                    # Try all categories
-                    recordings = self.db.get_prayer_recordings(tid)
-
-                if recordings:
-                    import random
-                    rec = random.choice(recordings)
-                    # Return special marker so audio.py knows to play the WAV file
-                    speaker = rec.get("speaker_name", "")
-                    title = rec.get("title", "a prayer")
-                    self._last_response[device_id] = f"{speaker}'s {title}"
-                    self.db.update_prayer_recording_played(rec["id"])
-                    return f"__PLAY_PRAYER__{rec['audio_filename']}__INTRO__{speaker}'s {rec.get('category', 'prayer')}."
-
-            # Fall back to AI-generated prayer
+            # AI-generated prayer (recorded blessings only play via "play_blessing" intent)
             if self.prayer:
                 resp = self.prayer.get_prayer(
                     theme, tenant_id=state.tenant_id, pray_for=pray_for)
