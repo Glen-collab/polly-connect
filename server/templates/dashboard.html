@@ -110,12 +110,13 @@
         <span class="text-lg sm:text-xl font-bold">Legacy Book</span>
     </a>
     {% else %}
-    <div class="bg-gray-200 rounded-2xl p-6 sm:p-8 text-center opacity-30">
-        <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <a href="/web/legacy" class="bg-red-700 hover:bg-red-800 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">
+        <svg class="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
         </svg>
-        <span class="text-lg sm:text-xl font-bold text-gray-400">Legacy Book</span>
-    </div>
+        <span class="text-lg sm:text-xl font-bold">Legacy</span>
+        <p class="text-xs text-red-200 mt-1">See the story being built</p>
+    </a>
     {% endif %}
     {% if session.role != 'family' %}
     <a href="/web/hub/settings" class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95">

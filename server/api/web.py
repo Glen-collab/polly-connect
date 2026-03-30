@@ -1017,6 +1017,48 @@ async def onboarding_signup(request: Request,
     return response
 
 
+@router.get("/legacy", response_class=HTMLResponse)
+async def family_legacy_page(request: Request):
+    """Legacy book preview page for family members."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+    owner_name = user.get("familiar_name") or user.get("name") or "the owner"
+
+    # Stats
+    conn = db._get_connection()
+    try:
+        import sqlite3 as _sq
+        conn.row_factory = _sq.Row
+        story_count = conn.execute("SELECT COUNT(*) FROM stories WHERE tenant_id = ?", (tid,)).fetchone()[0]
+        photo_count = conn.execute("SELECT COUNT(*) FROM photos WHERE tenant_id = ?", (tid,)).fetchone()[0]
+        contributor_count = conn.execute(
+            "SELECT COUNT(DISTINCT speaker_name) FROM stories WHERE tenant_id = ? AND speaker_name IS NOT NULL",
+            (tid,)).fetchone()[0]
+        my_name = session.get("name", "")
+        my_story_count = 0
+        if my_name:
+            my_story_count = conn.execute(
+                "SELECT COUNT(*) FROM stories WHERE tenant_id = ? AND LOWER(speaker_name) = ?",
+                (tid, my_name.lower())).fetchone()[0]
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return templates.TemplateResponse("family_legacy.html", {
+        "request": request, "session": session,
+        "owner_name": owner_name,
+        "story_count": story_count,
+        "photo_count": photo_count,
+        "contributor_count": contributor_count,
+        "my_story_count": my_story_count,
+    })
+
+
 @router.post("/onboarding/skip")
 async def onboarding_skip(request: Request):
     session = await get_web_session(request)

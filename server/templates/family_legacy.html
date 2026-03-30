@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ owner_name }}'s Legacy - Polly Connect{% endblock %}
+
+{% block content %}
+<a href="/web/dashboard" class="text-emerald-600 hover:underline text-sm">&larr; Home</a>
+
+<div class="max-w-lg mx-auto mt-2">
+
+    <!-- Hero -->
+    <div class="text-center mb-6">
+        <span class="text-5xl">&#x1F99C;</span>
+        <h1 class="text-2xl font-bold text-gray-800 mt-2">{{ owner_name }}'s Legacy</h1>
+        <p class="text-sm text-gray-500 mt-1">Every story you share becomes part of something permanent.</p>
+    </div>
+
+    <!-- What the legacy book is -->
+    <div class="bg-white rounded-lg shadow p-5 mb-4">
+        <h2 class="font-semibold text-gray-800 mb-2">The Legacy Book</h2>
+        <p class="text-sm text-gray-600 leading-relaxed">
+            Polly Connect takes every story, memory, and message shared by family
+            and weaves them into a printed book — {{ owner_name }}'s life story,
+            told by the people who know them best. Each page has QR codes that play
+            the original voice recording. It's not just a book — it's a living memory.
+        </p>
+    </div>
+
+    <!-- Progress -->
+    <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-5 mb-4">
+        <h2 class="font-semibold text-emerald-800 mb-3">How the book is growing</h2>
+        <div class="grid grid-cols-3 gap-3 text-center">
+            <div>
+                <div class="text-2xl font-bold text-emerald-700">{{ story_count }}</div>
+                <div class="text-xs text-emerald-600">Stories</div>
+            </div>
+            <div>
+                <div class="text-2xl font-bold text-emerald-700">{{ photo_count }}</div>
+                <div class="text-xs text-emerald-600">Photos</div>
+            </div>
+            <div>
+                <div class="text-2xl font-bold text-emerald-700">{{ contributor_count }}</div>
+                <div class="text-xs text-emerald-600">Contributors</div>
+            </div>
+        </div>
+        {% if my_story_count > 0 %}
+        <p class="text-xs text-emerald-700 text-center mt-3">You've contributed {{ my_story_count }} stor{{ 'ies' if my_story_count != 1 else 'y' }}!</p>
+        {% endif %}
+    </div>
+
+    <!-- Your contributions matter -->
+    <div class="bg-white rounded-lg shadow p-5 mb-4">
+        <h2 class="font-semibold text-gray-800 mb-2">Why your stories matter</h2>
+        <p class="text-sm text-gray-600 leading-relaxed mb-3">
+            The best legacy books aren't written by one person — they're built by everyone
+            who was part of the journey. Your perspective, your memories, your voice
+            fills in pieces that only you can provide.
+        </p>
+        <div class="space-y-2">
+            <a href="/web/hub/stories" class="block bg-emerald-600 text-white text-center py-2.5 rounded-lg hover:bg-emerald-700 text-sm font-medium">
+                Add a Story
+            </a>
+            <a href="/web/photos" class="block bg-emerald-100 text-emerald-700 text-center py-2.5 rounded-lg hover:bg-emerald-200 text-sm font-medium">
+                Upload a Photo
+            </a>
+            <a href="/web/messages" class="block bg-blue-100 text-blue-700 text-center py-2.5 rounded-lg hover:bg-blue-200 text-sm font-medium">
+                Leave a Message
+            </a>
+        </div>
+    </div>
+
+    <!-- Soft teaser — what more looks like -->
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-5 mb-4">
+        <h2 class="font-semibold text-gray-800 mb-2">There's more to Polly Connect</h2>
+        <p class="text-sm text-gray-500 leading-relaxed mb-3">
+            With your own Polly account, your family's stories never get lost.
+        </p>
+        <ul class="space-y-2 text-sm text-gray-600">
+            <li class="flex items-start gap-2">
+                <span class="text-emerald-500 mt-0.5">&#x1F4D6;</span>
+                <span><strong>Legacy Book</strong> — AI weaves family stories into chapters, printed with QR codes for your voice</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-blue-500 mt-0.5">&#x1F4AC;</span>
+                <span><strong>Voice Messages</strong> — send and receive voice messages between family Polly devices, saved forever</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-amber-500 mt-0.5">&#x1F64F;</span>
+                <span><strong>AI Prayers</strong> — personalized prayers for your family, read aloud by Polly</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <span class="text-purple-500 mt-0.5">&#x1F9E0;</span>
+                <span><strong>Memory Keeper</strong> — tell Polly where things are, ask later when you forget</span>
+            </li>
+        </ul>
+        <a href="/web/onboarding/step/5" class="block mt-4 bg-gray-800 text-white text-center py-2.5 rounded-lg hover:bg-gray-900 text-sm font-medium">
+            Get Your Own Polly Account
+        </a>
+    </div>
+
+</div>
+{% endblock %}
