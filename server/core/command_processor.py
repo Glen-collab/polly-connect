@@ -271,6 +271,22 @@ class CommandProcessor:
             person = intent_result.get("person", "")
             message = intent_result.get("message", "")
             if person and message:
+                # Transform pronouns so message reads naturally to the recipient
+                # "tell Glen he is awesome" → "you are awesome"
+                # "tell my wife I love her" → "I love you"
+                import re as _re
+                msg = message
+                # he/she → you (subject)
+                msg = _re.sub(r'\bhe is\b', 'you are', msg, flags=_re.IGNORECASE)
+                msg = _re.sub(r'\bshe is\b', 'you are', msg, flags=_re.IGNORECASE)
+                msg = _re.sub(r'\bhe\b', 'you', msg, flags=_re.IGNORECASE)
+                msg = _re.sub(r'\bshe\b', 'you', msg, flags=_re.IGNORECASE)
+                # him/her → you (object) — careful not to replace "her" in "here"
+                msg = _re.sub(r'\bhim\b', 'you', msg, flags=_re.IGNORECASE)
+                msg = _re.sub(r'\bher\b(?!\w)', 'you', msg, flags=_re.IGNORECASE)
+                # his/her → your (possessive)
+                msg = _re.sub(r'\bhis\b', 'your', msg, flags=_re.IGNORECASE)
+                message = msg
                 speaker = state.speaker_name or self.db.get_owner_name(tenant_id=tid) or "someone"
                 person_lower = person.lower().strip()
                 has_last_name = len(person_lower.split()) >= 2
