@@ -3087,9 +3087,31 @@ async def family_tree_page(request: Request):
         first = cf_name.split()[0] if cf_name else ""
         if first:
             connected_names.add(first)
+            # Check for unread messages we sent TO them (on their board from us)
+            conn = db._get_connection()
+            try:
+                import sqlite3 as _sq
+                conn.row_factory = _sq.Row
+                my_tenant = db.get_tenant(tid)
+                my_name = my_tenant["name"] if my_tenant else ""
+                unread_sent = conn.execute(
+                    "SELECT COUNT(*) FROM family_messages WHERE tenant_id = ? AND from_name = ? AND read = 0 AND expires_at > datetime('now')",
+                    (cf["connected_tenant_id"], my_name)
+                ).fetchone()[0]
+                # Unread messages FROM them on our board
+                unread_received = conn.execute(
+                    "SELECT COUNT(*) FROM family_messages WHERE tenant_id = ? AND from_name = ? AND read = 0 AND expires_at > datetime('now')",
+                    (tid, cf["connected_tenant_name"])
+                ).fetchone()[0]
+            finally:
+                if not db._conn:
+                    conn.close()
+
             connected_name_map[first] = {
                 "tenant_id": cf["connected_tenant_id"],
                 "tenant_name": cf["connected_tenant_name"],
+                "unread_sent": unread_sent,      # messages we sent, they haven't heard
+                "unread_received": unread_received,  # messages from them we haven't heard
             }
 
     return templates.TemplateResponse("family_tree.html", {
