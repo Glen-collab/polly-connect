@@ -273,48 +273,27 @@ class CommandProcessor:
             if person and message:
                 speaker = state.speaker_name or self.db.get_owner_name(tenant_id=tid) or "someone"
                 person_lower = person.lower().strip()
+                has_last_name = len(person_lower.split()) >= 2
 
-                # Check if person is a connected friend (cross-tenant)
-                connected = self.db.get_connected_families(tid)
-                matches = []
-                for cf in connected:
-                    cf_user = self.db.get_or_create_user(tenant_id=cf["connected_tenant_id"])
-                    cf_name = (cf_user.get("name") or "").strip()
-                    cf_lower = cf_name.lower()
-                    cf_first = cf_lower.split()[0] if cf_lower else ""
-                    person_first = person_lower.split()[0] if person_lower else ""
+                # Cross-tenant ONLY on full name (first + last) match
+                if has_last_name:
+                    connected = self.db.get_connected_families(tid)
+                    for cf in connected:
+                        cf_user = self.db.get_or_create_user(tenant_id=cf["connected_tenant_id"])
+                        cf_name = (cf_user.get("name") or "").strip()
+                        if person_lower == cf_name.lower():
+                            # Exact full name match → send cross-tenant
+                            my_tenant = self.db.get_tenant(tid)
+                            from_label = my_tenant["name"] if my_tenant else speaker
+                            self.db.save_message(from_name=from_label, message=message,
+                                                tenant_id=cf["connected_tenant_id"])
+                            resp = f"Sent to {cf_name}'s Polly: {message}."
+                            self._last_response[device_id] = resp
+                            return resp
 
-                    # Exact full name match → definitive
-                    if person_lower == cf_lower:
-                        matches = [{"cf": cf, "full_name": cf_name}]
-                        break
-                    # First name match
-                    if person_first and cf_first and person_first == cf_first:
-                        matches.append({"cf": cf, "full_name": cf_name})
-
-                if len(matches) == 1:
-                    # Check if also local family member (non-friend)
-                    local_members = self.db.get_family_members(tenant_id=tid)
-                    is_local = any(person_lower in (m.get("name") or "").lower() for m in local_members
-                                  if m.get("relation_to_owner") != "friend")
-                    if is_local:
-                        self.db.save_message(from_name=speaker, to_name=person, message=message, tenant_id=tid)
-                        resp = f"Got it. I'll let {person} know: {message}."
-                    else:
-                        my_tenant = self.db.get_tenant(tid)
-                        from_label = my_tenant["name"] if my_tenant else speaker
-                        self.db.save_message(from_name=from_label, message=message,
-                                            tenant_id=matches[0]["cf"]["connected_tenant_id"])
-                        resp = f"Sent to {matches[0]['full_name']}'s Polly: {message}."
-                elif len(matches) > 1:
-                    # Multiple matches — need clarification
-                    names = ", ".join(m["full_name"] for m in matches[:-1]) + f", or {matches[-1]['full_name']}"
-                    resp = f"Which {person.split()[0].title()} did you mean — {names}? Try using their full name."
-                else:
-                    # No cross-tenant match, save locally
-                    self.db.save_message(from_name=speaker, to_name=person, message=message, tenant_id=tid)
-                    resp = f"Got it. I'll let {person} know: {message}."
-
+                # First name only OR no cross-tenant match → local family board
+                self.db.save_message(from_name=speaker, to_name=person, message=message, tenant_id=tid)
+                resp = f"Got it. I'll let {person} know: {message}."
                 self._last_response[device_id] = resp
                 return resp
             return "I didn't catch the message. Try saying: tell dad I'm going to the store."
