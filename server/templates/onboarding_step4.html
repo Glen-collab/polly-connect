@@ -1,0 +1,54 @@
+{% extends "base_onboarding.html" %}
+{% block title %}Rate Your Experience - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="mt-4 text-center">
+    <h1 class="text-xl font-bold text-gray-800">How was your experience?</h1>
+    <p class="text-sm text-gray-500 mt-1">Your feedback helps us make Polly better for families.</p>
+</div>
+
+<form method="POST" action="/web/onboarding/step/4" class="mt-8">
+    <!-- Star rating -->
+    <div class="flex justify-center gap-3 text-4xl" id="stars">
+        {% for i in range(1, 6) %}
+        <button type="button" onclick="setRating({{ i }})" id="star-{{ i }}"
+                class="text-gray-300 hover:text-amber-400 transition cursor-pointer">
+            &#9733;
+        </button>
+        {% endfor %}
+    </div>
+    <input type="hidden" name="rating" id="rating-input" value="0">
+    <p id="rating-label" class="text-sm text-gray-400 text-center mt-2"></p>
+
+    <!-- Optional note -->
+    <div class="mt-6">
+        <textarea name="note" rows="2"
+                  class="w-full border rounded-lg px-3 py-2 text-sm resize-y focus:ring-2 focus:ring-amber-500"
+                  placeholder="Any thoughts? (optional)"></textarea>
+    </div>
+
+    <button type="submit" id="submit-btn" disabled
+            class="w-full bg-amber-500 text-white py-3 rounded-lg hover:bg-amber-600 font-medium mt-4 disabled:opacity-50 disabled:cursor-not-allowed">
+        Continue
+    </button>
+</form>
+
+<form method="POST" action="/web/onboarding/skip" class="mt-4 text-center">
+    <button type="submit" class="text-gray-400 text-sm hover:text-gray-600">Skip</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var labels = ['', 'Not great', 'Could be better', 'Pretty good', 'Really nice', 'Amazing!'];
+function setRating(n) {
+    document.getElementById('rating-input').value = n;
+    document.getElementById('rating-label').textContent = labels[n];
+    document.getElementById('submit-btn').disabled = false;
+    for (var i = 1; i <= 5; i++) {
+        document.getElementById('star-' + i).classList.toggle('text-amber-400', i <= n);
+        document.getElementById('star-' + i).classList.toggle('text-gray-300', i > n);
+    }
+}
+</script>
+{% endblock %}

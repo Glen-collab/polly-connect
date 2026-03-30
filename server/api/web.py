@@ -646,8 +646,19 @@ async def family_login_page(request: Request):
     session = await get_web_session(request)
     if session:
         return RedirectResponse("/web/dashboard", status_code=302)
+    # Pre-fill code from invitation link
+    invite_id = request.query_params.get("invite", "")
+    code = ""
+    inviter_name = ""
+    if invite_id and invite_id.isdigit():
+        db = request.app.state.db
+        invitation = db.get_invitation_by_id(int(invite_id))
+        if invitation:
+            code = invitation.get("family_code", "")
+            inviter_name = invitation.get("inviter_name", "")
     return templates.TemplateResponse("family_login.html", {
-        "request": request, "error": None, "name": "", "code": "", "session": None,
+        "request": request, "error": None, "name": "", "code": code,
+        "session": None, "inviter_name": inviter_name,
     })
 
 
@@ -678,13 +689,341 @@ async def family_login_submit(request: Request, name: str = Form(...),
         duration_hours=settings.SESSION_DURATION_HOURS,
     )
 
-    response = RedirectResponse("/web/dashboard", status_code=302)
+    # Check if there's an invitation linked (from ?invite= param in hidden field)
+    form = await request.form()
+    invite_id = form.get("invite_id", "") or ""
+    if invite_id and invite_id.isdigit():
+        invitation = db.get_invitation_by_id(int(invite_id))
+        if invitation and invitation["tenant_id"] == tenant["id"]:
+            # Link session to invitation
+            conn = db._get_connection()
+            try:
+                conn.execute("UPDATE web_sessions SET invitation_id = ? WHERE id = ?",
+                            (int(invite_id), session_id))
+                conn.commit()
+            finally:
+                if not db._conn:
+                    conn.close()
+            db.update_invitation_status(int(invite_id), "visited")
+
+    # New family sessions go to onboarding
+    redirect_url = "/web/onboarding/step/1"
+
+    response = RedirectResponse(redirect_url, status_code=302)
     response.set_cookie(
         "polly_session", session_id,
         max_age=settings.SESSION_DURATION_HOURS * 3600,
         httponly=True, samesite="lax",
     )
     return response
+
+
+# ── Onboarding Flow (5 steps for family members) ──
+
+def _get_onboarding_context(db, session):
+    """Get owner name and invitation for onboarding templates."""
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+    owner_name = user.get("familiar_name") or user.get("name") or "the owner"
+    inviter_name = owner_name
+
+    # Try to find linked invitation for voice message
+    voice_message = None
+    invitation_id = None
+    session_data = db.get_web_session(session.get("session_id", ""))
+    if session_data:
+        inv_id = session_data.get("invitation_id")
+        if inv_id:
+            invitation_id = inv_id
+            inv = db.get_invitation_by_id(inv_id)
+            if inv:
+                voice_message = inv.get("voice_message_filename")
+                inviter_name = inv.get("inviter_name") or owner_name
+
+    return {
+        "owner_name": owner_name,
+        "inviter_name": inviter_name,
+        "voice_message": voice_message,
+        "invitation_id": invitation_id,
+        "family_name": session.get("name", ""),
+    }
+
+
+@router.get("/onboarding/step/1", response_class=HTMLResponse)
+async def onboarding_step1(request: Request):
+    session = await get_web_session(request)
+    if not session:
+        return RedirectResponse("/web/family", status_code=302)
+    db = request.app.state.db
+    ctx = _get_onboarding_context(db, session)
+    return templates.TemplateResponse("onboarding_step1.html", {
+        "request": request, "session": session, "step": 1, **ctx,
+    })
+
+
+@router.get("/onboarding/step/2", response_class=HTMLResponse)
+async def onboarding_step2(request: Request):
+    session = await get_web_session(request)
+    if not session:
+        return RedirectResponse("/web/family", status_code=302)
+    db = request.app.state.db
+    ctx = _get_onboarding_context(db, session)
+    return templates.TemplateResponse("onboarding_step2.html", {
+        "request": request, "session": session, "step": 2, **ctx,
+    })
+
+
+@router.post("/onboarding/step/2")
+async def onboarding_step2_save(request: Request, story_text: str = Form(...)):
+    session = await get_web_session(request)
+    if not session:
+        return RedirectResponse("/web/family", status_code=302)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+    db.save_story(
+        transcript=story_text.strip(),
+        speaker_name=session.get("name", "Family"),
+        source="onboarding",
+        user_id=user["id"],
+        tenant_id=tid,
+    )
+    db.mark_session_onboarded(session.get("session_id", ""), step=3)
+    return RedirectResponse("/web/onboarding/step/3", status_code=303)
+
+
+@router.post("/onboarding/step/2/record")
+async def onboarding_step2_record(request: Request):
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    form = await request.form()
+    audio_file = form.get("audio")
+    if not audio_file:
+        return JSONResponse({"error": "No audio"}, status_code=400)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    import subprocess
+    audio_data = await audio_file.read()
+    filename = f"onboard_{uuid.uuid4().hex[:8]}.wav"
+    recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+    os.makedirs(recordings_dir, exist_ok=True)
+    filepath = os.path.join(recordings_dir, filename)
+    raw_path = filepath + ".raw"
+    with open(raw_path, "wb") as f:
+        f.write(audio_data)
+    try:
+        subprocess.run(["ffmpeg", "-y", "-i", raw_path, "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le", filepath],
+                      capture_output=True, timeout=15)
+        os.remove(raw_path)
+    except Exception:
+        os.rename(raw_path, filepath)
+
+    user = db.get_or_create_user(tenant_id=tid)
+    db.save_story(
+        transcript="(voice recording from onboarding)",
+        audio_s3_key=filename,
+        speaker_name=session.get("name", "Family"),
+        source="onboarding",
+        user_id=user["id"],
+        tenant_id=tid,
+    )
+    db.mark_session_onboarded(session.get("session_id", ""), step=3)
+    return JSONResponse({"ok": True})
+
+
+@router.get("/onboarding/step/3", response_class=HTMLResponse)
+async def onboarding_step3(request: Request):
+    session = await get_web_session(request)
+    if not session:
+        return RedirectResponse("/web/family", status_code=302)
+    db = request.app.state.db
+    ctx = _get_onboarding_context(db, session)
+    return templates.TemplateResponse("onboarding_step3.html", {
+        "request": request, "session": session, "step": 3, **ctx,
+    })
+
+
+@router.post("/onboarding/step/3")
+async def onboarding_step3_save(request: Request, message: str = Form(...)):
+    session = await get_web_session(request)
+    if not session:
+        return RedirectResponse("/web/family", status_code=302)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    db.save_message(
+        from_name=session.get("name", "Family"),
+        message=message.strip(),
+        tenant_id=tid,
+    )
+    db.mark_session_onboarded(session.get("session_id", ""), step=4)
+    return RedirectResponse("/web/onboarding/step/4", status_code=303)
+
+
+@router.post("/onboarding/step/3/record")
+async def onboarding_step3_record(request: Request):
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    form = await request.form()
+    audio_file = form.get("audio")
+    if not audio_file:
+        return JSONResponse({"error": "No audio"}, status_code=400)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    import subprocess
+    audio_data = await audio_file.read()
+    filename = f"onboard_msg_{uuid.uuid4().hex[:8]}.wav"
+    recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+    os.makedirs(recordings_dir, exist_ok=True)
+    filepath = os.path.join(recordings_dir, filename)
+    raw_path = filepath + ".raw"
+    with open(raw_path, "wb") as f:
+        f.write(audio_data)
+    try:
+        subprocess.run(["ffmpeg", "-y", "-i", raw_path, "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le", filepath],
+                      capture_output=True, timeout=15)
+        os.remove(raw_path)
+    except Exception:
+        os.rename(raw_path, filepath)
+
+    db.save_message(
+        from_name=session.get("name", "Family"),
+        message="Voice message",
+        tenant_id=tid,
+        audio_filename=filename,
+    )
+    db.mark_session_onboarded(session.get("session_id", ""), step=4)
+    return JSONResponse({"ok": True})
+
+
+@router.get("/onboarding/step/4", response_class=HTMLResponse)
+async def onboarding_step4(request: Request):
+    session = await get_web_session(request)
+    if not session:
+        return RedirectResponse("/web/family", status_code=302)
+    db = request.app.state.db
+    ctx = _get_onboarding_context(db, session)
+    return templates.TemplateResponse("onboarding_step4.html", {
+        "request": request, "session": session, "step": 4, **ctx,
+    })
+
+
+@router.post("/onboarding/step/4")
+async def onboarding_step4_save(request: Request, rating: str = Form("0"),
+                                 note: str = Form("")):
+    session = await get_web_session(request)
+    if not session:
+        return RedirectResponse("/web/family", status_code=302)
+    db = request.app.state.db
+    ctx = _get_onboarding_context(db, session)
+    if ctx["invitation_id"]:
+        db.save_onboarding_feedback(ctx["invitation_id"], int(rating), note.strip() or None)
+        db.update_invitation_status(ctx["invitation_id"], "onboarded")
+    db.mark_session_onboarded(session.get("session_id", ""), step=5)
+    return RedirectResponse("/web/onboarding/step/5", status_code=303)
+
+
+@router.get("/onboarding/step/5", response_class=HTMLResponse)
+async def onboarding_step5(request: Request):
+    session = await get_web_session(request)
+    if not session:
+        return RedirectResponse("/web/family", status_code=302)
+    db = request.app.state.db
+    ctx = _get_onboarding_context(db, session)
+    return templates.TemplateResponse("onboarding_step5.html", {
+        "request": request, "session": session, "step": 5,
+        "signup_error": request.query_params.get("signup_error"),
+        **ctx,
+    })
+
+
+@router.post("/onboarding/step/5/signup")
+async def onboarding_signup(request: Request,
+                             name: str = Form(...),
+                             email: str = Form(...),
+                             password: str = Form(...),
+                             password_confirm: str = Form(...),
+                             household_name: str = Form(...)):
+    session = await get_web_session(request)
+    if not session:
+        return RedirectResponse("/web/family", status_code=302)
+    db = request.app.state.db
+    email = email.strip().lower()
+
+    # Validate
+    if password != password_confirm:
+        return RedirectResponse("/web/onboarding/step/5?signup_error=Passwords+don't+match", status_code=303)
+    if len(password) < 10:
+        return RedirectResponse("/web/onboarding/step/5?signup_error=Password+must+be+10%2B+characters", status_code=303)
+    if db.get_account_by_email(email):
+        return RedirectResponse("/web/onboarding/step/5?signup_error=Email+already+registered", status_code=303)
+
+    # Create new tenant
+    new_tid = db.create_tenant(household_name.strip())
+    from core.subscription import start_trial
+    start_trial(db, new_tid, days=30)
+
+    # Create account
+    pw_hash = hash_password(password)
+    account_id = db.create_account(email, pw_hash, name.strip(), new_tid, role="owner")
+    db.get_or_create_user(name=name.strip(), tenant_id=new_tid)
+
+    # Generate family code
+    db.generate_family_code(new_tid)
+
+    # Auto-connect to inviting family
+    old_tid = session["tenant_id"]
+    old_tenant = db.get_tenant(old_tid)
+    if old_tenant and old_tenant.get("family_code"):
+        db.send_friend_request(new_tid, old_tenant["family_code"])
+
+    # Update invitation status
+    ctx = _get_onboarding_context(db, session)
+    if ctx["invitation_id"]:
+        db.update_invitation_status(ctx["invitation_id"], "converted",
+                                    converted_tenant_id=new_tid)
+
+    # Mark onboarding complete
+    db.mark_session_onboarded(session.get("session_id", ""))
+
+    # Notify admin
+    try:
+        from core.notify import notify_new_registration
+        import threading
+        threading.Thread(
+            target=notify_new_registration,
+            args=(name, email, household_name),
+            daemon=True,
+        ).start()
+    except Exception:
+        pass
+
+    # Log in as new account
+    new_session_id = db.create_web_session(
+        account_id, new_tid,
+        duration_hours=settings.SESSION_DURATION_HOURS,
+    )
+    response = RedirectResponse("/web/welcome", status_code=302)
+    response.set_cookie(
+        "polly_session", new_session_id,
+        max_age=settings.SESSION_DURATION_HOURS * 3600,
+        httponly=True, samesite="lax",
+    )
+    return response
+
+
+@router.post("/onboarding/skip")
+async def onboarding_skip(request: Request):
+    session = await get_web_session(request)
+    if session:
+        db = request.app.state.db
+        db.mark_session_onboarded(session.get("session_id", ""))
+    return RedirectResponse("/web/dashboard", status_code=303)
 
 
 # ── Protected routes (session required) ──

@@ -1,0 +1,119 @@
+{% extends "base_onboarding.html" %}
+{% block title %}Share a Story - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="mt-4">
+    <h1 class="text-xl font-bold text-gray-800">Share a story about {{ owner_name }}</h1>
+    <p class="text-sm text-gray-500 mt-1">Pick one or write your own — this is how Polly captures memories.</p>
+</div>
+
+<!-- Prompt cards -->
+<div class="mt-4 space-y-2">
+    <button type="button" onclick="setPrompt('How I know {{ owner_name }}')"
+            class="w-full text-left bg-white border rounded-lg px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50 hover:border-emerald-300 transition">
+        How do you know {{ owner_name }}?
+    </button>
+    <button type="button" onclick="setPrompt('Where we met')"
+            class="w-full text-left bg-white border rounded-lg px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50 hover:border-emerald-300 transition">
+        Where did you meet?
+    </button>
+    <button type="button" onclick="setPrompt('Advice or lesson from {{ owner_name }}')"
+            class="w-full text-left bg-white border rounded-lg px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50 hover:border-emerald-300 transition">
+        Any advice you'd give them or lessons you learned?
+    </button>
+</div>
+
+<!-- Text form -->
+<form method="POST" action="/web/onboarding/step/2" class="mt-4">
+    <textarea name="story_text" id="story-text" rows="4" required
+              class="w-full border rounded-lg px-3 py-2 text-sm resize-y focus:ring-2 focus:ring-emerald-500"
+              placeholder="Type your story here..."></textarea>
+    <button type="submit" class="w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-medium mt-3">
+        Save & Continue
+    </button>
+</form>
+
+<!-- Or record -->
+<div class="mt-4 pt-4 border-t text-center">
+    <button type="button" onclick="document.getElementById('voice-panel').classList.toggle('hidden')"
+            class="text-sm text-blue-600 font-medium hover:text-blue-800">
+        Or record your answer with your voice
+    </button>
+    <div id="voice-panel" class="hidden mt-3">
+        <div class="flex justify-center items-center gap-3">
+            <button type="button" id="rec-btn" onclick="startStopRec()"
+                    class="bg-red-500 text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-red-600">
+                Tap to Record
+            </button>
+            <span id="rec-status" class="text-xs text-gray-400"></span>
+        </div>
+        <audio id="rec-preview" controls class="hidden mt-3 w-full"></audio>
+        <button type="button" id="rec-send" onclick="sendRecording()" class="hidden mt-3 w-full bg-emerald-600 text-white py-3 rounded-lg hover:bg-emerald-700 font-medium">
+            Save Recording & Continue
+        </button>
+    </div>
+</div>
+
+<form method="POST" action="/web/onboarding/skip" class="mt-4 text-center">
+    <button type="submit" class="text-gray-400 text-sm hover:text-gray-600">Skip this step</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setPrompt(prompt) {
+    document.getElementById('story-text').value = prompt + ': ';
+    document.getElementById('story-text').focus();
+}
+
+var recorder = null, chunks = [], blob = null;
+function startStopRec() {
+    var btn = document.getElementById('rec-btn');
+    var status = document.getElementById('rec-status');
+    if (recorder && recorder.state === 'recording') {
+        recorder.stop();
+        btn.textContent = 'Record Again';
+        btn.classList.remove('animate-pulse');
+        status.textContent = 'Processing...';
+        return;
+    }
+    chunks = []; blob = null;
+    document.getElementById('rec-preview').classList.add('hidden');
+    document.getElementById('rec-send').classList.add('hidden');
+    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    .then(function(stream) {
+        recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = function(e) { chunks.push(e.data); };
+        recorder.onstop = function() {
+            blob = new Blob(chunks, { type: recorder.mimeType });
+            var preview = document.getElementById('rec-preview');
+            preview.src = URL.createObjectURL(blob);
+            preview.classList.remove('hidden');
+            document.getElementById('rec-send').classList.remove('hidden');
+            status.textContent = 'Ready';
+            stream.getTracks().forEach(function(t) { t.stop(); });
+        };
+        recorder.start();
+        btn.textContent = 'Stop';
+        btn.classList.add('animate-pulse');
+        status.textContent = 'Recording...';
+    })
+    .catch(function(e) { status.textContent = 'Mic denied'; });
+}
+
+function sendRecording() {
+    if (!blob) return;
+    var status = document.getElementById('rec-status');
+    status.textContent = 'Saving...';
+    var fd = new FormData();
+    fd.append('audio', blob, 'story.webm');
+    fetch('/web/onboarding/step/2/record', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) { window.location.href = '/web/onboarding/step/3'; }
+        else { status.textContent = 'Error'; }
+    })
+    .catch(function(e) { status.textContent = 'Error'; });
+}
+</script>
+{% endblock %}

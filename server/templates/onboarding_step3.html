@@ -1,0 +1,98 @@
+{% extends "base_onboarding.html" %}
+{% block title %}Send a Message - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="mt-4">
+    <h1 class="text-xl font-bold text-gray-800">Send {{ owner_name }} a message</h1>
+    <p class="text-sm text-gray-500 mt-1">This will play on {{ owner_name }}'s Polly device — they'll hear it in your words.</p>
+</div>
+
+<!-- Text form -->
+<form method="POST" action="/web/onboarding/step/3" class="mt-6">
+    <textarea name="message" rows="3" required
+              class="w-full border rounded-lg px-3 py-2 text-sm resize-y focus:ring-2 focus:ring-emerald-500"
+              placeholder="e.g. Hey {{ owner_name }}, this is pretty cool!"></textarea>
+    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium mt-3">
+        Send Message & Continue
+    </button>
+</form>
+
+<!-- Or record -->
+<div class="mt-4 pt-4 border-t text-center">
+    <button type="button" onclick="document.getElementById('msg-voice-panel').classList.toggle('hidden')"
+            class="text-sm text-blue-600 font-medium hover:text-blue-800">
+        Or record a voice message
+    </button>
+    <div id="msg-voice-panel" class="hidden mt-3">
+        <div class="flex justify-center items-center gap-3">
+            <button type="button" id="msg-rec-btn" onclick="startStopMsgRec()"
+                    class="bg-red-500 text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-red-600">
+                Tap to Record
+            </button>
+            <span id="msg-rec-status" class="text-xs text-gray-400"></span>
+        </div>
+        <audio id="msg-preview" controls class="hidden mt-3 w-full"></audio>
+        <button type="button" id="msg-send" onclick="sendMsgRecording()" class="hidden mt-3 w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-medium">
+            Send Voice Message & Continue
+        </button>
+    </div>
+</div>
+
+<form method="POST" action="/web/onboarding/skip" class="mt-4 text-center">
+    <button type="submit" class="text-gray-400 text-sm hover:text-gray-600">Skip this step</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var msgRecorder = null, msgChunks = [], msgBlob = null;
+function startStopMsgRec() {
+    var btn = document.getElementById('msg-rec-btn');
+    var status = document.getElementById('msg-rec-status');
+    if (msgRecorder && msgRecorder.state === 'recording') {
+        msgRecorder.stop();
+        btn.textContent = 'Record Again';
+        btn.classList.remove('animate-pulse');
+        status.textContent = 'Processing...';
+        return;
+    }
+    msgChunks = []; msgBlob = null;
+    document.getElementById('msg-preview').classList.add('hidden');
+    document.getElementById('msg-send').classList.add('hidden');
+    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    .then(function(stream) {
+        msgRecorder = new MediaRecorder(stream);
+        msgRecorder.ondataavailable = function(e) { msgChunks.push(e.data); };
+        msgRecorder.onstop = function() {
+            msgBlob = new Blob(msgChunks, { type: msgRecorder.mimeType });
+            var preview = document.getElementById('msg-preview');
+            preview.src = URL.createObjectURL(msgBlob);
+            preview.classList.remove('hidden');
+            document.getElementById('msg-send').classList.remove('hidden');
+            status.textContent = 'Ready';
+            stream.getTracks().forEach(function(t) { t.stop(); });
+        };
+        msgRecorder.start();
+        btn.textContent = 'Stop';
+        btn.classList.add('animate-pulse');
+        status.textContent = 'Recording...';
+    })
+    .catch(function(e) { status.textContent = 'Mic denied'; });
+}
+
+function sendMsgRecording() {
+    if (!msgBlob) return;
+    var status = document.getElementById('msg-rec-status');
+    status.textContent = 'Sending...';
+    var fd = new FormData();
+    fd.append('audio', msgBlob, 'message.webm');
+    fetch('/web/onboarding/step/3/record', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) { window.location.href = '/web/onboarding/step/4'; }
+        else { status.textContent = 'Error'; }
+    })
+    .catch(function(e) { status.textContent = 'Error'; });
+}
+</script>
+{% endblock %}
