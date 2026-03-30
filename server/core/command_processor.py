@@ -222,31 +222,47 @@ class CommandProcessor:
         # ── Message board ──
 
         elif intent == "send_polly_message":
-            # Two-step: "send a message to Matt's Polly" → ask for message → send
+            # Two-step: "send a message to Matt's Polly" → confirm name → ask for message → send
             person = intent_result.get("person", "")
             if person:
                 person_lower = person.lower().strip()
                 connected = self.db.get_connected_families(tid)
-                matched = None
+
+                # Build list of ALL matching connected friends
+                matches = []
                 for cf in connected:
                     cf_user = self.db.get_or_create_user(tenant_id=cf["connected_tenant_id"])
-                    cf_name = (cf_user.get("name") or "").strip().lower()
-                    cf_first = cf_name.split()[0] if cf_name else ""
+                    cf_name = (cf_user.get("name") or "").strip()
+                    cf_lower = cf_name.lower()
+                    cf_first = cf_lower.split()[0] if cf_lower else ""
                     person_first = person_lower.split()[0] if person_lower else ""
-                    if person_first and cf_first and person_first == cf_first:
-                        matched = cf
+
+                    # Exact full name match
+                    if person_lower == cf_lower:
+                        matches = [{"cf": cf, "full_name": cf_name}]
                         break
-                if matched:
-                    cf_user = self.db.get_or_create_user(tenant_id=matched["connected_tenant_id"])
-                    full_name = cf_user.get("name") or matched["connected_tenant_name"]
+                    # First name match
+                    if person_first and cf_first and person_first == cf_first:
+                        matches.append({"cf": cf, "full_name": cf_name})
+
+                if len(matches) == 1:
+                    m = matches[0]
                     state.pending_polly_target = {
-                        "tenant_id": matched["connected_tenant_id"],
-                        "name": matched["connected_tenant_name"],
-                        "person": full_name,
+                        "tenant_id": m["cf"]["connected_tenant_id"],
+                        "name": m["cf"]["connected_tenant_name"],
+                        "person": m["full_name"],
                     }
                     state.mode = ConversationMode.AWAITING_POLLY_MESSAGE
-                    resp = f"What would you like to say to {full_name}?"
+                    resp = f"What would you like to say to {m['full_name']}?"
                     self._last_response[device_id] = resp
+                    return resp
+                elif len(matches) > 1:
+                    names = ", ".join(m["full_name"] for m in matches[:-1]) + f", or {matches[-1]['full_name']}"
+                    resp = f"Which {person.split()[0].title()} — {names}?"
+                    self._last_response[device_id] = resp
+                    # Store all matches so we can resolve on next response
+                    state.pending_polly_target = {"matches": matches}
+                    state.mode = ConversationMode.AWAITING_POLLY_MESSAGE
                     return resp
                 return f"I don't see {person} as a connected Polly friend. You can connect them on the family tree."
             return "Who would you like to send a message to?"
@@ -260,48 +276,43 @@ class CommandProcessor:
 
                 # Check if person is a connected friend (cross-tenant)
                 connected = self.db.get_connected_families(tid)
-                matched_connection = None
+                matches = []
                 for cf in connected:
-                    # Match on connected tenant's owner name
                     cf_user = self.db.get_or_create_user(tenant_id=cf["connected_tenant_id"])
-                    cf_name = (cf_user.get("name") or "").strip().lower()
-                    cf_first = cf_name.split()[0] if cf_name else ""
+                    cf_name = (cf_user.get("name") or "").strip()
+                    cf_lower = cf_name.lower()
+                    cf_first = cf_lower.split()[0] if cf_lower else ""
                     person_first = person_lower.split()[0] if person_lower else ""
-                    if person_first and cf_first and person_first == cf_first:
-                        matched_connection = cf
-                        break
 
-                if matched_connection:
-                    # Check if this person is ALSO a local family member
+                    # Exact full name match → definitive
+                    if person_lower == cf_lower:
+                        matches = [{"cf": cf, "full_name": cf_name}]
+                        break
+                    # First name match
+                    if person_first and cf_first and person_first == cf_first:
+                        matches.append({"cf": cf, "full_name": cf_name})
+
+                if len(matches) == 1:
+                    # Check if also local family member (non-friend)
                     local_members = self.db.get_family_members(tenant_id=tid)
                     is_local = any(person_lower in (m.get("name") or "").lower() for m in local_members
-                                  if not m.get("relation_to_owner") == "friend")
-
+                                  if m.get("relation_to_owner") != "friend")
                     if is_local:
-                        # Person exists locally AND as connected friend — save locally
-                        # (they're on the same household Polly)
-                        self.db.save_message(
-                            from_name=speaker, to_name=person,
-                            message=message, tenant_id=tid
-                        )
+                        self.db.save_message(from_name=speaker, to_name=person, message=message, tenant_id=tid)
                         resp = f"Got it. I'll let {person} know: {message}."
                     else:
-                        # Cross-tenant: send to their Polly
                         my_tenant = self.db.get_tenant(tid)
                         from_label = my_tenant["name"] if my_tenant else speaker
-                        self.db.save_message(
-                            from_name=from_label,
-                            message=message,
-                            tenant_id=matched_connection["connected_tenant_id"]
-                        )
-                        friend_name = matched_connection["connected_tenant_name"]
-                        resp = f"Sent to {person}'s Polly: {message}."
+                        self.db.save_message(from_name=from_label, message=message,
+                                            tenant_id=matches[0]["cf"]["connected_tenant_id"])
+                        resp = f"Sent to {matches[0]['full_name']}'s Polly: {message}."
+                elif len(matches) > 1:
+                    # Multiple matches — need clarification
+                    names = ", ".join(m["full_name"] for m in matches[:-1]) + f", or {matches[-1]['full_name']}"
+                    resp = f"Which {person.split()[0].title()} did you mean — {names}? Try using their full name."
                 else:
-                    # Local message only
-                    self.db.save_message(
-                        from_name=speaker, to_name=person,
-                        message=message, tenant_id=tid
-                    )
+                    # No cross-tenant match, save locally
+                    self.db.save_message(from_name=speaker, to_name=person, message=message, tenant_id=tid)
                     resp = f"Got it. I'll let {person} know: {message}."
 
                 self._last_response[device_id] = resp
@@ -1199,21 +1210,44 @@ NARRATIVE:"""
         # Awaiting message for cross-tenant Polly
         if state.mode == ConversationMode.AWAITING_POLLY_MESSAGE:
             target = state.pending_polly_target
-            if target and raw_text.strip():
-                my_tenant = self.db.get_tenant(tid)
-                from_label = my_tenant["name"] if my_tenant else "A friend"
-                self.db.save_message(
-                    from_name=from_label,
-                    message=raw_text.strip(),
-                    tenant_id=target["tenant_id"]
-                )
-                person = target["person"]
+            if not target or not raw_text.strip():
                 state.reset()
-                resp = f"Sent to {person}'s Polly: {raw_text.strip()}"
-                self._last_response[device_id] = resp
-                return (resp, ConversationMode.COMMAND)
+                return ("Message cancelled.", ConversationMode.COMMAND)
+
+            # If we're waiting to resolve multiple matches (user says a last name)
+            if "matches" in target:
+                text_lower = raw_text.strip().lower()
+                resolved = None
+                for m in target["matches"]:
+                    # Match on last name or full name
+                    if text_lower in m["full_name"].lower() or m["full_name"].lower().split()[-1] in text_lower:
+                        resolved = m
+                        break
+                if resolved:
+                    state.pending_polly_target = {
+                        "tenant_id": resolved["cf"]["connected_tenant_id"],
+                        "name": resolved["cf"]["connected_tenant_name"],
+                        "person": resolved["full_name"],
+                    }
+                    resp = f"What would you like to say to {resolved['full_name']}?"
+                    self._last_response[device_id] = resp
+                    return (resp, ConversationMode.AWAITING_POLLY_MESSAGE)
+                state.reset()
+                return ("I didn't catch which one. Try again.", ConversationMode.COMMAND)
+
+            # We have a confirmed target — send the message
+            my_tenant = self.db.get_tenant(tid)
+            from_label = my_tenant["name"] if my_tenant else "A friend"
+            self.db.save_message(
+                from_name=from_label,
+                message=raw_text.strip(),
+                tenant_id=target["tenant_id"]
+            )
+            person = target["person"]
             state.reset()
-            return ("Message cancelled.", ConversationMode.COMMAND)
+            resp = f"Sent to {person}'s Polly: {raw_text.strip()}"
+            self._last_response[device_id] = resp
+            return (resp, ConversationMode.COMMAND)
 
         # Check for explicit stop/exit commands even in conversational mode
         intent = intent_result.get("intent", "unknown")
