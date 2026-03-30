@@ -79,9 +79,16 @@
 </div>
 
 {% if connected_families %}
-<!-- Send to Connected Friend -->
+<!-- Send to Connected Friend (collapsible) -->
 <div class="bg-blue-50 border border-blue-200 rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
-    <h2 class="text-base sm:text-lg font-semibold mb-3 text-blue-800">Send to a Friend's Polly</h2>
+    <button type="button" onclick="document.getElementById('friend-polly-body').classList.toggle('hidden'); document.getElementById('friend-polly-arrow').classList.toggle('rotate-180')"
+            class="w-full flex items-center justify-between text-left">
+        <h2 class="text-base sm:text-lg font-semibold text-blue-800">Send to a Friend's Polly</h2>
+        <svg id="friend-polly-arrow" class="w-5 h-5 text-blue-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div id="friend-polly-body" class="hidden mt-3">
     <form method="POST" action="/web/messages/send-connected">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div>
@@ -121,6 +128,7 @@
                 Send Voice to Their Polly
             </button>
         </div>
+    </div>
     </div>
 </div>
 {% endif %}
