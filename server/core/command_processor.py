@@ -226,11 +226,54 @@ class CommandProcessor:
             message = intent_result.get("message", "")
             if person and message:
                 speaker = state.speaker_name or self.db.get_owner_name(tenant_id=tid) or "someone"
-                self.db.save_message(
-                    from_name=speaker, to_name=person,
-                    message=message, tenant_id=tid
-                )
-                resp = f"Got it. I'll let {person} know: {message}."
+                person_lower = person.lower().strip()
+
+                # Check if person is a connected friend (cross-tenant)
+                connected = self.db.get_connected_families(tid)
+                matched_connection = None
+                for cf in connected:
+                    # Match on connected tenant's owner name
+                    cf_user = self.db.get_or_create_user(tenant_id=cf["connected_tenant_id"])
+                    cf_name = (cf_user.get("name") or "").strip().lower()
+                    cf_first = cf_name.split()[0] if cf_name else ""
+                    person_first = person_lower.split()[0] if person_lower else ""
+                    if person_first and cf_first and person_first == cf_first:
+                        matched_connection = cf
+                        break
+
+                if matched_connection:
+                    # Check if this person is ALSO a local family member
+                    local_members = self.db.get_family_members(tenant_id=tid)
+                    is_local = any(person_lower in (m.get("name") or "").lower() for m in local_members
+                                  if not m.get("relation_to_owner") == "friend")
+
+                    if is_local:
+                        # Person exists locally AND as connected friend — save locally
+                        # (they're on the same household Polly)
+                        self.db.save_message(
+                            from_name=speaker, to_name=person,
+                            message=message, tenant_id=tid
+                        )
+                        resp = f"Got it. I'll let {person} know: {message}."
+                    else:
+                        # Cross-tenant: send to their Polly
+                        my_tenant = self.db.get_tenant(tid)
+                        from_label = my_tenant["name"] if my_tenant else speaker
+                        self.db.save_message(
+                            from_name=from_label,
+                            message=message,
+                            tenant_id=matched_connection["connected_tenant_id"]
+                        )
+                        friend_name = matched_connection["connected_tenant_name"]
+                        resp = f"Sent to {person}'s Polly: {message}."
+                else:
+                    # Local message only
+                    self.db.save_message(
+                        from_name=speaker, to_name=person,
+                        message=message, tenant_id=tid
+                    )
+                    resp = f"Got it. I'll let {person} know: {message}."
+
                 self._last_response[device_id] = resp
                 return resp
             return "I didn't catch the message. Try saying: tell dad I'm going to the store."
