@@ -569,15 +569,45 @@ class PollyDB:
                 "access_code": "ALTER TABLE family_members ADD COLUMN access_code TEXT",
                 "code_created_at": "ALTER TABLE family_members ADD COLUMN code_created_at TIMESTAMP",
                 "is_minor": "ALTER TABLE family_members ADD COLUMN is_minor INTEGER DEFAULT 0",
+                "email": "ALTER TABLE family_members ADD COLUMN email TEXT",
             }
             for col, sql in fm_ext.items():
                 if col not in cols:
                     conn.execute(sql)
 
-            # Add family_member_id to web_sessions
+            # Add family_member_id + onboarding columns to web_sessions
             cols = {row[1] for row in conn.execute("PRAGMA table_info(web_sessions)").fetchall()}
-            if "family_member_id" not in cols:
-                conn.execute("ALTER TABLE web_sessions ADD COLUMN family_member_id INTEGER")
+            ws_migrations = {
+                "family_member_id": "ALTER TABLE web_sessions ADD COLUMN family_member_id INTEGER",
+                "onboarding_complete": "ALTER TABLE web_sessions ADD COLUMN onboarding_complete INTEGER DEFAULT 0",
+                "invitation_id": "ALTER TABLE web_sessions ADD COLUMN invitation_id INTEGER",
+                "last_onboarding_step": "ALTER TABLE web_sessions ADD COLUMN last_onboarding_step INTEGER DEFAULT 1",
+            }
+            for col, sql in ws_migrations.items():
+                if col not in cols:
+                    conn.execute(sql)
+
+            # Family invitations table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS family_invitations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER NOT NULL,
+                    family_member_id INTEGER,
+                    inviter_name TEXT NOT NULL,
+                    invitee_name TEXT NOT NULL,
+                    invitee_email TEXT NOT NULL,
+                    voice_message_filename TEXT,
+                    family_code TEXT NOT NULL,
+                    status TEXT DEFAULT 'sent',
+                    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    visited_at TIMESTAMP,
+                    onboarded_at TIMESTAMP,
+                    converted_at TIMESTAMP,
+                    converted_tenant_id INTEGER,
+                    feedback_rating INTEGER,
+                    feedback_note TEXT
+                )
+            """)
 
             # Add timeline columns to memories
             cols = {row[1] for row in conn.execute("PRAGMA table_info(memories)").fetchall()}
@@ -946,6 +976,140 @@ class PollyDB:
                 (tenant_id,)
             ).fetchall()
             return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Family Invitations ──
+
+    def save_family_invitation(self, tenant_id: int, family_member_id: int,
+                                inviter_name: str, invitee_name: str,
+                                invitee_email: str, voice_filename: str = None,
+                                family_code: str = None) -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO family_invitations
+                (tenant_id, family_member_id, inviter_name, invitee_name, invitee_email,
+                 voice_message_filename, family_code)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (tenant_id, family_member_id, inviter_name, invitee_name,
+                  invitee_email, voice_filename, family_code))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_invitation_by_id(self, invitation_id: int) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM family_invitations WHERE id = ?", (invitation_id,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_invitations_for_tenant(self, tenant_id: int) -> List[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM family_invitations WHERE tenant_id = ? ORDER BY sent_at DESC",
+                (tenant_id,)
+            ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_invitation_by_email_and_tenant(self, email: str, tenant_id: int) -> Optional[Dict]:
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM family_invitations WHERE LOWER(invitee_email) = ? AND tenant_id = ? ORDER BY sent_at DESC LIMIT 1",
+                (email.lower(), tenant_id)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_invitation_status(self, invitation_id: int, status: str, **kwargs):
+        conn = self._get_connection()
+        try:
+            timestamp_col = {
+                "visited": "visited_at",
+                "onboarded": "onboarded_at",
+                "converted": "converted_at",
+            }.get(status)
+            if timestamp_col:
+                conn.execute(
+                    f"UPDATE family_invitations SET status = ?, {timestamp_col} = CURRENT_TIMESTAMP WHERE id = ?",
+                    (status, invitation_id))
+            else:
+                conn.execute(
+                    "UPDATE family_invitations SET status = ? WHERE id = ?",
+                    (status, invitation_id))
+            # Handle extra kwargs like converted_tenant_id
+            for key, val in kwargs.items():
+                if key in ("converted_tenant_id", "feedback_rating", "feedback_note"):
+                    conn.execute(
+                        f"UPDATE family_invitations SET {key} = ? WHERE id = ?",
+                        (val, invitation_id))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def mark_session_onboarded(self, session_id: str, step: int = None):
+        conn = self._get_connection()
+        try:
+            if step:
+                conn.execute(
+                    "UPDATE web_sessions SET last_onboarding_step = ? WHERE id = ?",
+                    (step, session_id))
+            else:
+                conn.execute(
+                    "UPDATE web_sessions SET onboarding_complete = 1 WHERE id = ?",
+                    (session_id,))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def save_onboarding_feedback(self, invitation_id: int, rating: int, note: str = None):
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE family_invitations SET feedback_rating = ?, feedback_note = ? WHERE id = ?",
+                (rating, note, invitation_id))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_invitation_funnel_stats(self) -> Dict:
+        conn = self._get_connection()
+        try:
+            row = conn.execute("""
+                SELECT
+                    COUNT(*) as total_sent,
+                    SUM(CASE WHEN status IN ('visited','onboarded','converted') THEN 1 ELSE 0 END) as total_visited,
+                    SUM(CASE WHEN status IN ('onboarded','converted') THEN 1 ELSE 0 END) as total_onboarded,
+                    SUM(CASE WHEN status = 'converted' THEN 1 ELSE 0 END) as total_converted
+                FROM family_invitations
+            """).fetchone()
+            return {
+                "total_sent": row[0] or 0,
+                "total_visited": row[1] or 0,
+                "total_onboarded": row[2] or 0,
+                "total_converted": row[3] or 0,
+            }
         finally:
             if not self._conn:
                 conn.close()
