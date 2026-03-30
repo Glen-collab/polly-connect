@@ -387,6 +387,19 @@ class IntentParser:
             if person.lower() not in ("it", "this", "that", "there", "what", "who", "everyone"):
                 return {"intent": "person_home", "person": person, "confidence": 0.9}
 
+        # "Send a message to [person]'s Polly" — cross-tenant messaging (two-step)
+        polly_msg_match = re.search(
+            r"(?:send|leave) (?:a )?message (?:to |for )?(\w+(?:\s+\w+)?)'?s? polly",
+            text_lower)
+        if not polly_msg_match:
+            polly_msg_match = re.search(
+                r"message (\w+(?:\s+\w+)?)'?s? polly",
+                text_lower)
+        if polly_msg_match:
+            person = polly_msg_match.group(1).strip()
+            if person.lower() not in ("a", "the", "my", "our"):
+                return {"intent": "send_polly_message", "person": person, "confidence": 0.95}
+
         leave_msg = self._is_leave_message(text_lower)
         if leave_msg:
             return {"intent": "leave_message", "person": leave_msg["person"],

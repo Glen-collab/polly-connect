@@ -4,7 +4,7 @@ Tracks per-device conversation mode for family storytelling flow.
 """
 
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
 class ConversationMode(Enum):
@@ -15,6 +15,7 @@ class ConversationMode(Enum):
     AWAITING_RELATIONSHIP = "awaiting_relationship"  # Asked how they know the owner
     AWAITING_NAME = "awaiting_name"            # Asked "who is this?" for message board
     STORY_RECORD = "story_record"              # Button-triggered WAV recording mode
+    AWAITING_POLLY_MESSAGE = "awaiting_polly_message"  # Waiting for message to send to friend's Polly
 
 
 # Dynamic timeouts per mode
@@ -26,6 +27,7 @@ SILENCE_TIMEOUTS = {
     ConversationMode.FOLLOWUP_WAIT: 8.0,
     ConversationMode.AWAITING_RELATIONSHIP: 8.0,
     ConversationMode.AWAITING_NAME: 8.0,
+    ConversationMode.AWAITING_POLLY_MESSAGE: 8.0,
     ConversationMode.STORY_RECORD: 15.0,       # Extra generous — button stops it, not silence
 }
 
@@ -36,6 +38,7 @@ MAX_RECORDING_TIMES = {
     ConversationMode.FOLLOWUP_WAIT: 300.0,
     ConversationMode.AWAITING_RELATIONSHIP: 30.0,
     ConversationMode.AWAITING_NAME: 30.0,
+    ConversationMode.AWAITING_POLLY_MESSAGE: 60.0,  # 1 min to say your message
     ConversationMode.STORY_RECORD: 1800.0,     # 30 minutes max
 }
 
@@ -56,6 +59,8 @@ class ConversationState:
         self.critical_thinking_step: int = 1             # 1-6
         # Message board pending status
         self.pending_status: Optional[str] = None
+        # Cross-tenant message target
+        self.pending_polly_target: Optional[Dict] = None  # {"tenant_id": int, "name": str, "person": str}
         # Multi-tenant context (device-level, persists across reset)
         self.tenant_id: Optional[int] = None
         self.user_id: Optional[int] = None
@@ -74,6 +79,7 @@ class ConversationState:
         self.current_life_phase = None
         self.critical_thinking_step = 1
         self.pending_status = None
+        self.pending_polly_target = None
         # tenant_id and user_id intentionally NOT reset (device-level)
 
     @property
@@ -96,5 +102,6 @@ class ConversationState:
             ConversationMode.FOLLOWUP_WAIT,
             ConversationMode.AWAITING_RELATIONSHIP,
             ConversationMode.AWAITING_NAME,
+            ConversationMode.AWAITING_POLLY_MESSAGE,
             ConversationMode.STORY_RECORD,
         )

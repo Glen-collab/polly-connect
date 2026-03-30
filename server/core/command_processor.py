@@ -221,6 +221,36 @@ class CommandProcessor:
 
         # ── Message board ──
 
+        elif intent == "send_polly_message":
+            # Two-step: "send a message to Matt's Polly" → ask for message → send
+            person = intent_result.get("person", "")
+            if person:
+                person_lower = person.lower().strip()
+                connected = self.db.get_connected_families(tid)
+                matched = None
+                for cf in connected:
+                    cf_user = self.db.get_or_create_user(tenant_id=cf["connected_tenant_id"])
+                    cf_name = (cf_user.get("name") or "").strip().lower()
+                    cf_first = cf_name.split()[0] if cf_name else ""
+                    person_first = person_lower.split()[0] if person_lower else ""
+                    if person_first and cf_first and person_first == cf_first:
+                        matched = cf
+                        break
+                if matched:
+                    cf_user = self.db.get_or_create_user(tenant_id=matched["connected_tenant_id"])
+                    full_name = cf_user.get("name") or matched["connected_tenant_name"]
+                    state.pending_polly_target = {
+                        "tenant_id": matched["connected_tenant_id"],
+                        "name": matched["connected_tenant_name"],
+                        "person": full_name,
+                    }
+                    state.mode = ConversationMode.AWAITING_POLLY_MESSAGE
+                    resp = f"What would you like to say to {full_name}?"
+                    self._last_response[device_id] = resp
+                    return resp
+                return f"I don't see {person} as a connected Polly friend. You can connect them on the family tree."
+            return "Who would you like to send a message to?"
+
         elif intent == "leave_message":
             person = intent_result.get("person", "")
             message = intent_result.get("message", "")
@@ -1165,6 +1195,25 @@ NARRATIVE:"""
         if state.mode == ConversationMode.COMMAND:
             response = await self.process(intent_result, raw_text, device_id)
             return (response, state.mode)
+
+        # Awaiting message for cross-tenant Polly
+        if state.mode == ConversationMode.AWAITING_POLLY_MESSAGE:
+            target = state.pending_polly_target
+            if target and raw_text.strip():
+                my_tenant = self.db.get_tenant(tid)
+                from_label = my_tenant["name"] if my_tenant else "A friend"
+                self.db.save_message(
+                    from_name=from_label,
+                    message=raw_text.strip(),
+                    tenant_id=target["tenant_id"]
+                )
+                person = target["person"]
+                state.reset()
+                resp = f"Sent to {person}'s Polly: {raw_text.strip()}"
+                self._last_response[device_id] = resp
+                return (resp, ConversationMode.COMMAND)
+            state.reset()
+            return ("Message cancelled.", ConversationMode.COMMAND)
 
         # Check for explicit stop/exit commands even in conversational mode
         intent = intent_result.get("intent", "unknown")
