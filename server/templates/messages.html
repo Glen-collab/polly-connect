@@ -66,7 +66,7 @@
             <div class="flex items-center gap-3">
                 <button type="button" id="voice-rec-btn" onclick="startStopVoiceRec()"
                         class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600">
-                    Hold to Record
+                    Tap to Record
                 </button>
                 <span id="voice-rec-status" class="text-xs text-gray-400"></span>
             </div>
@@ -215,6 +215,11 @@ function sendVoiceMsg() {
     var fd = new FormData();
     fd.append('audio', voiceBlob, 'voice_message.webm');
     fd.append('from_name', '{{ session.name }}');
+    // Grab device and recipient from the text message form
+    var deviceSel = document.querySelector('select[name="device_id"]');
+    var toSel = document.querySelector('select[name="to_name"]');
+    if (deviceSel && deviceSel.value) fd.append('device_id', deviceSel.value);
+    if (toSel && toSel.value) fd.append('to_name', toSel.value);
     fetch('/web/messages/send-voice', { method: 'POST', body: fd })
     .then(function(r) { return r.json(); })
     .then(function(data) {
