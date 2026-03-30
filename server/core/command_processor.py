@@ -291,6 +291,17 @@ class CommandProcessor:
         elif intent == "check_messages":
             messages = self.db.get_messages_for(tenant_id=tid, device_id=device_id)
             if messages:
+                # Mark all as read
+                msg_ids = [m["id"] for m in messages]
+                conn = self.db._get_connection()
+                try:
+                    placeholders = ",".join("?" * len(msg_ids))
+                    conn.execute(f"UPDATE family_messages SET read = 1 WHERE id IN ({placeholders})", msg_ids)
+                    conn.commit()
+                finally:
+                    if not self.db._conn:
+                        conn.close()
+
                 # Check if the first message is a voice message — play the audio
                 first_voice = None
                 for m in messages:

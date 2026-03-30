@@ -88,6 +88,11 @@
             <div class="flex justify-between items-start">
                 <div class="flex-1 min-w-0">
                     <div class="flex flex-wrap items-center gap-2 mb-1">
+                        {% if msg.read %}
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 flex-shrink-0" title="Read"></span>
+                        {% else %}
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-red-400 flex-shrink-0" title="Unread"></span>
+                        {% endif %}
                         <span class="font-semibold text-sm text-gray-800">{{ msg.from_name }}</span>
                         <span class="text-gray-400 text-xs">&rarr;</span>
                         {% if msg.to_name %}
