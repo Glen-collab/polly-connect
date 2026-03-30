@@ -241,12 +241,16 @@ async def continuous_stream(websocket: WebSocket):
                     try:
                         family_members = db.get_family_members(tenant_id=tenant_id)
                         family_names = set()
+                        relation_to_name = {}
                         for m in family_members:
                             family_names.add(m["name"].lower().split()[0])  # first name
                             family_names.add(m["name"].lower())  # full name
                             if m.get("relation_to_owner"):
-                                family_names.add(m["relation_to_owner"].lower())
+                                rel = m["relation_to_owner"].lower()
+                                family_names.add(rel)
+                                relation_to_name[rel] = m["name"]
                         intent_parser._family_names = family_names
+                        intent_parser._relation_to_name = relation_to_name
                         logger.info(f"Loaded {len(family_names)} family names for message board")
                     except Exception as e:
                         logger.warning(f"Could not load family names: {e}")

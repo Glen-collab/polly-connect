@@ -10,6 +10,7 @@ class IntentParser:
     def __init__(self, use_spacy: bool = False):
         self.use_spacy = False  # Disabled for simplicity
         self._family_names = set()  # populated from family tree
+        self._relation_to_name = {}  # "wife" → "Ali", populated from family tree
 
         # Family storytelling intents
         self._introduce_self_phrases = [
@@ -806,17 +807,14 @@ class IntentParser:
                 # Filter out non-person phrases like "tell me a joke"
                 if person.lower() in ("me", "us", "everyone", "a"):
                     continue
-                # Resolve "my wife" etc to a name from family tree
+                # Resolve "my wife" etc to actual name from family tree
                 person_lower = person.lower()
                 if person_lower in relationship_map:
                     rel = relationship_map[person_lower]
-                    # Look up in family names
-                    for fn in self._family_names:
-                        if fn.lower() == rel:
-                            person = fn
-                            break
+                    # Look up actual name via relation_to_name map
+                    if rel in self._relation_to_name:
+                        person = self._relation_to_name[rel]
                     else:
-                        # No match in tree — use the relationship word directly
                         person = rel.title()
                 if message:
                     return {"person": person, "message": message}
