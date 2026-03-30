@@ -3261,6 +3261,127 @@ async def family_tree_delete(request: Request, member_id: int):
     return RedirectResponse("/web/family-tree", status_code=303)
 
 
+# ── Family Invitations ──
+
+@router.get("/invite/{member_id}", response_class=HTMLResponse)
+async def invite_member_page(request: Request, member_id: int):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    member = db.get_family_member_by_id(member_id)
+    if not member or member.get("tenant_id") != tid:
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    # Get owner name
+    user = db.get_or_create_user(tenant_id=tid)
+    owner_name = user.get("name") or session.get("name", "")
+
+    # Check for existing invitation
+    existing = None
+    if member.get("email"):
+        existing = db.get_invitation_by_email_and_tenant(member["email"], tid)
+
+    return templates.TemplateResponse("invite_member.html", {
+        "request": request, "session": session,
+        "member": member, "owner_name": owner_name,
+        "existing_invitation": existing,
+    })
+
+
+@router.post("/invite/{member_id}/send")
+async def invite_member_send(request: Request, member_id: int,
+                              email: str = Form(...)):
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    member = db.get_family_member_by_id(member_id)
+    if not member or member.get("tenant_id") != tid:
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    email = email.strip().lower()
+    owner_name = session.get("name", "Someone")
+    tenant = db.get_tenant(tid)
+
+    # Ensure family code exists
+    family_code = tenant.get("family_code") if tenant else None
+    if not family_code:
+        family_code = db.generate_family_code(tid)
+
+    # Update member email
+    conn = db._get_connection()
+    try:
+        conn.execute("UPDATE family_members SET email = ? WHERE id = ?", (email, member_id))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    # Check for voice message (uploaded via AJAX before send)
+    voice_filename = request.query_params.get("voice_file", "")
+
+    # Save invitation
+    invitation_id = db.save_family_invitation(
+        tenant_id=tid,
+        family_member_id=member_id,
+        inviter_name=owner_name,
+        invitee_name=member["name"],
+        invitee_email=email,
+        voice_filename=voice_filename or None,
+        family_code=family_code,
+    )
+
+    # Send email in background
+    import threading
+    from core.notify import send_family_invitation
+    threading.Thread(
+        target=send_family_invitation,
+        args=(owner_name, member["name"], email, family_code, invitation_id,
+              bool(voice_filename)),
+        daemon=True,
+    ).start()
+
+    return RedirectResponse(f"/web/family-tree?invite_sent={member['name']}", status_code=303)
+
+
+@router.post("/invite/{member_id}/record-voice")
+async def invite_record_voice(request: Request, member_id: int):
+    """AJAX: record voice hook for invitation."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    form = await request.form()
+    audio_file = form.get("audio")
+    if not audio_file:
+        return JSONResponse({"error": "No audio"}, status_code=400)
+
+    import subprocess
+    audio_data = await audio_file.read()
+    filename = f"invite_{uuid.uuid4().hex[:8]}.wav"
+    recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+    os.makedirs(recordings_dir, exist_ok=True)
+    filepath = os.path.join(recordings_dir, filename)
+
+    raw_path = filepath + ".raw"
+    with open(raw_path, "wb") as f:
+        f.write(audio_data)
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", raw_path, "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le", filepath],
+            capture_output=True, timeout=15)
+        os.remove(raw_path)
+    except Exception:
+        os.rename(raw_path, filepath)
+
+    return JSONResponse({"ok": True, "filename": filename})
+
+
 @router.get("/api/family-tree/{member_id}/photos")
 async def family_member_photos(request: Request, member_id: int):
     session = await get_web_session(request)

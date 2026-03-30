@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Invite {{ member.name }} - Polly Connect{% endblock %}
+
+{% block content %}
+<a href="/web/family-tree" class="text-emerald-600 hover:underline text-sm">&larr; Family Tree</a>
+<h1 class="text-xl sm:text-2xl font-bold mb-2 mt-1">Invite {{ member.name }}</h1>
+<p class="text-sm text-gray-500 mb-6">Send {{ member.name }} an invitation to connect with your Polly family.</p>
+
+{% if existing_invitation %}
+<div class="bg-amber-50 border border-amber-300 rounded-lg p-3 mb-4 max-w-lg mx-auto">
+    <p class="text-sm text-amber-800 font-medium">Already invited ({{ existing_invitation.status }}) on {{ existing_invitation.sent_at }}</p>
+</div>
+{% endif %}
+
+<div class="bg-white rounded-lg shadow-md p-6 max-w-lg mx-auto">
+
+    <!-- Step 1: Record a voice message (optional) -->
+    <div class="mb-6">
+        <h2 class="text-base font-semibold mb-2">Record a personal message <span class="text-gray-400 text-sm font-normal">(optional)</span></h2>
+        <p class="text-xs text-gray-400 mb-3">{{ member.name }} will hear this when they open the invitation. A personal voice hook is the best way to get them curious.</p>
+
+        <div class="flex items-center gap-3">
+            <button type="button" id="inv-rec-btn" onclick="startStopInviteRec()"
+                    class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600">
+                Tap to Record
+            </button>
+            <span id="inv-rec-status" class="text-xs text-gray-400"></span>
+        </div>
+        <audio id="inv-preview" controls class="hidden mt-3 w-full"></audio>
+        <input type="hidden" id="inv-voice-file" value="">
+    </div>
+
+    <!-- Step 2: Enter email + send -->
+    <div class="border-t pt-4">
+        <h2 class="text-base font-semibold mb-2">Their email</h2>
+        <form id="invite-form" method="POST" action="/web/invite/{{ member.id }}/send" class="space-y-3">
+            <input type="email" name="email" required placeholder="e.g. {{ member.name|lower|replace(' ', '') }}@email.com"
+                   value="{{ member.email or '' }}"
+                   class="w-full border rounded-lg px-3 py-3 text-sm focus:ring-2 focus:ring-emerald-500">
+            <button type="submit" id="send-invite-btn"
+                    class="w-full bg-emerald-600 text-white px-4 py-3 rounded-lg hover:bg-emerald-700 font-medium text-base">
+                Send Invitation
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var invRecorder = null;
+var invChunks = [];
+var invBlob = null;
+var invVoiceFile = '';
+
+function startStopInviteRec() {
+    var btn = document.getElementById('inv-rec-btn');
+    var status = document.getElementById('inv-rec-status');
+    if (invRecorder && invRecorder.state === 'recording') {
+        invRecorder.stop();
+        btn.textContent = 'Record Again';
+        btn.classList.remove('animate-pulse');
+        status.textContent = 'Processing...';
+        return;
+    }
+    invChunks = [];
+    invBlob = null;
+    document.getElementById('inv-preview').classList.add('hidden');
+    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    .then(function(stream) {
+        invRecorder = new MediaRecorder(stream);
+        invRecorder.ondataavailable = function(e) { invChunks.push(e.data); };
+        invRecorder.onstop = function() {
+            invBlob = new Blob(invChunks, { type: invRecorder.mimeType });
+            var url = URL.createObjectURL(invBlob);
+            var preview = document.getElementById('inv-preview');
+            preview.src = url;
+            preview.classList.remove('hidden');
+            status.textContent = 'Uploading...';
+            stream.getTracks().forEach(function(t) { t.stop(); });
+
+            // Upload immediately
+            var fd = new FormData();
+            fd.append('audio', invBlob, 'invite_voice.webm');
+            fetch('/web/invite/{{ member.id }}/record-voice', { method: 'POST', body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    invVoiceFile = data.filename;
+                    document.getElementById('inv-voice-file').value = data.filename;
+                    status.textContent = 'Voice message ready!';
+                } else {
+                    status.textContent = 'Upload failed';
+                }
+            })
+            .catch(function(e) { status.textContent = 'Upload error'; });
+        };
+        invRecorder.start();
+        btn.textContent = 'Stop Recording';
+        btn.classList.add('animate-pulse');
+        status.textContent = 'Recording...';
+    })
+    .catch(function(e) { status.textContent = 'Mic access denied'; });
+}
+
+// Append voice file to form action before submit
+document.getElementById('invite-form').addEventListener('submit', function(e) {
+    var voiceFile = document.getElementById('inv-voice-file').value;
+    if (voiceFile) {
+        this.action = '/web/invite/{{ member.id }}/send?voice_file=' + encodeURIComponent(voiceFile);
+    }
+});
+</script>
+{% endblock %}

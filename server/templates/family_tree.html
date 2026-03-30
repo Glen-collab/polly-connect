@@ -11,6 +11,12 @@
     </button>
 </div>
 
+{% if request.query_params.get('invite_sent') %}
+<div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4 max-w-lg mx-auto text-center">
+    <p class="text-sm text-emerald-800 font-medium">Invitation sent to {{ request.query_params.get('invite_sent') }}!</p>
+</div>
+{% endif %}
+
 <!-- Add member form (hidden by default) -->
 <div id="add-form" class="hidden bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <h2 class="text-base font-semibold mb-3">Add a Family Member</h2>
@@ -421,6 +427,13 @@ function showPhotos(memberId) {
                 if (details.length > 0) html += '<p class="text-xs text-gray-500 mt-1">' + details.join(' · ') + '</p>';
                 html += '</div>';
             }
+        }
+
+        // Invite link (owner only, non-deceased)
+        if (m && !m.deceased && userRole !== 'family') {
+            html += '<div class="border border-emerald-200 bg-emerald-50 rounded-lg p-3 mb-4 text-center">';
+            html += '<a href="/web/invite/' + memberId + '" class="text-sm text-emerald-700 font-medium hover:text-emerald-900">Invite ' + data.member_name + ' to Polly Connect</a>';
+            html += '</div>';
         }
 
         // Connect their Polly section (owner only, non-deceased, not already connected)
