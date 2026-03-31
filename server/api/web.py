@@ -3258,6 +3258,30 @@ async def connections_remove(request: Request, connected_tenant_id: int):
     return RedirectResponse("/web/family-tree", status_code=303)
 
 
+@router.post("/settings/connections/request-by-email")
+async def connections_request_by_email(request: Request, member_id: int = Form(...)):
+    """Send a connection request based on a family member's email matching a Polly account."""
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    member = db.get_family_member_by_id(member_id)
+    if not member or member.get("tenant_id") != tid or not member.get("email"):
+        return RedirectResponse("/web/family-tree?req_error=Member+not+found", status_code=303)
+
+    account = db.get_account_by_email(member["email"].strip().lower())
+    if not account or account["tenant_id"] == tid:
+        return RedirectResponse("/web/family-tree?req_error=No+Polly+account+found+for+that+email", status_code=303)
+
+    result = db.send_friend_request_by_tenant(tid, account["tenant_id"])
+    if result:
+        return RedirectResponse(f"/web/family-tree?req_sent={result['connected_tenant_name']}", status_code=303)
+    return RedirectResponse("/web/family-tree?req_error=Already+connected+or+request+pending", status_code=303)
+
+
 @router.post("/settings/security-questions")
 async def security_questions_save(request: Request):
     session = await get_web_session(request)
@@ -3511,6 +3535,23 @@ async def family_tree_page(request: Request):
                 "unread_received": unread_received,  # messages from them we haven't heard
             }
 
+    # Email-based Polly discovery: check if family members' emails match registered accounts
+    email_matches = {}  # member_id -> {tenant_id, account_name, already_connected}
+    pending_tenant_ids = {r["connected_tenant_id"] for r in pending_requests}
+    if session.get("role") != "family":
+        for m in members:
+            member_email = (m.get("email") or "").strip().lower()
+            if member_email:
+                account = db.get_account_by_email(member_email)
+                if account and account["tenant_id"] != tid:
+                    target_tid = account["tenant_id"]
+                    already = target_tid in connected_tenant_ids or target_tid in pending_tenant_ids
+                    email_matches[m["id"]] = {
+                        "tenant_id": target_tid,
+                        "account_name": account.get("name", ""),
+                        "already_connected": already,
+                    }
+
     return templates.TemplateResponse("family_tree.html", {
         "request": request,
         "session": session,
@@ -3522,6 +3563,7 @@ async def family_tree_page(request: Request):
         "pending_requests": pending_requests,
         "connected_names": connected_names,
         "connected_name_map": connected_name_map,
+        "email_matches": email_matches,
     })
 
 
@@ -3535,7 +3577,8 @@ async def family_tree_add(request: Request,
                            deceased: str = Form(""),
                            birth_year: str = Form(""),
                            deceased_year: str = Form(""),
-                           is_minor: str = Form("")):
+                           is_minor: str = Form(""),
+                           email: str = Form("")):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -3575,6 +3618,7 @@ async def family_tree_add(request: Request,
         birth_year=by or 0,
         deceased_year=dy or 0,
         is_minor=1 if is_minor else 0,
+        email=email.strip(),
     )
 
     return RedirectResponse("/web/family-tree", status_code=303)
@@ -3590,7 +3634,8 @@ async def family_tree_edit(request: Request, member_id: int,
                             deceased: str = Form(""),
                             birth_year: str = Form(""),
                             deceased_year: str = Form(""),
-                            is_minor: str = Form("")):
+                            is_minor: str = Form(""),
+                            email: str = Form("")):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -3631,6 +3676,7 @@ async def family_tree_edit(request: Request, member_id: int,
         birth_year=by or 0,
         deceased_year=dy or 0,
         is_minor=1 if is_minor else 0,
+        email=email.strip(),
     )
 
     return RedirectResponse("/web/family-tree", status_code=303)

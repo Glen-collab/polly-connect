@@ -46,7 +46,7 @@
                 </select>
             </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Spouse/Partner</label>
                 <input type="text" name="spouse_name" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Linda">
@@ -54,6 +54,11 @@
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Short bio / family ties</label>
                 <input type="text" name="bio" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Married to Roger, 3 kids">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1">Email (optional)</label>
+                <input type="email" name="email" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. ryan@example.com">
+                <p class="text-xs text-gray-400 mt-1">Auto-detects if they have a Polly</p>
             </div>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
@@ -107,7 +112,7 @@
             {% for m in tree[gen_num] %}
             <div class="{{ card_class }} rounded-lg p-3 pb-5 text-center w-[140px] h-[100px] flex flex-col justify-center relative cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
                  onclick="showPhotos({{ m.id }})">
-                <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}{% if m.name.split()[0]|lower in connected_names %} <span class="text-xs" title="Has a Polly">&#x1F99C;</span>{% endif %}</p>
+                <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}{% if m.name.split()[0]|lower in connected_names or m.id in email_matches %} <span class="text-xs" title="Has a Polly">&#x1F99C;</span>{% endif %}</p>
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
                 {% if m.bio and not (session.role == 'family' and m.is_minor) %}
                 <p class="text-xs text-gray-400 mt-0.5 truncate">{{ m.bio[:30] }}{% if m.bio|length > 30 %}...{% endif %}</p>
@@ -122,6 +127,13 @@
                 <div class="absolute bottom-0 left-0 right-0 text-center pb-1" onclick="event.stopPropagation()">
                     <button type="button" onclick="showConnectedModal('{{ cn.tenant_name }}', {{ cn.tenant_id }})"
                             class="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full hover:bg-red-600 shadow-sm">Message</button>
+                </div>
+                {% elif m.id in email_matches and not email_matches[m.id].already_connected and session.role != 'family' %}
+                <div class="absolute bottom-0 left-0 right-0 text-center pb-1" onclick="event.stopPropagation()">
+                    <form method="POST" action="/web/settings/connections/request-by-email" style="display:inline">
+                        <input type="hidden" name="member_id" value="{{ m.id }}">
+                        <button type="submit" class="bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full hover:bg-blue-600 shadow-sm">Connect</button>
+                    </form>
                 </div>
                 {% endif %}
             </div>
@@ -321,6 +333,11 @@
                     <input type="text" name="bio" id="edit-bio" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. Married to Roger, 3 kids">
                 </div>
                 <div>
+                    <label class="block text-sm text-gray-600 mb-1">Email (optional)</label>
+                    <input type="email" name="email" id="edit-email" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. ryan@example.com">
+                    <p class="text-xs text-gray-400 mt-1">Auto-detects if they have a Polly</p>
+                </div>
+                <div>
                     <label class="flex items-center gap-2 text-sm text-gray-600">
                         <input type="checkbox" name="is_minor" id="edit-is-minor" value="1" class="rounded">
                         Minor (under 18)
@@ -354,7 +371,7 @@ var userRole = "{{ session.role or 'owner' }}";
 var userName = "{{ session.name or '' }}";
 var memberData = {
 {% for m in members %}
-{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, is_minor: {{ m.is_minor or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}", birth_year: {{ m.birth_year or 0 }}, deceased_year: {{ m.deceased_year or 0 }}, parent_name: "{% for p in members %}{% if p.id == m.parent_member_id %}{{ p.name | replace('"', '\\"') }}{% endif %}{% endfor %}" },
+{{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, is_minor: {{ m.is_minor or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}", birth_year: {{ m.birth_year or 0 }}, deceased_year: {{ m.deceased_year or 0 }}, email: "{{ m.email or '' }}", parent_name: "{% for p in members %}{% if p.id == m.parent_member_id %}{{ p.name | replace('"', '\\"') }}{% endif %}{% endfor %}" },
 {% endfor %}
 };
 
@@ -373,6 +390,7 @@ function editMember(id) {
     document.getElementById('edit-spouse').value = m.spouse;
     document.getElementById('edit-birth-year').value = m.birth_year > 0 ? m.birth_year : '';
     document.getElementById('edit-bio').value = m.bio;
+    document.getElementById('edit-email').value = m.email;
     document.getElementById('edit-is-minor').checked = m.is_minor == 1;
     document.getElementById('edit-deceased').checked = m.deceased == 1;
     document.getElementById('edit-deceased-year').value = m.deceased_year > 0 ? m.deceased_year : '';
@@ -446,7 +464,22 @@ function showPhotos(memberId) {
                 alreadyConnected = true;
             }
             {% endif %}
-            if (!alreadyConnected) {
+
+            // Check email-based match
+            var emailMatch = {% if email_matches %}({ {% for mid, em in email_matches.items() %}{{ mid }}: { tid: {{ em.tenant_id }}, connected: {{ 'true' if em.already_connected else 'false' }} }{% if not loop.last %},{% endif %}{% endfor %} })[memberId]{% else %}null{% endif %};
+            if (emailMatch && emailMatch.connected) alreadyConnected = true;
+
+            if (!alreadyConnected && emailMatch) {
+                // Email matched a Polly account — one-click connect
+                html += '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4 text-center">';
+                html += '<p class="text-xs text-gray-500 mb-2">&#x1F99C; ' + data.member_name + ' has a Polly!</p>';
+                html += '<form method="POST" action="/web/settings/connections/request-by-email">';
+                html += '<input type="hidden" name="member_id" value="' + memberId + '">';
+                html += '<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Connect Pollys</button>';
+                html += '</form>';
+                html += '</div>';
+            } else if (!alreadyConnected) {
+                // No email match — fall back to manual code entry
                 html += '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4">';
                 html += '<button type="button" onclick="document.getElementById(\'polly-link-' + memberId + '\').classList.toggle(\'hidden\')" class="text-sm text-blue-600 font-medium hover:text-blue-800 w-full text-left">Connect ' + data.member_name + '\'s Polly</button>';
                 html += '<div id="polly-link-' + memberId + '" class="hidden mt-2">';

@@ -877,6 +877,45 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def send_friend_request_by_tenant(self, tenant_id: int, target_tenant_id: int) -> Optional[Dict]:
+        """Connect to another family by tenant ID (email-based discovery).
+        Same as send_friend_request but skips code lookup."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            if target_tenant_id == tenant_id:
+                return None
+
+            existing = conn.execute(
+                "SELECT 1 FROM connected_families WHERE "
+                "(tenant_id = ? AND connected_tenant_id = ?) OR "
+                "(tenant_id = ? AND connected_tenant_id = ?)",
+                (tenant_id, target_tenant_id, target_tenant_id, tenant_id)
+            ).fetchone()
+            if existing:
+                return None
+
+            my_tenant = conn.execute("SELECT name FROM tenants WHERE id = ?", (tenant_id,)).fetchone()
+            target_tenant = conn.execute("SELECT name FROM tenants WHERE id = ?", (target_tenant_id,)).fetchone()
+            if not target_tenant:
+                return None
+            my_name = my_tenant["name"] if my_tenant else "Unknown"
+            target_name = target_tenant["name"]
+
+            # Sender side: instantly accepted
+            conn.execute(
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'accepted')",
+                (tenant_id, target_tenant_id, target_name))
+            # Target side: pending (they need to accept)
+            conn.execute(
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'pending')",
+                (target_tenant_id, tenant_id, my_name))
+            conn.commit()
+            return {"connected_tenant_id": target_tenant_id, "connected_tenant_name": target_name}
+        finally:
+            if not self._conn:
+                conn.close()
+
     def accept_friend_request(self, tenant_id: int, requester_tenant_id: int) -> bool:
         """Accept a pending friend request. Updates to accepted and adds sender to accepter's family tree."""
         conn = self._get_connection()
@@ -2081,7 +2120,8 @@ class PollyDB:
                              bio: str = None, added_by: str = None,
                              birth_year: int = None,
                              deceased_year: int = None,
-                             is_minor: int = None) -> bool:
+                             is_minor: int = None,
+                             email: str = None) -> bool:
         conn = self._get_connection()
         try:
             updates = []
@@ -2124,6 +2164,9 @@ class PollyDB:
             if is_minor is not None:
                 updates.append("is_minor = ?")
                 params.append(is_minor)
+            if email is not None:
+                updates.append("email = ?")
+                params.append(email.strip().lower() if email.strip() else None)
             if not updates:
                 return False
             params.append(member_id)
