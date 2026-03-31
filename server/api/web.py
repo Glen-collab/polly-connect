@@ -2298,14 +2298,24 @@ async def settings_save(request: Request):
     else:
         memory_care_mode = "1" if user.get("memory_care_mode") else ""
         kid_mode = "1" if user.get("kid_mode") else ""
-    squawk_interval = int(form.get("squawk_interval", user.get("squawk_interval") or 10))
-    chatter_interval = int(form.get("chatter_interval", user.get("chatter_interval") or 45))
-    quiet_hours_start = int(form.get("quiet_hours_start",
-                            user.get("quiet_hours_start") if user.get("quiet_hours_start") is not None else 21))
-    quiet_hours_end = int(form.get("quiet_hours_end",
-                          user.get("quiet_hours_end") if user.get("quiet_hours_end") is not None else 7))
-    squawk_volume = int(form.get("squawk_volume",
-                        user.get("squawk_volume") if user.get("squawk_volume") is not None else 30))
+    # When saving a specific device's sounds, don't let form values overwrite tenant profile
+    _device_specific_sound = bool(form.get("device_id", "").strip()) and section == "sounds"
+    if _device_specific_sound:
+        # Keep tenant profile sound settings unchanged
+        squawk_interval = int(user.get("squawk_interval") or 10)
+        chatter_interval = int(user.get("chatter_interval") or 45)
+        quiet_hours_start = int(user.get("quiet_hours_start") if user.get("quiet_hours_start") is not None else 21)
+        quiet_hours_end = int(user.get("quiet_hours_end") if user.get("quiet_hours_end") is not None else 7)
+        squawk_volume = int(user.get("squawk_volume") if user.get("squawk_volume") is not None else 30)
+    else:
+        squawk_interval = int(form.get("squawk_interval", user.get("squawk_interval") or 10))
+        chatter_interval = int(form.get("chatter_interval", user.get("chatter_interval") or 45))
+        quiet_hours_start = int(form.get("quiet_hours_start",
+                                user.get("quiet_hours_start") if user.get("quiet_hours_start") is not None else 21))
+        quiet_hours_end = int(form.get("quiet_hours_end",
+                              user.get("quiet_hours_end") if user.get("quiet_hours_end") is not None else 7))
+        squawk_volume = int(form.get("squawk_volume",
+                            user.get("squawk_volume") if user.get("squawk_volume") is not None else 30))
     voice_volume = int(form.get("voice_volume",
                        user.get("voice_volume") if user.get("voice_volume") is not None else 100))
     blessing_volume = int(form.get("blessing_volume",
@@ -2374,22 +2384,28 @@ async def settings_save(request: Request):
     # Per-device sound settings override
     target_device = form.get("device_id", "").strip()
     squawk_mgr = getattr(request.app.state, "squawk", None)
-    logger.info(f"Settings save: section={section}, device={target_device}, quiet_end={quiet_hours_end}, chatter={chatter_interval}")
     if target_device and section == "sounds":
+        # Read device-specific values directly from the form
+        dev_sq_int = max(0, min(60, int(form.get("squawk_interval", 10))))
+        dev_ch_int = max(0, min(240, int(form.get("chatter_interval", 45))))
+        dev_qs = max(0, min(23, int(form.get("quiet_hours_start", 21))))
+        dev_qe = max(0, min(23, int(form.get("quiet_hours_end", 7))))
+        dev_sv = max(0, min(100, int(form.get("squawk_volume", 30))))
+        logger.info(f"Settings save: device={target_device}, quiet={dev_qs}-{dev_qe}, squawk={dev_sq_int}, chatter={dev_ch_int}")
         # Verify device belongs to this tenant
         target_dev = db.get_device(target_device)
         if target_dev and target_dev.get("tenant_id") == session["tenant_id"]:
             db.update_device_settings(target_device,
-                                      squawk_interval=squawk_interval,
-                                      chatter_interval=chatter_interval,
-                                      quiet_hours_start=quiet_hours_start,
-                                      quiet_hours_end=quiet_hours_end,
-                                      squawk_volume=squawk_volume)
+                                      squawk_interval=dev_sq_int,
+                                      chatter_interval=dev_ch_int,
+                                      quiet_hours_start=dev_qs,
+                                      quiet_hours_end=dev_qe,
+                                      squawk_volume=dev_sv)
             # Update only this device in squawk manager
             if squawk_mgr and target_device in squawk_mgr._active_devices:
-                squawk_mgr.update_intervals(target_device, squawk_interval, chatter_interval,
-                                            quiet_hours_start, quiet_hours_end,
-                                            squawk_volume=squawk_volume)
+                squawk_mgr.update_intervals(target_device, dev_sq_int, dev_ch_int,
+                                            dev_qs, dev_qe,
+                                            squawk_volume=dev_sv)
     elif section == "sounds":
         # All Devices — update tenant profile AND all per-device overrides
         devices = db.get_devices_by_tenant(session["tenant_id"])

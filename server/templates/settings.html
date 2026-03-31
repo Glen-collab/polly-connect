@@ -571,25 +571,46 @@ function saveAllSounds() {
     // Debug — log what we're saving
     console.log('Saving all devices:', JSON.stringify(deviceSettings));
 
-    // Save each device individually
-    var count = 0;
-    for (var devId in deviceSettings) {
-        var ds = deviceSettings[devId];
-        (function(id, settings) {
-            var body = new URLSearchParams();
-            body.append('_section', 'sounds');
-            body.append('squawk_interval', settings.squawk_interval);
-            body.append('chatter_interval', settings.chatter_interval);
-            body.append('squawk_volume', settings.squawk_volume);
-            body.append('quiet_hours_start', settings.quiet_hours_start);
-            body.append('quiet_hours_end', settings.quiet_hours_end);
-            if (id) body.append('device_id', id);
-            fetch('/web/settings', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
-        })(devId, ds);
-        count++;
+    // Build list of saves — sequential to avoid race conditions
+    var saves = [];
+    if (_currentSoundDevice === '') {
+        // "All Devices" tab selected — apply current values to every device
+        var allSettings = deviceSettings[''];
+        for (var devId in deviceSettings) {
+            if (!devId) continue;  // skip '' key itself
+            // Push the All Devices values to each individual device
+            deviceSettings[devId].squawk_interval = allSettings.squawk_interval;
+            deviceSettings[devId].chatter_interval = allSettings.chatter_interval;
+            deviceSettings[devId].squawk_volume = allSettings.squawk_volume;
+            deviceSettings[devId].quiet_hours_start = allSettings.quiet_hours_start;
+            deviceSettings[devId].quiet_hours_end = allSettings.quiet_hours_end;
+            saves.push({id: devId, settings: allSettings});
+        }
+    } else {
+        // Individual device tab — only save that one device
+        saves.push({id: _currentSoundDevice, settings: deviceSettings[_currentSoundDevice]});
     }
+
+    // Send saves sequentially to avoid race conditions overwriting each other
+    var count = saves.length;
+    function sendNext(idx) {
+        if (idx >= saves.length) return;
+        var s = saves[idx];
+        var body = new URLSearchParams();
+        body.append('_section', 'sounds');
+        body.append('squawk_interval', s.settings.squawk_interval);
+        body.append('chatter_interval', s.settings.chatter_interval);
+        body.append('squawk_volume', s.settings.squawk_volume);
+        body.append('quiet_hours_start', s.settings.quiet_hours_start);
+        body.append('quiet_hours_end', s.settings.quiet_hours_end);
+        body.append('device_id', s.id);
+        fetch('/web/settings', {method: 'POST', body: body, headers: {'Content-Type': 'application/x-www-form-urlencoded'}})
+            .then(function() { sendNext(idx + 1); });
+    }
+    sendNext(0);
+
     var fb = document.getElementById('sounds-save-feedback');
-    fb.textContent = count + ' devices saved!';
+    fb.textContent = count + (count === 1 ? ' device' : ' devices') + ' saved!';
     fb.className = 'ml-2 text-sm font-medium text-emerald-700';
     fb.style.display = 'inline';
     setTimeout(function() { fb.style.display = 'none'; }, 3000);
