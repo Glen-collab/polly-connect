@@ -363,8 +363,10 @@ setTimeout(function() {
     </div>
     {% endif %}
 
-    <!-- Status banner -->
-    {% if snooze_status == 'snoozed' %}
+    <!-- Status banner (updated dynamically per device when multi-device) -->
+    {% if has_multiple_devices %}
+    <div id="snooze-status-banner" class="rounded-lg p-3 mb-3"></div>
+    {% elif snooze_status == 'snoozed' %}
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
         <p class="text-sm text-amber-800 font-medium">Polly is snoozed — {{ snooze_minutes }} minute{{ 's' if snooze_minutes != 1 }} remaining</p>
     </div>
@@ -618,6 +620,58 @@ function saveAllSounds() {
 
 var _snoozeDeviceId = '';
 
+function _updateSnoozeBanner(deviceId) {
+    var banner = document.getElementById('snooze-status-banner');
+    if (!banner) return;
+    var ds = deviceId ? deviceSettings[deviceId] : null;
+    var devName = '';
+    if (deviceId) {
+        var tab = document.getElementById('snooze-tab-' + deviceId);
+        devName = tab ? tab.textContent.replace('zzz','').trim() : 'Polly';
+    }
+
+    // Check if device is snoozed
+    if (ds && ds.snoozed_until) {
+        var end = new Date(ds.snoozed_until + 'Z');
+        var mins = Math.round((end - new Date()) / 60000);
+        if (mins > 0) {
+            banner.className = 'bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3';
+            banner.innerHTML = '<p class="text-sm text-amber-800 font-medium">' + devName + ' is snoozed — ' + mins + ' minute' + (mins !== 1 ? 's' : '') + ' remaining</p>';
+            return;
+        }
+    }
+
+    // Check if device is in quiet hours
+    var qs, qe;
+    if (ds) {
+        qs = ds.quiet_hours_start !== undefined ? ds.quiet_hours_start : 21;
+        qe = ds.quiet_hours_end !== undefined ? ds.quiet_hours_end : 7;
+    } else {
+        // "All Devices" — use tenant defaults
+        var all = deviceSettings[''] || {};
+        qs = all.quiet_hours_start !== undefined ? all.quiet_hours_start : 21;
+        qe = all.quiet_hours_end !== undefined ? all.quiet_hours_end : 7;
+    }
+    // Convert server time (Central) — approximate with local hour
+    var nowHour = new Date().getHours();
+    var inQuiet = false;
+    if (qs > qe) {
+        inQuiet = nowHour >= qs || nowHour < qe;
+    } else if (qs < qe) {
+        inQuiet = nowHour >= qs && nowHour < qe;
+    }
+
+    if (inQuiet) {
+        var label = devName || 'Polly';
+        banner.className = 'bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-3';
+        banner.innerHTML = '<p class="text-sm text-indigo-800 font-medium">' + label + ' is sleeping (quiet hours)</p>';
+    } else {
+        var label = devName || 'Polly';
+        banner.className = 'bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-3';
+        banner.innerHTML = '<p class="text-sm text-emerald-800 font-medium">' + label + ' is awake and chirping</p>';
+    }
+}
+
 function switchSnoozeDevice(deviceId) {
     _snoozeDeviceId = deviceId;
     var tabs = document.querySelectorAll('[id^="snooze-tab-"]');
@@ -626,6 +680,9 @@ function switchSnoozeDevice(deviceId) {
     });
     var active = document.getElementById('snooze-tab-' + (deviceId || 'all'));
     if (active) active.className = 'px-3 py-1 rounded-full text-sm font-medium bg-emerald-600 text-white';
+
+    // Update status banner for this device
+    _updateSnoozeBanner(deviceId);
 
     // Show countdown if device is snoozed
     var fb = document.getElementById('snooze-feedback');
@@ -719,6 +776,8 @@ function switchPrefsDevice(deviceId) {
     var kidMode = ds ? ds.kid_mode : {{ user.kid_mode or 0 }};
     document.getElementById('prefs-kid-mode').checked = !!kidMode;
 }
+// Initialize snooze banner on page load
+_updateSnoozeBanner('');
 {% endif %}
 </script>
 {% endblock %}
