@@ -554,7 +554,7 @@ function startStopFriendRec() {
         btn.classList.add('animate-pulse');
         status.textContent = 'Recording...';
     })
-    .catch(function(e) { status.textContent = 'Mic access denied'; });
+    .catch(function(e) { status.textContent = 'Mic blocked — tap the lock icon in your browser address bar and allow Microphone'; });
 }
 
 function sendFriendVoice() {
