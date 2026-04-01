@@ -3620,6 +3620,68 @@ async def family_tree_page(request: Request):
                         "already_connected": already,
                     }
 
+    # Build member_id -> connected_tenant_id map using multiple matching strategies
+    # This replaces the fragile first-name matching in the template
+    member_connected = {}  # member_id -> {tenant_id, tenant_name, unread_sent, unread_received}
+    if connected_families:
+        # Build lookup data for each connected tenant
+        cf_lookup = []
+        for cf in connected_families:
+            cf_user = db.get_or_create_user(tenant_id=cf["connected_tenant_id"])
+            cf_account = None
+            try:
+                conn2 = db._get_connection()
+                conn2.row_factory = __import__("sqlite3").Row
+                cf_account = conn2.execute(
+                    "SELECT name, email FROM accounts WHERE tenant_id = ?",
+                    (cf["connected_tenant_id"],)
+                ).fetchone()
+                if cf_account:
+                    cf_account = dict(cf_account)
+            finally:
+                if not db._conn:
+                    conn2.close()
+
+            # Collect all name words associated with this connected tenant
+            name_words = set()
+            for src in [cf.get("connected_tenant_name", ""),
+                        cf_user.get("name", ""),
+                        (cf_account or {}).get("name", "")]:
+                for w in (src or "").lower().split():
+                    if len(w) > 2 and w not in ("the", "family"):
+                        name_words.add(w)
+
+            cf_email = ((cf_account or {}).get("email") or "").lower()
+            first = connected_name_map.get(
+                (cf_user.get("name") or cf["connected_tenant_name"]).strip().lower().split()[0]
+                if (cf_user.get("name") or cf["connected_tenant_name"]).strip() else "", {})
+
+            cf_lookup.append({
+                "tenant_id": cf["connected_tenant_id"],
+                "tenant_name": cf["connected_tenant_name"],
+                "name_words": name_words,
+                "email": cf_email,
+                "unread_sent": first.get("unread_sent", 0),
+                "unread_received": first.get("unread_received", 0),
+            })
+
+        for m in members:
+            m_name_words = set()
+            for w in (m.get("name") or "").lower().split():
+                if len(w) > 2:
+                    m_name_words.add(w)
+            m_email = (m.get("email") or "").strip().lower()
+
+            for cfl in cf_lookup:
+                # Match by email
+                if m_email and cfl["email"] and m_email == cfl["email"]:
+                    member_connected[m["id"]] = cfl
+                    break
+                # Match by name overlap (any shared word > 2 chars, excluding common words)
+                if m_name_words & cfl["name_words"]:
+                    member_connected[m["id"]] = cfl
+                    break
+
     return templates.TemplateResponse("family_tree.html", {
         "request": request,
         "session": session,
@@ -3632,6 +3694,7 @@ async def family_tree_page(request: Request):
         "connected_names": connected_names,
         "connected_name_map": connected_name_map,
         "email_matches": email_matches,
+        "member_connected": member_connected,
     })
 
 

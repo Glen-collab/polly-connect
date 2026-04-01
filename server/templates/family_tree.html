@@ -112,20 +112,20 @@
             {% for m in tree[gen_num] %}
             <div class="{{ card_class }} rounded-lg p-3 pb-5 text-center w-[140px] h-[100px] flex flex-col justify-center relative cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
                  onclick="showPhotos({{ m.id }})">
-                <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}{% if m.name.split()[0]|lower in connected_names or m.id in email_matches %} <span class="text-xs" title="Has a Polly">&#x1F99C;</span>{% endif %}</p>
+                <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}{% if m.id in member_connected or (m.id in email_matches and email_matches[m.id].already_connected) %} <span class="text-xs" title="Has a Polly">&#x1F99C;</span>{% elif m.id in email_matches %} <span class="text-xs" title="Has a Polly">&#x1F99C;</span>{% endif %}</p>
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
                 {% if m.bio and not (session.role == 'family' and m.is_minor) %}
                 <p class="text-xs text-gray-400 mt-0.5 truncate">{{ m.bio[:30] }}{% if m.bio|length > 30 %}...{% endif %}</p>
                 {% endif %}
-                {% if m.name.split()[0]|lower in connected_name_map and session.role != 'family' %}
-                {% set cn = connected_name_map[m.name.split()[0]|lower] %}
-                {% if cn.get('unread_sent', 0) > 0 %}
+                {% if m.id in member_connected and session.role != 'family' %}
+                {% set mc = member_connected[m.id] %}
+                {% if mc.get('unread_sent', 0) > 0 %}
                 <span class="absolute top-1 right-1 inline-block w-3 h-3 rounded-full bg-red-400" title="Sent — not yet heard"></span>
-                {% elif cn.get('unread_sent', -1) == 0 %}
+                {% elif mc.get('unread_sent', -1) == 0 %}
                 <span class="absolute top-1 right-1 inline-block w-3 h-3 rounded-full bg-emerald-400" title="Message heard"></span>
                 {% endif %}
                 <div class="absolute bottom-0 left-0 right-0 text-center pb-1" onclick="event.stopPropagation()">
-                    <button type="button" onclick="showConnectedModal('{{ cn.tenant_name }}', {{ cn.tenant_id }})"
+                    <button type="button" onclick="showConnectedModal('{{ mc.tenant_name }}', {{ mc.tenant_id }})"
                             class="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full hover:bg-red-600 shadow-sm">Message</button>
                 </div>
                 {% elif m.id in email_matches and not email_matches[m.id].already_connected and session.role != 'family' %}
@@ -447,24 +447,14 @@ function showPhotos(memberId) {
             }
         }
 
-        // Connection status check
-        var alreadyConnected = false;
-        var connectedTid = null;
-        {% if connected_families %}
-        var _connMap = { {% for cf in connected_families %}'{{ cf.connected_tenant_name|lower|replace("'", "\\'") }}': {{ cf.connected_tenant_id }}{% if not loop.last %},{% endif %}{% endfor %} };
-        var _firstName = data.member_name.toLowerCase().split(' ')[0];
-        for (var _cn in _connMap) {
-            if (_cn.indexOf(_firstName) >= 0) {
-                alreadyConnected = true;
-                connectedTid = _connMap[_cn];
-                break;
-            }
-        }
-        {% endif %}
+        // Connection status check (server-side matched by name/email)
+        var _memberConn = { {% for mid, mc in member_connected.items() %}{{ mid }}: { tid: {{ mc.tenant_id }}, name: '{{ mc.tenant_name|replace("'", "\\'") }}' }{% if not loop.last %},{% endif %}{% endfor %} };
+        var alreadyConnected = !!_memberConn[memberId];
+        var connectedTid = _memberConn[memberId] ? _memberConn[memberId].tid : null;
 
-        // Check email-based match
+        // Also check email-based match
         var emailMatch = {% if email_matches %}({ {% for mid, em in email_matches.items() %}{{ mid }}: { tid: {{ em.tenant_id }}, connected: {{ 'true' if em.already_connected else 'false' }} }{% if not loop.last %},{% endif %}{% endfor %} })[memberId]{% else %}null{% endif %};
-        if (emailMatch && emailMatch.connected) { alreadyConnected = true; connectedTid = emailMatch.tid; }
+        if (emailMatch && emailMatch.connected && !connectedTid) { alreadyConnected = true; connectedTid = emailMatch.tid; }
 
         if (m && !m.deceased && userRole !== 'family') {
             if (alreadyConnected && connectedTid) {
