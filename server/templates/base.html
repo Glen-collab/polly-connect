@@ -207,6 +207,116 @@
         };
     })();
     </script>
+    <!-- Page Guide Tips System -->
+    {% if session %}
+    <div id="page-tip-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[999] flex items-center justify-center p-4" onclick="dismissPageTip()">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center" onclick="event.stopPropagation()">
+            <div class="text-3xl mb-3" id="page-tip-icon"></div>
+            <h3 class="text-lg font-bold text-gray-800 mb-2" id="page-tip-title"></h3>
+            <p class="text-sm text-gray-600 mb-4 leading-relaxed" id="page-tip-body"></p>
+            <button onclick="dismissPageTip()" class="bg-emerald-600 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-emerald-700 transition">Got it!</button>
+        </div>
+    </div>
+    <script>
+    var PAGE_TIPS = {
+        '/web/dashboard': {
+            icon: '&#x1F3E0;',
+            title: 'Welcome to Your Dashboard',
+            body: 'This is home base! Tap any button to explore. Stories captures memories, Family connects loved ones, Care manages reminders, and Legacy Book builds your printed keepsake.'
+        },
+        '/web/stories': {
+            icon: '&#x1F4D6;',
+            title: 'Stories & Answers',
+            body: 'Every conversation with Polly is captured here. You can edit transcriptions, play back audio, delete entries, or save favorites to nostalgia so Polly shares them again later.'
+        },
+        '/web/family-tree': {
+            icon: '&#x1F333;',
+            title: 'Your Family Tree',
+            body: 'Add family members, connect their Pollys, and share stories across households. Tap any person to see their photos, send messages, or share a story to their device.'
+        },
+        '/web/photos': {
+            icon: '&#x1F4F7;',
+            title: 'Photo Gallery',
+            body: 'Upload photos and tag family members. Photos can be linked to stories and included in the printed legacy book. Toggle "In Book" to control what makes the final print.'
+        },
+        '/web/book': {
+            icon: '&#x1F4DA;',
+            title: 'Legacy Book Builder',
+            body: 'Polly weaves your stories into chapters organized by life stage. Generate drafts, edit them, design a cover, and export a print-ready PDF. This is the heart of the legacy.'
+        },
+        '/web/medications': {
+            icon: '&#x1F48A;',
+            title: 'Reminders',
+            body: 'Set up daily reminders that Polly announces at scheduled times. Great for medications, appointments, or anything that needs a gentle nudge.'
+        },
+        '/web/settings': {
+            icon: '&#x2699;&#xFE0F;',
+            title: 'Settings',
+            body: 'Customize Polly\'s sounds, quiet hours, voice volume, and more. Each device can have its own schedule. You\'ll also find your family access code here for inviting others.'
+        },
+        '/web/nostalgia': {
+            icon: '&#x1F3B5;',
+            title: 'Nostalgia',
+            body: 'Polly generates era-specific memories based on your hometown and birth year. Edit, delete, or generate more. These play randomly during chatter or when you say "take me back."'
+        },
+        '/web/messages': {
+            icon: '&#x1F4AC;',
+            title: 'Message Board',
+            body: 'Family members can leave voice or text messages that play on Polly. Messages expire after 24 hours. Check here or say "check messages" to your Polly device.'
+        },
+        '/web/prayers': {
+            icon: '&#x1F64F;',
+            title: 'Prayer Requests',
+            body: 'Add names and prayer requests. Polly weaves them into personalized prayers with 15 spiritual themes. Say "pray for me" or "pray for [name]" anytime.'
+        },
+        '/web/hub/stories': {
+            icon: '&#x1F4D6;',
+            title: 'Stories Hub',
+            body: 'Your storytelling command center. Browse all stories, manage transcriptions, explore the narrative timeline, or jump into the legacy book builder.'
+        },
+        '/web/hub/family': {
+            icon: '&#x1F46A;',
+            title: 'Family Hub',
+            body: 'Everything family in one place. View your family tree, browse photos, check messages, explore memories, and manage prayer requests.'
+        },
+        '/web/hub/care': {
+            icon: '&#x1F49C;',
+            title: 'Care Hub',
+            body: 'Manage daily reminders and care routines. Polly will announce reminders at the times you set, helping keep your loved one on track.'
+        },
+        '/web/hub/settings': {
+            icon: '&#x2699;&#xFE0F;',
+            title: 'Settings Hub',
+            body: 'Configure your Polly experience. Adjust sounds, manage devices, set up pronunciation guides, and control family access codes.'
+        },
+        '/web/memory': {
+            icon: '&#x1F9E0;',
+            title: 'Memory Module',
+            body: 'Polly helps track important items and their locations. Say "remember my keys are on the hook" and Polly will recall it later. Photos are indexed by AI for visual memory.'
+        },
+    };
+
+    (function() {
+        var path = window.location.pathname;
+        var tip = PAGE_TIPS[path];
+        if (!tip) return;
+        var key = 'polly_tip_seen_' + path.replace(/\//g, '_');
+        if (localStorage.getItem(key)) return;
+        document.getElementById('page-tip-icon').innerHTML = tip.icon;
+        document.getElementById('page-tip-title').textContent = tip.title;
+        document.getElementById('page-tip-body').textContent = tip.body;
+        document.getElementById('page-tip-overlay').classList.remove('hidden');
+    })();
+
+    function dismissPageTip() {
+        var path = window.location.pathname;
+        var key = 'polly_tip_seen_' + path.replace(/\//g, '_');
+        localStorage.setItem(key, '1');
+        document.getElementById('page-tip-overlay').classList.add('hidden');
+    }
+    </script>
+    {% endif %}
+
     {% block scripts %}{% endblock %}
 </body>
 </html>
