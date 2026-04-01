@@ -1126,7 +1126,7 @@ async def _process_command(
 
             # Then play the recorded WAV (apply voice volume)
             if os.path.exists(filepath) and squawk_mgr:
-                await asyncio.sleep(1.0)  # brief pause between intro and prayer
+                await asyncio.sleep(0.3)  # brief pause between intro and message
                 with open(filepath, "rb") as f:
                     wav_data = f.read()
                 # Scale volume to match blessing volume setting
