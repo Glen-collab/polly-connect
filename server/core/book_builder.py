@@ -59,6 +59,47 @@ class BookBuilder:
         self._ai_available = (followup_generator is not None
                               and followup_generator.available)
 
+    @staticmethod
+    def _age_to_bucket(age: int, current_age: int) -> tuple:
+        """Assign Jungian arc bucket relative to current age, not fixed cutoffs.
+
+        The arc scales to wherever you are in life right now:
+        - Childhood is always 0-12 (universal)
+        - Adolescence is always 13-18 (universal)
+        - Everything after 18 is divided proportionally up to current_age
+        - The last ~15% of your life so far = return_with_knowledge (wisdom/reflection)
+        - The chunk before that = transformation (how you changed)
+        - The rest of adulthood splits between crossing_threshold and trials
+
+        A 47-year-old teaching their kids → "return with knowledge"
+        A 47-year-old at age 35 → "trials_allies_enemies"
+        An 80-year-old at age 47 → "trials_allies_enemies"
+        """
+        if age <= 12:
+            return ("ordinary_world", "childhood")
+        if age <= 18:
+            return ("call_to_adventure", "adolescence")
+
+        # Adult years: 19 to current_age
+        adult_span = max(current_age - 18, 1)
+        adult_age = age - 18  # how far into adulthood
+
+        # Proportional splits of adult life
+        # 0-40%: crossing_threshold (young adult, building life)
+        # 40-70%: trials_allies_enemies (middle years, hard work)
+        # 70-85%: transformation (how you changed)
+        # 85-100%: return_with_knowledge (wisdom, teaching, now)
+        pct = adult_age / adult_span
+
+        if pct <= 0.40:
+            return ("crossing_threshold", "young_adult")
+        elif pct <= 0.70:
+            return ("trials_allies_enemies", "adult")
+        elif pct <= 0.85:
+            return ("transformation", "midlife")
+        else:
+            return ("return_with_knowledge", "reflection")
+
     def _guess_wedding_year(self, tenant_id: int) -> Optional[int]:
         """Try to find wedding year from family data or photos."""
         conn = self.db._get_connection()
@@ -153,24 +194,15 @@ class BookBuilder:
 
             if est_year:
                 mem["estimated_year"] = est_year
-                # Assign bucket/life_phase based on age
+                # Assign bucket/life_phase relative to current age
+                # A 47-year-old teaching their kids IS the wisdom chapter
                 if owner_birth_year:
+                    from datetime import datetime
+                    current_age = datetime.now().year - owner_birth_year
                     age = est_year - owner_birth_year
-                    if age <= 12:
-                        mem["bucket"] = "ordinary_world"
-                        mem["life_phase"] = "childhood"
-                    elif age <= 18:
-                        mem["bucket"] = "call_to_adventure"
-                        mem["life_phase"] = "adolescence"
-                    elif age <= 30:
-                        mem["bucket"] = "crossing_threshold"
-                        mem["life_phase"] = "young_adult"
-                    elif age <= 50:
-                        mem["bucket"] = "trials_allies_enemies"
-                        mem["life_phase"] = "adult"
-                    else:
-                        mem["bucket"] = "return_with_knowledge"
-                        mem["life_phase"] = "reflection"
+                    bucket, life_phase = self._age_to_bucket(age, current_age)
+                    mem["bucket"] = bucket
+                    mem["life_phase"] = life_phase
                     mem["owner_age"] = age
                 # Persist to DB so we don't recalculate each time
                 try:

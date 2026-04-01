@@ -2891,11 +2891,41 @@ class PollyDB:
     @staticmethod
     def _estimate_year_from_phrases(text_lower: str, birth_year: int) -> Optional[int]:
         """Estimate a calendar year from relative date phrases + birth_year."""
+        import re
+        from datetime import datetime
+        current_year = datetime.now().year
+
+        # Present-tense phrases → current year (check first, most specific)
+        PRESENT_PHRASES = [
+            r'\b(?:right now|these days|nowadays|currently)\b',
+            r'\b(?:this year|this past year|this past)\b',
+            r'\b(?:recently|the other day|last week|last month|last year)\b',
+            r'\b(?:just (?:the other|last|yesterday|today))\b',
+            r'\b(?:i[\'m ]+teaching|i[\'m ]+telling|i[\'m ]+showing)\b',
+            r'\b(?:my kids? (?:are|is)|my grandkids? (?:are|is))\b',
+            r'\b(?:at this point in my life|at my age|looking back)\b',
+            r'\b(?:what i[\'ve ]+learned|lesson[s]? i[\'ve ]+learned)\b',
+            r'\b(?:i tell my|i always tell|advice i[\'d ]+give)\b',
+            r'\b(?:now that i[\'m ]|now i)\b',
+        ]
+        for pattern in PRESENT_PHRASES:
+            if re.search(pattern, text_lower):
+                return current_year
+
         # Ordered by specificity — first match wins
         PHRASE_MAP = [
             # Specific ages / life stages
             (r'\b(?:when i was|as) a (?:little )?(?:kid|child|boy|girl)\b', 8),
             (r'\b(?:growing up|childhood|as a child)\b', 10),
+            # Specific grade levels → age 5 + grade number
+            (r'\b(?:1st|first) grade\b', 6),
+            (r'\b(?:2nd|second) grade\b', 7),
+            (r'\b(?:3rd|third) grade\b', 8),
+            (r'\b(?:4th|fourth) grade\b', 9),
+            (r'\b(?:5th|fifth) grade\b', 10),
+            (r'\b(?:6th|sixth) grade\b', 11),
+            (r'\b(?:7th|seventh) grade\b', 12),
+            (r'\b(?:8th|eighth) grade\b', 13),
             (r'\b(?:in (?:grade|elementary) school)\b', 10),
             (r'\b(?:in (?:middle|junior high) school)\b', 13),
             (r'\b(?:in high school|as a teenager|teenage years)\b', 16),
@@ -2911,7 +2941,6 @@ class PollyDB:
             (r'\b(?:when i was young|back then|years ago|long time ago)\b', 15),
             (r'\b(?:during the war)\b', 22),  # generic — assumes young adult
         ]
-        import re
         for pattern, age_offset in PHRASE_MAP:
             if re.search(pattern, text_lower):
                 return birth_year + age_offset
