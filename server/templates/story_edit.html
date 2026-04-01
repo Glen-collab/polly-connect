@@ -83,10 +83,10 @@
     </div>
 </form>
 
-{% if story.audio_s3_key %}
+{% if session.role != 'family' %}
 <div class="mt-4">
     <form method="POST" action="/web/stories/{{ story.id }}/delete"
-          onsubmit="return confirm('Delete this story and its audio recording? This cannot be undone.')">
+          onsubmit="return confirm('Delete this story? This cannot be undone.')">
         <button type="submit" class="text-sm text-red-500 hover:text-red-700">Delete this story</button>
     </form>
 </div>

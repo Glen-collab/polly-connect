@@ -38,8 +38,8 @@
             <a href="/web/stories/{{ story.id }}/edit" class="text-sm text-emerald-600 hover:underline">Edit</a>
             {% endif %}
         </div>
-        {% if story.audio_s3_key %}
         <div class="flex items-center gap-3 mt-3 pt-3 border-t">
+            {% if story.audio_s3_key %}
             <img src="/web/stories/{{ story.id }}/qr.png" alt="QR" class="w-16 h-16" loading="lazy">
             <div class="flex-1">
                 {% if story.qr_in_book %}
@@ -56,12 +56,16 @@
                 {% endif %}
                 {% endif %}
             </div>
+            {% else %}
+            <div class="flex-1"></div>
+            {% endif %}
+            {% if session.role != 'family' %}
             <form method="POST" action="/web/stories/{{ story.id }}/delete"
-                  onsubmit="return confirm('Delete this story and its audio? This cannot be undone.')">
+                  onsubmit="return confirm('Delete this story? This cannot be undone.')">
                 <button type="submit" class="text-xs text-red-500 hover:text-red-700">Delete</button>
             </form>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
     {% endfor %}
 </div>
