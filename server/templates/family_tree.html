@@ -447,50 +447,70 @@ function showPhotos(memberId) {
             }
         }
 
-        // Invite link (owner only, non-deceased)
-        if (m && !m.deceased && userRole !== 'family') {
-            html += '<div class="border border-emerald-200 bg-emerald-50 rounded-lg p-3 mb-4 text-center">';
-            html += '<a href="/web/invite/' + memberId + '" class="text-sm text-emerald-700 font-medium hover:text-emerald-900">Invite ' + data.member_name + ' to Polly Connect</a>';
-            html += '</div>';
-        }
-
-        // Connect their Polly section (owner only, non-deceased, not already connected)
-        if (m && !m.deceased && userRole !== 'family') {
-            // Check if this member is already a connected friend
-            var alreadyConnected = false;
-            {% if connected_families %}
-            var connectedNames = [{% for cf in connected_families %}'{{ cf.connected_tenant_name|lower }}'{% if not loop.last %},{% endif %}{% endfor %}];
-            if (connectedNames.some(function(n) { return n.indexOf(data.member_name.toLowerCase().split(' ')[0]) >= 0; })) {
+        // Connection status check
+        var alreadyConnected = false;
+        var connectedTid = null;
+        {% if connected_families %}
+        var _connMap = { {% for cf in connected_families %}'{{ cf.connected_tenant_name|lower|replace("'", "\\'") }}': {{ cf.connected_tenant_id }}{% if not loop.last %},{% endif %}{% endfor %} };
+        var _firstName = data.member_name.toLowerCase().split(' ')[0];
+        for (var _cn in _connMap) {
+            if (_cn.indexOf(_firstName) >= 0) {
                 alreadyConnected = true;
+                connectedTid = _connMap[_cn];
+                break;
             }
-            {% endif %}
+        }
+        {% endif %}
 
-            // Check email-based match
-            var emailMatch = {% if email_matches %}({ {% for mid, em in email_matches.items() %}{{ mid }}: { tid: {{ em.tenant_id }}, connected: {{ 'true' if em.already_connected else 'false' }} }{% if not loop.last %},{% endif %}{% endfor %} })[memberId]{% else %}null{% endif %};
-            if (emailMatch && emailMatch.connected) alreadyConnected = true;
+        // Check email-based match
+        var emailMatch = {% if email_matches %}({ {% for mid, em in email_matches.items() %}{{ mid }}: { tid: {{ em.tenant_id }}, connected: {{ 'true' if em.already_connected else 'false' }} }{% if not loop.last %},{% endif %}{% endfor %} })[memberId]{% else %}null{% endif %};
+        if (emailMatch && emailMatch.connected) { alreadyConnected = true; connectedTid = emailMatch.tid; }
 
-            if (!alreadyConnected && emailMatch) {
-                // Email matched a Polly account — one-click connect
-                html += '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4 text-center">';
-                html += '<p class="text-xs text-gray-500 mb-2">&#x1F99C; ' + data.member_name + ' has a Polly!</p>';
-                html += '<form method="POST" action="/web/settings/connections/request-by-email">';
-                html += '<input type="hidden" name="member_id" value="' + memberId + '">';
-                html += '<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Connect Pollys</button>';
-                html += '</form>';
+        if (m && !m.deceased && userRole !== 'family') {
+            if (alreadyConnected && connectedTid) {
+                // CONNECTED — show Share a Story button (replaces invite/connect)
+                html += '<div class="border border-emerald-200 bg-emerald-50 rounded-lg p-3 mb-4">';
+                html += '<button type="button" onclick="toggleShareStory(' + memberId + ', ' + connectedTid + ', \'' + data.member_name.replace(/'/g, "\\'") + '\')" class="text-sm text-emerald-700 font-medium hover:text-emerald-900 w-full text-center">&#x1F99C; Share a Story with ' + data.member_name + '</button>';
+                html += '<div id="share-story-' + memberId + '" class="hidden mt-3">';
+                html += '<textarea id="share-text-' + memberId + '" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Type a story or memory to share..."></textarea>';
+                html += '<div class="flex items-center gap-2 mb-2">';
+                html += '<button type="button" onclick="toggleShareRec(' + memberId + ')" id="share-rec-btn-' + memberId + '" class="bg-red-500 text-white text-xs px-3 py-1 rounded-full hover:bg-red-600">Record Voice</button>';
+                html += '<span id="share-rec-status-' + memberId + '" class="text-xs text-gray-500"></span>';
                 html += '</div>';
-            } else if (!alreadyConnected) {
-                // No email match — fall back to manual code entry
-                html += '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4">';
-                html += '<button type="button" onclick="document.getElementById(\'polly-link-' + memberId + '\').classList.toggle(\'hidden\')" class="text-sm text-blue-600 font-medium hover:text-blue-800 w-full text-left">Connect ' + data.member_name + '\'s Polly</button>';
-                html += '<div id="polly-link-' + memberId + '" class="hidden mt-2">';
-                html += '<p class="text-xs text-gray-500 mb-2">If ' + data.member_name + ' has a Polly device, enter their 6-digit code to connect.</p>';
-                html += '<form method="POST" action="/web/settings/connections/add" class="flex gap-2">';
-                html += '<input type="hidden" name="member_id" value="' + memberId + '">';
-                html += '<input type="text" name="family_code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="000000" class="border rounded-lg px-3 py-2 text-sm text-center font-mono tracking-widest focus:ring-2 focus:ring-blue-500" style="max-width:140px;">';
-                html += '<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Connect</button>';
-                html += '</form>';
+                html += '<audio id="share-preview-' + memberId + '" controls class="hidden w-full h-8 mb-2"></audio>';
+                html += '<button type="button" onclick="sendSharedStory(' + memberId + ', ' + connectedTid + ')" class="w-full bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700">Send Story</button>';
+                html += '<p id="share-feedback-' + memberId + '" class="text-xs text-center mt-1"></p>';
                 html += '</div>';
                 html += '</div>';
+            } else {
+                // NOT CONNECTED — show invite + connect options
+                html += '<div class="border border-emerald-200 bg-emerald-50 rounded-lg p-3 mb-4 text-center">';
+                html += '<a href="/web/invite/' + memberId + '" class="text-sm text-emerald-700 font-medium hover:text-emerald-900">Invite ' + data.member_name + ' to Polly Connect</a>';
+                html += '</div>';
+
+                if (emailMatch && !emailMatch.connected) {
+                    // Email matched a Polly account — one-click connect
+                    html += '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4 text-center">';
+                    html += '<p class="text-xs text-gray-500 mb-2">&#x1F99C; ' + data.member_name + ' has a Polly!</p>';
+                    html += '<form method="POST" action="/web/settings/connections/request-by-email">';
+                    html += '<input type="hidden" name="member_id" value="' + memberId + '">';
+                    html += '<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Connect Pollys</button>';
+                    html += '</form>';
+                    html += '</div>';
+                } else {
+                    // No email match — manual code entry
+                    html += '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4">';
+                    html += '<button type="button" onclick="document.getElementById(\'polly-link-' + memberId + '\').classList.toggle(\'hidden\')" class="text-sm text-blue-600 font-medium hover:text-blue-800 w-full text-left">Connect ' + data.member_name + '\'s Polly</button>';
+                    html += '<div id="polly-link-' + memberId + '" class="hidden mt-2">';
+                    html += '<p class="text-xs text-gray-500 mb-2">If ' + data.member_name + ' has a Polly device, enter their 6-digit code to connect.</p>';
+                    html += '<form method="POST" action="/web/settings/connections/add" class="flex gap-2">';
+                    html += '<input type="hidden" name="member_id" value="' + memberId + '">';
+                    html += '<input type="text" name="family_code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="000000" class="border rounded-lg px-3 py-2 text-sm text-center font-mono tracking-widest focus:ring-2 focus:ring-blue-500" style="max-width:140px;">';
+                    html += '<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Connect</button>';
+                    html += '</form>';
+                    html += '</div>';
+                    html += '</div>';
+                }
             }
         }
 
@@ -611,6 +631,95 @@ function sendFriendVoice() {
         }
     })
     .catch(function(e) { status.textContent = 'Error: ' + e; });
+}
+
+// Share Story functions
+var _shareRecorders = {};  // memberId -> MediaRecorder
+var _shareBlobs = {};      // memberId -> Blob
+
+function toggleShareStory(memberId, tid, name) {
+    var el = document.getElementById('share-story-' + memberId);
+    if (el) el.classList.toggle('hidden');
+}
+
+function toggleShareRec(memberId) {
+    var btn = document.getElementById('share-rec-btn-' + memberId);
+    var status = document.getElementById('share-rec-status-' + memberId);
+    var recorder = _shareRecorders[memberId];
+
+    if (recorder && recorder.state === 'recording') {
+        recorder.stop();
+        btn.textContent = 'Record Again';
+        btn.classList.remove('animate-pulse');
+        status.textContent = 'Processing...';
+        return;
+    }
+
+    _shareBlobs[memberId] = null;
+    document.getElementById('share-preview-' + memberId).classList.add('hidden');
+
+    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    .then(function(stream) {
+        var chunks = [];
+        var rec = new MediaRecorder(stream);
+        _shareRecorders[memberId] = rec;
+        rec.ondataavailable = function(e) { chunks.push(e.data); };
+        rec.onstop = function() {
+            _shareBlobs[memberId] = new Blob(chunks, { type: rec.mimeType });
+            var preview = document.getElementById('share-preview-' + memberId);
+            preview.src = URL.createObjectURL(_shareBlobs[memberId]);
+            preview.classList.remove('hidden');
+            status.textContent = 'Ready to send';
+            stream.getTracks().forEach(function(t) { t.stop(); });
+        };
+        rec.start();
+        btn.textContent = 'Stop';
+        btn.classList.add('animate-pulse');
+        status.textContent = 'Recording...';
+    })
+    .catch(function(e) { status.textContent = 'Mic blocked — tap the lock icon in your browser address bar and allow Microphone'; });
+}
+
+function sendSharedStory(memberId, tid) {
+    var text = document.getElementById('share-text-' + memberId).value.trim();
+    var blob = _shareBlobs[memberId];
+    var fb = document.getElementById('share-feedback-' + memberId);
+
+    if (!text && !blob) {
+        fb.textContent = 'Type a story or record a voice message first';
+        fb.className = 'text-xs text-center mt-1 text-red-500';
+        return;
+    }
+
+    fb.textContent = 'Sending...';
+    fb.className = 'text-xs text-center mt-1 text-gray-500';
+
+    var fd = new FormData();
+    fd.append('connected_tenant_id', tid);
+    fd.append('speaker_name', '{{ session.name }}');
+    if (text) fd.append('story_text', text);
+    if (blob) fd.append('audio', blob, 'shared_story.webm');
+
+    fetch('/web/stories/share', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            fb.textContent = 'Story shared!';
+            fb.className = 'text-xs text-center mt-1 text-emerald-600 font-medium';
+            document.getElementById('share-text-' + memberId).value = '';
+            _shareBlobs[memberId] = null;
+            document.getElementById('share-preview-' + memberId).classList.add('hidden');
+            document.getElementById('share-rec-btn-' + memberId).textContent = 'Record Voice';
+            document.getElementById('share-rec-status-' + memberId).textContent = '';
+        } else {
+            fb.textContent = 'Error: ' + (data.error || 'unknown');
+            fb.className = 'text-xs text-center mt-1 text-red-500';
+        }
+    })
+    .catch(function(e) {
+        fb.textContent = 'Error: ' + e;
+        fb.className = 'text-xs text-center mt-1 text-red-500';
+    });
 }
 </script>
 {% endblock %}

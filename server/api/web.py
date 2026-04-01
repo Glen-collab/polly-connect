@@ -1591,6 +1591,74 @@ async def story_delete(request: Request, story_id: int):
     return RedirectResponse("/web/stories", status_code=303)
 
 
+@router.post("/stories/share")
+async def story_share(request: Request):
+    """Share a story (voice or text) to a connected family's story board."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    form = await request.form()
+    target_tenant = form.get("connected_tenant_id", "")
+    text = form.get("story_text", "").strip()
+    audio_file = form.get("audio")
+    speaker_name = form.get("speaker_name", session.get("name", "A friend"))
+
+    if not target_tenant:
+        return JSONResponse({"error": "No target"}, status_code=400)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    target_tid = int(target_tenant)
+
+    # Verify connection
+    connections = db.get_connected_families(tid)
+    connected = next((c for c in connections if c["connected_tenant_id"] == target_tid), None)
+    if not connected:
+        return JSONResponse({"error": "Not connected"}, status_code=403)
+
+    audio_key = None
+    if audio_file and hasattr(audio_file, "read"):
+        import subprocess
+        audio_data = await audio_file.read()
+        if len(audio_data) > 0:
+            filename = f"shared_{uuid.uuid4().hex[:8]}.wav"
+            recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+            os.makedirs(recordings_dir, exist_ok=True)
+            filepath = os.path.join(recordings_dir, filename)
+            raw_path = filepath + ".raw"
+            with open(raw_path, "wb") as f:
+                f.write(audio_data)
+            try:
+                result = subprocess.run(
+                    ["ffmpeg", "-y", "-i", raw_path, "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le", filepath],
+                    capture_output=True, timeout=15)
+                if result.returncode == 0:
+                    audio_key = filename
+                os.remove(raw_path)
+            except Exception:
+                if os.path.exists(raw_path):
+                    os.remove(raw_path)
+
+    if not text and not audio_key:
+        return JSONResponse({"error": "No story content"}, status_code=400)
+
+    # Get sender's household name for speaker attribution
+    my_tenant = db.get_tenant(tid)
+    household = my_tenant["name"] if my_tenant else "A friend"
+
+    db.save_story(
+        transcript=text or f"(Voice story shared by {household})",
+        audio_s3_key=audio_key,
+        speaker_name=speaker_name,
+        source="shared",
+        tenant_id=target_tid,
+    )
+
+    return JSONResponse({"ok": True})
+
+
 @router.get("/medications", response_class=HTMLResponse)
 async def medications_page(request: Request):
     session = await get_web_session(request)
