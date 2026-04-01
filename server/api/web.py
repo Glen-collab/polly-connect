@@ -1591,6 +1591,58 @@ async def story_delete(request: Request, story_id: int):
     return RedirectResponse("/web/stories", status_code=303)
 
 
+@router.post("/stories/{story_id}/to-nostalgia")
+async def story_to_nostalgia(request: Request, story_id: int):
+    """Save a story's text as a nostalgia snippet for voice playback rotation."""
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Get the story
+    conn = db._get_connection()
+    try:
+        conn.row_factory = __import__("sqlite3").Row
+        story = conn.execute(
+            "SELECT corrected_transcript, transcript, speaker_name, source FROM stories WHERE id = ? AND tenant_id = ?",
+            (story_id, tid)
+        ).fetchone()
+        if not story:
+            return RedirectResponse("/web/stories", status_code=303)
+        story = dict(story)
+    finally:
+        if not db._conn:
+            conn.close()
+
+    text = (story.get("corrected_transcript") or story.get("transcript") or "").strip()
+    if not text:
+        return RedirectResponse("/web/stories", status_code=303)
+
+    # Determine category based on source
+    source = story.get("source", "")
+    if source == "shared":
+        category = "friends"
+    elif source == "onboarding":
+        category = "childhood"
+    else:
+        category = "stories"
+
+    # Add speaker attribution if from someone else
+    speaker = story.get("speaker_name", "")
+    owner = db.get_or_create_user(tenant_id=tid)
+    owner_name = (owner.get("name") or "").strip()
+    if speaker and speaker.lower() != owner_name.lower():
+        text = f"{speaker} shared: {text}"
+
+    # Save as nostalgia snippet
+    db.save_nostalgia_snippets(tid, [{"category": category, "variation": 1, "text": text}], append=True)
+
+    return RedirectResponse("/web/stories?nostalgia_saved=1", status_code=303)
+
+
 @router.post("/stories/share")
 async def story_share(request: Request):
     """Share a story (voice or text) to a connected family's story board."""

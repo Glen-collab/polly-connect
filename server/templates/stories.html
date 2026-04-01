@@ -10,6 +10,12 @@
     </button>
 </div>
 
+{% if request.query_params.get('nostalgia_saved') %}
+<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+    <p class="text-sm text-blue-800 font-medium">Story saved to nostalgia rotation! Polly will share it during chatter.</p>
+</div>
+{% endif %}
+
 {% if stories %}
 <div class="space-y-3 sm:space-y-4">
     {% for story in stories %}
@@ -60,10 +66,15 @@
             <div class="flex-1"></div>
             {% endif %}
             {% if session.role != 'family' %}
-            <form method="POST" action="/web/stories/{{ story.id }}/delete"
-                  onsubmit="return confirm('Delete this story? This cannot be undone.')">
-                <button type="submit" class="text-xs text-red-500 hover:text-red-700">Delete</button>
-            </form>
+            <div class="flex items-center gap-3">
+                <form method="POST" action="/web/stories/{{ story.id }}/to-nostalgia" class="inline">
+                    <button type="submit" class="text-xs text-blue-500 hover:text-blue-700">Save to Nostalgia</button>
+                </form>
+                <form method="POST" action="/web/stories/{{ story.id }}/delete"
+                      onsubmit="return confirm('Delete this story? This cannot be undone.')">
+                    <button type="submit" class="text-xs text-red-500 hover:text-red-700">Delete</button>
+                </form>
+            </div>
             {% endif %}
         </div>
     </div>
