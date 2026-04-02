@@ -3930,6 +3930,9 @@ async def family_tree_page(request: Request):
                 (cf_user.get("name") or cf["connected_tenant_name"]).strip().lower().split()[0]
                 if (cf_user.get("name") or cf["connected_tenant_name"]).strip() else "", {})
 
+            # Count new wall items from them that we haven't reacted to
+            wall_new = db.get_wall_new_count(cf["connected_tenant_id"], tid)
+
             cf_lookup.append({
                 "tenant_id": cf["connected_tenant_id"],
                 "tenant_name": cf["connected_tenant_name"],
@@ -3938,6 +3941,7 @@ async def family_tree_page(request: Request):
                 "email": cf_email,
                 "unread_sent": first.get("unread_sent", 0),
                 "unread_received": first.get("unread_received", 0),
+                "wall_new": wall_new,
             })
 
         for m in members:

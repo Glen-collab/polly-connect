@@ -1170,6 +1170,23 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def get_wall_new_count(self, from_tenant_id: int, to_tenant_id: int) -> int:
+        """Count wall items shared TO this tenant that they haven't reacted to yet (new/unseen)."""
+        conn = self._get_connection()
+        try:
+            count = conn.execute("""
+                SELECT COUNT(*) FROM shared_wall_items w
+                WHERE w.from_tenant_id = ? AND w.to_tenant_id = ?
+                AND NOT EXISTS (
+                    SELECT 1 FROM wall_reactions r
+                    WHERE r.wall_item_id = w.id AND r.tenant_id = ?
+                )
+            """, (from_tenant_id, to_tenant_id, to_tenant_id)).fetchone()[0]
+            return count
+        finally:
+            if not self._conn:
+                conn.close()
+
     def delete_wall_item(self, item_id: int, tenant_id: int) -> bool:
         """Delete a wall item (only the sharer can remove it)."""
         conn = self._get_connection()
