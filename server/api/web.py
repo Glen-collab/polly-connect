@@ -3448,6 +3448,10 @@ async def shared_wall_page(request: Request, connected_tenant_id: int):
     items = db.get_wall_items(tid, connected_tenant_id, limit=50)
     my_photos = db.get_photos(limit=100, tenant_id=tid, include_wall_only=True) if session.get("role") != "family" else []
 
+    # Load reactions for all wall items
+    item_ids = [i["id"] for i in items]
+    reactions = db.get_wall_reactions(item_ids) if item_ids else {}
+
     return templates.TemplateResponse("shared_wall.html", {
         "request": request,
         "session": session,
@@ -3455,6 +3459,7 @@ async def shared_wall_page(request: Request, connected_tenant_id: int):
         "wall_items": items,
         "my_photos": my_photos,
         "my_tenant_id": tid,
+        "reactions": reactions,
     })
 
 
@@ -3587,6 +3592,24 @@ async def wall_upload_photo(request: Request):
         except Exception:
             pass
 
+    return JSONResponse({"ok": True})
+
+
+@router.post("/wall/{item_id}/react")
+async def wall_react(request: Request, item_id: int):
+    """Toggle a reaction on a wall item."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    form = await request.form()
+    reaction = form.get("reaction", "")
+    if not reaction:
+        return JSONResponse({"error": "No reaction"}, status_code=400)
+
+    db = request.app.state.db
+    db.react_to_wall_item(item_id, session["tenant_id"], reaction)
     return JSONResponse({"ok": True})
 
 

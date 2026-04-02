@@ -120,7 +120,21 @@
         <p class="text-xs text-gray-400 mt-1">From {{ item.message.from_name }}</p>
         {% endif %}
 
-        <div class="mt-2 flex justify-between items-center">
+        <!-- Reactions -->
+        <div class="mt-2 flex items-center gap-1 flex-wrap">
+            {% set item_reactions = reactions.get(item.id, []) %}
+            {% set my_reaction = '' %}
+            {% for rx in item_reactions %}{% if rx.tenant_id == my_tenant_id %}{% set my_reaction = rx.reaction %}{% endif %}{% endfor %}
+            {% for emoji, label in [('\U0001F99C', 'Polly Love'), ('\U0001F919', 'Hang Loose'), ('\u2764\ufe0f', 'Heart'), ('\U0001F4AA', 'Strong'), ('\U0001F602', 'Haha'), ('\U0001F64F', 'Blessed')] %}
+            <button onclick="react({{ item.id }}, '{{ emoji }}')" title="{{ label }}"
+                    class="text-lg hover:scale-125 transition {% if my_reaction == emoji %}bg-emerald-100 rounded-full ring-2 ring-emerald-400{% endif %}">{{ emoji }}</button>
+            {% endfor %}
+            {% for rx in item_reactions %}
+            <span class="text-xs text-gray-400 ml-1">{{ rx.reaction }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="mt-1 flex justify-between items-center">
             <div>
                 {% if item.content_type == 'story' and item.content_id and session.role != 'family' %}
                 <form method="POST" action="/web/stories/{{ item.content_id }}/to-nostalgia" class="inline">
@@ -154,6 +168,14 @@ var _wallTid = {{ connected_family.connected_tenant_id }};
 var _wallRecorder = null;
 var _wallBlob = null;
 var _uploadFile = null;
+
+function react(itemId, emoji) {
+    var fd = new FormData();
+    fd.append('reaction', emoji);
+    fetch('/web/wall/' + itemId + '/react', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.ok) window.location.reload(); });
+}
 
 function previewUpload(input) {
     if (input.files && input.files[0]) {

@@ -332,6 +332,17 @@ class PollyDB:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_shared_wall_pair ON shared_wall_items(from_tenant_id, to_tenant_id)")
 
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS wall_reactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    wall_item_id INTEGER NOT NULL,
+                    tenant_id INTEGER NOT NULL,
+                    reaction TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(wall_item_id, tenant_id)
+                )
+            """)
+
             # ── Multi-tenant tables ──
 
             conn.execute("""
@@ -1109,6 +1120,52 @@ class PollyDB:
                         continue
                 items.append(item)
             return items
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def react_to_wall_item(self, wall_item_id: int, tenant_id: int, reaction: str) -> bool:
+        """Toggle a reaction on a wall item. Same reaction again = remove it."""
+        conn = self._get_connection()
+        try:
+            existing = conn.execute(
+                "SELECT reaction FROM wall_reactions WHERE wall_item_id = ? AND tenant_id = ?",
+                (wall_item_id, tenant_id)
+            ).fetchone()
+            if existing and existing[0] == reaction:
+                # Same reaction = toggle off
+                conn.execute("DELETE FROM wall_reactions WHERE wall_item_id = ? AND tenant_id = ?",
+                             (wall_item_id, tenant_id))
+            else:
+                # New or different reaction = upsert
+                conn.execute(
+                    "INSERT OR REPLACE INTO wall_reactions (wall_item_id, tenant_id, reaction) VALUES (?, ?, ?)",
+                    (wall_item_id, tenant_id, reaction))
+            conn.commit()
+            return True
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_wall_reactions(self, wall_item_ids: list) -> dict:
+        """Get reactions for a list of wall item IDs. Returns {item_id: [{tenant_id, reaction}]}."""
+        if not wall_item_ids:
+            return {}
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            placeholders = ",".join("?" * len(wall_item_ids))
+            rows = conn.execute(
+                f"SELECT wall_item_id, tenant_id, reaction FROM wall_reactions WHERE wall_item_id IN ({placeholders})",
+                wall_item_ids
+            ).fetchall()
+            result = {}
+            for r in rows:
+                wid = r["wall_item_id"]
+                if wid not in result:
+                    result[wid] = []
+                result[wid].append({"tenant_id": r["tenant_id"], "reaction": r["reaction"]})
+            return result
         finally:
             if not self._conn:
                 conn.close()
