@@ -858,21 +858,64 @@ async def _process_command(
     if pre_transcription:
         transcription = pre_transcription
     else:
+        # Cap audio at 60s for Google STT (synchronous API limit)
+        # Full audio is already saved as WAV above for story mode
+        max_stt_bytes = settings.SAMPLE_RATE * 2 * 60  # 60 seconds of 16kHz 16-bit mono
+        stt_audio = command_audio[:max_stt_bytes] if len(command_audio) > max_stt_bytes else command_audio
+        if len(command_audio) > max_stt_bytes:
+            logger.info(f"Audio exceeds 60s ({len(command_audio)} bytes), sending first 60s to STT")
+
         # Wrap raw PCM in WAV header for STT
         wav_buffer = io.BytesIO()
         with wave.open(wav_buffer, 'wb') as wf:
             wf.setnchannels(settings.CHANNELS)
             wf.setsampwidth(2)
             wf.setframerate(settings.SAMPLE_RATE)
-            wf.writeframes(command_audio)
+            wf.writeframes(stt_audio)
         wav_bytes = wav_buffer.getvalue()
 
-        # Transcribe
-        transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+        # Transcribe with timeout to prevent hang
+        try:
+            transcription = await asyncio.wait_for(
+                asyncio.to_thread(transcriber.transcribe, wav_bytes),
+                timeout=30.0
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"STT timed out after 30s for {len(stt_audio)} bytes")
+            transcription = ""
 
     logger.info(f"Transcription: {transcription}")
 
     if not transcription:
+        # If in story mode with saved audio, still preserve it as a story
+        if _saved_wav_filename and conv_state_check and conv_state_check.is_conversational:
+            try:
+                _db = getattr(websocket.app.state, "db", None)
+                _tid = conv_state_check.tenant_id if conv_state_check else 1
+                _q = getattr(conv_state_check, "current_question", None)
+                _speaker = None
+                try:
+                    _usr = _db.get_or_create_user(tenant_id=_tid) if _db else {}
+                    _speaker = _usr.get("name") or None
+                except Exception:
+                    pass
+                story_id = _db.save_story(
+                    transcript="(Transcription pending — long recording)",
+                    audio_s3_key=_saved_wav_filename,
+                    speaker_name=_speaker,
+                    source="voice",
+                    duration_seconds=len(command_audio) / (settings.SAMPLE_RATE * 2),
+                    tenant_id=_tid,
+                    question_text=_q,
+                )
+                logger.info(f"Saved story audio without transcription: id={story_id}, wav={_saved_wav_filename}")
+                fallback = "I got your recording saved, but I had trouble with the transcription. You can check it on the stories page."
+                await websocket.send_json({"event": "response", "text": fallback, "audio": None})
+                dur = await _send_tts(websocket, tts, fallback, squawk_mgr=squawk_mgr, device_id=device_id)
+                return dur
+            except Exception as e:
+                logger.error(f"Failed to save story without transcription: {e}")
+
         fallback = "I didn't catch that."
         await websocket.send_json({"event": "response", "text": fallback, "audio": None})
         dur = await _send_tts(websocket, tts, fallback, squawk_mgr=squawk_mgr, device_id=device_id)
