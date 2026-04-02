@@ -2359,11 +2359,28 @@ async def settings_page(request: Request):
 
     # Load devices with per-device settings for settings UI
     tenant_devices = db.get_devices_by_tenant(session["tenant_id"])
+    from config import settings as app_settings
+    try:
+        from zoneinfo import ZoneInfo
+        _tz = ZoneInfo(app_settings.TIMEZONE)
+    except Exception:
+        from datetime import timezone as _tzmod
+        _tz = _tzmod.utc
+    _now_hour = datetime.now(_tz).hour
     for dev in tenant_devices:
         try:
             dev["settings"] = db.get_device_settings(dev["device_id"], session["tenant_id"])
         except Exception:
             dev["settings"] = {}
+        # Flag if device is currently in quiet hours
+        qs = dev["settings"].get("quiet_hours_start", 21)
+        qe = dev["settings"].get("quiet_hours_end", 7)
+        in_quiet = False
+        if qs > qe:
+            in_quiet = _now_hour >= qs or _now_hour < qe
+        elif qs < qe:
+            in_quiet = qs <= _now_hour < qe
+        dev["in_quiet_hours"] = in_quiet
     has_multiple_devices = len(tenant_devices) > 1
 
     return templates.TemplateResponse("settings.html", {

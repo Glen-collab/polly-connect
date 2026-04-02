@@ -357,7 +357,7 @@ setTimeout(function() {
         <button type="button" onclick="switchSnoozeDevice('{{ dev.device_id }}')"
                 id="snooze-tab-{{ dev.device_id }}" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">
             {{ dev.name or dev.device_id }}
-            {% if dev.settings.get('squawk_snoozed_until') %}<span class="ml-1 text-amber-500">zzz</span>{% endif %}
+            {% if dev.settings.get('squawk_snoozed_until') or dev.get('in_quiet_hours') %}<span class="ml-1 text-amber-500">zzz</span>{% endif %}
         </button>
         {% endfor %}
     </div>
