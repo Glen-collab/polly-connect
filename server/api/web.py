@@ -6206,14 +6206,18 @@ async def admin_dashboard(request: Request):
     intents = db.get_admin_intent_stats(days=7)
     errors = db.get_admin_error_log(limit=50)
 
-    # Add is_online flag for template
+    # Add is_online flag — check live WebSocket connections first, fall back to last_seen
     from datetime import datetime, timedelta
+    squawk_mgr = getattr(request.app.state, "squawk", None)
+    live_devices = set(squawk_mgr._active_devices.keys()) if squawk_mgr else set()
     now = datetime.utcnow()
     for d in devices:
-        if d.get("last_seen"):
+        if d.get("device_id") in live_devices:
+            d["is_online"] = True
+        elif d.get("last_seen"):
             try:
                 ls = datetime.fromisoformat(d["last_seen"])
-                d["is_online"] = (now - ls) < timedelta(minutes=5)
+                d["is_online"] = (now - ls) < timedelta(minutes=2)
             except Exception:
                 d["is_online"] = False
         else:
@@ -6228,6 +6232,10 @@ async def admin_dashboard(request: Request):
         )
 
     tenants = db.get_all_tenants()
+
+    # Override online count with actual live WebSocket connections
+    online_count = sum(1 for d in devices if d.get("is_online"))
+    stats["online_devices"] = online_count
 
     return templates.TemplateResponse("admin.html", {
         "request": request,

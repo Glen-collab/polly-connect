@@ -188,6 +188,12 @@ async def continuous_stream(websocket: WebSocket):
                             logger.info(f"Device {device_id} firmware: v{fw_version} ({fw_variant})")
                         logger.info(f"Continuous stream device: {device_id} (tenant={device_info['tenant_id']})")
 
+                        # Mark device as seen (for admin dashboard online status)
+                        try:
+                            db.update_device_last_seen(db_device_id)
+                        except Exception:
+                            pass
+
                         # Swap to per-device wake word detector (cached, reused on reconnect)
                         if _shared_detector.ready and _shared_detector.model_path:
                             if device_id not in app.state._device_detectors:
@@ -432,6 +438,12 @@ async def continuous_stream(websocket: WebSocket):
 
                 if event == "ping":
                     await websocket.send_json({"event": "pong"})
+                    # Update last_seen on ping (~every 30s) for admin dashboard
+                    if db_device_id:
+                        try:
+                            db.update_device_last_seen(db_device_id)
+                        except Exception:
+                            pass
                     continue
 
                 if event == "story_button":
