@@ -3613,6 +3613,43 @@ async def wall_react(request: Request, item_id: int):
     return JSONResponse({"ok": True})
 
 
+@router.post("/wall/save-photo-to-library")
+async def wall_save_photo_to_library(request: Request):
+    """Copy a shared wall photo into your own photo gallery."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    form = await request.form()
+    photo_id = int(form.get("photo_id", 0))
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Get the original photo
+    photo = db.get_photo_by_id(photo_id)
+    if not photo:
+        return JSONResponse({"error": "Photo not found"}, status_code=404)
+
+    # Don't duplicate if it's already ours
+    if photo.get("tenant_id") == tid:
+        return JSONResponse({"error": "Already in your library"}, status_code=400)
+
+    # Copy the photo record to our tenant (same file, new DB record)
+    user = db.get_or_create_user(tenant_id=tid)
+    db.save_photo(
+        filename=photo["filename"],
+        original_name=photo.get("original_name"),
+        caption=photo.get("caption"),
+        date_taken=photo.get("date_taken"),
+        user_id=user["id"],
+        tenant_id=tid,
+    )
+
+    return JSONResponse({"ok": True})
+
+
 @router.get("/api/photos/list")
 async def photos_list_api(request: Request):
     """Lightweight JSON endpoint returning tenant's photos for share picker."""

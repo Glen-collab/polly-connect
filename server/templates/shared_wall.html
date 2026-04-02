@@ -126,19 +126,22 @@
         {% for rx in item_reactions %}{% if rx.tenant_id == my_tenant_id %}{% set ns.my_reaction = rx.reaction %}{% endif %}{% endfor %}
         <div class="mt-2 flex items-center gap-1 flex-wrap">
             {% for emoji, label in [('\U0001F99C', 'Polly Love'), ('\U0001F919', 'Hang Loose'), ('\u2764\ufe0f', 'Heart'), ('\U0001F4AA', 'Strong'), ('\U0001F602', 'Haha'), ('\U0001F64F', 'Blessed')] %}
-            <button onclick="react({{ item.id }}, '{{ emoji }}')" title="{{ label }}"
-                    class="text-lg hover:scale-125 transition {% if ns.my_reaction == emoji %}bg-emerald-100 rounded-full ring-2 ring-emerald-400{% endif %}">{{ emoji }}</button>
+            <button onclick="react({{ item.id }}, '{{ emoji }}', this)" title="{{ label }}"
+                    class="text-lg hover:scale-125 transition {% if ns.my_reaction == emoji %}bg-emerald-100 rounded-full ring-2 ring-emerald-400 was-active{% endif %}">{{ emoji }}</button>
             {% endfor %}
             {% if ns.my_reaction %}<span class="text-xs text-gray-500 ml-2">You: {{ ns.my_reaction }}</span>{% endif %}
             {% for rx in item_reactions %}{% if rx.tenant_id != my_tenant_id %}<span class="text-xs text-gray-400 ml-1">{{ rx.reaction }}</span>{% endif %}{% endfor %}
         </div>
 
         <div class="mt-1 flex justify-between items-center">
-            <div>
+            <div class="flex gap-3">
                 {% if item.content_type == 'story' and item.content_id and session.role != 'family' %}
                 <form method="POST" action="/web/stories/{{ item.content_id }}/to-nostalgia" class="inline">
                     <button type="submit" class="text-xs text-blue-500 hover:text-blue-700">Save to Nostalgia</button>
                 </form>
+                {% endif %}
+                {% if item.content_type == 'photo' and item.photo and item.from_tenant_id != my_tenant_id and session.role != 'family' %}
+                <button type="button" onclick="savePhotoToLibrary({{ item.content_id }}, this)" class="text-xs text-emerald-500 hover:text-emerald-700">Save to My Photos</button>
                 {% endif %}
             </div>
             <div>
@@ -168,12 +171,56 @@ var _wallRecorder = null;
 var _wallBlob = null;
 var _uploadFile = null;
 
-function react(itemId, emoji) {
+function react(itemId, emoji, btn) {
     var fd = new FormData();
     fd.append('reaction', emoji);
     fetch('/web/wall/' + itemId + '/react', { method: 'POST', body: fd })
     .then(function(r) { return r.json(); })
-    .then(function(data) { if (data.ok) window.location.reload(); });
+    .then(function(data) {
+        if (!data.ok) return;
+        // Update UI in place without reload
+        var row = btn.closest('.flex-wrap');
+        // Clear all highlights in this row
+        row.querySelectorAll('button').forEach(function(b) {
+            b.classList.remove('bg-emerald-100', 'ring-2', 'ring-emerald-400');
+        });
+        // Remove old "You:" label
+        var oldLabel = row.querySelector('.you-label');
+        if (oldLabel) oldLabel.remove();
+        // If same emoji was already selected (toggle off), we're done
+        if (btn.classList.contains('was-active')) {
+            btn.classList.remove('was-active');
+            return;
+        }
+        // Highlight new selection
+        btn.classList.add('bg-emerald-100', 'ring-2', 'ring-emerald-400');
+        var label = document.createElement('span');
+        label.className = 'text-xs text-gray-500 ml-2 you-label';
+        label.textContent = 'You: ' + emoji;
+        row.appendChild(label);
+        // Mark for toggle detection
+        row.querySelectorAll('button').forEach(function(b) { b.classList.remove('was-active'); });
+        btn.classList.add('was-active');
+    });
+}
+
+function savePhotoToLibrary(photoId, btn) {
+    var fd = new FormData();
+    fd.append('photo_id', photoId);
+    btn.textContent = 'Saving...';
+    fetch('/web/wall/save-photo-to-library', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            btn.textContent = 'Saved!';
+            btn.classList.remove('text-emerald-500');
+            btn.classList.add('text-gray-400');
+            btn.onclick = null;
+        } else {
+            btn.textContent = data.error || 'Error';
+        }
+    })
+    .catch(function(e) { btn.textContent = 'Error'; });
 }
 
 function previewUpload(input) {
