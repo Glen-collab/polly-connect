@@ -858,31 +858,62 @@ async def _process_command(
     if pre_transcription:
         transcription = pre_transcription
     else:
-        # Cap audio at 60s for Google STT (synchronous API limit)
-        # Full audio is already saved as WAV above for story mode
-        max_stt_bytes = settings.SAMPLE_RATE * 2 * 60  # 60 seconds of 16kHz 16-bit mono
-        stt_audio = command_audio[:max_stt_bytes] if len(command_audio) > max_stt_bytes else command_audio
-        if len(command_audio) > max_stt_bytes:
-            logger.info(f"Audio exceeds 60s ({len(command_audio)} bytes), sending first 60s to STT")
+        # Google STT synchronous API has a ~60 second limit
+        # For longer recordings, chunk into 55s segments (with 1s overlap) and transcribe each
+        max_stt_bytes = settings.SAMPLE_RATE * 2 * 55  # 55 seconds per chunk (safety margin)
+        total_bytes = len(command_audio)
 
-        # Wrap raw PCM in WAV header for STT
-        wav_buffer = io.BytesIO()
-        with wave.open(wav_buffer, 'wb') as wf:
-            wf.setnchannels(settings.CHANNELS)
-            wf.setsampwidth(2)
-            wf.setframerate(settings.SAMPLE_RATE)
-            wf.writeframes(stt_audio)
-        wav_bytes = wav_buffer.getvalue()
+        if total_bytes > max_stt_bytes:
+            # Chunked transcription for long recordings
+            logger.info(f"Audio exceeds 55s ({total_bytes} bytes / {total_bytes / 32000:.0f}s), chunking for STT")
+            chunks = []
+            offset = 0
+            while offset < total_bytes:
+                chunk = command_audio[offset:offset + max_stt_bytes]
+                chunks.append(chunk)
+                offset += max_stt_bytes
 
-        # Transcribe with timeout to prevent hang
-        try:
-            transcription = await asyncio.wait_for(
-                asyncio.to_thread(transcriber.transcribe, wav_bytes),
-                timeout=30.0
-            )
-        except asyncio.TimeoutError:
-            logger.error(f"STT timed out after 30s for {len(stt_audio)} bytes")
-            transcription = ""
+            parts = []
+            for i, chunk in enumerate(chunks):
+                wav_buffer = io.BytesIO()
+                with wave.open(wav_buffer, 'wb') as wf:
+                    wf.setnchannels(settings.CHANNELS)
+                    wf.setsampwidth(2)
+                    wf.setframerate(settings.SAMPLE_RATE)
+                    wf.writeframes(chunk)
+                wav_bytes = wav_buffer.getvalue()
+                try:
+                    part = await asyncio.wait_for(
+                        asyncio.to_thread(transcriber.transcribe, wav_bytes),
+                        timeout=30.0
+                    )
+                    if part:
+                        parts.append(part)
+                        logger.info(f"STT chunk {i+1}/{len(chunks)}: {len(part)} chars")
+                except asyncio.TimeoutError:
+                    logger.error(f"STT chunk {i+1}/{len(chunks)} timed out")
+                except Exception as e:
+                    logger.error(f"STT chunk {i+1}/{len(chunks)} error: {e}")
+            transcription = " ".join(parts)
+            logger.info(f"Chunked STT: {len(chunks)} chunks, {len(transcription)} chars total")
+        else:
+            # Single-shot transcription for short recordings
+            wav_buffer = io.BytesIO()
+            with wave.open(wav_buffer, 'wb') as wf:
+                wf.setnchannels(settings.CHANNELS)
+                wf.setsampwidth(2)
+                wf.setframerate(settings.SAMPLE_RATE)
+                wf.writeframes(command_audio)
+            wav_bytes = wav_buffer.getvalue()
+
+            try:
+                transcription = await asyncio.wait_for(
+                    asyncio.to_thread(transcriber.transcribe, wav_bytes),
+                    timeout=30.0
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"STT timed out after 30s for {total_bytes} bytes")
+                transcription = ""
 
     logger.info(f"Transcription: {transcription}")
 
