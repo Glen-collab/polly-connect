@@ -505,6 +505,12 @@ class CommandProcessor:
             last = self._last_response.get(device_id)
             if last:
                 prefix = self.data.get_response("repeat_acknowledgment") or "Sure, here it is again."
+                # If we have a pending question, restore story mode so user can answer
+                state = self._get_state(device_id)
+                if state.current_question:
+                    state.mode = ConversationMode.STORY_PROMPT
+                    state.story_parts = []
+                    state.followup_count = 0
                 return f"{prefix} {last}"
             return "I don't have anything to repeat."
 
