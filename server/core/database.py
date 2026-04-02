@@ -333,6 +333,18 @@ class PollyDB:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_shared_wall_pair ON shared_wall_items(from_tenant_id, to_tenant_id)")
 
             conn.execute("""
+                CREATE TABLE IF NOT EXISTS wall_comments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    wall_item_id INTEGER NOT NULL,
+                    tenant_id INTEGER NOT NULL,
+                    tenant_name TEXT,
+                    comment TEXT,
+                    audio_filename TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS wall_reactions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     wall_item_id INTEGER NOT NULL,
@@ -1165,6 +1177,44 @@ class PollyDB:
                 if wid not in result:
                     result[wid] = []
                 result[wid].append({"tenant_id": r["tenant_id"], "reaction": r["reaction"]})
+            return result
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def add_wall_comment(self, wall_item_id: int, tenant_id: int,
+                         tenant_name: str, comment: str = None,
+                         audio_filename: str = None) -> int:
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "INSERT INTO wall_comments (wall_item_id, tenant_id, tenant_name, comment, audio_filename) VALUES (?, ?, ?, ?, ?)",
+                (wall_item_id, tenant_id, tenant_name, comment, audio_filename))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_wall_comments(self, wall_item_ids: list) -> dict:
+        """Returns {item_id: [comment_dicts]} for all given wall item IDs."""
+        if not wall_item_ids:
+            return {}
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            placeholders = ",".join("?" * len(wall_item_ids))
+            rows = conn.execute(
+                f"SELECT * FROM wall_comments WHERE wall_item_id IN ({placeholders}) ORDER BY created_at ASC",
+                wall_item_ids
+            ).fetchall()
+            result = {}
+            for r in rows:
+                d = dict(r)
+                wid = d["wall_item_id"]
+                if wid not in result:
+                    result[wid] = []
+                result[wid].append(d)
             return result
         finally:
             if not self._conn:

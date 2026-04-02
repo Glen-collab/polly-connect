@@ -133,6 +133,41 @@
             {% for rx in item_reactions %}{% if rx.tenant_id != my_tenant_id %}<span class="text-xs text-gray-400 ml-1">{{ rx.reaction }}</span>{% endif %}{% endfor %}
         </div>
 
+        <!-- Comments -->
+        {% set item_comments = comments.get(item.id, []) %}
+        <div class="mt-2 border-t pt-2">
+            {% if item_comments %}
+            <div class="space-y-2 mb-2">
+                {% for c in item_comments %}
+                <div class="bg-gray-50 rounded-lg px-3 py-2">
+                    <span class="text-xs font-medium text-gray-700">{{ c.tenant_name or 'Someone' }}</span>
+                    <span class="text-xs text-gray-400 ml-1">{{ c.created_at[:16] if c.created_at else '' }}</span>
+                    {% if c.comment %}
+                    <p class="text-sm text-gray-700 mt-0.5">{{ c.comment }}</p>
+                    {% endif %}
+                    {% if c.audio_filename %}
+                    <audio controls preload="none" class="h-7 mt-1 w-full">
+                        <source src="/static/recordings/{{ c.audio_filename }}" type="audio/wav">
+                    </audio>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="flex gap-2" id="comment-row-{{ item.id }}">
+                <input type="text" id="comment-text-{{ item.id }}" placeholder="Say something..."
+                       class="flex-1 border rounded-lg px-3 py-1.5 text-sm" onkeydown="if(event.key==='Enter')sendComment({{ item.id }})">
+                <button type="button" onclick="toggleCommentRec({{ item.id }})" id="comment-rec-btn-{{ item.id }}"
+                        class="bg-red-500 text-white text-xs px-2 py-1.5 rounded-lg hover:bg-red-600" title="Record voice">Mic</button>
+                <button type="button" onclick="sendComment({{ item.id }})"
+                        class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-emerald-700">Send</button>
+            </div>
+            <div class="flex items-center gap-2 mt-1 hidden" id="comment-rec-row-{{ item.id }}">
+                <span id="comment-rec-status-{{ item.id }}" class="text-xs text-gray-500"></span>
+                <audio id="comment-preview-{{ item.id }}" controls class="hidden h-7 flex-1"></audio>
+            </div>
+        </div>
+
         <div class="mt-1 flex justify-between items-center">
             <div class="flex gap-3">
                 {% if item.content_type == 'story' and item.content_id and session.role != 'family' %}
@@ -201,6 +236,86 @@ function react(itemId, emoji, btn) {
         // Mark for toggle detection
         row.querySelectorAll('button').forEach(function(b) { b.classList.remove('was-active'); });
         btn.classList.add('was-active');
+    });
+}
+
+var _commentRecorders = {};
+var _commentBlobs = {};
+
+function toggleCommentRec(itemId) {
+    var btn = document.getElementById('comment-rec-btn-' + itemId);
+    var status = document.getElementById('comment-rec-status-' + itemId);
+    var recRow = document.getElementById('comment-rec-row-' + itemId);
+    var recorder = _commentRecorders[itemId];
+
+    if (recorder && recorder.state === 'recording') {
+        recorder.stop();
+        btn.textContent = 'Mic';
+        btn.classList.remove('animate-pulse');
+        status.textContent = 'Processing...';
+        return;
+    }
+    _commentBlobs[itemId] = null;
+    document.getElementById('comment-preview-' + itemId).classList.add('hidden');
+    recRow.classList.remove('hidden');
+
+    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    .then(function(stream) {
+        var chunks = [];
+        var rec = new MediaRecorder(stream);
+        _commentRecorders[itemId] = rec;
+        rec.ondataavailable = function(e) { chunks.push(e.data); };
+        rec.onstop = function() {
+            _commentBlobs[itemId] = new Blob(chunks, { type: rec.mimeType });
+            var preview = document.getElementById('comment-preview-' + itemId);
+            preview.src = URL.createObjectURL(_commentBlobs[itemId]);
+            preview.classList.remove('hidden');
+            status.textContent = 'Ready';
+            stream.getTracks().forEach(function(t) { t.stop(); });
+        };
+        rec.start();
+        btn.textContent = 'Stop';
+        btn.classList.add('animate-pulse');
+        status.textContent = 'Recording...';
+    })
+    .catch(function() { status.textContent = 'Mic blocked'; });
+}
+
+function sendComment(itemId) {
+    var text = document.getElementById('comment-text-' + itemId).value.trim();
+    var blob = _commentBlobs[itemId];
+    if (!text && !blob) return;
+
+    var fd = new FormData();
+    if (text) fd.append('comment', text);
+    if (blob) fd.append('audio', blob, 'comment.webm');
+
+    fetch('/web/wall/' + itemId + '/comment', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            // Add comment to DOM in place
+            var container = document.getElementById('comment-row-' + itemId).parentElement;
+            var commentsDiv = container.querySelector('.space-y-2') || (function() {
+                var d = document.createElement('div');
+                d.className = 'space-y-2 mb-2';
+                container.insertBefore(d, document.getElementById('comment-row-' + itemId));
+                return d;
+            })();
+            var html = '<div class="bg-gray-50 rounded-lg px-3 py-2"><span class="text-xs font-medium text-gray-700">' + data.name + '</span>';
+            if (data.comment) html += '<p class="text-sm text-gray-700 mt-0.5">' + data.comment + '</p>';
+            if (data.audio) html += '<audio controls preload="none" class="h-7 mt-1 w-full"><source src="/static/recordings/' + data.audio + '" type="audio/wav"></audio>';
+            html += '</div>';
+            commentsDiv.insertAdjacentHTML('beforeend', html);
+            // Clear input
+            document.getElementById('comment-text-' + itemId).value = '';
+            _commentBlobs[itemId] = null;
+            var preview = document.getElementById('comment-preview-' + itemId);
+            preview.classList.add('hidden');
+            document.getElementById('comment-rec-row-' + itemId).classList.add('hidden');
+            document.getElementById('comment-rec-btn-' + itemId).textContent = 'Mic';
+            document.getElementById('comment-rec-status-' + itemId).textContent = '';
+        }
     });
 }
 

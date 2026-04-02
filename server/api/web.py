@@ -3448,9 +3448,10 @@ async def shared_wall_page(request: Request, connected_tenant_id: int):
     items = db.get_wall_items(tid, connected_tenant_id, limit=50)
     my_photos = db.get_photos(limit=100, tenant_id=tid, include_wall_only=True) if session.get("role") != "family" else []
 
-    # Load reactions for all wall items
+    # Load reactions and comments for all wall items
     item_ids = [i["id"] for i in items]
     reactions = db.get_wall_reactions(item_ids) if item_ids else {}
+    comments = db.get_wall_comments(item_ids) if item_ids else {}
 
     return templates.TemplateResponse("shared_wall.html", {
         "request": request,
@@ -3460,6 +3461,7 @@ async def shared_wall_page(request: Request, connected_tenant_id: int):
         "my_photos": my_photos,
         "my_tenant_id": tid,
         "reactions": reactions,
+        "comments": comments,
     })
 
 
@@ -3611,6 +3613,56 @@ async def wall_react(request: Request, item_id: int):
     db = request.app.state.db
     db.react_to_wall_item(item_id, session["tenant_id"], reaction)
     return JSONResponse({"ok": True})
+
+
+@router.post("/wall/{item_id}/comment")
+async def wall_comment(request: Request, item_id: int):
+    """Add a text or voice comment on a wall item."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    form = await request.form()
+    comment_text = (form.get("comment") or "").strip()
+    audio_file = form.get("audio")
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    my_tenant = db.get_tenant(tid)
+    tenant_name = my_tenant["name"] if my_tenant else "Someone"
+
+    audio_key = None
+    if audio_file and hasattr(audio_file, "read"):
+        import subprocess
+        audio_data = await audio_file.read()
+        if len(audio_data) > 0:
+            filename = f"wallcmt_{uuid.uuid4().hex[:8]}.wav"
+            recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+            os.makedirs(recordings_dir, exist_ok=True)
+            filepath = os.path.join(recordings_dir, filename)
+            raw_path = filepath + ".raw"
+            with open(raw_path, "wb") as f:
+                f.write(audio_data)
+            try:
+                result = subprocess.run(
+                    ["ffmpeg", "-y", "-i", raw_path, "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le", filepath],
+                    capture_output=True, timeout=15)
+                if result.returncode == 0:
+                    audio_key = filename
+                os.remove(raw_path)
+            except Exception:
+                if os.path.exists(raw_path):
+                    os.remove(raw_path)
+
+    if not comment_text and not audio_key:
+        return JSONResponse({"error": "No comment"}, status_code=400)
+
+    db.add_wall_comment(item_id, tid, tenant_name,
+                        comment=comment_text or None,
+                        audio_filename=audio_key)
+
+    return JSONResponse({"ok": True, "name": tenant_name, "comment": comment_text or "", "audio": audio_key or ""})
 
 
 @router.post("/wall/save-photo-to-library")
