@@ -59,7 +59,7 @@ function startStopMsgRec() {
     msgChunks = []; msgBlob = null;
     document.getElementById('msg-preview').classList.add('hidden');
     document.getElementById('msg-send').classList.add('hidden');
-    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    navigator.mediaDevices.getUserMedia({ audio: true })
     .then(function(stream) {
         msgRecorder = new MediaRecorder(stream);
         msgRecorder.ondataavailable = function(e) { msgChunks.push(e.data); };

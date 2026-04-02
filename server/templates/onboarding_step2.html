@@ -80,7 +80,7 @@ function startStopRec() {
     chunks = []; blob = null;
     document.getElementById('rec-preview').classList.add('hidden');
     document.getElementById('rec-send').classList.add('hidden');
-    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    navigator.mediaDevices.getUserMedia({ audio: true })
     .then(function(stream) {
         recorder = new MediaRecorder(stream);
         recorder.ondataavailable = function(e) { chunks.push(e.data); };

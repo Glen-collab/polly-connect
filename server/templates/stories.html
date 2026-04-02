@@ -195,7 +195,7 @@ function showState(state) {
 
 function startRecording() {
     pcmChunks = [];
-    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    navigator.mediaDevices.getUserMedia({ audio: true })
     .then(function(stream) {
         mediaStream = stream;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });

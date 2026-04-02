@@ -590,7 +590,7 @@ function startStopFriendRec() {
     friendBlob = null;
     document.getElementById('friend-preview').classList.add('hidden');
     document.getElementById('friend-send-btn').classList.add('hidden');
-    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    navigator.mediaDevices.getUserMedia({ audio: true })
     .then(function(stream) {
         friendRecorder = new MediaRecorder(stream);
         friendRecorder.ondataavailable = function(e) { friendChunks.push(e.data); };
@@ -660,7 +660,7 @@ function toggleShareRec(memberId) {
     _shareBlobs[memberId] = null;
     document.getElementById('share-preview-' + memberId).classList.add('hidden');
 
-    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    navigator.mediaDevices.getUserMedia({ audio: true })
     .then(function(stream) {
         var chunks = [];
         var rec = new MediaRecorder(stream);

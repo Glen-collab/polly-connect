@@ -172,7 +172,7 @@ var recordingStart = null;
 var timerInterval = null;
 
 function startPrayerRecording() {
-    navigator.mediaDevices.getUserMedia({audio: {sampleRate: 16000, channelCount: 1}})
+    navigator.mediaDevices.getUserMedia({ audio: true })
     .then(function(stream) {
         audioChunks = [];
         mediaRecorder = new MediaRecorder(stream, {mimeType: 'audio/webm'});

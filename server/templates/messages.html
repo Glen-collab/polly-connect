@@ -243,7 +243,7 @@ function startStopVoiceRec() {
     voiceBlob = null;
     document.getElementById('voice-preview').classList.add('hidden');
     document.getElementById('voice-send-btn').classList.add('hidden');
-    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    navigator.mediaDevices.getUserMedia({ audio: true })
     .then(function(stream) {
         voiceStream = stream;
         voiceRecorder = new MediaRecorder(stream);
@@ -308,7 +308,7 @@ function startStopFriendBoardRec() {
     friendBoardBlob = null;
     document.getElementById('friend-board-preview').classList.add('hidden');
     document.getElementById('friend-board-send-btn').classList.add('hidden');
-    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    navigator.mediaDevices.getUserMedia({ audio: true })
     .then(function(stream) {
         friendBoardRecorder = new MediaRecorder(stream);
         friendBoardRecorder.ondataavailable = function(e) { friendBoardChunks.push(e.data); };
