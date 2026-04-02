@@ -176,7 +176,7 @@
                 </form>
                 {% endif %}
                 {% if item.content_type == 'photo' and item.photo and item.from_tenant_id != my_tenant_id and session.role != 'family' %}
-                <button type="button" onclick="savePhotoToLibrary({{ item.content_id }}, this)" class="text-xs text-emerald-500 hover:text-emerald-700">Save to My Photos</button>
+                <button type="button" onclick="savePhotoToLibrary({{ item.content_id }}, this, '{{ (item.caption or item.photo.caption or "") | replace("'", "\\'") }}')" class="text-xs text-emerald-500 hover:text-emerald-700">Save to My Photos</button>
                 {% endif %}
             </div>
             <div>
@@ -326,9 +326,10 @@ function sendComment(itemId) {
     });
 }
 
-function savePhotoToLibrary(photoId, btn) {
+function savePhotoToLibrary(photoId, btn, wallCaption) {
     var fd = new FormData();
     fd.append('photo_id', photoId);
+    if (wallCaption) fd.append('wall_caption', wallCaption);
     btn.textContent = 'Saving...';
     fetch('/web/wall/save-photo-to-library', { method: 'POST', body: fd })
     .then(function(r) { return r.json(); })

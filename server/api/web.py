@@ -3675,6 +3675,7 @@ async def wall_save_photo_to_library(request: Request):
 
     form = await request.form()
     photo_id = int(form.get("photo_id", 0))
+    wall_caption = (form.get("wall_caption") or "").strip()
 
     db = request.app.state.db
     tid = session["tenant_id"]
@@ -3688,12 +3689,15 @@ async def wall_save_photo_to_library(request: Request):
     if photo.get("tenant_id") == tid:
         return JSONResponse({"error": "Already in your library"}, status_code=400)
 
+    # Use photo's own caption, or fall back to wall sharing note
+    caption = photo.get("caption") or wall_caption or None
+
     # Copy the photo record to our tenant (same file, new DB record)
     user = db.get_or_create_user(tenant_id=tid)
     db.save_photo(
         filename=photo["filename"],
         original_name=photo.get("original_name"),
-        caption=photo.get("caption"),
+        caption=caption,
         date_taken=photo.get("date_taken"),
         user_id=user["id"],
         tenant_id=tid,
