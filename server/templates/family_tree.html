@@ -136,7 +136,7 @@
         <div class="flex flex-wrap justify-center gap-3">
             {% for m in tree[gen_num] %}
             {% set has_button = (m.id in member_connected and not m.deceased and session.role != 'family') or (m.id in email_matches and not email_matches[m.id].already_connected and not m.deceased and session.role != 'family') %}
-            <div class="{{ card_class }} rounded-lg p-3 pb-{% if has_button %}9{% else %}5{% endif %} text-center w-[140px] {% if has_button %}min-h-[120px]{% else %}h-[100px]{% endif %} flex flex-col justify-center relative cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
+            <div class="{{ card_class }} rounded-lg p-3 pb-5 text-center w-[140px] h-[100px] flex flex-col justify-center relative cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
                  onclick="showPhotos({{ m.id }})">
                 <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}{% if m.id in member_connected or (m.id in email_matches and email_matches[m.id].already_connected) %} <span class="text-xs" title="Has a Polly">&#x1F99C;</span>{% elif m.id in email_matches %} <span class="text-xs" title="Has a Polly">&#x1F99C;</span>{% endif %}</p>
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
