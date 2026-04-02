@@ -22,6 +22,23 @@
 
     <!-- Share Photo -->
     <div id="share-photo-section" class="hidden">
+        <!-- Upload new photo directly -->
+        <div class="border-2 border-dashed border-blue-300 rounded-lg p-4 mb-3 text-center bg-blue-50">
+            <label class="cursor-pointer">
+                <input type="file" id="wall-photo-upload" accept="image/*" class="hidden" onchange="previewUpload(this)">
+                <p class="text-sm text-blue-600 font-medium">Tap to upload a new photo</p>
+                <p class="text-xs text-gray-400">or pick from your gallery below</p>
+            </label>
+            <img id="upload-preview-img" class="hidden mx-auto mt-2 max-h-32 rounded-lg">
+        </div>
+        <label class="flex items-center gap-2 text-xs text-gray-500 mb-3">
+            <input type="checkbox" id="also-save-to-gallery" checked class="rounded">
+            Also save to my photo gallery
+        </label>
+
+        <!-- Or pick from existing -->
+        {% if my_photos %}
+        <p class="text-xs text-gray-400 mb-2">Or choose from your gallery:</p>
         <div class="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-3 max-h-48 overflow-y-auto" id="photo-picker">
             {% for p in my_photos %}
             <div class="cursor-pointer border-2 border-transparent rounded-lg overflow-hidden hover:border-blue-400 transition photo-pick-item" data-photo-id="{{ p.id }}" onclick="selectPhoto(this, {{ p.id }})">
@@ -29,13 +46,11 @@
                 {% if p.caption %}<p class="text-xs text-gray-500 p-1 truncate">{{ p.caption[:30] }}</p>{% endif %}
             </div>
             {% endfor %}
-            {% if not my_photos %}
-            <p class="text-sm text-gray-400 col-span-3">No photos yet. <a href="/web/photos" class="text-emerald-600 hover:underline">Upload some first</a>.</p>
-            {% endif %}
         </div>
+        {% endif %}
         <input type="hidden" id="selected-photo-id" value="">
         <input type="text" id="share-photo-caption" class="w-full border rounded-lg px-3 py-2 text-sm mb-2" placeholder="Add a note (optional)">
-        <button type="button" onclick="sendPhoto()" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Send Photo</button>
+        <button type="button" onclick="sendPhoto()" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Share Photo</button>
         <p id="photo-feedback" class="text-xs text-center mt-1"></p>
     </div>
 
@@ -105,14 +120,23 @@
         <p class="text-xs text-gray-400 mt-1">From {{ item.message.from_name }}</p>
         {% endif %}
 
-        {% if item.from_tenant_id == my_tenant_id %}
-        <div class="mt-2 text-right">
-            <form method="POST" action="/web/wall/{{ item.id }}/delete" class="inline"
-                  onsubmit="return confirm('Remove this from the wall?')">
-                <button type="submit" class="text-xs text-red-400 hover:text-red-600">Remove</button>
-            </form>
+        <div class="mt-2 flex justify-between items-center">
+            <div>
+                {% if item.content_type == 'story' and item.content_id and session.role != 'family' %}
+                <form method="POST" action="/web/stories/{{ item.content_id }}/to-nostalgia" class="inline">
+                    <button type="submit" class="text-xs text-blue-500 hover:text-blue-700">Save to Nostalgia</button>
+                </form>
+                {% endif %}
+            </div>
+            <div>
+                {% if item.from_tenant_id == my_tenant_id %}
+                <form method="POST" action="/web/wall/{{ item.id }}/delete" class="inline"
+                      onsubmit="return confirm('Remove this from the wall?')">
+                    <button type="submit" class="text-xs text-red-400 hover:text-red-600">Remove</button>
+                </form>
+                {% endif %}
+            </div>
         </div>
-        {% endif %}
     </div>
     {% endfor %}
 </div>
@@ -129,8 +153,33 @@
 var _wallTid = {{ connected_family.connected_tenant_id }};
 var _wallRecorder = null;
 var _wallBlob = null;
+var _uploadFile = null;
+
+function previewUpload(input) {
+    if (input.files && input.files[0]) {
+        _uploadFile = input.files[0];
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = document.getElementById('upload-preview-img');
+            img.src = e.target.result;
+            img.classList.remove('hidden');
+        };
+        reader.readAsDataURL(_uploadFile);
+        // Clear any gallery selection
+        document.getElementById('selected-photo-id').value = '';
+        document.querySelectorAll('.photo-pick-item').forEach(function(p) {
+            p.classList.remove('border-blue-500');
+            p.classList.add('border-transparent');
+        });
+    }
+}
 
 function selectPhoto(el, photoId) {
+    // Clear upload selection
+    _uploadFile = null;
+    document.getElementById('upload-preview-img').classList.add('hidden');
+    document.getElementById('wall-photo-upload').value = '';
+
     document.querySelectorAll('.photo-pick-item').forEach(function(p) {
         p.classList.remove('border-blue-500');
         p.classList.add('border-transparent');
@@ -144,8 +193,28 @@ function sendPhoto() {
     var photoId = document.getElementById('selected-photo-id').value;
     var caption = document.getElementById('share-photo-caption').value.trim();
     var fb = document.getElementById('photo-feedback');
+
+    // Direct upload takes priority
+    if (_uploadFile) {
+        fb.textContent = 'Uploading & sharing...';
+        fb.className = 'text-xs text-center mt-1 text-gray-500';
+        var fd = new FormData();
+        fd.append('connected_tenant_id', _wallTid);
+        fd.append('photo', _uploadFile);
+        fd.append('caption', caption);
+        fd.append('save_to_gallery', document.getElementById('also-save-to-gallery').checked ? '1' : '');
+        fetch('/web/wall/upload-photo', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) { window.location.reload(); }
+            else { fb.textContent = data.error || 'Error'; fb.className = 'text-xs text-center mt-1 text-red-500'; }
+        })
+        .catch(function(e) { fb.textContent = 'Error: ' + e; fb.className = 'text-xs text-center mt-1 text-red-500'; });
+        return;
+    }
+
     if (!photoId) {
-        fb.textContent = 'Select a photo first';
+        fb.textContent = 'Upload a photo or select one from your gallery';
         fb.className = 'text-xs text-center mt-1 text-red-500';
         return;
     }

@@ -3522,6 +3522,74 @@ async def wall_delete_item(request: Request, item_id: int):
     return RedirectResponse("/web/family-tree", status_code=303)
 
 
+@router.post("/wall/upload-photo")
+async def wall_upload_photo(request: Request):
+    """Upload a new photo directly to the shared wall. Optionally save to own gallery too."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    form = await request.form()
+    target_tid = int(form.get("connected_tenant_id", 0))
+    photo_file = form.get("photo")
+    caption = (form.get("caption") or "").strip()
+    save_to_gallery = form.get("save_to_gallery", "")
+
+    if not photo_file or not hasattr(photo_file, "read"):
+        return JSONResponse({"error": "No photo"}, status_code=400)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Verify connection
+    connections = db.get_connected_families(tid)
+    connected = next((c for c in connections if c["connected_tenant_id"] == target_tid), None)
+    if not connected:
+        return JSONResponse({"error": "Not connected"}, status_code=403)
+
+    # Validate file
+    ext = os.path.splitext(photo_file.filename or "")[1].lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"}:
+        return JSONResponse({"error": "Invalid file type"}, status_code=400)
+
+    content = await photo_file.read()
+    if len(content) > 10 * 1024 * 1024:  # 10MB
+        return JSONResponse({"error": "Photo too large (10MB max)"}, status_code=400)
+
+    # Save file
+    unique_name = f"{uuid.uuid4().hex}{ext}"
+    uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
+    with open(os.path.join(uploads_dir, unique_name), "wb") as f:
+        f.write(content)
+
+    # Save photo record (always on sender's tenant for wall reference)
+    user = db.get_or_create_user(tenant_id=tid)
+    photo_id = db.save_photo(
+        filename=unique_name,
+        original_name=photo_file.filename,
+        caption=caption or None,
+        user_id=user["id"],
+        tenant_id=tid,
+    )
+
+    # Share to wall
+    if photo_id:
+        db.share_to_wall(tid, target_tid, "photo", photo_id, caption=caption or None)
+
+    # If user unchecked "save to gallery", mark photo as wall-only (in_book=0)
+    if not save_to_gallery and photo_id:
+        try:
+            conn = db._get_connection()
+            conn.execute("UPDATE photos SET in_book = 0 WHERE id = ?", (photo_id,))
+            conn.commit()
+        except Exception:
+            pass
+
+    return JSONResponse({"ok": True})
+
+
 @router.get("/api/photos/list")
 async def photos_list_api(request: Request):
     """Lightweight JSON endpoint returning tenant's photos for share picker."""
