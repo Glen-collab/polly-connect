@@ -3897,14 +3897,10 @@ async def family_tree_page(request: Request):
                 if not db._conn:
                     conn2.close()
 
-            # Collect all name words associated with this connected tenant
-            name_words = set()
-            for src in [cf.get("connected_tenant_name", ""),
-                        cf_user.get("name", ""),
-                        (cf_account or {}).get("name", "")]:
-                for w in (src or "").lower().split():
-                    if len(w) > 2 and w not in ("the", "family"):
-                        name_words.add(w)
+            # Build match targets: account holder's FULL name (not household name)
+            # Only full-name match prevents "Rogers" from matching every Rogers family member
+            account_full_name = ((cf_account or {}).get("name") or "").strip().lower()
+            profile_full_name = (cf_user.get("name") or "").strip().lower()
 
             cf_email = ((cf_account or {}).get("email") or "").lower()
             first = connected_name_map.get(
@@ -3914,26 +3910,28 @@ async def family_tree_page(request: Request):
             cf_lookup.append({
                 "tenant_id": cf["connected_tenant_id"],
                 "tenant_name": cf["connected_tenant_name"],
-                "name_words": name_words,
+                "account_full_name": account_full_name,
+                "profile_full_name": profile_full_name,
                 "email": cf_email,
                 "unread_sent": first.get("unread_sent", 0),
                 "unread_received": first.get("unread_received", 0),
             })
 
         for m in members:
-            m_name_words = set()
-            for w in (m.get("name") or "").lower().split():
-                if len(w) > 2:
-                    m_name_words.add(w)
+            m_name = (m.get("name") or "").strip().lower()
             m_email = (m.get("email") or "").strip().lower()
 
             for cfl in cf_lookup:
-                # Match by email
+                # Match by email (most reliable)
                 if m_email and cfl["email"] and m_email == cfl["email"]:
                     member_connected[m["id"]] = cfl
                     break
-                # Match by name overlap (any shared word > 2 chars, excluding common words)
-                if m_name_words & cfl["name_words"]:
+                # Match by full name against account holder name
+                if m_name and cfl["account_full_name"] and m_name == cfl["account_full_name"]:
+                    member_connected[m["id"]] = cfl
+                    break
+                # Match by full name against profile name
+                if m_name and cfl["profile_full_name"] and m_name == cfl["profile_full_name"]:
                     member_connected[m["id"]] = cfl
                     break
 

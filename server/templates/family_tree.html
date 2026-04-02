@@ -89,6 +89,31 @@
     </form>
 </div>
 
+{% if pending_requests %}
+<!-- Pending Friend Requests — TOP of page, impossible to miss -->
+<div class="bg-amber-50 border-2 border-amber-400 rounded-xl p-5 mb-6 max-w-lg mx-auto shadow-md">
+    <div class="text-center mb-3">
+        <span class="text-2xl">&#x1F99C;</span>
+        <h3 class="text-lg font-bold text-amber-800">Someone wants to connect!</h3>
+        <p class="text-xs text-amber-600">Accept to share stories, photos, and messages between your Pollys</p>
+    </div>
+    {% for req in pending_requests %}
+    <div class="flex items-center justify-between bg-white rounded-lg px-4 py-3 mb-2 shadow-sm">
+        <span class="text-sm font-bold text-gray-800">{{ req.connected_tenant_name }}</span>
+        <div class="flex gap-2">
+            <form method="POST" action="/web/settings/connections/{{ req.connected_tenant_id }}/accept">
+                <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700">Accept</button>
+            </form>
+            <form method="POST" action="/web/settings/connections/{{ req.connected_tenant_id }}/decline"
+                  onsubmit="return confirm('Decline request from {{ req.connected_tenant_name }}?')">
+                <button type="submit" class="bg-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300">Decline</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 <!-- Family Tree Visualization -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <!-- Owner at center -->
@@ -179,31 +204,6 @@
 {% if request.query_params.get('req_error') %}
 <div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-4 mt-4 max-w-lg mx-auto text-center">
     <p class="text-sm text-red-800 font-medium">{{ request.query_params.get('req_error') }}</p>
-</div>
-{% endif %}
-
-{% if pending_requests %}
-<!-- Pending Friend Requests — prominent banner -->
-<div class="bg-amber-50 border-2 border-amber-400 rounded-xl p-5 mb-6 mt-4 max-w-lg mx-auto shadow-md">
-    <div class="text-center mb-3">
-        <span class="text-2xl">&#x1F99C;</span>
-        <h3 class="text-lg font-bold text-amber-800">Someone wants to connect!</h3>
-        <p class="text-xs text-amber-600">Accept to share stories, photos, and messages between your Pollys</p>
-    </div>
-    {% for req in pending_requests %}
-    <div class="flex items-center justify-between bg-white rounded-lg px-4 py-3 mb-2 shadow-sm">
-        <span class="text-sm font-bold text-gray-800">{{ req.connected_tenant_name }}</span>
-        <div class="flex gap-2">
-            <form method="POST" action="/web/settings/connections/{{ req.connected_tenant_id }}/accept">
-                <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700">Accept</button>
-            </form>
-            <form method="POST" action="/web/settings/connections/{{ req.connected_tenant_id }}/decline"
-                  onsubmit="return confirm('Decline request from {{ req.connected_tenant_name }}?')">
-                <button type="submit" class="bg-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300">Decline</button>
-            </form>
-        </div>
-    </div>
-    {% endfor %}
 </div>
 {% endif %}
 
