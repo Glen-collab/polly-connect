@@ -110,14 +110,15 @@
         <h3 class="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center">{{ label|safe }}</h3>
         <div class="flex flex-wrap justify-center gap-3">
             {% for m in tree[gen_num] %}
-            <div class="{{ card_class }} rounded-lg p-3 pb-5 text-center w-[140px] h-[100px] flex flex-col justify-center relative cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
+            {% set has_button = (m.id in member_connected and not m.deceased and session.role != 'family') or (m.id in email_matches and not email_matches[m.id].already_connected and not m.deceased and session.role != 'family') %}
+            <div class="{{ card_class }} rounded-lg p-3 pb-{% if has_button %}8{% else %}5{% endif %} text-center w-[140px] h-[{% if has_button %}115{% else %}100{% endif %}px] flex flex-col justify-center relative cursor-pointer hover:shadow-md transition{% if m.deceased %} opacity-75{% endif %}"
                  onclick="showPhotos({{ m.id }})">
                 <p class="font-medium text-sm text-gray-800">{{ m.name }}{% if m.deceased %} <span class="text-xs">&#10013;</span>{% endif %}{% if m.id in member_connected or (m.id in email_matches and email_matches[m.id].already_connected) %} <span class="text-xs" title="Has a Polly">&#x1F99C;</span>{% elif m.id in email_matches %} <span class="text-xs" title="Has a Polly">&#x1F99C;</span>{% endif %}</p>
                 <p class="text-xs {{ text_class }}">{{ m.relation_to_owner or m.relationship or '' }}</p>
                 {% if m.bio and not (session.role == 'family' and m.is_minor) %}
                 <p class="text-xs text-gray-400 mt-0.5 truncate">{{ m.bio[:30] }}{% if m.bio|length > 30 %}...{% endif %}</p>
                 {% endif %}
-                {% if m.id in member_connected and session.role != 'family' %}
+                {% if m.id in member_connected and not m.deceased and session.role != 'family' %}
                 {% set mc = member_connected[m.id] %}
                 {% if mc.get('unread_sent', 0) > 0 %}
                 <span class="absolute top-1 right-1 inline-block w-3 h-3 rounded-full bg-red-400" title="Sent — not yet heard"></span>
@@ -128,7 +129,7 @@
                     <button type="button" onclick="showConnectedModal('{{ mc.tenant_name }}', {{ mc.tenant_id }})"
                             class="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full hover:bg-red-600 shadow-sm">Message</button>
                 </div>
-                {% elif m.id in email_matches and not email_matches[m.id].already_connected and session.role != 'family' %}
+                {% elif m.id in email_matches and not email_matches[m.id].already_connected and not m.deceased and session.role != 'family' %}
                 <div class="absolute bottom-0 left-0 right-0 text-center pb-1" onclick="event.stopPropagation()">
                     <form method="POST" action="/web/settings/connections/request-by-email" style="display:inline">
                         <input type="hidden" name="member_id" value="{{ m.id }}">
@@ -182,19 +183,23 @@
 {% endif %}
 
 {% if pending_requests %}
-<!-- Pending Friend Requests -->
-<div class="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 mb-4 mt-4 max-w-lg mx-auto">
-    <h3 class="text-base font-bold text-amber-800 mb-3">Friend Requests</h3>
+<!-- Pending Friend Requests — prominent banner -->
+<div class="bg-amber-50 border-2 border-amber-400 rounded-xl p-5 mb-6 mt-4 max-w-lg mx-auto shadow-md">
+    <div class="text-center mb-3">
+        <span class="text-2xl">&#x1F99C;</span>
+        <h3 class="text-lg font-bold text-amber-800">Someone wants to connect!</h3>
+        <p class="text-xs text-amber-600">Accept to share stories, photos, and messages between your Pollys</p>
+    </div>
     {% for req in pending_requests %}
-    <div class="flex items-center justify-between bg-white rounded-lg px-4 py-3 mb-2">
-        <span class="text-sm font-medium text-gray-800">{{ req.connected_tenant_name }}</span>
+    <div class="flex items-center justify-between bg-white rounded-lg px-4 py-3 mb-2 shadow-sm">
+        <span class="text-sm font-bold text-gray-800">{{ req.connected_tenant_name }}</span>
         <div class="flex gap-2">
             <form method="POST" action="/web/settings/connections/{{ req.connected_tenant_id }}/accept">
-                <button type="submit" class="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-medium hover:bg-emerald-700">Accept</button>
+                <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700">Accept</button>
             </form>
             <form method="POST" action="/web/settings/connections/{{ req.connected_tenant_id }}/decline"
                   onsubmit="return confirm('Decline request from {{ req.connected_tenant_name }}?')">
-                <button type="submit" class="bg-gray-200 text-gray-600 px-3 py-1 rounded text-xs font-medium hover:bg-gray-300">Decline</button>
+                <button type="submit" class="bg-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300">Decline</button>
             </form>
         </div>
     </div>
