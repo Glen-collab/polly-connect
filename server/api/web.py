@@ -3675,7 +3675,7 @@ async def wall_save_photo_to_library(request: Request):
 
     form = await request.form()
     photo_id = int(form.get("photo_id", 0))
-    wall_caption = (form.get("wall_caption") or "").strip()
+    wall_item_id = int(form.get("wall_item_id", 0))
 
     db = request.app.state.db
     tid = session["tenant_id"]
@@ -3689,8 +3689,32 @@ async def wall_save_photo_to_library(request: Request):
     if photo.get("tenant_id") == tid:
         return JSONResponse({"error": "Already in your library"}, status_code=400)
 
-    # Use photo's own caption, or fall back to wall sharing note
-    caption = photo.get("caption") or wall_caption or None
+    # Build caption: photo's own caption + wall sharing note + conversation
+    parts = []
+    if photo.get("caption"):
+        parts.append(photo["caption"])
+
+    # Get the wall item's sharing note
+    if wall_item_id:
+        conn = db._get_connection()
+        try:
+            conn.row_factory = __import__("sqlite3").Row
+            wall_item = conn.execute("SELECT caption FROM shared_wall_items WHERE id = ?", (wall_item_id,)).fetchone()
+            if wall_item and wall_item["caption"]:
+                parts.append(wall_item["caption"])
+        finally:
+            if not db._conn:
+                conn.close()
+
+        # Get all comments on this wall item (the conversation)
+        wall_comments = db.get_wall_comments([wall_item_id])
+        for c in wall_comments.get(wall_item_id, []):
+            name = c.get("tenant_name") or "Someone"
+            text = c.get("comment") or ""
+            if text:
+                parts.append(f"{name}: {text}")
+
+    caption = "\n\n".join(parts) if parts else None
 
     # Copy the photo record to our tenant (same file, new DB record)
     user = db.get_or_create_user(tenant_id=tid)
