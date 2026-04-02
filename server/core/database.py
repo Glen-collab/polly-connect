@@ -500,6 +500,8 @@ class PollyDB:
             cols = {row[1] for row in conn.execute("PRAGMA table_info(photos)").fetchall()}
             if "in_book" not in cols:
                 conn.execute("ALTER TABLE photos ADD COLUMN in_book INTEGER DEFAULT 1")
+            if "wall_only" not in cols:
+                conn.execute("ALTER TABLE photos ADD COLUMN wall_only INTEGER DEFAULT 0")
 
             # Add is_admin to accounts
             cols = {row[1] for row in conn.execute("PRAGMA table_info(accounts)").fetchall()}
@@ -3434,18 +3436,19 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def get_photos(self, limit: int = 100, tenant_id: int = None) -> List[Dict]:
+    def get_photos(self, limit: int = 100, tenant_id: int = None, include_wall_only: bool = False) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
+            wall_filter = "" if include_wall_only else " AND (wall_only IS NULL OR wall_only = 0)"
             if tenant_id:
                 results = conn.execute(
-                    "SELECT * FROM photos WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?",
+                    f"SELECT * FROM photos WHERE tenant_id = ?{wall_filter} ORDER BY created_at DESC LIMIT ?",
                     (tenant_id, limit)
                 ).fetchall()
             else:
                 results = conn.execute(
-                    "SELECT * FROM photos ORDER BY created_at DESC LIMIT ?", (limit,)
+                    f"SELECT * FROM photos WHERE 1=1{wall_filter} ORDER BY created_at DESC LIMIT ?", (limit,)
                 ).fetchall()
             return [dict(r) for r in results]
         finally:

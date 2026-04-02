@@ -3446,7 +3446,7 @@ async def shared_wall_page(request: Request, connected_tenant_id: int):
         return RedirectResponse("/web/family-tree", status_code=303)
 
     items = db.get_wall_items(tid, connected_tenant_id, limit=50)
-    my_photos = db.get_photos(limit=100, tenant_id=tid) if session.get("role") != "family" else []
+    my_photos = db.get_photos(limit=100, tenant_id=tid, include_wall_only=True) if session.get("role") != "family" else []
 
     return templates.TemplateResponse("shared_wall.html", {
         "request": request,
@@ -3578,11 +3578,11 @@ async def wall_upload_photo(request: Request):
     if photo_id:
         db.share_to_wall(tid, target_tid, "photo", photo_id, caption=caption or None)
 
-    # If user unchecked "save to gallery", mark photo as wall-only (in_book=0)
+    # If user unchecked "save to gallery", mark photo as wall-only (hidden from gallery)
     if not save_to_gallery and photo_id:
         try:
             conn = db._get_connection()
-            conn.execute("UPDATE photos SET in_book = 0 WHERE id = ?", (photo_id,))
+            conn.execute("UPDATE photos SET wall_only = 1, in_book = 0 WHERE id = ?", (photo_id,))
             conn.commit()
         except Exception:
             pass
