@@ -309,6 +309,15 @@
         },
     };
 
+    // Dynamic path tips (prefix match)
+    if (window.location.pathname.match(/^\/web\/wall\/\d+$/)) {
+        PAGE_TIPS[window.location.pathname] = {
+            icon: '&#x1F9F1;',
+            title: 'Shared Wall',
+            body: 'This is your private space with this family. Share photos, stories, and messages here. Only you two can see what\'s on this wall — it\'s not visible to anyone else.'
+        };
+    }
+
     (function() {
         var path = window.location.pathname;
         var tip = PAGE_TIPS[path];

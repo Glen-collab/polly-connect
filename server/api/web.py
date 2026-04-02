@@ -1700,13 +1700,16 @@ async def story_share(request: Request):
     my_tenant = db.get_tenant(tid)
     household = my_tenant["name"] if my_tenant else "A friend"
 
-    db.save_story(
+    story_id = db.save_story(
         transcript=text or f"(Voice story shared by {household})",
         audio_s3_key=audio_key,
         speaker_name=speaker_name,
         source="shared",
         tenant_id=target_tid,
     )
+
+    # Log to shared wall
+    db.share_to_wall(tid, target_tid, "story", story_id)
 
     return JSONResponse({"ok": True})
 
@@ -2110,11 +2113,15 @@ async def messages_send_connected(request: Request,
     from_name = my_tenant["name"] if my_tenant else "A friend"
 
     # Save message on the TARGET tenant's board
-    db.save_message(
+    msg_id = db.save_message(
         from_name=from_name,
         message=message.strip(),
         tenant_id=target_tid,
     )
+
+    # Log to shared wall
+    if msg_id:
+        db.share_to_wall(tid, target_tid, "message", msg_id)
 
     # Check where the request came from — stay on that page
     referer = request.headers.get("referer", "")
@@ -3417,6 +3424,117 @@ async def connections_request_by_email(request: Request, member_id: int = Form(.
     if result:
         return RedirectResponse(f"/web/family-tree?req_sent={result['connected_tenant_name']}", status_code=303)
     return RedirectResponse("/web/family-tree?req_error=Already+connected+or+request+pending", status_code=303)
+
+
+# ── Shared Wall ──
+
+@router.get("/wall/{connected_tenant_id}", response_class=HTMLResponse)
+async def shared_wall_page(request: Request, connected_tenant_id: int):
+    """View the shared wall between you and a connected family."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Verify connection
+    connections = db.get_connected_families(tid)
+    connected = next((c for c in connections if c["connected_tenant_id"] == connected_tenant_id), None)
+    if not connected:
+        return RedirectResponse("/web/family-tree", status_code=303)
+
+    items = db.get_wall_items(tid, connected_tenant_id, limit=50)
+    my_photos = db.get_photos(limit=100, tenant_id=tid) if session.get("role") != "family" else []
+
+    return templates.TemplateResponse("shared_wall.html", {
+        "request": request,
+        "session": session,
+        "connected_family": connected,
+        "wall_items": items,
+        "my_photos": my_photos,
+        "my_tenant_id": tid,
+    })
+
+
+@router.post("/wall/share-photo")
+async def wall_share_photo(request: Request):
+    """Share a photo to a connected family's wall."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    form = await request.form()
+    target_tid = int(form.get("connected_tenant_id", 0))
+    photo_id = int(form.get("photo_id", 0))
+    caption = (form.get("caption") or "").strip()
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    connections = db.get_connected_families(tid)
+    connected = next((c for c in connections if c["connected_tenant_id"] == target_tid), None)
+    if not connected:
+        return JSONResponse({"error": "Not connected"}, status_code=403)
+
+    photo = db.get_photo_by_id(photo_id, tenant_id=tid)
+    if not photo:
+        return JSONResponse({"error": "Photo not found"}, status_code=404)
+
+    result = db.share_to_wall(tid, target_tid, "photo", photo_id, caption=caption or None)
+    if result is None:
+        return JSONResponse({"error": "Already shared"}, status_code=400)
+
+    return JSONResponse({"ok": True})
+
+
+@router.post("/wall/{item_id}/delete")
+async def wall_delete_item(request: Request, item_id: int):
+    """Remove an item from the shared wall (only the sharer can remove)."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Get the item to find out which wall to redirect back to
+    conn = db._get_connection()
+    try:
+        conn.row_factory = __import__("sqlite3").Row
+        item = conn.execute("SELECT * FROM shared_wall_items WHERE id = ?", (item_id,)).fetchone()
+        if item:
+            item = dict(item)
+            other_tid = item["to_tenant_id"] if item["from_tenant_id"] == tid else item["from_tenant_id"]
+        else:
+            other_tid = None
+    finally:
+        if not db._conn:
+            conn.close()
+
+    db.delete_wall_item(item_id, tid)
+
+    if other_tid:
+        return RedirectResponse(f"/web/wall/{other_tid}", status_code=303)
+    return RedirectResponse("/web/family-tree", status_code=303)
+
+
+@router.get("/api/photos/list")
+async def photos_list_api(request: Request):
+    """Lightweight JSON endpoint returning tenant's photos for share picker."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    db = request.app.state.db
+    photos = db.get_photos(limit=100, tenant_id=session["tenant_id"])
+    return JSONResponse([{
+        "id": p["id"],
+        "filename": p["filename"],
+        "caption": p.get("caption") or "",
+    } for p in photos])
 
 
 @router.post("/settings/security-questions")

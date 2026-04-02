@@ -318,6 +318,20 @@ class PollyDB:
             if "status" not in cf_cols:
                 conn.execute("ALTER TABLE connected_families ADD COLUMN status TEXT DEFAULT 'accepted'")
 
+            # ── Shared Wall ──
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS shared_wall_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    from_tenant_id INTEGER NOT NULL,
+                    to_tenant_id INTEGER NOT NULL,
+                    content_type TEXT NOT NULL,
+                    content_id INTEGER,
+                    caption TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_shared_wall_pair ON shared_wall_items(from_tenant_id, to_tenant_id)")
+
             # ── Multi-tenant tables ──
 
             conn.execute("""
@@ -1015,6 +1029,95 @@ class PollyDB:
                 (tenant_id,)
             ).fetchall()
             return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # ── Shared Wall ──
+
+    def share_to_wall(self, from_tenant_id: int, to_tenant_id: int,
+                      content_type: str, content_id: int, caption: str = None) -> Optional[int]:
+        """Share a photo/story/message to the wall between two connected families."""
+        conn = self._get_connection()
+        try:
+            # Verify connection exists
+            conn.row_factory = sqlite3.Row
+            exists = conn.execute(
+                "SELECT 1 FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+                (from_tenant_id, to_tenant_id)
+            ).fetchone()
+            if not exists:
+                return None
+            # Prevent duplicates
+            dup = conn.execute(
+                "SELECT 1 FROM shared_wall_items WHERE from_tenant_id = ? AND to_tenant_id = ? AND content_type = ? AND content_id = ?",
+                (from_tenant_id, to_tenant_id, content_type, content_id)
+            ).fetchone()
+            if dup:
+                return None
+            cursor = conn.execute(
+                "INSERT INTO shared_wall_items (from_tenant_id, to_tenant_id, content_type, content_id, caption) VALUES (?, ?, ?, ?, ?)",
+                (from_tenant_id, to_tenant_id, content_type, content_id, caption))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_wall_items(self, tenant_a: int, tenant_b: int, limit: int = 50) -> List[Dict]:
+        """Get all shared wall items between two tenants (both directions), newest first."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT w.*, t.name as from_tenant_name
+                FROM shared_wall_items w
+                LEFT JOIN tenants t ON t.id = w.from_tenant_id
+                WHERE (w.from_tenant_id = ? AND w.to_tenant_id = ?)
+                   OR (w.from_tenant_id = ? AND w.to_tenant_id = ?)
+                ORDER BY w.created_at DESC LIMIT ?
+            """, (tenant_a, tenant_b, tenant_b, tenant_a, limit)).fetchall()
+
+            items = []
+            for r in rows:
+                item = dict(r)
+                ctype = item["content_type"]
+                cid = item["content_id"]
+                if ctype == "photo" and cid:
+                    photo = conn.execute("SELECT filename, caption, date_taken FROM photos WHERE id = ?", (cid,)).fetchone()
+                    if photo:
+                        item["photo"] = dict(photo)
+                    else:
+                        continue  # skip orphaned
+                elif ctype == "story" and cid:
+                    story = conn.execute(
+                        "SELECT corrected_transcript, transcript, audio_s3_key, speaker_name, question_text FROM stories WHERE id = ?",
+                        (cid,)).fetchone()
+                    if story:
+                        item["story"] = dict(story)
+                    else:
+                        continue
+                elif ctype == "message" and cid:
+                    msg = conn.execute(
+                        "SELECT from_name, message, audio_filename FROM family_messages WHERE id = ?",
+                        (cid,)).fetchone()
+                    if msg:
+                        item["message"] = dict(msg)
+                    else:
+                        continue
+                items.append(item)
+            return items
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_wall_item(self, item_id: int, tenant_id: int) -> bool:
+        """Delete a wall item (only the sharer can remove it)."""
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM shared_wall_items WHERE id = ? AND from_tenant_id = ?", (item_id, tenant_id))
+            conn.commit()
+            return True
         finally:
             if not self._conn:
                 conn.close()
