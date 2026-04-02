@@ -259,7 +259,11 @@ function toggleCommentRec(itemId) {
     document.getElementById('comment-preview-' + itemId).classList.add('hidden');
     recRow.classList.remove('hidden');
 
-    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        status.textContent = 'Mic not available — try a different browser or check HTTPS';
+        return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true })
     .then(function(stream) {
         var chunks = [];
         var rec = new MediaRecorder(stream);
@@ -278,7 +282,10 @@ function toggleCommentRec(itemId) {
         btn.classList.add('animate-pulse');
         status.textContent = 'Recording...';
     })
-    .catch(function() { status.textContent = 'Mic blocked'; });
+    .catch(function(e) {
+        console.error('Mic error:', e);
+        status.textContent = 'Mic blocked — tap the lock icon in your browser and allow Microphone';
+    });
 }
 
 function sendComment(itemId) {
@@ -432,7 +439,11 @@ function toggleWallRec() {
     }
     _wallBlob = null;
     document.getElementById('wall-preview').classList.add('hidden');
-    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        status.textContent = 'Mic not available — try a different browser or check HTTPS';
+        return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true })
     .then(function(stream) {
         var chunks = [];
         _wallRecorder = new MediaRecorder(stream);

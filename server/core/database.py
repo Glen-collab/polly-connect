@@ -1221,7 +1221,7 @@ class PollyDB:
                 conn.close()
 
     def get_wall_new_count(self, from_tenant_id: int, to_tenant_id: int) -> int:
-        """Count wall items shared TO this tenant that they haven't reacted to yet (new/unseen)."""
+        """Count wall items shared TO this tenant that they haven't interacted with (no reaction or comment)."""
         conn = self._get_connection()
         try:
             count = conn.execute("""
@@ -1231,7 +1231,11 @@ class PollyDB:
                     SELECT 1 FROM wall_reactions r
                     WHERE r.wall_item_id = w.id AND r.tenant_id = ?
                 )
-            """, (from_tenant_id, to_tenant_id, to_tenant_id)).fetchone()[0]
+                AND NOT EXISTS (
+                    SELECT 1 FROM wall_comments c
+                    WHERE c.wall_item_id = w.id AND c.tenant_id = ?
+                )
+            """, (from_tenant_id, to_tenant_id, to_tenant_id, to_tenant_id)).fetchone()[0]
             return count
         finally:
             if not self._conn:
