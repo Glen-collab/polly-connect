@@ -387,6 +387,20 @@ async def forgot_code_submit(request: Request):
             conn.close()
 
 
+# ── Legal Pages ──
+
+@router.get("/terms", response_class=HTMLResponse)
+async def terms_page(request: Request):
+    session = await get_web_session(request)
+    return templates.TemplateResponse("terms.html", {"request": request, "session": session})
+
+
+@router.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    session = await get_web_session(request)
+    return templates.TemplateResponse("privacy.html", {"request": request, "session": session})
+
+
 # ── Contact Us ──
 
 @router.get("/contact", response_class=HTMLResponse)
@@ -477,11 +491,18 @@ async def register_page(request: Request):
 async def register_submit(request: Request, name: str = Form(...),
                             household_name: str = Form(...),
                             email: str = Form(...), password: str = Form(...),
-                            password_confirm: str = Form(...)):
+                            password_confirm: str = Form(...),
+                            agree_terms: str = Form("")):
     db = request.app.state.db
     email = email.strip().lower()
 
     # Validation
+    if not agree_terms:
+        return templates.TemplateResponse("register.html", {
+            "request": request, "error": "You must agree to the Terms of Service and Privacy Policy.",
+            "name": name, "email": email, "household_name": household_name,
+            "session": None,
+        })
     if password != password_confirm:
         return templates.TemplateResponse("register.html", {
             "request": request, "error": "Passwords don't match.",

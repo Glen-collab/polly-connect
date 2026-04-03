@@ -526,12 +526,14 @@ class PollyDB:
             if "wall_only" not in cols:
                 conn.execute("ALTER TABLE photos ADD COLUMN wall_only INTEGER DEFAULT 0")
 
-            # Add is_admin to accounts
+            # Add is_admin and terms_accepted_at to accounts
             cols = {row[1] for row in conn.execute("PRAGMA table_info(accounts)").fetchall()}
             if "is_admin" not in cols:
                 conn.execute("ALTER TABLE accounts ADD COLUMN is_admin INTEGER DEFAULT 0")
                 # First account is always admin (manufacturer)
                 conn.execute("UPDATE accounts SET is_admin = 1 WHERE id = 1")
+            if "terms_accepted_at" not in cols:
+                conn.execute("ALTER TABLE accounts ADD COLUMN terms_accepted_at TIMESTAMP")
 
             # Add api_key_hash and firmware info to devices
             cols = {row[1] for row in conn.execute("PRAGMA table_info(devices)").fetchall()}
@@ -1393,8 +1395,8 @@ class PollyDB:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
-                INSERT INTO accounts (email, password_hash, name, tenant_id, role)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO accounts (email, password_hash, name, tenant_id, role, terms_accepted_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """, (email, password_hash, name, tenant_id, role))
             conn.commit()
             return cursor.lastrowid

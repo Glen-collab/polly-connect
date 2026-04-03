@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service - Polly Connect{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Terms of Service</h1>
+    <p class="text-sm text-gray-400 mb-6">Effective April 3, 2026 | Polly Labs, LLC</p>
+
+    <div class="bg-white rounded-lg shadow p-5 sm:p-8 space-y-6 text-sm text-gray-700 leading-relaxed">
+
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+            <p class="text-sm text-emerald-800">We've written these terms in plain English because we believe you deserve to actually understand what you're agreeing to. If anything is unclear, email us at <a href="mailto:support@polly-connect.com" class="underline">support@polly-connect.com</a>.</p>
+        </div>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">1. What Polly Connect Is</h2>
+            <p>Polly Connect is a voice-powered storytelling platform made by Polly Labs, LLC. It uses a physical device (the Polly) that listens for a wake word, records your stories, and saves them. The web portal lets you manage stories, build a family tree, share memories with connected families, and create a printed legacy book.</p>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">2. Your Account</h2>
+            <ul class="list-disc ml-5 space-y-1">
+                <li>You must be <strong>18 years or older</strong> to create an account.</li>
+                <li>You are responsible for keeping your password secure.</li>
+                <li>Each account represents one household. The account owner controls settings, devices, and data.</li>
+                <li>Family members can join via access codes with limited, read-only permissions.</li>
+                <li>You agree to provide accurate information when registering.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">3. Your Content &amp; Ownership</h2>
+            <p><strong>You own your content.</strong> Your voice recordings, photos, stories, family data, and everything you put into Polly Connect belongs to you.</p>
+            <p class="mt-2">By using the service, you grant Polly Labs a limited license to:</p>
+            <ul class="list-disc ml-5 space-y-1 mt-1">
+                <li>Store, process, and transcribe your recordings</li>
+                <li>Generate AI-powered narratives, chapters, and nostalgia content from your stories</li>
+                <li>Display your content back to you and your authorized family members</li>
+                <li>Share content with connected families that you explicitly choose to share with</li>
+            </ul>
+            <p class="mt-2">This license exists solely to provide the service. <strong>We do not sell your content. We do not use your content to train AI models. We do not share your content with anyone you haven't authorized.</strong></p>
+            <p class="mt-2">You can delete your content at any time through the web portal or by contacting us.</p>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">4. Voice Recordings</h2>
+            <ul class="list-disc ml-5 space-y-1">
+                <li>The Polly device records audio when activated by a wake word ("Hey Polly").</li>
+                <li>Recordings are transmitted to our server for transcription and storage.</li>
+                <li>All members of your household should be aware that the device is listening for its wake word and will record after activation.</li>
+                <li>You are responsible for informing guests and visitors that a recording device is present.</li>
+                <li>Recordings can be played back, edited, or deleted through the web portal.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">5. AI-Generated Content</h2>
+            <p>Polly Connect uses artificial intelligence to:</p>
+            <ul class="list-disc ml-5 space-y-1 mt-1">
+                <li>Transcribe voice recordings (Google Speech-to-Text)</li>
+                <li>Generate narrative chapters for your legacy book (OpenAI GPT)</li>
+                <li>Create nostalgia snippets based on your era and hometown</li>
+                <li>Generate prayers based on your prayer requests</li>
+                <li>Convert text to speech (Amazon Polly)</li>
+            </ul>
+            <p class="mt-2"><strong>AI content may contain inaccuracies.</strong> Generated narratives, chapters, and nostalgia snippets are creative interpretations of your stories. You should review all AI-generated content before sharing or printing. Polly Labs is not responsible for errors in AI-generated output.</p>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">6. Subscriptions &amp; Billing</h2>
+            <ul class="list-disc ml-5 space-y-1">
+                <li><strong>Free tier:</strong> Limited features, no credit card required.</li>
+                <li><strong>Paid tiers (Basic, Legacy):</strong> Billed monthly or annually through Stripe.</li>
+                <li>Subscriptions auto-renew unless canceled before the billing date.</li>
+                <li>You can cancel anytime from the billing page. Access continues through the end of the paid period.</li>
+                <li>We do not offer refunds for partial billing periods.</li>
+                <li>If payment fails, your account is marked past-due and features are limited until resolved.</li>
+                <li>Your stories and data are never deleted due to payment issues. They remain safe.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">7. Connected Families &amp; Sharing</h2>
+            <ul class="list-disc ml-5 space-y-1">
+                <li>You can connect your Polly with other households to share stories, photos, and messages on a private wall.</li>
+                <li>Sharing is explicit: only content you choose to share appears on the wall.</li>
+                <li>Connected families can react to and comment on shared content.</li>
+                <li>You can disconnect from any family at any time, which removes the shared wall.</li>
+                <li>Content you shared remains on the other person's wall unless they remove it.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">8. Acceptable Use</h2>
+            <p>You agree not to:</p>
+            <ul class="list-disc ml-5 space-y-1 mt-1">
+                <li>Use Polly Connect for any illegal purpose</li>
+                <li>Upload harmful, abusive, or threatening content</li>
+                <li>Share your access codes publicly or with unauthorized individuals</li>
+                <li>Attempt to access other users' data or circumvent security measures</li>
+                <li>Use automated tools to scrape or extract data from the service</li>
+                <li>Resell or redistribute the service</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">9. Limitation of Liability</h2>
+            <p>Polly Connect is provided <strong>"as is"</strong> without warranties of any kind. Polly Labs, LLC is not liable for:</p>
+            <ul class="list-disc ml-5 space-y-1 mt-1">
+                <li>Service interruptions or downtime</li>
+                <li>Data loss beyond reasonable backup measures</li>
+                <li>Inaccuracies in AI-generated content</li>
+                <li>Actions taken by connected families with shared content</li>
+                <li>Issues caused by third-party services (Google, AWS, OpenAI, Stripe)</li>
+            </ul>
+            <p class="mt-2">Our total liability for any claim shall not exceed the amount you paid us in the 12 months preceding the claim.</p>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">10. Termination</h2>
+            <ul class="list-disc ml-5 space-y-1">
+                <li>You can delete your account at any time by contacting us.</li>
+                <li>We may suspend or terminate accounts that violate these terms.</li>
+                <li>Upon termination, your data can be exported or deleted upon request.</li>
+                <li>We will make reasonable efforts to notify you before termination, except in cases of abuse.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">11. Changes to These Terms</h2>
+            <p>We may update these terms from time to time. When we make significant changes, we'll notify you by email. Your continued use of Polly Connect after changes means you accept the updated terms.</p>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">12. Governing Law</h2>
+            <p>These terms are governed by the laws of the State of Wisconsin, United States. Any disputes will be resolved in the courts of Wisconsin.</p>
+        </section>
+
+        <section>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">13. Contact Us</h2>
+            <p>Polly Labs, LLC<br>
+            Email: <a href="mailto:support@polly-connect.com" class="text-emerald-600 hover:underline">support@polly-connect.com</a><br>
+            Web: <a href="/web/contact" class="text-emerald-600 hover:underline">polly-connect.com/contact</a></p>
+        </section>
+    </div>
+</div>
+{% endblock %}
