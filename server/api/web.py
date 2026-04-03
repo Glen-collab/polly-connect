@@ -825,16 +825,21 @@ async def welcome_save(request: Request):
 
     conn = db._get_connection()
     try:
+        final_name = name or user.get("name")
         conn.execute("""
             UPDATE user_profiles SET name = ?, familiar_name = ?,
             hometown = ?, birth_year = ?,
             location_city = ?, location_lat = ?, location_lon = ?,
             setup_complete = 1, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
-        """, (name or user.get("name"), familiar_name or None,
+        """, (final_name, familiar_name or None,
               hometown or None, birth_year_int,
               location_city or None, location_lat, location_lon,
               user["id"]))
+        # Keep accounts.name in sync so dashboard greeting matches
+        if final_name and session.get("account_id"):
+            conn.execute("UPDATE accounts SET name = ? WHERE id = ?",
+                         (familiar_name or final_name, session["account_id"]))
         conn.commit()
     finally:
         if not db._conn:
