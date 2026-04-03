@@ -87,7 +87,7 @@
 
         {% if item.content_type == 'photo' and item.photo %}
         <a href="/static/uploads/{{ item.photo.filename }}" target="_blank">
-            <img src="/static/uploads/{{ item.photo.filename }}" class="w-full max-h-96 object-contain rounded-lg mb-2" loading="lazy">
+            <img src="/static/uploads/{{ item.photo.filename }}" class="w-full object-contain rounded-lg mb-2" style="max-height: 70vh;" loading="lazy">
         </a>
         {% if item.photo.caption %}
         <p class="text-sm text-gray-700">{{ item.photo.caption }}</p>
@@ -158,8 +158,8 @@
                 <input type="text" id="comment-text-{{ item.id }}" placeholder="Say something..."
                        class="flex-1 border rounded-lg px-3 py-1.5 text-sm" onkeydown="if(event.key==='Enter')sendComment({{ item.id }})">
                 <button type="button" onclick="toggleCommentRec({{ item.id }})" id="comment-rec-btn-{{ item.id }}"
-                        class="bg-red-500 text-white text-xs px-2 py-1.5 rounded-lg hover:bg-red-600" title="Record voice">Mic</button>
-                <button type="button" onclick="sendComment({{ item.id }})"
+                        class="bg-red-500 text-white text-xs px-2 py-1.5 rounded-lg hover:bg-red-600" title="Record voice">Record</button>
+                <button type="button" onclick="sendComment({{ item.id }})" id="comment-send-btn-{{ item.id }}"
                         class="bg-emerald-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-emerald-700">Send</button>
             </div>
             <div class="flex items-center gap-2 mt-1 hidden" id="comment-rec-row-{{ item.id }}">
@@ -250,8 +250,9 @@ function toggleCommentRec(itemId) {
 
     if (recorder && recorder.state === 'recording') {
         recorder.stop();
-        btn.textContent = 'Mic';
-        btn.classList.remove('animate-pulse');
+        btn.textContent = 'Record';
+        btn.classList.remove('animate-pulse', 'bg-gray-600');
+        btn.classList.add('bg-red-500');
         status.textContent = 'Processing...';
         return;
     }
@@ -278,9 +279,10 @@ function toggleCommentRec(itemId) {
             stream.getTracks().forEach(function(t) { t.stop(); });
         };
         rec.start();
-        btn.textContent = 'Stop';
-        btn.classList.add('animate-pulse');
-        status.textContent = 'Recording...';
+        btn.textContent = 'Stop Recording';
+        btn.classList.remove('bg-red-500');
+        btn.classList.add('animate-pulse', 'bg-gray-600');
+        status.textContent = 'Recording now...';
     })
     .catch(function(e) {
         console.error('Mic error:', e);
@@ -293,6 +295,10 @@ function sendComment(itemId) {
     var blob = _commentBlobs[itemId];
     if (!text && !blob) return;
 
+    var sendBtn = document.getElementById('comment-send-btn-' + itemId);
+    sendBtn.textContent = 'Sending...';
+    sendBtn.classList.add('opacity-50');
+
     var fd = new FormData();
     if (text) fd.append('comment', text);
     if (blob) fd.append('audio', blob, 'comment.webm');
@@ -301,6 +307,16 @@ function sendComment(itemId) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.ok) {
+            // Show sent confirmation
+            sendBtn.textContent = 'Sent!';
+            sendBtn.classList.remove('opacity-50', 'bg-emerald-600');
+            sendBtn.classList.add('bg-emerald-400');
+            setTimeout(function() {
+                sendBtn.textContent = 'Send';
+                sendBtn.classList.remove('bg-emerald-400');
+                sendBtn.classList.add('bg-emerald-600');
+            }, 2000);
+
             // Add comment to DOM in place
             var container = document.getElementById('comment-row-' + itemId).parentElement;
             var commentsDiv = container.querySelector('.space-y-2') || (function() {
@@ -320,7 +336,7 @@ function sendComment(itemId) {
             var preview = document.getElementById('comment-preview-' + itemId);
             preview.classList.add('hidden');
             document.getElementById('comment-rec-row-' + itemId).classList.add('hidden');
-            document.getElementById('comment-rec-btn-' + itemId).textContent = 'Mic';
+            document.getElementById('comment-rec-btn-' + itemId).textContent = 'Record';
             document.getElementById('comment-rec-status-' + itemId).textContent = '';
         }
     });
