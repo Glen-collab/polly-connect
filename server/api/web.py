@@ -106,14 +106,17 @@ async def login_page(request: Request):
     session = await get_web_session(request)
     if session:
         return RedirectResponse("/web/dashboard", status_code=302)
+    invite_id = request.query_params.get("invite", "")
     return templates.TemplateResponse("login.html", {
         "request": request, "error": None, "email": "", "session": None,
+        "invite_id": invite_id,
     })
 
 
 @router.post("/login")
 async def login_submit(request: Request, email: str = Form(...),
-                        password: str = Form(...)):
+                        password: str = Form(...),
+                        invite_id: str = Form("")):
     from core.rate_limit import is_rate_limited, record_attempt, get_remaining_lockout
     client_ip = request.client.host if request.client else "unknown"
     if is_rate_limited(client_ip):
@@ -155,6 +158,20 @@ async def login_submit(request: Request, email: str = Form(...),
         duration_hours=settings.SESSION_DURATION_HOURS,
     )
     db.update_account_login(account["id"])
+
+    # Auto-connect if coming from an invite link
+    invite_id_val = invite_id.strip() if invite_id else ""
+    if invite_id_val and invite_id_val.isdigit():
+        invitation = db.get_invitation_by_id(int(invite_id_val))
+        if invitation:
+            inviter_tid = invitation["tenant_id"]
+            my_tid = account["tenant_id"]
+            if inviter_tid != my_tid:
+                db.send_friend_request_by_tenant(my_tid, inviter_tid)
+                db.accept_friend_request(my_tid, inviter_tid)
+                _auto_add_inviter_to_tree(db, my_tid, invitation)
+                db.update_invitation_status(int(invite_id_val), "converted",
+                                            converted_tenant_id=my_tid)
 
     # Check if owner needs onboarding
     dest = "/web/dashboard"
@@ -573,6 +590,181 @@ async def register_submit(request: Request, name: str = Form(...),
         httponly=True, samesite="lax",
     )
     return response
+
+
+# ── Invite Signup (invited user gets their own account) ──
+
+@router.get("/invite-signup", response_class=HTMLResponse)
+async def invite_signup_page(request: Request):
+    session = await get_web_session(request)
+    if session:
+        # Already logged in — check if we should auto-connect
+        invite_id = request.query_params.get("invite", "")
+        if invite_id and invite_id.isdigit():
+            db = request.app.state.db
+            invitation = db.get_invitation_by_id(int(invite_id))
+            if invitation:
+                inviter_tid = invitation["tenant_id"]
+                my_tid = session["tenant_id"]
+                if inviter_tid != my_tid:
+                    db.send_friend_request_by_tenant(my_tid, inviter_tid)
+                    # Also auto-accept from their side
+                    db.accept_friend_request(my_tid, inviter_tid)
+                    # Add inviter to my family tree
+                    _auto_add_inviter_to_tree(db, my_tid, invitation)
+                    db.update_invitation_status(int(invite_id), "converted",
+                                                converted_tenant_id=my_tid)
+        return RedirectResponse("/web/dashboard", status_code=302)
+
+    # Look up invitation details for pre-fill
+    invite_id = request.query_params.get("invite", "")
+    inviter_name = ""
+    invitee_name = ""
+    invitee_email = ""
+    voice_file = ""
+    if invite_id and invite_id.isdigit():
+        db = request.app.state.db
+        invitation = db.get_invitation_by_id(int(invite_id))
+        if invitation:
+            inviter_name = invitation.get("inviter_name", "")
+            invitee_name = invitation.get("invitee_name", "")
+            invitee_email = invitation.get("invitee_email", "")
+            if invitation.get("voice_message_filename"):
+                voice_file = invitation.get("voice_message_filename")
+            db.update_invitation_status(int(invite_id), "visited")
+
+    return templates.TemplateResponse("invite_signup.html", {
+        "request": request, "error": None, "session": None,
+        "invite_id": invite_id,
+        "inviter_name": inviter_name,
+        "name": invitee_name,
+        "email": invitee_email,
+        "household_name": "",
+        "voice_file": voice_file,
+    })
+
+
+@router.post("/invite-signup")
+async def invite_signup_submit(request: Request,
+                                name: str = Form(...),
+                                email: str = Form(...),
+                                password: str = Form(...),
+                                password_confirm: str = Form(...),
+                                household_name: str = Form(...),
+                                invite_id: str = Form(""),
+                                agree_terms: str = Form("")):
+    db = request.app.state.db
+    email = email.strip().lower()
+    invite_id_str = invite_id.strip()
+
+    # Look up invitation for error page context
+    inviter_name = ""
+    voice_file = ""
+    if invite_id_str and invite_id_str.isdigit():
+        invitation = db.get_invitation_by_id(int(invite_id_str))
+        if invitation:
+            inviter_name = invitation.get("inviter_name", "")
+            voice_file = invitation.get("voice_message_filename") or ""
+
+    def _err(msg):
+        return templates.TemplateResponse("invite_signup.html", {
+            "request": request, "error": msg, "session": None,
+            "invite_id": invite_id_str, "inviter_name": inviter_name,
+            "name": name, "email": email, "household_name": household_name,
+            "voice_file": voice_file,
+        })
+
+    if not agree_terms:
+        return _err("You must agree to the Terms of Service and Privacy Policy.")
+    if password != password_confirm:
+        return _err("Passwords don't match.")
+    if len(password) < 6:
+        return _err("Password must be at least 6 characters.")
+    if db.get_account_by_email(email):
+        return _err("An account with this email already exists. Try signing in instead.")
+
+    # Create new tenant + account
+    new_tid = db.create_tenant(household_name.strip())
+    from core.subscription import start_trial
+    start_trial(db, new_tid, days=30)
+
+    pw_hash = hash_password(password)
+    account_id = db.create_account(email, pw_hash, name.strip(), new_tid, role="owner")
+    db.get_or_create_user(name=name.strip(), tenant_id=new_tid)
+    db.generate_family_code(new_tid)
+
+    # Auto-connect to inviter's family (BOTH directions accepted)
+    if invite_id_str and invite_id_str.isdigit():
+        invitation = db.get_invitation_by_id(int(invite_id_str))
+        if invitation:
+            inviter_tid = invitation["tenant_id"]
+            # Create connection both ways
+            result = db.send_friend_request_by_tenant(new_tid, inviter_tid)
+            if result:
+                # Auto-accept from inviter's side too (no pending state)
+                db.accept_friend_request(new_tid, inviter_tid)
+            # Add inviter to new user's family tree
+            _auto_add_inviter_to_tree(db, new_tid, invitation)
+            # Mark invitation converted
+            db.update_invitation_status(int(invite_id_str), "converted",
+                                        converted_tenant_id=new_tid)
+
+    # Notify admin
+    try:
+        from core.notify import notify_new_registration
+        import threading
+        threading.Thread(
+            target=notify_new_registration,
+            args=(name, email, household_name),
+            daemon=True,
+        ).start()
+    except Exception:
+        pass
+
+    # Log in
+    session_id = db.create_web_session(
+        account_id, new_tid,
+        duration_hours=settings.SESSION_DURATION_HOURS,
+    )
+    db.update_account_login(account_id)
+
+    response = RedirectResponse("/web/welcome", status_code=302)
+    response.set_cookie(
+        "polly_session", session_id,
+        max_age=settings.SESSION_DURATION_HOURS * 3600,
+        httponly=True, samesite="lax",
+    )
+    return response
+
+
+def _auto_add_inviter_to_tree(db, new_tid: int, invitation: dict):
+    """Add the inviter as a family member in the new user's tree if not already there."""
+    inviter_name = invitation.get("inviter_name", "")
+    if not inviter_name:
+        return
+    conn = db._get_connection()
+    try:
+        conn.row_factory = __import__("sqlite3").Row
+        existing = conn.execute(
+            "SELECT 1 FROM family_members WHERE LOWER(name) = ? AND tenant_id = ?",
+            (inviter_name.lower().strip(), new_tid)
+        ).fetchone()
+        if not existing:
+            # Look up inviter's email from their account
+            inviter_account = conn.execute(
+                "SELECT email FROM accounts WHERE tenant_id = ? AND role = 'owner' LIMIT 1",
+                (invitation["tenant_id"],)
+            ).fetchone()
+            inviter_email = inviter_account["email"] if inviter_account else None
+            conn.execute("""
+                INSERT INTO family_members (name, name_normalized, relationship, relation_to_owner,
+                generation, tenant_id, added_by, email)
+                VALUES (?, ?, 'friend', 'friend', 0, ?, 'Polly Connect', ?)
+            """, (inviter_name, inviter_name.lower().strip(), new_tid, inviter_email))
+            conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
 
 
 # ── Welcome / Onboarding (first login) ──

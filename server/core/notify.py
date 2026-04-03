@@ -56,7 +56,7 @@ def send_family_invitation(inviter_name: str, invitee_name: str, invitee_email: 
                             has_voice_message: bool = False,
                             base_url: str = "https://polly-connect.com"):
     """Send a family invitation email with the family code and link."""
-    invite_url = f"{base_url}/web/family?invite={invitation_id}"
+    invite_url = f"{base_url}/web/invite-signup?invite={invitation_id}"
 
     voice_hook = ""
     if has_voice_message:
@@ -110,7 +110,7 @@ def send_family_invitation(inviter_name: str, invitee_name: str, invitee_email: 
                 {family_code}
             </p>
             <p style="color: #9ca3af; font-size: 11px; margin: 8px 0 0 0;">
-                Enter this code at polly-connect.com/web/family
+                Or enter this code at polly-connect.com/web/family
             </p>
         </div>
 
