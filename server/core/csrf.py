@@ -22,8 +22,8 @@ else:
     except Exception:
         pass  # If we can't write, it'll regenerate next restart
 
-# Token validity: 4 hours
-TOKEN_MAX_AGE = 4 * 3600
+# Token validity: 24 hours (users leave pages open all day)
+TOKEN_MAX_AGE = 24 * 3600
 
 
 def generate_csrf_token(session_id: str) -> str:
