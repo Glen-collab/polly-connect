@@ -130,7 +130,7 @@
                     class="text-lg hover:scale-125 transition {% if ns.my_reaction == emoji %}bg-emerald-100 rounded-full ring-2 ring-emerald-400 was-active{% endif %}">{{ emoji }}</button>
             {% endfor %}
             {% if ns.my_reaction %}<span class="text-xs text-gray-500 ml-2">You: {{ ns.my_reaction }}</span>{% endif %}
-            {% for rx in item_reactions %}{% if rx.tenant_id != my_tenant_id %}<span class="text-xs text-gray-400 ml-1">{{ rx.reaction }}</span>{% endif %}{% endfor %}
+            {% for rx in item_reactions %}{% if rx.tenant_id != my_tenant_id %}<span class="text-xs text-gray-500 ml-2">{{ connected_family.connected_tenant_name }}: {{ rx.reaction }}</span>{% endif %}{% endfor %}
         </div>
 
         <!-- Comments -->
