@@ -268,10 +268,10 @@ async def reset_password_submit(request: Request,
             "request": request, "token": token, "email": account["email"],
             "error": "Passwords don't match.", "session": None,
         })
-    if len(password) < 10:
+    if len(password) < 6:
         return templates.TemplateResponse("reset_password.html", {
             "request": request, "token": token, "email": account["email"],
-            "error": "Password must be at least 10 characters.", "session": None,
+            "error": "Password must be at least 6 characters.", "session": None,
         })
 
     new_hash = hash_password(password)
@@ -509,9 +509,9 @@ async def register_submit(request: Request, name: str = Form(...),
             "name": name, "email": email, "household_name": household_name,
             "session": None,
         })
-    if len(password) < 10:
+    if len(password) < 6:
         return templates.TemplateResponse("register.html", {
-            "request": request, "error": "Password must be at least 10 characters.",
+            "request": request, "error": "Password must be at least 6 characters.",
             "name": name, "email": email, "household_name": household_name,
             "session": None,
         })
@@ -979,8 +979,8 @@ async def onboarding_signup(request: Request,
     # Validate
     if password != password_confirm:
         return RedirectResponse("/web/onboarding/step/5?signup_error=Passwords+don't+match", status_code=303)
-    if len(password) < 10:
-        return RedirectResponse("/web/onboarding/step/5?signup_error=Password+must+be+10%2B+characters", status_code=303)
+    if len(password) < 6:
+        return RedirectResponse("/web/onboarding/step/5?signup_error=Password+must+be+6%2B+characters", status_code=303)
     if db.get_account_by_email(email):
         return RedirectResponse("/web/onboarding/step/5?signup_error=Email+already+registered", status_code=303)
 
