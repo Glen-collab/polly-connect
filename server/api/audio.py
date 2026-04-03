@@ -425,7 +425,8 @@ async def continuous_stream(websocket: WebSocket):
                         _msg_cmd = cmd
                         async def _has_messages():
                             msgs = _msg_db.get_messages_for(tenant_id=_msg_tid, device_id=_msg_dev)
-                            return len(msgs) > 0
+                            # Only nag for unread messages
+                            return any(not m.get("read") for m in msgs)
                         async def _tts_message(text):
                             await _send_tts(_msg_ws, _msg_tts, text,
                                            squawk_mgr=_msg_smgr, device_id=_msg_dev)
