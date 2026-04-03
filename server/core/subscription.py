@@ -2,7 +2,7 @@
 Stripe subscription management for Polly Connect.
 
 Tiers:
-  - trial: 30-day free trial (limited stories/photos/items)
+  - trial: Free tier (permanent, limited stories/photos/items)
   - basic: $9.99/mo or $99/yr — unlimited stories, no book export
   - legacy: $19.99/mo or $199/yr — full access including book export
 
@@ -164,27 +164,10 @@ def get_subscription(db, tenant_id: int) -> Dict:
         tenant = dict(tenant)
         tier = tenant.get("subscription_tier") or "trial"
         status = tenant.get("subscription_status") or "active"
-        trial_end = tenant.get("trial_ends_at")
 
-        # Check if trial has expired
-        if tier == "trial" and trial_end:
-            try:
-                end_dt = datetime.fromisoformat(trial_end)
-                if datetime.utcnow() > end_dt:
-                    status = "expired"
-                    # Update DB
-                    conn.execute(
-                        "UPDATE tenants SET subscription_status = 'expired' WHERE id = ?",
-                        (tenant_id,)
-                    )
-                    conn.commit()
-                else:
-                    days_left = (end_dt - datetime.utcnow()).days
-                    return {"tier": tier, "status": "active",
-                            "trial_days_left": max(0, days_left),
-                            "stripe_customer_id": tenant.get("stripe_customer_id")}
-            except (ValueError, TypeError):
-                pass
+        # Free tier never expires — always active
+        if tier == "trial":
+            status = "active"
 
         return {
             "tier": tier,
