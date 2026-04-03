@@ -40,18 +40,19 @@ def _get_stripe():
 
 TIERS = {
     "trial": {
-        "name": "Free Trial",
+        "name": "Free",
         "max_stories": 10,
-        "max_photos": 5,
+        "max_photos": 10,
         "max_items": 10,
         "max_photo_stories": 3,
         "max_family_codes": 1,
         "max_devices": 1,
+        "max_reminders": 3,
         "book_preview_chapters": 2,
         "book_export": False,
         "book_qr_codes": False,
         "phone_recording": True,
-        "family_tree_edit": False,
+        "family_tree_edit": True,
         "nostalgia_limit": 5,
     },
     "basic": {
@@ -62,6 +63,7 @@ TIERS = {
         "max_photo_stories": 99999,
         "max_family_codes": 3,
         "max_devices": 1,
+        "max_reminders": 99999,
         "book_preview_chapters": 2,
         "book_export": False,
         "book_qr_codes": False,
@@ -77,6 +79,7 @@ TIERS = {
         "max_photo_stories": 99999,
         "max_family_codes": 99999,
         "max_devices": 3,
+        "max_reminders": 99999,
         "book_preview_chapters": 99999,
         "book_export": True,
         "book_qr_codes": True,
@@ -99,7 +102,8 @@ def check_feature(db, tenant_id: int, feature: str) -> bool:
     """Check if a tenant can use a specific feature.
 
     Features: 'add_story', 'add_photo', 'add_item', 'add_photo_story',
-              'book_export', 'book_qr', 'phone_recording', 'family_tree_edit'
+              'add_reminder', 'book_export', 'book_qr', 'phone_recording',
+              'family_tree_edit'
     """
     # Admin always has full access
     if tenant_id == ADMIN_TENANT_ID:
@@ -135,6 +139,9 @@ def check_feature(db, tenant_id: int, feature: str) -> bool:
         return limits["phone_recording"]
     elif feature == "family_tree_edit":
         return limits["family_tree_edit"]
+    elif feature == "add_reminder":
+        count = _count_reminders(db, tenant_id)
+        return count < limits.get("max_reminders", 99999)
 
     return True
 
@@ -353,6 +360,18 @@ def _count_photo_stories(db, tenant_id: int) -> int:
     try:
         return conn.execute(
             "SELECT COUNT(*) FROM stories WHERE tenant_id = ? AND photo_id IS NOT NULL",
+            (tenant_id,)
+        ).fetchone()[0]
+    finally:
+        if not db._conn:
+            conn.close()
+
+
+def _count_reminders(db, tenant_id: int) -> int:
+    conn = db._get_connection()
+    try:
+        return conn.execute(
+            "SELECT COUNT(*) FROM medications WHERE user_id IN (SELECT id FROM user_profiles WHERE tenant_id = ?)",
             (tenant_id,)
         ).fetchone()[0]
     finally:

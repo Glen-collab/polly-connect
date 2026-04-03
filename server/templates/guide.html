@@ -146,12 +146,11 @@
 <!-- BASIC TIER -->
 <!-- ═══════════════════════════════════════════════════ -->
 
-{% if tier in ('basic', 'legacy') or role == 'family' %}
-<div class="border-t-4 border-blue-400 mt-6 pt-4">
-    <p class="text-xs text-blue-600 font-bold uppercase tracking-wide mb-3">Polly Basic</p>
+<!-- Stories (all tiers) -->
+<div class="border-t-4 border-emerald-400 mt-6 pt-4">
+    <p class="text-xs text-emerald-600 font-bold uppercase tracking-wide mb-3">Stories &amp; Family</p>
 </div>
 
-<!-- Stories -->
 <div class="bg-white rounded-lg shadow p-4">
     <h3 class="font-bold text-gray-800">Record & Preserve Family Stories</h3>
     <p class="text-xs text-gray-500 mt-1">Every voice. Every memory. Saved forever.</p>
@@ -161,29 +160,24 @@
         <p><strong>Listen:</strong> <em>"Tell me a story"</em> — Polly reads back a memory</p>
         <p><strong>Phone:</strong> Record a Memory button on the app — audio saved even if transcription fails</p>
         <p><strong>Edit:</strong> Fix transcriptions on the Stories page</p>
+        {% if tier == 'trial' and role != 'family' %}
+        <p class="text-xs text-blue-600 mt-2">Free plan: 10 stories, 10 photos, 5 nostalgia snippets. <a href="/web/pricing" class="underline font-medium">Upgrade for unlimited</a>.</p>
+        {% endif %}
     </div>
 </div>
 
-<!-- Family -->
+<!-- Family (all tiers) -->
 <div class="bg-white rounded-lg shadow p-4">
-    <h3 class="font-bold text-gray-800">Family Tree & Photos</h3>
-    <p class="text-xs text-gray-500 mt-1">Build your family's history. 8 generations deep.</p>
+    <h3 class="font-bold text-gray-800">Family Tree, Wall &amp; Connections</h3>
+    <p class="text-xs text-gray-500 mt-1">Build your family's history. Connect Pollys. Share memories.</p>
     <div class="mt-2 text-sm text-gray-700 space-y-1">
-        <p><strong>Tree:</strong> Add family members with relationships, bios, birth years</p>
+        <p><strong>Tree:</strong> Add family members with relationships, bios, birth years, emails</p>
+        <p><strong>Connect:</strong> Link Pollys by email or code — share stories, photos, and messages on a private wall</p>
+        <p><strong>Wall:</strong> React, comment, and save shared photos to your library with the conversation</p>
         <p><strong>Photos:</strong> Upload photos. Record voice stories about each one.</p>
-        <p><strong>Share:</strong> Generate a family access code so relatives can view and contribute</p>
         <p><strong>Nostalgia:</strong> Polly generates era-based memories from your hometown and birth year</p>
     </div>
 </div>
-
-{% elif tier == 'trial' and role != 'family' %}
-<!-- Upgrade prompt for Basic -->
-<div class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mt-6">
-    <h3 class="font-bold text-blue-800">Record & Preserve Family Stories Forever</h3>
-    <p class="text-sm text-blue-700 mt-1">Unlimited stories, family tree, photos, and nostalgia. Every voice saved.</p>
-    <a href="/web/pricing" class="inline-block mt-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 font-medium">Upgrade to Basic &rarr;</a>
-</div>
-{% endif %}
 
 <!-- ═══════════════════════════════════════════════════ -->
 <!-- LEGACY TIER -->

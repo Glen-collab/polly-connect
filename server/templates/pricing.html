@@ -41,14 +41,16 @@
 <div class="max-w-2xl mx-auto mb-6">
     <div class="bg-gray-50 rounded-2xl border border-gray-200 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h2 class="text-lg font-bold text-gray-700">Free Trial <span class="text-sm font-normal text-gray-400">(30 days)</span></h2>
-            <p class="text-sm text-gray-500 mt-1">Try Polly free. After 30 days, your stories stay safe — you just can't add new ones until you subscribe.</p>
+            <h2 class="text-lg font-bold text-gray-700">Free</h2>
+            <p class="text-sm text-gray-500 mt-1">Get started with Polly. Build your family tree, connect with loved ones, and start capturing memories.</p>
             <ul class="mt-2 text-xs text-gray-500 space-y-1">
-                <li>&#10003; Up to 10 stories &amp; 5 photos</li>
+                <li>&#10003; Full family tree &amp; shared wall</li>
+                <li>&#10003; Connect Pollys &amp; message friends</li>
+                <li>&#10003; Up to 10 stories &amp; 10 photos</li>
+                <li>&#10003; Up to 3 reminders</li>
+                <li>&#10003; 5 nostalgia snippets</li>
                 <li>&#10003; Voice commands, prayers, jokes, weather</li>
-                <li>&#10003; 1 family access code</li>
                 <li>&#10003; Book preview (2 chapters)</li>
-                <li>&#10007; No book export or QR codes</li>
             </ul>
         </div>
         {% if subscription and subscription.tier == 'trial' and subscription.status == 'active' %}
@@ -58,7 +60,7 @@
         {% elif not session %}
         <a href="/web/register"
            class="shrink-0 bg-gray-800 text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-gray-700 transition">
-            Start Free Trial
+            Get Started Free
         </a>
         {% endif %}
     </div>
@@ -76,12 +78,13 @@
         </div>
         <p class="text-xs text-gray-400 mt-1" id="annual-note-basic" style="display:none;">Billed annually at $99/yr</p>
         <ul class="mt-4 space-y-2 text-sm text-gray-600 flex-1">
-            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Unlimited stories & recordings</li>
-            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Unlimited photos & items</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Everything in Free, plus:</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> <strong>Unlimited stories &amp; recordings</strong></li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> <strong>Unlimited photos &amp; items</strong></li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> <strong>Unlimited reminders</strong></li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> <strong>Unlimited nostalgia</strong></li>
             <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Phone recording</li>
-            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> AI prayers & nostalgia</li>
-            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Family tree & message board</li>
-            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> 3 family access codes</li>
+            <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> AI prayers &amp; nostalgia</li>
             <li class="flex items-start gap-2"><span class="text-emerald-500 font-bold">&#10003;</span> Book preview (2 chapters)</li>
             <li class="flex items-start gap-2"><span class="text-gray-300 font-bold">&#10007;</span> <span class="text-gray-400">Legacy Book PDF export</span></li>
             <li class="flex items-start gap-2"><span class="text-gray-300 font-bold">&#10007;</span> <span class="text-gray-400">QR voice codes in book</span></li>

@@ -1742,6 +1742,9 @@ async def medication_add(request: Request, name: str = Form(...),
         return redirect
 
     db = request.app.state.db
+    gate = _gate_feature(db, session, "add_reminder")
+    if gate:
+        return gate
     tid = session["tenant_id"]
     user = db.get_or_create_user(tenant_id=tid)
     # Parse comma-separated times (supports "8am", "2:30 PM", "14:00")
