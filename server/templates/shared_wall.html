@@ -87,7 +87,7 @@
 
         {% if item.content_type == 'photo' and item.photo %}
         <a href="/static/uploads/{{ item.photo.filename }}" target="_blank">
-            <img src="/static/uploads/{{ item.photo.filename }}" class="w-full max-h-64 object-cover rounded-lg mb-2" loading="lazy">
+            <img src="/static/uploads/{{ item.photo.filename }}" class="w-full max-h-96 object-contain rounded-lg mb-2" loading="lazy">
         </a>
         {% if item.photo.caption %}
         <p class="text-sm text-gray-700">{{ item.photo.caption }}</p>
