@@ -3264,20 +3264,78 @@ async def photo_toggle_book(request: Request, photo_id: int):
     if not photo:
         return RedirectResponse("/web/photos", status_code=303)
 
+    import sqlite3 as _sqlite3
     conn = db._get_connection()
     try:
+        conn.row_factory = _sqlite3.Row
         # Toggle on photos table
         new_val = 0 if photo.get("in_book", 1) else 1
         conn.execute("UPDATE photos SET in_book = ? WHERE id = ? AND tenant_id = ?",
                      (new_val, photo_id, tid))
         # Also sync to linked story if exists
-        if photo.get("story_id"):
+        story_id = photo.get("story_id")
+        if story_id:
             conn.execute("UPDATE stories SET photo_in_book = ? WHERE id = ? AND tenant_id = ?",
-                         (new_val, photo["story_id"], tid))
+                         (new_val, story_id, tid))
+            # When adding to book, auto-verify the story and create memory if missing
+            if new_val == 1:
+                conn.execute("""
+                    UPDATE stories SET verified = 1, verified_by = 'book_toggle',
+                    verified_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND tenant_id = ? AND (verified IS NULL OR verified = 0)
+                """, (story_id, tid))
+                # Create memory entry if one doesn't exist for this story
+                existing_mem = conn.execute(
+                    "SELECT id FROM memories WHERE story_id = ? AND tenant_id = ?",
+                    (story_id, tid)
+                ).fetchone()
+                if not existing_mem:
+                    story = conn.execute(
+                        "SELECT * FROM stories WHERE id = ? AND tenant_id = ?",
+                        (story_id, tid)
+                    ).fetchone()
+                    if story:
+                        transcript = story["corrected_transcript"] or story["transcript"] or ""
+                        speaker = story["speaker_name"] or "Unknown"
+                        conn.execute("""
+                            INSERT INTO memories (story_id, speaker, bucket, life_phase,
+                                text_summary, text, verification_status, tenant_id)
+                            VALUES (?, ?, 'ordinary_world', 'unknown', ?, ?, 'verified', ?)
+                        """, (story_id, speaker, transcript[:200], transcript, tid))
         conn.commit()
     finally:
         if not db._conn:
             conn.close()
+
+    # If toggled on and memory_extractor is available, try to enrich the memory
+    if new_val == 1 and photo.get("story_id"):
+        try:
+            memory_extractor = getattr(request.app.state, "memory_extractor", None)
+            if memory_extractor:
+                story = db.get_story_by_id(photo["story_id"], tenant_id=tid)
+                if story:
+                    transcript = story.get("corrected_transcript") or story.get("transcript") or ""
+                    caption = photo.get("caption") or ""
+                    enriched_q = f"Photo: {caption}" if caption else ""
+                    mem_data = memory_extractor.extract(
+                        text=transcript, question=enriched_q,
+                        speaker=story.get("speaker_name") or None,
+                    )
+                    # Update the memory with enriched data
+                    conn2 = db._get_connection()
+                    try:
+                        conn2.execute("""
+                            UPDATE memories SET bucket = ?, life_phase = ?,
+                            text_summary = ?, verification_status = 'verified'
+                            WHERE story_id = ? AND tenant_id = ?
+                        """, (mem_data["bucket"], mem_data["life_phase"],
+                              mem_data["text_summary"], photo["story_id"], tid))
+                        conn2.commit()
+                    finally:
+                        if not db._conn:
+                            conn2.close()
+        except Exception:
+            pass  # Memory was still created with defaults above
 
     return RedirectResponse("/web/photos", status_code=303)
 
