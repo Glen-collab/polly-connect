@@ -391,95 +391,106 @@ setTimeout(function() {
     <p id="snooze-feedback" class="text-sm font-medium mt-2" style="display:none;"></p>
 </div>
 
-<!-- Family Access Code (always open) -->
+<!-- Family Access Code (collapsible) -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-5 mb-4">
-    <h2 class="text-base sm:text-lg font-semibold mb-3">Family Access Code</h2>
-    <p class="text-xs sm:text-sm text-gray-500 mb-4">
-        Share this code with family members so they can view stories, photos, medications, and verify transcriptions.
-        Family members <strong>cannot</strong> change settings, delete items, or manage devices.
-    </p>
+    <button type="button" onclick="toggleSection('family-code')"
+            class="w-full flex items-center justify-between text-left">
+        <div>
+            <h2 class="text-base sm:text-lg font-semibold">Family Access Code</h2>
+            <p class="text-xs text-gray-400">Let family members view your stories and photos</p>
+        </div>
+        <svg id="family-code-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div id="family-code-body" class="hidden mt-4">
+        <p class="text-xs sm:text-sm text-gray-500 mb-4">
+            Share this code with family members so they can view stories, photos, reminders, and verify transcriptions.
+            Family members <strong>cannot</strong> change settings, delete items, or manage devices.
+        </p>
 
-    {% if tenant and tenant.family_code %}
-    <div class="bg-gray-50 border rounded-lg p-4 mb-4 text-center">
-        <p class="text-xs text-gray-500 mb-1">Current Code</p>
-        <p class="text-3xl font-mono font-bold tracking-widest text-emerald-700">{{ tenant.family_code }}</p>
-        <p class="text-xs text-gray-400 mt-1">Created {{ tenant.family_code_created_at or 'recently' }}</p>
-    </div>
-    <p class="text-xs text-gray-500 mb-3">Family members go to <strong>/web/family</strong> and enter this code with their name.</p>
-    <div class="flex flex-col sm:flex-row gap-2">
-        <form method="POST" action="/web/settings/family-code/generate">
-            <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
-                Regenerate Code
-            </button>
-        </form>
-        <form method="POST" action="/web/settings/family-code/revoke"
-              onsubmit="return confirm('Revoke the family code? All family members will be logged out immediately.');">
-            <button type="submit" class="w-full sm:w-auto bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-sm">
-                Revoke Code
-            </button>
-        </form>
-    </div>
-    {% else %}
-    <p class="text-sm text-gray-400 mb-3">No family code has been generated yet.</p>
-    <form method="POST" action="/web/settings/family-code/generate">
-        <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
-            Generate Family Code
-        </button>
-    </form>
-    {% endif %}
-
-    <!-- Security Questions for Code Recovery (collapsible) -->
-    <div class="mt-6 border-t pt-4">
-        <button type="button" onclick="document.getElementById('security-q-body').classList.toggle('hidden'); document.getElementById('security-q-arrow').classList.toggle('rotate-180')"
-                class="w-full flex items-center justify-between text-left">
-            <div>
-                <h3 class="text-base font-semibold">Code Recovery Questions</h3>
-                <p class="text-xs text-gray-400">Set 2 security questions so family members can recover their access code.</p>
-            </div>
-            <svg id="security-q-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-            </svg>
-        </button>
-        <div id="security-q-body" class="hidden mt-3">
-            {% if security_questions %}
-            <div class="bg-gray-50 border rounded-lg p-3 mb-3">
-                <p class="text-xs text-emerald-600 font-medium mb-1">Questions set up:</p>
-                {% for q in security_questions %}
-                <p class="text-sm text-gray-700">{{ loop.index }}. {{ q.question }}</p>
-                {% endfor %}
-            </div>
-            {% endif %}
-            <form method="POST" action="/web/settings/security-questions" class="space-y-3">
-                <div>
-                    <label class="block text-xs text-gray-600 mb-1">Question 1</label>
-                    <select name="question_1" class="w-full border rounded px-3 py-2 text-sm">
-                        <option value="What street did you grow up on?">What street did you grow up on?</option>
-                        <option value="What was the name of your first pet?">What was the name of your first pet?</option>
-                        <option value="What city were you married in?">What city were you married in?</option>
-                        <option value="What was your mother's maiden name?">What was your mother's maiden name?</option>
-                        <option value="What school did you attend?">What school did you attend?</option>
-                        <option value="What was your childhood nickname?">What was your childhood nickname?</option>
-                    </select>
-                    <input type="text" name="answer_1" required placeholder="Answer"
-                           class="w-full border rounded px-3 py-2 text-sm mt-1">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-600 mb-1">Question 2</label>
-                    <select name="question_2" class="w-full border rounded px-3 py-2 text-sm">
-                        <option value="What was the name of your first pet?">What was the name of your first pet?</option>
-                        <option value="What street did you grow up on?">What street did you grow up on?</option>
-                        <option value="What city were you married in?">What city were you married in?</option>
-                        <option value="What was your mother's maiden name?">What was your mother's maiden name?</option>
-                        <option value="What school did you attend?">What school did you attend?</option>
-                        <option value="What was your childhood nickname?">What was your childhood nickname?</option>
-                    </select>
-                    <input type="text" name="answer_2" required placeholder="Answer"
-                           class="w-full border rounded px-3 py-2 text-sm mt-1">
-                </div>
+        {% if tenant and tenant.family_code %}
+        <div class="bg-gray-50 border rounded-lg p-4 mb-4 text-center">
+            <p class="text-xs text-gray-500 mb-1">Current Code</p>
+            <p class="text-3xl font-mono font-bold tracking-widest text-emerald-700">{{ tenant.family_code }}</p>
+            <p class="text-xs text-gray-400 mt-1">Created {{ tenant.family_code_created_at or 'recently' }}</p>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">Give this code to family members. They can sign in at <strong>polly-connect.com</strong> using their name and this code.</p>
+        <div class="flex flex-col sm:flex-row gap-2">
+            <form method="POST" action="/web/settings/family-code/generate">
                 <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
-                    {{ 'Update Questions' if security_questions else 'Save Questions' }}
+                    Regenerate Code
                 </button>
             </form>
+            <form method="POST" action="/web/settings/family-code/revoke"
+                  onsubmit="return confirm('Revoke the family code? All family members will be logged out immediately.');">
+                <button type="submit" class="w-full sm:w-auto bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-sm">
+                    Revoke Code
+                </button>
+            </form>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400 mb-3">No family code has been generated yet.</p>
+        <form method="POST" action="/web/settings/family-code/generate">
+            <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
+                Generate Family Code
+            </button>
+        </form>
+        {% endif %}
+
+        <!-- Security Questions for Code Recovery -->
+        <div class="mt-6 border-t pt-4">
+            <button type="button" onclick="document.getElementById('security-q-body').classList.toggle('hidden'); document.getElementById('security-q-arrow').classList.toggle('rotate-180')"
+                    class="w-full flex items-center justify-between text-left">
+                <div>
+                    <h3 class="text-base font-semibold">Code Recovery Questions</h3>
+                    <p class="text-xs text-gray-400">Set 2 security questions so family members can recover their access code.</p>
+                </div>
+                <svg id="security-q-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div id="security-q-body" class="hidden mt-3">
+                {% if security_questions %}
+                <div class="bg-gray-50 border rounded-lg p-3 mb-3">
+                    <p class="text-xs text-emerald-600 font-medium mb-1">Questions set up:</p>
+                    {% for q in security_questions %}
+                    <p class="text-sm text-gray-700">{{ loop.index }}. {{ q.question }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <form method="POST" action="/web/settings/security-questions" class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Question 1</label>
+                        <select name="question_1" class="w-full border rounded px-3 py-2 text-sm">
+                            <option value="What street did you grow up on?">What street did you grow up on?</option>
+                            <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                            <option value="What city were you married in?">What city were you married in?</option>
+                            <option value="What was your mother's maiden name?">What was your mother's maiden name?</option>
+                            <option value="What school did you attend?">What school did you attend?</option>
+                            <option value="What was your childhood nickname?">What was your childhood nickname?</option>
+                        </select>
+                        <input type="text" name="answer_1" required placeholder="Answer"
+                               class="w-full border rounded px-3 py-2 text-sm mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-600 mb-1">Question 2</label>
+                        <select name="question_2" class="w-full border rounded px-3 py-2 text-sm">
+                            <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                            <option value="What street did you grow up on?">What street did you grow up on?</option>
+                            <option value="What city were you married in?">What city were you married in?</option>
+                            <option value="What was your mother's maiden name?">What was your mother's maiden name?</option>
+                            <option value="What school did you attend?">What school did you attend?</option>
+                            <option value="What was your childhood nickname?">What was your childhood nickname?</option>
+                        </select>
+                        <input type="text" name="answer_2" required placeholder="Answer"
+                               class="w-full border rounded px-3 py-2 text-sm mt-1">
+                    </div>
+                    <button type="submit" class="w-full sm:w-auto bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">
+                        {{ 'Update Questions' if security_questions else 'Save Questions' }}
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
