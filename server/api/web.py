@@ -1671,13 +1671,38 @@ async def stories_list(request: Request):
         return redirect
 
     db = request.app.state.db
-    # Family role only sees verified stories; owner/caretaker sees all for management
+    tid = session["tenant_id"]
+    page = int(request.query_params.get("page", "1"))
+    per_page = 5
+    offset = (page - 1) * per_page
     verified_filter = session.get("role") == "family"
-    stories = db.get_stories(limit=50, tenant_id=session["tenant_id"], verified_only=verified_filter)
+
+    import sqlite3 as _sq
+    conn = db._get_connection()
+    try:
+        conn.row_factory = _sq.Row
+        where = "WHERE tenant_id = ?"
+        params = [tid]
+        if verified_filter:
+            where += " AND verified = 1"
+        total = conn.execute(f"SELECT COUNT(*) FROM stories {where}", params).fetchone()[0]
+        stories = [dict(r) for r in conn.execute(
+            f"SELECT * FROM stories {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            params + [per_page, offset]
+        ).fetchall()]
+    finally:
+        if not db._conn:
+            conn.close()
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
     return templates.TemplateResponse("stories.html", {
         "request": request,
         "session": session,
         "stories": stories,
+        "page": page,
+        "total_pages": total_pages,
+        "total": total,
     })
 
 
@@ -3038,34 +3063,38 @@ async def transcriptions_page(request: Request):
     db = request.app.state.db
     tid = session["tenant_id"]
     filter_val = request.query_params.get("filter", "all")
+    page = int(request.query_params.get("page", "1"))
+    per_page = 5
+    offset = (page - 1) * per_page
 
     conn = db._get_connection()
     try:
         conn.row_factory = __import__("sqlite3").Row
         if filter_val == "verified":
-            stories = [dict(r) for r in conn.execute(
-                "SELECT * FROM stories WHERE verified = 1 AND tenant_id = ? ORDER BY created_at DESC LIMIT 100",
-                (tid,)
-            ).fetchall()]
+            where = "WHERE verified = 1 AND tenant_id = ?"
         elif filter_val == "unverified":
-            stories = [dict(r) for r in conn.execute(
-                "SELECT * FROM stories WHERE (verified = 0 OR verified IS NULL) AND tenant_id = ? ORDER BY created_at DESC LIMIT 100",
-                (tid,)
-            ).fetchall()]
+            where = "WHERE (verified = 0 OR verified IS NULL) AND tenant_id = ?"
         else:
-            stories = [dict(r) for r in conn.execute(
-                "SELECT * FROM stories WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 100",
-                (tid,)
-            ).fetchall()]
+            where = "WHERE tenant_id = ?"
+        total = conn.execute(f"SELECT COUNT(*) FROM stories {where}", (tid,)).fetchone()[0]
+        stories = [dict(r) for r in conn.execute(
+            f"SELECT * FROM stories {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (tid, per_page, offset)
+        ).fetchall()]
     finally:
         if not db._conn:
             conn.close()
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
 
     return templates.TemplateResponse("transcriptions.html", {
         "request": request,
         "session": session,
         "stories": stories,
         "filter": filter_val,
+        "page": page,
+        "total_pages": total_pages,
+        "total": total,
     })
 
 

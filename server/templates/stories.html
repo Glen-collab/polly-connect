@@ -17,6 +17,7 @@
 {% endif %}
 
 {% if stories %}
+<p class="text-sm text-gray-500 mb-3">{{ total }} stor{{ 'ies' if total != 1 else 'y' }} &middot; Page {{ page }} of {{ total_pages }}</p>
 <div class="space-y-3 sm:space-y-4">
     {% for story in stories %}
     <div class="bg-white rounded-lg shadow p-4 sm:p-6">
@@ -80,6 +81,25 @@
     </div>
     {% endfor %}
 </div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="flex justify-center items-center gap-2 mt-6">
+    {% if page > 1 %}
+    <a href="/web/stories?page={{ page - 1 }}"
+       class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">&larr; Prev</a>
+    {% endif %}
+    {% for p in range(1, total_pages + 1) %}
+    <a href="/web/stories?page={{ p }}"
+       class="px-3 py-2 rounded-lg text-sm {% if p == page %}bg-emerald-600 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">{{ p }}</a>
+    {% endfor %}
+    {% if page < total_pages %}
+    <a href="/web/stories?page={{ page + 1 }}"
+       class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">Next &rarr;</a>
+    {% endif %}
+</div>
+{% endif %}
+
 {% else %}
 <div class="bg-white rounded-lg shadow p-8 sm:p-12 text-center">
     <p class="text-gray-400 text-base sm:text-lg">No stories yet.</p>
