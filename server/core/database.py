@@ -525,6 +525,7 @@ class PollyDB:
                 "squawk_quiet_override": "ALTER TABLE user_profiles ADD COLUMN squawk_quiet_override INTEGER DEFAULT 0",
                 "book_page_count": "ALTER TABLE user_profiles ADD COLUMN book_page_count INTEGER",
                 "book_cover_config": "ALTER TABLE user_profiles ADD COLUMN book_cover_config TEXT",
+                "last_aviary_visit": "ALTER TABLE user_profiles ADD COLUMN last_aviary_visit TIMESTAMP",
             }
             for col, sql in migrations.items():
                 if col not in cols:

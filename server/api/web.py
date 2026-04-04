@@ -1314,6 +1314,36 @@ async def dashboard(request: Request):
     claim_error = request.query_params.get("claim_error")
     claim_success = request.query_params.get("claim_success")
 
+    # Count aviary posts mentioning me since last visit
+    aviary_badge = 0
+    try:
+        import sqlite3
+        conn = db._get_connection()
+        conn.row_factory = sqlite3.Row
+        my_name = session.get("name", "")
+        # Get connected tenant IDs
+        connected = conn.execute(
+            "SELECT connected_tenant_id FROM connected_families WHERE tenant_id = ? AND status = 'accepted'",
+            (tid,)
+        ).fetchall()
+        visible_tids = [tid] + [c["connected_tenant_id"] for c in connected]
+        placeholders = ",".join("?" * len(visible_tids))
+        # Get last visit time
+        user = db.get_or_create_user(tenant_id=tid)
+        last_visit = user.get("last_aviary_visit") or "2000-01-01"
+        # Count new posts that @mention me (from OTHER tenants)
+        if my_name:
+            row = conn.execute(f"""
+                SELECT COUNT(*) as cnt FROM aviary_posts
+                WHERE tenant_id IN ({placeholders})
+                AND tenant_id != ?
+                AND content LIKE ?
+                AND created_at > ?
+            """, visible_tids + [tid, f"%@{my_name}%", last_visit]).fetchone()
+            aviary_badge = row["cnt"] if row else 0
+    except Exception:
+        pass
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "session": session,
@@ -1321,6 +1351,7 @@ async def dashboard(request: Request):
         "has_device": has_device,
         "claim_error": claim_error,
         "claim_success": claim_success,
+        "aviary_badge": aviary_badge,
     })
 
 
@@ -4055,6 +4086,19 @@ async def aviary_page(request: Request):
     finally:
         if not db._conn:
             conn.close()
+
+    # Mark visit time for badge tracking
+    try:
+        conn2 = db._get_connection()
+        conn2.execute("""
+            UPDATE user_profiles SET last_aviary_visit = datetime('now')
+            WHERE tenant_id = ?
+        """, (tid,))
+        conn2.commit()
+        if not db._conn:
+            conn2.close()
+    except Exception:
+        pass
 
     return templates.TemplateResponse("aviary.html", {
         "request": request,

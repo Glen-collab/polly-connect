@@ -101,7 +101,7 @@
 
     <!-- Reactions -->
     <div class="flex items-center gap-1 flex-wrap mb-2">
-        {% for emoji, label in [("&#x1F99C;", "parrot"), ("&#x1F919;", "shaka"), ("&#x2764;", "heart"), ("&#x1F4AA;", "strong"), ("&#x1F602;", "haha"), ("&#x1F64F;", "blessed")] %}
+        {% for emoji, label in [("\U0001F99C", "parrot"), ("\U0001F919", "shaka"), ("\u2764\uFE0F", "heart"), ("\U0001F4AA", "strong"), ("\U0001F602", "haha"), ("\U0001F64F", "blessed")] %}
         <button onclick="toggleReaction({{ post.id }}, '{{ label }}')"
                 class="reaction-btn px-2 py-1 rounded-full text-sm border hover:bg-gray-50 {% if label in post.my_reaction %}bg-orange-50 border-orange-300{% else %}border-gray-200{% endif %}"
                 id="react-{{ post.id }}-{{ label }}">
