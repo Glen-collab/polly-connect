@@ -341,9 +341,19 @@ setTimeout(function() {
     </div>
 </div>
 
-<!-- Snooze Polly (always open) -->
+<!-- Snooze Polly (collapsible) -->
 <div class="bg-white rounded-lg shadow p-4 sm:p-5 mb-4">
-    <h2 class="text-base sm:text-lg font-semibold mb-3">Snooze Polly</h2>
+    <button type="button" onclick="toggleSection('snooze')"
+            class="w-full flex items-center justify-between text-left">
+        <div>
+            <h2 class="text-base sm:text-lg font-semibold">Snooze Polly</h2>
+            <p class="text-xs text-gray-400">Temporarily quiet bird sounds</p>
+        </div>
+        <svg id="snooze-arrow" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+    <div id="snooze-body" class="hidden mt-4">
     <p class="text-xs sm:text-sm text-gray-500 mb-3">
         Temporarily quiet bird sounds. Polly will still respond to voice commands.
     </p>
@@ -389,6 +399,7 @@ setTimeout(function() {
         <button onclick="doWake()" class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700 text-sm">Wake Up</button>
     </div>
     <p id="snooze-feedback" class="text-sm font-medium mt-2" style="display:none;"></p>
+    </div>
 </div>
 
 <!-- Family Access Code (collapsible) -->
