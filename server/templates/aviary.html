@@ -11,9 +11,13 @@
 <!-- New Post -->
 <div class="bg-white rounded-lg shadow p-4 mb-6 max-w-2xl mx-auto">
     <form id="post-form" method="POST" action="/web/aviary/post" enctype="multipart/form-data">
+        <div class="relative">
         <textarea name="content" id="post-content" rows="2" maxlength="1000"
-                  placeholder="Start a chatter..."
-                  class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 resize-none"></textarea>
+                  placeholder="Start a chatter... (type @ to tag someone)"
+                  class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:border-orange-400 resize-none"
+                  oninput="handleMention(this, 'mention-dropdown')"></textarea>
+        <div id="mention-dropdown" class="hidden absolute left-0 right-0 bg-white border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto"></div>
+        </div>
 
         <!-- Photo preview -->
         <div id="photo-preview" class="hidden mt-2">
@@ -84,7 +88,7 @@
 
     <!-- Content -->
     {% if post.content %}
-    <p class="text-sm text-gray-700 mb-3 whitespace-pre-wrap">{{ post.content }}</p>
+    <p class="text-sm text-gray-700 mb-3 whitespace-pre-wrap">{{ post.content_html|safe }}</p>
     {% endif %}
     {% if post.photo_filename %}
     <img src="/static/photos/{{ post.photo_filename }}" class="w-full rounded-lg mb-3 max-h-96 object-contain bg-gray-50">
@@ -131,11 +135,15 @@
             </div>
         {% endfor %}
         </div>
-        <div class="flex gap-2 mt-2">
-            <input type="text" placeholder="Add a comment..." id="comment-input-{{ post.id }}"
-                   class="flex-1 border rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-orange-400"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();addComment({{ post.id }});}">
-            <button onclick="addComment({{ post.id }})" class="text-orange-500 hover:text-orange-600 text-xs font-bold px-2">Post</button>
+        <div class="relative mt-2">
+            <div class="flex gap-2">
+                <input type="text" placeholder="Add a comment... (@ to tag)" id="comment-input-{{ post.id }}"
+                       class="flex-1 border rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-orange-400"
+                       oninput="handleMentionInput(this, 'comment-mention-{{ post.id }}')"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();addComment({{ post.id }});}">
+                <button onclick="addComment({{ post.id }})" class="text-orange-500 hover:text-orange-600 text-xs font-bold px-2">Post</button>
+            </div>
+            <div id="comment-mention-{{ post.id }}" class="hidden absolute left-0 right-0 bottom-full bg-white border rounded-lg shadow-lg z-50 max-h-36 overflow-y-auto mb-1"></div>
         </div>
     </div>
 </div>
@@ -145,6 +153,94 @@
 
 {% block scripts %}
 <script>
+// --- @ Mention autocomplete ---
+var mentionPeople = [];
+var activeMentionField = null;
+var activeMentionDropdown = null;
+
+// Load people list on page load
+fetch('/web/aviary/people').then(function(r) { return r.json(); }).then(function(data) {
+    mentionPeople = data.people || [];
+});
+
+function handleMention(textarea, dropdownId) {
+    var dropdown = document.getElementById(dropdownId);
+    var val = textarea.value;
+    var cursor = textarea.selectionStart;
+    // Find the @ before cursor
+    var before = val.substring(0, cursor);
+    var atIdx = before.lastIndexOf('@');
+    if (atIdx === -1 || (atIdx > 0 && before[atIdx-1] !== ' ' && before[atIdx-1] !== '\n')) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    var query = before.substring(atIdx + 1).toLowerCase();
+    if (query.length > 30 || query.indexOf(' ') > 15) { dropdown.classList.add('hidden'); return; }
+    var matches = mentionPeople.filter(function(p) { return p.name.toLowerCase().indexOf(query) === 0; });
+    if (matches.length === 0) { dropdown.classList.add('hidden'); return; }
+    activeMentionField = textarea;
+    activeMentionDropdown = dropdown;
+    var html = '';
+    matches.slice(0, 8).forEach(function(p) {
+        html += '<div class="px-3 py-2 hover:bg-orange-50 cursor-pointer text-sm flex items-center gap-2" onclick="insertMention(\'' + p.name.replace(/'/g, "\\'") + '\')">';
+        html += '<div class="w-7 h-7 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-xs font-bold">' + p.name[0].toUpperCase() + '</div>';
+        html += '<div><span class="font-medium text-gray-800">' + p.name + '</span>';
+        if (p.household) html += '<span class="text-xs text-gray-400 ml-1">' + p.household + '</span>';
+        html += '</div></div>';
+    });
+    dropdown.innerHTML = html;
+    dropdown.classList.remove('hidden');
+}
+
+function handleMentionInput(input, dropdownId) {
+    var dropdown = document.getElementById(dropdownId);
+    var val = input.value;
+    var cursor = input.selectionStart;
+    var before = val.substring(0, cursor);
+    var atIdx = before.lastIndexOf('@');
+    if (atIdx === -1 || (atIdx > 0 && before[atIdx-1] !== ' ')) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    var query = before.substring(atIdx + 1).toLowerCase();
+    if (query.length > 30) { dropdown.classList.add('hidden'); return; }
+    var matches = mentionPeople.filter(function(p) { return p.name.toLowerCase().indexOf(query) === 0; });
+    if (matches.length === 0) { dropdown.classList.add('hidden'); return; }
+    activeMentionField = input;
+    activeMentionDropdown = dropdown;
+    var html = '';
+    matches.slice(0, 6).forEach(function(p) {
+        html += '<div class="px-3 py-2 hover:bg-orange-50 cursor-pointer text-xs flex items-center gap-2" onclick="insertMention(\'' + p.name.replace(/'/g, "\\'") + '\')">';
+        html += '<span class="font-medium text-gray-800">@' + p.name + '</span>';
+        if (p.household) html += '<span class="text-gray-400 ml-1">' + p.household + '</span>';
+        html += '</div>';
+    });
+    dropdown.innerHTML = html;
+    dropdown.classList.remove('hidden');
+}
+
+function insertMention(name) {
+    if (!activeMentionField) return;
+    var field = activeMentionField;
+    var val = field.value;
+    var cursor = field.selectionStart;
+    var before = val.substring(0, cursor);
+    var after = val.substring(cursor);
+    var atIdx = before.lastIndexOf('@');
+    field.value = before.substring(0, atIdx) + '@' + name + ' ' + after;
+    field.focus();
+    var newPos = atIdx + name.length + 2;
+    field.setSelectionRange(newPos, newPos);
+    if (activeMentionDropdown) activeMentionDropdown.classList.add('hidden');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    document.querySelectorAll('[id^="mention-"], [id^="comment-mention-"]').forEach(function(d) {
+        if (!d.contains(e.target)) d.classList.add('hidden');
+    });
+});
+
 // --- Photo preview ---
 function previewPhoto(input) {
     if (input.files && input.files[0]) {

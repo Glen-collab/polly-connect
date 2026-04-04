@@ -4021,6 +4021,16 @@ async def aviary_page(request: Request):
             post = dict(row)
             post["time_ago"] = _time_ago(post["created_at"])
 
+            # Render @mentions as styled HTML
+            import re
+            from markupsafe import escape
+            raw = str(escape(post.get("content") or ""))
+            post["content_html"] = re.sub(
+                r'@([\w\s]+?)(?=\s@|\s*$|[.,!?;:])',
+                r'<span class="bg-orange-100 text-orange-700 px-1 rounded font-medium">@\1</span>',
+                raw
+            )
+
             # Reactions
             reactions = conn.execute(
                 "SELECT reaction, COUNT(*) as cnt FROM aviary_reactions WHERE post_id = ? GROUP BY reaction",
@@ -4051,6 +4061,62 @@ async def aviary_page(request: Request):
         "session": session,
         "posts": posts,
     })
+
+
+@router.get("/aviary/people")
+async def aviary_people(request: Request):
+    """Return list of taggable people for @ mentions."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"people": []})
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+        people = []
+        seen = set()
+
+        # Connected account holders
+        connected = conn.execute("""
+            SELECT cf.connected_tenant_id, t.name as household,
+                   COALESCE(a.name, up.name) as person_name
+            FROM connected_families cf
+            JOIN tenants t ON cf.connected_tenant_id = t.id
+            LEFT JOIN accounts a ON a.tenant_id = cf.connected_tenant_id AND a.role = 'owner'
+            LEFT JOIN user_profiles up ON up.tenant_id = cf.connected_tenant_id
+            WHERE cf.tenant_id = ? AND cf.status = 'accepted'
+        """, (tid,)).fetchall()
+        for row in connected:
+            name = row["person_name"]
+            if name and name.lower() not in seen:
+                seen.add(name.lower())
+                people.append({"name": name, "household": row["household"]})
+
+        # My own family members
+        members = conn.execute(
+            "SELECT name FROM family_members WHERE tenant_id = ?", (tid,)
+        ).fetchall()
+        for m in members:
+            if m["name"] and m["name"].lower() not in seen:
+                seen.add(m["name"].lower())
+                people.append({"name": m["name"], "household": ""})
+
+        # My own household members (other accounts on my tenant)
+        my_accounts = conn.execute(
+            "SELECT name FROM accounts WHERE tenant_id = ?", (tid,)
+        ).fetchall()
+        for a in my_accounts:
+            if a["name"] and a["name"].lower() not in seen:
+                seen.add(a["name"].lower())
+                people.append({"name": a["name"], "household": ""})
+
+        people.sort(key=lambda p: p["name"].lower())
+        return JSONResponse({"people": people})
+    finally:
+        if not db._conn:
+            conn.close()
 
 
 @router.post("/aviary/post")
