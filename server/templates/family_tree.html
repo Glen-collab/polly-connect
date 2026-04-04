@@ -148,14 +148,14 @@
                 {% if mc.get('wall_new', 0) > 0 %}
                 <span class="absolute top-1 left-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-bold shadow" title="{{ mc.wall_new }} new on wall">{{ mc.wall_new }}</span>
                 {% endif %}
-                {% if mc.get('unread_sent', 0) > 0 %}
-                <span class="absolute top-1 right-1 inline-block w-3 h-3 rounded-full bg-red-400" title="Sent — not yet heard"></span>
-                {% elif mc.get('unread_sent', -1) == 0 %}
-                <span class="absolute top-1 right-1 inline-block w-3 h-3 rounded-full bg-emerald-400" title="Message heard"></span>
-                {% endif %}
                 <div class="absolute bottom-0 left-0 right-0 text-center pb-1" onclick="event.stopPropagation()">
+                    <div class="relative inline-block">
                     <button type="button" onclick="showConnectedModal('{{ mc.tenant_name }}', {{ mc.tenant_id }})"
                             class="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full hover:bg-red-600 shadow-sm">Message</button>
+                    {% if mc.get('unread_received', 0) > 0 %}
+                    <span class="absolute -top-2 -right-2 bg-emerald-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">{{ mc.unread_received }}</span>
+                    {% endif %}
+                    </div>
                 </div>
                 {% elif m.id in email_matches and not email_matches[m.id].already_connected and not m.deceased and session.role != 'family' %}
                 <div class="absolute bottom-0 left-0 right-0 text-center pb-1" onclick="event.stopPropagation()">
@@ -220,10 +220,8 @@
         {% set cf_info = connected_name_map.get(cf_first, {}) %}
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 pb-5 text-center w-[140px] h-[100px] flex flex-col justify-center relative cursor-pointer hover:shadow-md transition"
              onclick="showConnectedModal('{{ cf.connected_tenant_name }}', {{ cf.connected_tenant_id }})">
-            {% if cf_info.get('unread_sent', 0) > 0 %}
-            <span class="absolute top-1 right-1 inline-block w-3 h-3 rounded-full bg-red-400" title="Sent — not yet heard"></span>
-            {% elif cf_info.get('unread_sent', -1) == 0 %}
-            <span class="absolute top-1 right-1 inline-block w-3 h-3 rounded-full bg-emerald-400" title="Message heard"></span>
+            {% if cf_info.get('unread_received', 0) > 0 %}
+            <span class="absolute top-1 right-1 bg-emerald-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">{{ cf_info.unread_received }}</span>
             {% endif %}
             <p class="font-medium text-sm text-gray-800">{{ cf.connected_tenant_name }}</p>
             <p class="text-xs text-blue-600">Friend</p>
@@ -268,8 +266,7 @@
                 </button>
             </div>
         </div>
-        <a href="#" id="connected-modal-wall-link" class="block text-center text-sm text-emerald-700 font-medium mt-3 hover:text-emerald-900 border border-emerald-200 rounded-lg py-2">View Shared Wall</a>
-        <form method="POST" id="connected-modal-disconnect" class="mt-2 text-center"
+        <form method="POST" id="connected-modal-disconnect" class="mt-3 text-center"
               onsubmit="return confirm('Disconnect from this friend?')">
             <button type="submit" class="text-xs text-red-400 hover:text-red-600">Disconnect</button>
         </form>
@@ -557,7 +554,6 @@ function showConnectedModal(name, tid) {
     document.getElementById('connected-modal-name').textContent = name;
     document.getElementById('connected-modal-tid').value = tid;
     document.getElementById('connected-modal-disconnect').action = '/web/settings/connections/' + tid + '/remove';
-    document.getElementById('connected-modal-wall-link').href = '/web/wall/' + tid;
     document.getElementById('connected-modal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 }
