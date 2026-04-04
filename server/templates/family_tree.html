@@ -4,12 +4,31 @@
 {% block content %}
 <a href="/web/hub/family" class="text-emerald-600 hover:underline text-sm">&larr; Family</a>
 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6 mt-1">
-    <h1 class="text-xl sm:text-2xl font-bold">Family Tree</h1>
+    <h1 class="text-xl sm:text-2xl font-bold">
+        {% if viewing_connected %}{{ owner_name }}'s Family Tree{% else %}Family Tree{% endif %}
+    </h1>
     <button onclick="document.getElementById('add-form').classList.toggle('hidden')"
             class="bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700">
         + Add Family Member
     </button>
 </div>
+
+{% if tree_switcher %}
+<!-- Tree Switcher -->
+<div class="bg-white rounded-lg shadow p-3 mb-4 flex flex-wrap items-center gap-2">
+    <span class="text-xs text-gray-400 uppercase tracking-wide mr-1">View tree:</span>
+    <a href="/web/family-tree"
+       class="px-3 py-1.5 rounded-full text-sm font-medium {% if not viewing_connected %}bg-emerald-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+        My Tree
+    </a>
+    {% for ts in tree_switcher %}
+    <a href="/web/family-tree?view={{ ts.tenant_id }}"
+       class="px-3 py-1.5 rounded-full text-sm font-medium {% if view_tid == ts.tenant_id %}bg-emerald-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+        {{ ts.name }}
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
 
 {% if request.query_params.get('invite_sent') %}
 <div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4 max-w-lg mx-auto text-center">
@@ -21,6 +40,7 @@
 <div id="add-form" class="hidden bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <h2 class="text-base font-semibold mb-3">Add a Family Member</h2>
     <form method="POST" action="/web/family-tree/add">
+        {% if viewing_connected %}<input type="hidden" name="target_tid" value="{{ view_tid }}">{% endif %}
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             <div>
                 <label class="block text-sm text-gray-600 mb-1">Name</label>
@@ -118,10 +138,10 @@
 <div class="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
     <!-- Owner at center -->
     <div class="text-center mb-6">
-        <div class="inline-block bg-emerald-600 text-white rounded-full px-6 py-3 text-lg font-bold shadow-lg">
+        <div class="inline-block {% if viewing_connected %}bg-blue-600{% else %}bg-emerald-600{% endif %} text-white rounded-full px-6 py-3 text-lg font-bold shadow-lg">
             {{ owner_name }}
         </div>
-        <p class="text-xs text-gray-400 mt-1">Polly's Owner</p>
+        <p class="text-xs text-gray-400 mt-1">{% if viewing_connected %}{{ owner_name }}'s Tree{% else %}Polly's Owner{% endif %}</p>
     </div>
 
     {% if members %}
@@ -192,7 +212,7 @@
     {% endif %}
 </div>
 
-{% if session.role != 'family' %}
+{% if session.role != 'family' and not viewing_connected %}
 <!-- Connected Friends -->
 {% if request.query_params.get('msg_sent') %}
 <div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4 mt-4 max-w-lg mx-auto text-center">
@@ -375,6 +395,7 @@
 var currentMemberId = null;
 var userRole = "{{ session.role or 'owner' }}";
 var userName = "{{ session.name or '' }}";
+var viewingConnected = {{ 'true' if viewing_connected else 'false' }};
 var memberData = {
 {% for m in members %}
 {{ m.id }}: { name: "{{ m.name | replace('"', '\\"') }}", relation: "{{ m.relation_to_owner or '' }}", parent: "{{ m.parent_member_id or '' }}", spouse: "{{ m.spouse_name or '' | replace('"', '\\"') }}", bio: "{{ m.bio or '' | replace('"', '\\"') }}", deceased: {{ m.deceased or 0 }}, is_minor: {{ m.is_minor or 0 }}, added_by: "{{ m.added_by or '' | replace('"', '\\"') }}", birth_year: {{ m.birth_year or 0 }}, deceased_year: {{ m.deceased_year or 0 }}, email: "{{ m.email or '' }}", parent_name: "{% for p in members %}{% if p.id == m.parent_member_id %}{{ p.name | replace('"', '\\"') }}{% endif %}{% endfor %}" },
@@ -382,8 +403,12 @@ var memberData = {
 };
 
 function canEditMember(id) {
-    if (userRole !== "family") return true;
     var m = memberData[id];
+    if (viewingConnected) {
+        // On a connected tree, can only edit/delete members you added
+        return m && m.added_by && m.added_by === userName;
+    }
+    if (userRole !== "family") return true;
     return m && m.added_by && m.added_by === userName;
 }
 

@@ -4653,14 +4653,30 @@ async def family_tree_page(request: Request):
 
     db = request.app.state.db
     tid = session["tenant_id"]
-    members = db.get_family_members(tenant_id=tid)
+
+    # Check if viewing a connected family's tree
+    view_tid_str = request.query_params.get("view", "")
+    view_tid = int(view_tid_str) if view_tid_str.isdigit() else None
+    viewing_connected = False
+
+    # Validate that view_tid is actually a connected family
+    if view_tid and view_tid != tid:
+        connected = db.get_connected_families(tid)
+        connected_tids = {cf["connected_tenant_id"] for cf in connected}
+        if view_tid in connected_tids:
+            viewing_connected = True
+        else:
+            view_tid = None  # Not connected, fall back to own tree
+
+    target_tid = view_tid if viewing_connected else tid
+    members = db.get_family_members(tenant_id=target_tid)
 
     # Get owner name from setup
     conn = db._get_connection()
     try:
         conn.row_factory = __import__("sqlite3").Row
         profile = conn.execute(
-            "SELECT * FROM user_profiles WHERE tenant_id = ? LIMIT 1", (tid,)
+            "SELECT * FROM user_profiles WHERE tenant_id = ? LIMIT 1", (target_tid,)
         ).fetchone()
         owner_name = profile["name"] if profile and profile["name"] else "The Owner"
     finally:
@@ -4802,6 +4818,28 @@ async def family_tree_page(request: Request):
                     member_connected[m["id"]] = cfl
                     break
 
+    # Build tree switcher list: my tree + all connected families
+    tree_switcher = []
+    if connected_families:
+        for cf in connected_families:
+            cf_profile = None
+            try:
+                conn3 = db._get_connection()
+                conn3.row_factory = __import__("sqlite3").Row
+                cf_profile = conn3.execute(
+                    "SELECT name FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                    (cf["connected_tenant_id"],)
+                ).fetchone()
+            finally:
+                if not db._conn:
+                    conn3.close()
+            display_name = (cf_profile["name"] if cf_profile and cf_profile["name"]
+                           else cf["connected_tenant_name"])
+            tree_switcher.append({
+                "tenant_id": cf["connected_tenant_id"],
+                "name": display_name,
+            })
+
     return templates.TemplateResponse("family_tree.html", {
         "request": request,
         "session": session,
@@ -4810,11 +4848,14 @@ async def family_tree_page(request: Request):
         "owner_name": owner_name,
         "relationship_choices": RELATIONSHIP_CHOICES,
         "connected_families": connected_families,
-        "pending_requests": pending_requests,
+        "pending_requests": pending_requests if not viewing_connected else [],
         "connected_names": connected_names,
         "connected_name_map": connected_name_map,
         "email_matches": email_matches,
         "member_connected": member_connected,
+        "viewing_connected": viewing_connected,
+        "view_tid": view_tid if viewing_connected else None,
+        "tree_switcher": tree_switcher,
     })
 
 
@@ -4829,7 +4870,8 @@ async def family_tree_add(request: Request,
                            birth_year: str = Form(""),
                            deceased_year: str = Form(""),
                            is_minor: str = Form(""),
-                           email: str = Form("")):
+                           email: str = Form(""),
+                           target_tid: str = Form("")):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -4837,6 +4879,16 @@ async def family_tree_add(request: Request,
 
     db = request.app.state.db
     tid = session["tenant_id"]
+
+    # Determine target tenant (own tree or connected family's tree)
+    actual_tid = tid
+    redirect_suffix = ""
+    if target_tid and target_tid.isdigit() and int(target_tid) != tid:
+        ttid = int(target_tid)
+        connected = db.get_connected_families(tid)
+        if any(cf["connected_tenant_id"] == ttid for cf in connected):
+            actual_tid = ttid
+            redirect_suffix = f"?view={ttid}"
 
     generation = RELATION_GENERATION.get(relation_to_owner, 0)
     parent_id = int(parent_member_id) if parent_member_id else None
@@ -4853,7 +4905,7 @@ async def family_tree_add(request: Request,
     member_id = db.add_family_member(
         name=name.strip(),
         relationship=relation_to_owner,
-        tenant_id=tid,
+        tenant_id=actual_tid,
     )
     # Set tree-specific fields + track who added this member
     added_by_name = session.get("name", "")
@@ -4872,7 +4924,7 @@ async def family_tree_add(request: Request,
         email=email.strip(),
     )
 
-    return RedirectResponse("/web/family-tree", status_code=303)
+    return RedirectResponse(f"/web/family-tree{redirect_suffix}", status_code=303)
 
 
 @router.post("/family-tree/{member_id}/edit")
@@ -4896,13 +4948,26 @@ async def family_tree_edit(request: Request, member_id: int,
     tid = session["tenant_id"]
 
     member = db.get_family_member_by_id(member_id)
-    if not member or member.get("tenant_id") != tid:
+    if not member:
         return RedirectResponse("/web/family-tree", status_code=303)
 
-    # Family role can only edit members they added
-    if session.get("role") == "family":
-        if member.get("added_by") != session.get("name"):
+    member_tid = member.get("tenant_id")
+    redirect_suffix = ""
+
+    if member_tid != tid:
+        # Cross-tenant edit: must be connected and can only edit members you added
+        connected = db.get_connected_families(tid)
+        connected_tids = {cf["connected_tenant_id"] for cf in connected}
+        if member_tid not in connected_tids:
             return RedirectResponse("/web/family-tree", status_code=303)
+        if member.get("added_by") != session.get("name"):
+            return RedirectResponse(f"/web/family-tree?view={member_tid}", status_code=303)
+        redirect_suffix = f"?view={member_tid}"
+    else:
+        # Own tree: family role can only edit members they added
+        if session.get("role") == "family":
+            if member.get("added_by") != session.get("name"):
+                return RedirectResponse("/web/family-tree", status_code=303)
 
     generation = RELATION_GENERATION.get(relation_to_owner, 0)
     parent_id = int(parent_member_id) if parent_member_id else None
@@ -4930,7 +4995,7 @@ async def family_tree_edit(request: Request, member_id: int,
         email=email.strip(),
     )
 
-    return RedirectResponse("/web/family-tree", status_code=303)
+    return RedirectResponse(f"/web/family-tree{redirect_suffix}", status_code=303)
 
 
 @router.post("/family-tree/{member_id}/delete")
@@ -4943,16 +5008,29 @@ async def family_tree_delete(request: Request, member_id: int):
     db = request.app.state.db
     tid = session["tenant_id"]
     member = db.get_family_member_by_id(member_id)
-    if not member or member.get("tenant_id") != tid:
+    if not member:
         return RedirectResponse("/web/family-tree", status_code=303)
 
-    # Family role can only delete members they added
-    if session.get("role") == "family":
-        if member.get("added_by") != session.get("name"):
+    member_tid = member.get("tenant_id")
+    redirect_suffix = ""
+
+    if member_tid != tid:
+        # Cross-tenant delete: must be connected and can only delete members you added
+        connected = db.get_connected_families(tid)
+        connected_tids = {cf["connected_tenant_id"] for cf in connected}
+        if member_tid not in connected_tids:
             return RedirectResponse("/web/family-tree", status_code=303)
+        if member.get("added_by") != session.get("name"):
+            return RedirectResponse(f"/web/family-tree?view={member_tid}", status_code=303)
+        redirect_suffix = f"?view={member_tid}"
+    else:
+        # Own tree: family role can only delete members they added
+        if session.get("role") == "family":
+            if member.get("added_by") != session.get("name"):
+                return RedirectResponse("/web/family-tree", status_code=303)
 
     db.delete_family_member(member_id)
-    return RedirectResponse("/web/family-tree", status_code=303)
+    return RedirectResponse(f"/web/family-tree{redirect_suffix}", status_code=303)
 
 
 # ── Family Invitations ──
@@ -5085,14 +5163,21 @@ async def family_member_photos(request: Request, member_id: int):
     db = request.app.state.db
     tid = session["tenant_id"]
     member = db.get_family_member_by_id(member_id)
-    if not member or member.get("tenant_id") != tid:
+    if not member:
         return JSONResponse({"error": "Not found"}, status_code=404)
 
-    photos = db.get_photos_by_tag(member["name"], tenant_id=tid)
+    member_tid = member.get("tenant_id")
+    if member_tid != tid:
+        # Allow viewing photos on connected family's tree
+        connected = db.get_connected_families(tid)
+        if not any(cf["connected_tenant_id"] == member_tid for cf in connected):
+            return JSONResponse({"error": "Not found"}, status_code=404)
+
+    photos = db.get_photos_by_tag(member["name"], tenant_id=member_tid)
     # Also search by first name if full name has multiple words
     first_name = member["name"].split()[0] if " " in member["name"] else None
     if first_name:
-        first_photos = db.get_photos_by_tag(first_name, tenant_id=tid)
+        first_photos = db.get_photos_by_tag(first_name, tenant_id=member_tid)
         seen_ids = {p["id"] for p in photos}
         for p in first_photos:
             if p["id"] not in seen_ids:
