@@ -8,42 +8,9 @@
     <p class="text-sm text-gray-500 mt-1">What would you like to do?</p>
 </div>
 
-<!-- Subscription Banner -->
-{% if subscription and subscription.tier == 'trial' %}
-<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 max-w-2xl mx-auto text-center">
-    <p class="text-sm text-blue-800 font-medium">Free plan &mdash; 10 stories, 10 photos, 3 reminders</p>
-    <a href="/web/pricing" class="text-xs text-blue-600 hover:underline">Upgrade for unlimited</a>
-</div>
-{% elif subscription and subscription.status == 'past_due' %}
+{% if subscription and subscription.status == 'past_due' %}
 <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 max-w-2xl mx-auto text-center">
     <p class="text-sm text-amber-800 font-medium">Payment failed. Please <a href="/web/billing" class="underline font-bold">update your payment method</a>.</p>
-</div>
-{% endif %}
-
-<!-- Claim Device Prompt (no device on this account) -->
-{% if not has_device and session.role == 'owner' %}
-<div class="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 mb-6 max-w-2xl mx-auto">
-    <h2 class="text-base font-bold text-amber-800 mb-1">Connect Your Polly Device</h2>
-    <p class="text-xs text-amber-700 mb-3">Enter the 6-digit claim code from your setup card to link your device.</p>
-    {% if claim_error %}
-    <div class="bg-red-50 border border-red-300 rounded p-2 mb-3">
-        <p class="text-xs text-red-700">{{ claim_error }}</p>
-    </div>
-    {% endif %}
-    <form method="POST" action="/web/devices/claim" class="flex flex-col gap-3">
-        <div class="flex gap-3">
-            <input type="text" name="claim_code" required maxlength="6" pattern="[0-9]{6}"
-                   placeholder="000000" inputmode="numeric"
-                   class="border-2 border-amber-300 rounded-lg px-3 py-2 text-center text-lg font-mono font-bold tracking-widest focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                   style="max-width: 160px;">
-            <input type="text" name="device_name" placeholder="Name your Polly"
-                   class="flex-1 min-w-0 border-2 border-amber-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
-        </div>
-        <button type="submit"
-                class="bg-amber-500 text-white px-5 py-2 rounded-lg hover:bg-amber-600 font-medium text-sm whitespace-nowrap w-full sm:w-auto">
-            Claim Device
-        </button>
-    </form>
 </div>
 {% endif %}
 
@@ -134,4 +101,38 @@
         <span class="text-base font-bold">Owner's Guide</span>
     </a>
 </div>
+
+<!-- Claim Device Prompt (no device on this account) -->
+{% if not has_device and session.role == 'owner' %}
+<div class="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 mt-4 max-w-2xl mx-auto">
+    <h2 class="text-base font-bold text-amber-800 mb-1">Connect Your Polly Device</h2>
+    <p class="text-xs text-amber-700 mb-3">Enter the 6-digit claim code from your setup card to link your device.</p>
+    {% if claim_error %}
+    <div class="bg-red-50 border border-red-300 rounded p-2 mb-3">
+        <p class="text-xs text-red-700">{{ claim_error }}</p>
+    </div>
+    {% endif %}
+    <form method="POST" action="/web/devices/claim" class="flex flex-col gap-3">
+        <div class="flex gap-3">
+            <input type="text" name="claim_code" required maxlength="6" pattern="[0-9]{6}"
+                   placeholder="000000" inputmode="numeric"
+                   class="border-2 border-amber-300 rounded-lg px-3 py-2 text-center text-lg font-mono font-bold tracking-widest focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                   style="max-width: 160px;">
+            <input type="text" name="device_name" placeholder="Name your Polly"
+                   class="flex-1 min-w-0 border-2 border-amber-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+        </div>
+        <button type="submit"
+                class="bg-amber-500 text-white px-5 py-2 rounded-lg hover:bg-amber-600 font-medium text-sm whitespace-nowrap w-full sm:w-auto">
+            Claim Device
+        </button>
+    </form>
+</div>
+{% endif %}
+
+<!-- Free plan info -->
+{% if subscription and subscription.tier == 'trial' %}
+<div class="max-w-2xl mx-auto mt-4 text-center">
+    <p class="text-xs text-gray-400">You're on the <strong>Free Plan</strong> &mdash; unlimited family tree, wall, aviary, and messages. <a href="/web/pricing" class="text-emerald-600 hover:underline">See all plans</a></p>
+</div>
+{% endif %}
 {% endblock %}
