@@ -4087,7 +4087,7 @@ async def photos_list_api(request: Request):
     } for p in photos])
 
 
-# ── Aviary (community feed) ──
+# ── Chatter (community feed) ──
 
 def _time_ago(created_at_str):
     """Human-readable time ago from ISO timestamp."""
@@ -4117,7 +4117,7 @@ def _time_ago(created_at_str):
         return ""
 
 
-@router.get("/aviary", response_class=HTMLResponse)
+@router.get("/chatter", response_class=HTMLResponse)
 async def aviary_page(request: Request):
     session = await get_web_session(request)
     redirect = require_login(session)
@@ -4202,14 +4202,14 @@ async def aviary_page(request: Request):
     except Exception:
         pass
 
-    return templates.TemplateResponse("aviary.html", {
+    return templates.TemplateResponse("chatter.html", {
         "request": request,
         "session": session,
         "posts": posts,
     })
 
 
-@router.get("/aviary/people")
+@router.get("/chatter/people")
 async def aviary_people(request: Request):
     """Return list of taggable people for @ mentions."""
     session = await get_web_session(request)
@@ -4265,7 +4265,7 @@ async def aviary_people(request: Request):
             conn.close()
 
 
-@router.post("/aviary/post")
+@router.post("/chatter/post")
 async def aviary_create_post(request: Request):
     session = await get_web_session(request)
     redirect = require_login(session)
@@ -4318,7 +4318,7 @@ async def aviary_create_post(request: Request):
                     os.remove(raw_path)
 
     if not content and not photo_filename and not audio_filename:
-        return RedirectResponse("/web/aviary", status_code=303)
+        return RedirectResponse("/web/chatter", status_code=303)
 
     content_type = "text"
     if photo_filename:
@@ -4338,10 +4338,10 @@ async def aviary_create_post(request: Request):
         if not db._conn:
             conn.close()
 
-    return RedirectResponse("/web/aviary", status_code=303)
+    return RedirectResponse("/web/chatter", status_code=303)
 
 
-@router.post("/aviary/{post_id}/delete")
+@router.post("/chatter/{post_id}/delete")
 async def aviary_delete_post(request: Request, post_id: int):
     session = await get_web_session(request)
     redirect = require_login(session)
@@ -4359,10 +4359,10 @@ async def aviary_delete_post(request: Request, post_id: int):
     finally:
         if not db._conn:
             conn.close()
-    return RedirectResponse("/web/aviary", status_code=303)
+    return RedirectResponse("/web/chatter", status_code=303)
 
 
-@router.post("/aviary/{post_id}/react")
+@router.post("/chatter/{post_id}/react")
 async def aviary_react(request: Request, post_id: int):
     session = await get_web_session(request)
     if not session:
@@ -4398,7 +4398,7 @@ async def aviary_react(request: Request, post_id: int):
             conn.close()
 
 
-@router.post("/aviary/{post_id}/comment")
+@router.post("/chatter/{post_id}/comment")
 async def aviary_comment(request: Request, post_id: int):
     session = await get_web_session(request)
     if not session:
@@ -4423,9 +4423,9 @@ async def aviary_comment(request: Request, post_id: int):
     return JSONResponse({"ok": True, "name": author, "comment": comment_text})
 
 
-@router.post("/aviary/{post_id}/save-to-stories")
+@router.post("/chatter/{post_id}/save-to-stories")
 async def aviary_save_to_stories(request: Request, post_id: int):
-    """Save any Aviary post to your own stories."""
+    """Save any Chatter post to your own stories."""
     session = await get_web_session(request)
     if not session:
         return JSONResponse({"error": "Not logged in"}, status_code=401)
@@ -4441,7 +4441,7 @@ async def aviary_save_to_stories(request: Request, post_id: int):
         post = dict(post)
 
         # Build transcript
-        attribution = f"[From the Aviary — posted by {post['author_name']}]"
+        attribution = f"[From Chatter — posted by {post['author_name']}]"
         transcript = post.get("content") or ""
         if transcript:
             transcript = f"{attribution}\n\n{transcript}"
@@ -4459,7 +4459,7 @@ async def aviary_save_to_stories(request: Request, post_id: int):
             conn.execute("""
                 INSERT INTO photos (tenant_id, filename, caption, created_at)
                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            """, (tid, post["photo_filename"], f"From the Aviary — {post['author_name']}"))
+            """, (tid, post["photo_filename"], f"From Chatter — {post['author_name']}"))
 
         conn.commit()
         return JSONResponse({"ok": True})

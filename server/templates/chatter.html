@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}The Aviary - Polly Connect{% endblock %}
+{% block title %}Chatter - Polly Connect{% endblock %}
 
 {% block content %}
 <div class="mb-5">
     <a href="/web/dashboard" class="text-emerald-600 hover:underline text-sm">&larr; Home</a>
-    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-2">The Aviary</h1>
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-2">Chatter</h1>
     <p class="text-sm text-gray-500 mt-1">See what everyone's saying. Post a note, photo, or voice clip.</p>
 </div>
 
 <!-- New Post -->
 <div class="bg-white rounded-lg shadow p-4 mb-6 max-w-2xl mx-auto">
-    <form id="post-form" method="POST" action="/web/aviary/post" enctype="multipart/form-data">
+    <form id="post-form" method="POST" action="/web/chatter/post" enctype="multipart/form-data">
         <div class="relative">
         <textarea name="content" id="post-content" rows="2" maxlength="1000"
                   placeholder="Start a chatter... (type @ to tag someone)"
@@ -61,7 +61,7 @@
 {% if not posts %}
 <div class="text-center text-gray-400 mt-12 max-w-2xl mx-auto">
     <span class="text-5xl">&#x1F99C;</span>
-    <p class="mt-3 text-lg font-medium">The Aviary is quiet...</p>
+    <p class="mt-3 text-lg font-medium">Chatter is quiet...</p>
     <p class="text-sm mt-1">Be the first to post! Share what's on your mind.</p>
 </div>
 {% endif %}
@@ -80,7 +80,7 @@
             <p class="text-xs text-gray-400">{{ post.household_name }} &middot; {{ post.time_ago }}</p>
         </div>
         {% if post.tenant_id == session.tenant_id %}
-        <form method="POST" action="/web/aviary/{{ post.id }}/delete" onsubmit="return confirm('Delete this post?')">
+        <form method="POST" action="/web/chatter/{{ post.id }}/delete" onsubmit="return confirm('Delete this post?')">
             <button type="submit" class="text-gray-300 hover:text-red-500 text-xs">&#x2715;</button>
         </form>
         {% endif %}
@@ -159,7 +159,7 @@ var activeMentionField = null;
 var activeMentionDropdown = null;
 
 // Load people list on page load
-fetch('/web/aviary/people').then(function(r) { return r.json(); }).then(function(data) {
+fetch('/web/chatter/people').then(function(r) { return r.json(); }).then(function(data) {
     mentionPeople = data.people || [];
 });
 
@@ -301,7 +301,7 @@ function clearVoice() {
 
 // --- Reactions (one per person per post) ---
 function toggleReaction(postId, reaction) {
-    fetch('/web/aviary/' + postId + '/react', {
+    fetch('/web/chatter/' + postId + '/react', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'reaction=' + reaction,
@@ -342,7 +342,7 @@ function addComment(postId) {
     var input = document.getElementById('comment-input-' + postId);
     var text = input.value.trim();
     if (!text) return;
-    fetch('/web/aviary/' + postId + '/comment', {
+    fetch('/web/chatter/' + postId + '/comment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'comment=' + encodeURIComponent(text),
@@ -363,7 +363,7 @@ function addComment(postId) {
 function saveToStories(postId) {
     var btn = document.getElementById('save-btn-' + postId);
     btn.textContent = 'Saving...';
-    fetch('/web/aviary/' + postId + '/save-to-stories', {
+    fetch('/web/chatter/' + postId + '/save-to-stories', {
         method: 'POST',
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.ok) {

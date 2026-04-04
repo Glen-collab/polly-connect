@@ -60,8 +60,8 @@
                         </div>
                     </div>
 
-                    <!-- Aviary (community feed) -->
-                    <a href="/web/aviary" class="hover:underline">Aviary</a>
+                    <!-- Chatter (community feed) -->
+                    <a href="/web/chatter" class="hover:underline">Chatter</a>
 
                     {% if session.role != 'family' %}
                     <!-- Settings group -->
@@ -147,9 +147,9 @@
                     </ul>
                 </div>
                 <div>
-                    <a href="/web/aviary" class="font-semibold text-orange-600 hover:underline">Aviary</a>
+                    <a href="/web/chatter" class="font-semibold text-orange-600 hover:underline">Chatter</a>
                     <ul class="mt-1 space-y-1 text-gray-500">
-                        <li><a href="/web/aviary" class="hover:text-gray-800">Community Feed</a></li>
+                        <li><a href="/web/chatter" class="hover:text-gray-800">Community Feed</a></li>
                     </ul>
                 </div>
                 {% if session.role != 'family' %}
@@ -234,7 +234,7 @@
         '/web/dashboard': {
             icon: '&#x1F3E0;',
             title: 'Welcome to Your Dashboard',
-            body: 'This is home base! Tap any button to explore. Stories captures memories, Family connects loved ones, the Aviary is your community feed, and Legacy Book builds your printed keepsake.',
+            body: 'This is home base! Tap any button to explore. Stories captures memories, Family connects loved ones, Chatter is your community feed, and Legacy Book builds your printed keepsake.',
             upgrade: _isFree ? 'Your free plan includes 10 stories and 10 photos. Upgrade anytime for unlimited.' : ''
         },
         '/web/stories': {
@@ -299,9 +299,9 @@
             title: 'Family Hub',
             body: 'Everything family in one place. View your family tree, browse photos, check messages, explore memories, and manage prayer requests.'
         },
-        '/web/aviary': {
+        '/web/chatter': {
             icon: '&#x1F99C;',
-            title: 'The Aviary',
+            title: 'Chatter',
             body: 'Your community feed! See what everyone in your Polly circle is sharing. Post notes, photos, or voice clips. Save any post to your stories for your legacy book.'
         },
         '/web/hub/settings': {
