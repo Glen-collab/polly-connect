@@ -60,10 +60,10 @@
                         </div>
                     </div>
 
-                    {% if session.role != 'family' %}
-                    <!-- Care group -->
-                    <a href="/web/hub/care" class="hover:underline">Care</a>
+                    <!-- Aviary (community feed) -->
+                    <a href="/web/aviary" class="hover:underline">Aviary</a>
 
+                    {% if session.role != 'family' %}
                     <!-- Settings group -->
                     <div class="relative nav-group">
                         <a href="/web/hub/settings" class="hover:underline cursor-pointer">Settings</a>
@@ -139,15 +139,17 @@
                     </ul>
                 </div>
                 <div>
-                    <a href="/web/hub/care" class="font-semibold text-purple-600 hover:underline">Care</a>
-                    <ul class="mt-1 space-y-1 text-gray-500">
-                        <li><a href="/web/medications" class="hover:text-gray-800">Reminders</a></li>
-                    </ul>
-                </div>
-                <div>
                     <a href="/web/hub/memory" class="font-semibold text-amber-600 hover:underline">Memory</a>
                     <ul class="mt-1 space-y-1 text-gray-500">
                         <li><a href="/web/memory/items" class="hover:text-gray-800">Stored Items</a></li>
+                        <li><a href="/web/medications" class="hover:text-gray-800">Reminders</a></li>
+                        <li><a href="/web/medications/calendar" class="hover:text-gray-800">Calendar</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <a href="/web/aviary" class="font-semibold text-orange-600 hover:underline">Aviary</a>
+                    <ul class="mt-1 space-y-1 text-gray-500">
+                        <li><a href="/web/aviary" class="hover:text-gray-800">Community Feed</a></li>
                     </ul>
                 </div>
                 {% if session.role != 'family' %}
@@ -232,7 +234,7 @@
         '/web/dashboard': {
             icon: '&#x1F3E0;',
             title: 'Welcome to Your Dashboard',
-            body: 'This is home base! Tap any button to explore. Stories captures memories, Family connects loved ones, Care manages reminders, and Legacy Book builds your printed keepsake.',
+            body: 'This is home base! Tap any button to explore. Stories captures memories, Family connects loved ones, the Aviary is your community feed, and Legacy Book builds your printed keepsake.',
             upgrade: _isFree ? 'Your free plan includes 10 stories and 10 photos. Upgrade anytime for unlimited.' : ''
         },
         '/web/stories': {
@@ -297,10 +299,10 @@
             title: 'Family Hub',
             body: 'Everything family in one place. View your family tree, browse photos, check messages, explore memories, and manage prayer requests.'
         },
-        '/web/hub/care': {
-            icon: '&#x1F49C;',
-            title: 'Care Hub',
-            body: 'Manage daily reminders and care routines. Polly will announce reminders at the times you set, helping keep your loved one on track.'
+        '/web/aviary': {
+            icon: '&#x1F99C;',
+            title: 'The Aviary',
+            body: 'Your community feed! See what everyone in your Polly circle is sharing. Post notes, photos, or voice clips. Save any post to your stories for your legacy book.'
         },
         '/web/hub/settings': {
             icon: '&#x2699;&#xFE0F;',

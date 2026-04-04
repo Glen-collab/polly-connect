@@ -355,6 +355,46 @@ class PollyDB:
                 )
             """)
 
+            # ── Aviary (community feed) tables ──
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS aviary_posts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER NOT NULL,
+                    author_name TEXT NOT NULL,
+                    content_type TEXT NOT NULL DEFAULT 'text',
+                    content TEXT,
+                    photo_filename TEXT,
+                    audio_filename TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_aviary_tenant ON aviary_posts(tenant_id)")
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS aviary_reactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    post_id INTEGER NOT NULL,
+                    tenant_id INTEGER NOT NULL,
+                    reactor_name TEXT,
+                    reaction TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(post_id, tenant_id)
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS aviary_comments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    post_id INTEGER NOT NULL,
+                    tenant_id INTEGER NOT NULL,
+                    author_name TEXT NOT NULL,
+                    comment TEXT,
+                    audio_filename TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
             # ── Multi-tenant tables ──
 
             conn.execute("""

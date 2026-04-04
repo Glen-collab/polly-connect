@@ -1358,22 +1358,8 @@ async def hub_family(request: Request):
 
 @router.get("/hub/care", response_class=HTMLResponse)
 async def hub_care(request: Request):
-    session = await get_web_session(request)
-    redirect = require_login(session)
-    if redirect:
-        return redirect
-    if session.get("role") == "family":
-        return RedirectResponse("/web/dashboard", status_code=302)
-    db = request.app.state.db
-    medications = db.get_medications(tenant_id=session["tenant_id"])
-    book_builder = getattr(request.app.state, "book_builder", None)
-    book_progress = book_builder.get_book_progress(tenant_id=session["tenant_id"]) if book_builder else None
-    return templates.TemplateResponse("hub_care.html", {
-        "request": request,
-        "session": session,
-        "medications": medications,
-        "book_progress": book_progress,
-    })
+    """Redirect old Care hub to Memory hub."""
+    return RedirectResponse("/web/hub/memory", status_code=302)
 
 
 @router.get("/hub/settings", response_class=HTMLResponse)
@@ -1404,10 +1390,12 @@ async def hub_memory(request: Request):
     db = request.app.state.db
     tid = session["tenant_id"]
     items = db.list_all(tenant_id=tid)
+    medications = db.get_medications(tenant_id=tid)
     return templates.TemplateResponse("hub_memory.html", {
         "request": request,
         "session": session,
         "item_count": len(items),
+        "medications": medications,
     })
 
 
@@ -3964,6 +3952,305 @@ async def photos_list_api(request: Request):
         "filename": p["filename"],
         "caption": p.get("caption") or "",
     } for p in photos])
+
+
+# ── Aviary (community feed) ──
+
+def _time_ago(created_at_str):
+    """Human-readable time ago from ISO timestamp."""
+    from datetime import datetime, timezone
+    try:
+        if isinstance(created_at_str, str):
+            created = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+        else:
+            created = created_at_str
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        diff = now - created
+        mins = int(diff.total_seconds() / 60)
+        if mins < 1:
+            return "just now"
+        if mins < 60:
+            return f"{mins}m ago"
+        hours = mins // 60
+        if hours < 24:
+            return f"{hours}h ago"
+        days = hours // 24
+        if days < 7:
+            return f"{days}d ago"
+        return created.strftime("%b %d")
+    except Exception:
+        return ""
+
+
+@router.get("/aviary", response_class=HTMLResponse)
+async def aviary_page(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+
+        # Get my connected tenant IDs (accepted only)
+        connected = conn.execute(
+            "SELECT connected_tenant_id FROM connected_families WHERE tenant_id = ? AND status = 'accepted'",
+            (tid,)
+        ).fetchall()
+        visible_tids = [tid] + [c["connected_tenant_id"] for c in connected]
+        placeholders = ",".join("?" * len(visible_tids))
+
+        # Fetch posts from all visible tenants
+        rows = conn.execute(f"""
+            SELECT ap.*, t.name as household_name
+            FROM aviary_posts ap
+            JOIN tenants t ON ap.tenant_id = t.id
+            WHERE ap.tenant_id IN ({placeholders})
+            ORDER BY ap.created_at DESC
+            LIMIT 100
+        """, visible_tids).fetchall()
+
+        posts = []
+        for row in rows:
+            post = dict(row)
+            post["time_ago"] = _time_ago(post["created_at"])
+
+            # Reactions
+            reactions = conn.execute(
+                "SELECT reaction, COUNT(*) as cnt FROM aviary_reactions WHERE post_id = ? GROUP BY reaction",
+                (post["id"],)
+            ).fetchall()
+            post["reaction_counts"] = {r["reaction"]: r["cnt"] for r in reactions}
+
+            my_react = conn.execute(
+                "SELECT reaction FROM aviary_reactions WHERE post_id = ? AND tenant_id = ?",
+                (post["id"], tid)
+            ).fetchone()
+            post["my_reaction"] = my_react["reaction"] if my_react else ""
+
+            # Comments
+            comments = conn.execute(
+                "SELECT * FROM aviary_comments WHERE post_id = ? ORDER BY created_at ASC",
+                (post["id"],)
+            ).fetchall()
+            post["comments"] = [dict(c) for c in comments]
+
+            posts.append(post)
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return templates.TemplateResponse("aviary.html", {
+        "request": request,
+        "session": session,
+        "posts": posts,
+    })
+
+
+@router.post("/aviary/post")
+async def aviary_create_post(request: Request):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return RedirectResponse("/web/login", status_code=302)
+
+    form = await request.form()
+    content = (form.get("content") or "").strip()
+    photo_file = form.get("photo")
+    audio_file = form.get("audio")
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    author = session.get("name", "Someone")
+
+    photo_filename = None
+    audio_filename = None
+
+    # Handle photo upload
+    if photo_file and hasattr(photo_file, "read"):
+        photo_data = await photo_file.read()
+        if len(photo_data) > 0:
+            photo_filename = f"aviary_{uuid.uuid4().hex[:8]}.jpg"
+            photos_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "photos")
+            os.makedirs(photos_dir, exist_ok=True)
+            with open(os.path.join(photos_dir, photo_filename), "wb") as f:
+                f.write(photo_data)
+
+    # Handle voice upload
+    if audio_file and hasattr(audio_file, "read"):
+        import subprocess
+        audio_data = await audio_file.read()
+        if len(audio_data) > 0:
+            audio_filename = f"aviary_{uuid.uuid4().hex[:8]}.wav"
+            recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+            os.makedirs(recordings_dir, exist_ok=True)
+            raw_path = os.path.join(recordings_dir, audio_filename + ".raw")
+            wav_path = os.path.join(recordings_dir, audio_filename)
+            with open(raw_path, "wb") as f:
+                f.write(audio_data)
+            try:
+                result = subprocess.run(
+                    ["ffmpeg", "-y", "-i", raw_path, "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le", wav_path],
+                    capture_output=True, timeout=15)
+                if result.returncode != 0:
+                    audio_filename = None
+                os.remove(raw_path)
+            except Exception:
+                audio_filename = None
+                if os.path.exists(raw_path):
+                    os.remove(raw_path)
+
+    if not content and not photo_filename and not audio_filename:
+        return RedirectResponse("/web/aviary", status_code=303)
+
+    content_type = "text"
+    if photo_filename:
+        content_type = "photo"
+    elif audio_filename:
+        content_type = "voice"
+
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.execute("""
+            INSERT INTO aviary_posts (tenant_id, author_name, content_type, content, photo_filename, audio_filename)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (tid, author, content_type, content or None, photo_filename, audio_filename))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return RedirectResponse("/web/aviary", status_code=303)
+
+
+@router.post("/aviary/{post_id}/delete")
+async def aviary_delete_post(request: Request, post_id: int):
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return RedirectResponse("/web/login", status_code=302)
+    db = request.app.state.db
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.execute("DELETE FROM aviary_posts WHERE id = ? AND tenant_id = ?",
+                     (post_id, session["tenant_id"]))
+        conn.execute("DELETE FROM aviary_reactions WHERE post_id = ?", (post_id,))
+        conn.execute("DELETE FROM aviary_comments WHERE post_id = ?", (post_id,))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    return RedirectResponse("/web/aviary", status_code=303)
+
+
+@router.post("/aviary/{post_id}/react")
+async def aviary_react(request: Request, post_id: int):
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    form = await request.form()
+    reaction = form.get("reaction", "")
+    if not reaction:
+        return JSONResponse({"error": "No reaction"}, status_code=400)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        existing = conn.execute(
+            "SELECT id, reaction FROM aviary_reactions WHERE post_id = ? AND tenant_id = ?",
+            (post_id, tid)
+        ).fetchone()
+        if existing:
+            conn.execute("DELETE FROM aviary_reactions WHERE id = ?", (existing[0],))
+            if existing[1] == reaction:
+                conn.commit()
+                return JSONResponse({"ok": True, "action": "removed"})
+        conn.execute(
+            "INSERT INTO aviary_reactions (post_id, tenant_id, reactor_name, reaction) VALUES (?, ?, ?, ?)",
+            (post_id, tid, session.get("name", ""), reaction))
+        conn.commit()
+        return JSONResponse({"ok": True, "action": "added"})
+    finally:
+        if not db._conn:
+            conn.close()
+
+
+@router.post("/aviary/{post_id}/comment")
+async def aviary_comment(request: Request, post_id: int):
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    form = await request.form()
+    comment_text = (form.get("comment") or "").strip()
+    if not comment_text:
+        return JSONResponse({"error": "No comment"}, status_code=400)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    author = session.get("name", "Someone")
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "INSERT INTO aviary_comments (post_id, tenant_id, author_name, comment) VALUES (?, ?, ?, ?)",
+            (post_id, tid, author, comment_text))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    return JSONResponse({"ok": True, "name": author, "comment": comment_text})
+
+
+@router.post("/aviary/{post_id}/save-to-stories")
+async def aviary_save_to_stories(request: Request, post_id: int):
+    """Save any Aviary post to your own stories."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+        post = conn.execute("SELECT * FROM aviary_posts WHERE id = ?", (post_id,)).fetchone()
+        if not post:
+            return JSONResponse({"error": "Post not found"}, status_code=404)
+        post = dict(post)
+
+        # Build transcript
+        attribution = f"[From the Aviary — posted by {post['author_name']}]"
+        transcript = post.get("content") or ""
+        if transcript:
+            transcript = f"{attribution}\n\n{transcript}"
+        else:
+            transcript = attribution
+
+        # Save as story
+        conn.execute("""
+            INSERT INTO stories (tenant_id, transcript, speaker_name, source, audio_filename, created_at)
+            VALUES (?, ?, ?, 'aviary', ?, CURRENT_TIMESTAMP)
+        """, (tid, transcript, post["author_name"], post.get("audio_filename")))
+
+        # If it has a photo, copy it to the user's photos too
+        if post.get("photo_filename"):
+            conn.execute("""
+                INSERT INTO photos (tenant_id, filename, caption, created_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """, (tid, post["photo_filename"], f"From the Aviary — {post['author_name']}"))
+
+        conn.commit()
+        return JSONResponse({"ok": True})
+    finally:
+        if not db._conn:
+            conn.close()
 
 
 @router.post("/settings/security-questions")
