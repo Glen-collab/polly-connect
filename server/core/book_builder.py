@@ -491,12 +491,73 @@ Timeline context:
 
 """
 
+        # Also collect unlinked photos (in_book=1, no story) that fit this chapter's time range
+        if tenant_id:
+            import re as _re
+            try:
+                conn = self.db._get_connection()
+                unlinked_photos = conn.execute("""
+                    SELECT id, caption, date_taken, tags
+                    FROM photos WHERE tenant_id = ? AND in_book = 1
+                    AND (story_id IS NULL OR story_id = 0)
+                    AND caption IS NOT NULL AND caption != ''
+                """, (tenant_id,)).fetchall()
+                for up in unlinked_photos:
+                    caption = up[1] or ""
+                    # Extract year from caption or date_taken
+                    photo_year = None
+                    for source in [up[2] or "", caption]:
+                        yr_match = _re.search(r'(19\d{2}|20\d{2})', str(source))
+                        if yr_match:
+                            photo_year = int(yr_match.group(1))
+                            break
+                    # Try age-based clues in caption (e.g., "6th grade" = ~age 11)
+                    if not photo_year and owner_birth_year:
+                        grade_match = _re.search(r'(\d+)(?:st|nd|rd|th)\s*grade', caption.lower())
+                        if grade_match:
+                            grade = int(grade_match.group(1))
+                            photo_year = owner_birth_year + 5 + grade
+
+                    # Check if this photo fits the chapter's time range
+                    chapter_years = [m.get("estimated_year") for m in memories if m.get("estimated_year")]
+                    if chapter_years and photo_year:
+                        ch_min = min(chapter_years) - 3
+                        ch_max = max(chapter_years) + 3
+                        if not (ch_min <= photo_year <= ch_max):
+                            continue
+                    elif chapter_years and not photo_year:
+                        # No year on photo — skip for now, will catch in a later chapter or appendix
+                        continue
+
+                    people_in_photo = []
+                    if up[3]:
+                        try:
+                            import json as _json
+                            tags = _json.loads(up[3]) if isinstance(up[3], str) else up[3]
+                            people_in_photo = [t for t in tags if isinstance(t, str)]
+                        except (ValueError, TypeError):
+                            pass
+
+                    available_photos.append({
+                        "photo_id": up[0],
+                        "story_id": None,
+                        "caption": caption,
+                        "date_taken": up[2] or "",
+                        "photo_year": photo_year,
+                        "people": people_in_photo,
+                    })
+            except Exception as e:
+                logger.warning(f"Could not load unlinked photos: {e}")
+
         # Build photo placement instructions
         photo_block = ""
         if available_photos:
             photo_lines = []
             for p in available_photos:
-                line = f"  - [PHOTO:{p['story_id']}]"
+                if p.get("story_id"):
+                    line = f"  - [PHOTO:{p['story_id']}]"
+                else:
+                    line = f"  - [PHOTO:p{p['photo_id']}]"
                 if p["caption"]:
                     line += f" — {p['caption']}"
                 if p["photo_year"]:
@@ -511,7 +572,7 @@ Available photos for this chapter:
 
 PHOTO PLACEMENT RULES:
 - Place each photo marker on its OWN line, right AFTER the paragraph that discusses that time period, person, or event
-- Format: [PHOTO:story_id] on a line by itself between paragraphs
+- Format: [PHOTO:story_id] or [PHOTO:p123] on a line by itself between paragraphs
 - Match photos to content by year, people mentioned, and caption context
 - Use family birth years to calculate when events happened (e.g. if a child was born in 2018 and the story mentions their first steps, that photo belongs around 2019)
 - Every available photo MUST be placed exactly once

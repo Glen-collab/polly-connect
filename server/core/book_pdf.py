@@ -386,6 +386,37 @@ class LegacyBookPDF:
             media_by_story = self._get_chapter_media_by_story(
                 ch, global_used_photos, global_used_audio
             )
+            # Also build lookup for unlinked photos (PHOTO:p123 markers)
+            media_by_photo_id = {}
+            if self.tenant_id:
+                try:
+                    conn = self.db._get_connection()
+                    unlinked = conn.execute("""
+                        SELECT id, filename, caption FROM photos
+                        WHERE tenant_id = ? AND in_book = 1
+                        AND (story_id IS NULL OR story_id = 0)
+                        AND id NOT IN (SELECT COALESCE(photo_id,0) FROM stories WHERE tenant_id = ?)
+                    """, (self.tenant_id, self.tenant_id)).fetchall()
+                    for up in unlinked:
+                        pid = up[0]
+                        if pid in global_used_photos:
+                            continue
+                        fname = up[1]
+                        for base in [UPLOADS_DIR,
+                                     os.path.join(os.path.dirname(__file__), "..", "static", "uploads"),
+                                     os.path.join(os.path.dirname(__file__), "..", "static", "photos"),
+                                     "server/static/uploads", "server/static/photos"]:
+                            path = os.path.join(base, fname)
+                            if os.path.exists(path):
+                                media_by_photo_id[pid] = {
+                                    "story_id": None,
+                                    "photo_id": pid,
+                                    "photo_path": path,
+                                    "photo_caption": up[2] or "",
+                                }
+                                break
+                except Exception:
+                    pass
             placed_stories = set()
 
             # Chapter body
@@ -400,13 +431,20 @@ class LegacyBookPDF:
                     if not para:
                         continue
 
-                    # Check for inline photo marker: [PHOTO:123]
-                    photo_match = re.match(r'^\[PHOTO:(\d+)\]$', para)
+                    # Check for inline photo marker: [PHOTO:123] or [PHOTO:p123]
+                    photo_match = re.match(r'^\[PHOTO:(p?)(\d+)\]$', para)
                     if photo_match:
-                        sid = int(photo_match.group(1))
-                        if sid in media_by_story:
+                        is_photo_id = photo_match.group(1) == 'p'
+                        num = int(photo_match.group(2))
+                        if is_photo_id and num in media_by_photo_id:
                             self._render_media_item(
-                                story, media_by_story[sid],
+                                story, media_by_photo_id[num],
+                                include_qr_codes, placed_stories
+                            )
+                            global_used_photos.add(num)
+                        elif not is_photo_id and num in media_by_story:
+                            self._render_media_item(
+                                story, media_by_story[num],
                                 include_qr_codes, placed_stories
                             )
                         continue
@@ -418,7 +456,7 @@ class LegacyBookPDF:
 
                     # Check if paragraph contains embedded markers mixed with text
                     # Split on valid markers and render text + photos in order
-                    parts = re.split(r'\[PHOTO:(\d+)\]', para)
+                    parts = re.split(r'\[PHOTO:(p?\d+)\]', para)
                     if len(parts) > 1:
                         for j, part in enumerate(parts):
                             if j % 2 == 0:
@@ -430,13 +468,22 @@ class LegacyBookPDF:
                                     story.append(Paragraph(text, style))
                                     body_para_idx += 1
                             else:
-                                # Story ID part
-                                sid = int(part)
-                                if sid in media_by_story:
-                                    self._render_media_item(
-                                        story, media_by_story[sid],
-                                        include_qr_codes, placed_stories
-                                    )
+                                # Photo marker part (e.g. "123" or "p123")
+                                if part.startswith('p'):
+                                    pid = int(part[1:])
+                                    if pid in media_by_photo_id:
+                                        self._render_media_item(
+                                            story, media_by_photo_id[pid],
+                                            include_qr_codes, placed_stories
+                                        )
+                                        global_used_photos.add(pid)
+                                else:
+                                    sid = int(part)
+                                    if sid in media_by_story:
+                                        self._render_media_item(
+                                            story, media_by_story[sid],
+                                            include_qr_codes, placed_stories
+                                        )
                     else:
                         # Normal paragraph — strip rogue markers, then render
                         para = re.sub(r'\[PHOTO[:\s][^\]]*\]', '', para).strip()
