@@ -4278,16 +4278,19 @@ async def aviary_react(request: Request, post_id: int):
             "SELECT id, reaction FROM aviary_reactions WHERE post_id = ? AND tenant_id = ?",
             (post_id, tid)
         ).fetchone()
+        old_reaction = existing[1] if existing else None
         if existing:
             conn.execute("DELETE FROM aviary_reactions WHERE id = ?", (existing[0],))
             if existing[1] == reaction:
+                # Same emoji tapped again — toggle off
                 conn.commit()
-                return JSONResponse({"ok": True, "action": "removed"})
+                return JSONResponse({"ok": True, "action": "removed", "old": old_reaction})
+        # New or different emoji — insert it
         conn.execute(
             "INSERT INTO aviary_reactions (post_id, tenant_id, reactor_name, reaction) VALUES (?, ?, ?, ?)",
             (post_id, tid, session.get("name", ""), reaction))
         conn.commit()
-        return JSONResponse({"ok": True, "action": "added"})
+        return JSONResponse({"ok": True, "action": "added", "old": old_reaction})
     finally:
         if not db._conn:
             conn.close()

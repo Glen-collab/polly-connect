@@ -299,7 +299,7 @@ function clearVoice() {
     document.getElementById('audio-input').value = '';
 }
 
-// --- Reactions ---
+// --- Reactions (one per person per post) ---
 function toggleReaction(postId, reaction) {
     fetch('/web/aviary/' + postId + '/react', {
         method: 'POST',
@@ -307,6 +307,20 @@ function toggleReaction(postId, reaction) {
         body: 'reaction=' + reaction,
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.ok) {
+            // If switching from a different emoji, un-highlight and decrement the old one
+            if (data.old && data.old !== reaction) {
+                var oldBtn = document.getElementById('react-' + postId + '-' + data.old);
+                var oldCnt = document.getElementById('react-count-' + postId + '-' + data.old);
+                if (oldBtn) {
+                    oldBtn.classList.remove('bg-orange-50', 'border-orange-300');
+                    oldBtn.classList.add('border-gray-200');
+                }
+                if (oldCnt) {
+                    var n = (parseInt(oldCnt.textContent) || 1) - 1;
+                    oldCnt.textContent = n > 0 ? n : '';
+                }
+            }
+            // Now update the clicked emoji
             var btn = document.getElementById('react-' + postId + '-' + reaction);
             var cnt = document.getElementById('react-count-' + postId + '-' + reaction);
             if (data.action === 'added') {
@@ -316,8 +330,8 @@ function toggleReaction(postId, reaction) {
             } else {
                 btn.classList.remove('bg-orange-50', 'border-orange-300');
                 btn.classList.add('border-gray-200');
-                var n = (parseInt(cnt.textContent) || 1) - 1;
-                cnt.textContent = n > 0 ? n : '';
+                var n2 = (parseInt(cnt.textContent) || 1) - 1;
+                cnt.textContent = n2 > 0 ? n2 : '';
             }
         }
     });
