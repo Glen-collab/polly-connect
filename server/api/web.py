@@ -4659,12 +4659,28 @@ async def family_tree_page(request: Request):
     view_tid = int(view_tid_str) if view_tid_str.isdigit() else None
     viewing_connected = False
 
-    # Validate that view_tid is actually a connected family
+    # Validate that view_tid is actually a connected family AND they've shared their tree
     if view_tid and view_tid != tid:
         connected = db.get_connected_families(tid)
         connected_tids = {cf["connected_tenant_id"] for cf in connected}
         if view_tid in connected_tids:
-            viewing_connected = True
+            # Check that THEY have shared their tree with us
+            # Their row: tenant_id=view_tid, connected_tenant_id=tid
+            import sqlite3 as _sq2
+            conn_check = db._get_connection()
+            try:
+                conn_check.row_factory = _sq2.Row
+                their_row = conn_check.execute(
+                    "SELECT share_tree FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+                    (view_tid, tid)
+                ).fetchone()
+                if their_row and their_row["share_tree"]:
+                    viewing_connected = True
+                else:
+                    view_tid = None
+            finally:
+                if not db._conn:
+                    conn_check.close()
         else:
             view_tid = None  # Not connected, fall back to own tree
 
@@ -4818,27 +4834,67 @@ async def family_tree_page(request: Request):
                     member_connected[m["id"]] = cfl
                     break
 
-    # Build tree switcher list: my tree + all connected families
+    # Build tree switcher list with sharing status
     tree_switcher = []
+    tree_requests = []  # People requesting access to MY tree
+    my_share_settings = {}  # tid -> share_tree (am I sharing with them?)
+    import sqlite3 as _sq3
     if connected_families:
         for cf in connected_families:
+            cf_tid = cf["connected_tenant_id"]
             cf_profile = None
             try:
                 conn3 = db._get_connection()
-                conn3.row_factory = __import__("sqlite3").Row
+                conn3.row_factory = _sq3.Row
                 cf_profile = conn3.execute(
                     "SELECT name FROM user_profiles WHERE tenant_id = ? LIMIT 1",
-                    (cf["connected_tenant_id"],)
+                    (cf_tid,)
+                ).fetchone()
+                # Check if THEY shared their tree with us (their row)
+                their_row = conn3.execute(
+                    "SELECT share_tree, tree_requested FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+                    (cf_tid, tid)
                 ).fetchone()
             finally:
                 if not db._conn:
                     conn3.close()
             display_name = (cf_profile["name"] if cf_profile and cf_profile["name"]
                            else cf["connected_tenant_name"])
+            they_shared = their_row["share_tree"] if their_row else 0
+            # Did we already request access to their tree?
+            our_request = cf.get("tree_requested", 0)  # on OUR row: we requested from them
+
             tree_switcher.append({
-                "tenant_id": cf["connected_tenant_id"],
+                "tenant_id": cf_tid,
                 "name": display_name,
+                "shared": bool(they_shared),
+                "requested": bool(our_request),
             })
+
+            # Track our own sharing settings
+            my_share_settings[cf_tid] = {
+                "name": display_name,
+                "sharing": bool(cf.get("share_tree", 0)),
+            }
+
+    # Check for incoming tree access requests (on MY rows where tree_requested=1)
+    if not viewing_connected:
+        try:
+            conn4 = db._get_connection()
+            conn4.row_factory = _sq3.Row
+            reqs = conn4.execute(
+                "SELECT cf.connected_tenant_id, cf.connected_tenant_name, up.name as profile_name "
+                "FROM connected_families cf "
+                "LEFT JOIN user_profiles up ON up.tenant_id = cf.connected_tenant_id "
+                "WHERE cf.tenant_id = ? AND cf.status = 'accepted' AND cf.tree_requested = 1 AND cf.share_tree = 0",
+                (tid,)
+            ).fetchall()
+            tree_requests = [{"tenant_id": r["connected_tenant_id"],
+                              "name": r["profile_name"] or r["connected_tenant_name"]}
+                             for r in reqs]
+        finally:
+            if not db._conn:
+                conn4.close()
 
     return templates.TemplateResponse("family_tree.html", {
         "request": request,
@@ -4856,6 +4912,8 @@ async def family_tree_page(request: Request):
         "viewing_connected": viewing_connected,
         "view_tid": view_tid if viewing_connected else None,
         "tree_switcher": tree_switcher,
+        "tree_requests": tree_requests,
+        "my_share_settings": my_share_settings,
     })
 
 
@@ -4887,8 +4945,20 @@ async def family_tree_add(request: Request,
         ttid = int(target_tid)
         connected = db.get_connected_families(tid)
         if any(cf["connected_tenant_id"] == ttid for cf in connected):
-            actual_tid = ttid
-            redirect_suffix = f"?view={ttid}"
+            # Verify they've shared their tree with us
+            import sqlite3 as _sq
+            conn_chk = db._get_connection()
+            try:
+                their_share = conn_chk.execute(
+                    "SELECT share_tree FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+                    (ttid, tid)
+                ).fetchone()
+                if their_share and their_share[0]:
+                    actual_tid = ttid
+                    redirect_suffix = f"?view={ttid}"
+            finally:
+                if not db._conn:
+                    conn_chk.close()
 
     generation = RELATION_GENERATION.get(relation_to_owner, 0)
     parent_id = int(parent_member_id) if parent_member_id else None
@@ -4955,11 +5025,24 @@ async def family_tree_edit(request: Request, member_id: int,
     redirect_suffix = ""
 
     if member_tid != tid:
-        # Cross-tenant edit: must be connected and can only edit members you added
+        # Cross-tenant edit: must be connected, tree shared, and can only edit members you added
         connected = db.get_connected_families(tid)
         connected_tids = {cf["connected_tenant_id"] for cf in connected}
         if member_tid not in connected_tids:
             return RedirectResponse("/web/family-tree", status_code=303)
+        # Verify they've shared their tree
+        import sqlite3 as _sq
+        conn_chk = db._get_connection()
+        try:
+            their_share = conn_chk.execute(
+                "SELECT share_tree FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+                (member_tid, tid)
+            ).fetchone()
+            if not their_share or not their_share[0]:
+                return RedirectResponse("/web/family-tree", status_code=303)
+        finally:
+            if not db._conn:
+                conn_chk.close()
         if member.get("added_by") != session.get("name"):
             return RedirectResponse(f"/web/family-tree?view={member_tid}", status_code=303)
         redirect_suffix = f"?view={member_tid}"
@@ -5015,11 +5098,24 @@ async def family_tree_delete(request: Request, member_id: int):
     redirect_suffix = ""
 
     if member_tid != tid:
-        # Cross-tenant delete: must be connected and can only delete members you added
+        # Cross-tenant delete: must be connected, tree shared, and can only delete members you added
         connected = db.get_connected_families(tid)
         connected_tids = {cf["connected_tenant_id"] for cf in connected}
         if member_tid not in connected_tids:
             return RedirectResponse("/web/family-tree", status_code=303)
+        # Verify they've shared their tree
+        import sqlite3 as _sq
+        conn_chk = db._get_connection()
+        try:
+            their_share = conn_chk.execute(
+                "SELECT share_tree FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+                (member_tid, tid)
+            ).fetchone()
+            if not their_share or not their_share[0]:
+                return RedirectResponse("/web/family-tree", status_code=303)
+        finally:
+            if not db._conn:
+                conn_chk.close()
         if member.get("added_by") != session.get("name"):
             return RedirectResponse(f"/web/family-tree?view={member_tid}", status_code=303)
         redirect_suffix = f"?view={member_tid}"
@@ -5031,6 +5127,108 @@ async def family_tree_delete(request: Request, member_id: int):
 
     db.delete_family_member(member_id)
     return RedirectResponse(f"/web/family-tree{redirect_suffix}", status_code=303)
+
+
+# ── Tree Sharing Permissions ──
+
+@router.post("/family-tree/request-access/{target_tid}")
+async def family_tree_request_access(request: Request, target_tid: int):
+    """Request access to view a connected family's tree."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    # Verify we're connected
+    connected = db.get_connected_families(tid)
+    if not any(cf["connected_tenant_id"] == target_tid for cf in connected):
+        return RedirectResponse("/web/family-tree", status_code=303)
+    # Set tree_requested=1 on THEIR row (tenant_id=target_tid, connected_tenant_id=us)
+    import sqlite3 as _sq
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "UPDATE connected_families SET tree_requested = 1 WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+            (target_tid, tid))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    return RedirectResponse("/web/family-tree?tree_requested=1", status_code=303)
+
+
+@router.post("/family-tree/grant-access/{requester_tid}")
+async def family_tree_grant_access(request: Request, requester_tid: int):
+    """Grant a connected family access to view your tree."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3 as _sq
+    conn = db._get_connection()
+    try:
+        # Set share_tree=1 and clear the request flag on MY row
+        conn.execute(
+            "UPDATE connected_families SET share_tree = 1, tree_requested = 0 WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+            (tid, requester_tid))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    return RedirectResponse("/web/family-tree", status_code=303)
+
+
+@router.post("/family-tree/decline-access/{requester_tid}")
+async def family_tree_decline_access(request: Request, requester_tid: int):
+    """Decline a tree access request."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3 as _sq
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "UPDATE connected_families SET tree_requested = 0 WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+            (tid, requester_tid))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    return RedirectResponse("/web/family-tree", status_code=303)
+
+
+@router.post("/family-tree/toggle-share/{target_tid}")
+async def family_tree_toggle_share(request: Request, target_tid: int):
+    """Toggle sharing your tree with a connected family."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3 as _sq
+    conn = db._get_connection()
+    try:
+        current = conn.execute(
+            "SELECT share_tree FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+            (tid, target_tid)
+        ).fetchone()
+        if current:
+            new_val = 0 if current[0] else 1
+            conn.execute(
+                "UPDATE connected_families SET share_tree = ?, tree_requested = 0 WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+                (new_val, tid, target_tid))
+            conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    return RedirectResponse("/web/family-tree", status_code=303)
 
 
 # ── Family Invitations ──

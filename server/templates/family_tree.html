@@ -9,7 +9,7 @@
     </h1>
     <button onclick="document.getElementById('add-form').classList.toggle('hidden')"
             class="bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700">
-        + Add Family Member
+        + Add Family or Friends
     </button>
 </div>
 
@@ -22,11 +22,70 @@
         My Tree
     </a>
     {% for ts in tree_switcher %}
+    {% if ts.shared %}
     <a href="/web/family-tree?view={{ ts.tenant_id }}"
        class="px-3 py-1.5 rounded-full text-sm font-medium {% if view_tid == ts.tenant_id %}bg-emerald-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
         {{ ts.name }}
     </a>
+    {% elif ts.requested %}
+    <span class="px-3 py-1.5 rounded-full text-sm font-medium bg-amber-50 text-amber-600 border border-amber-200 cursor-default">
+        {{ ts.name }} <span class="text-xs">(pending)</span>
+    </span>
+    {% else %}
+    <form method="POST" action="/web/family-tree/request-access/{{ ts.tenant_id }}" class="inline">
+        <button type="submit" class="px-3 py-1.5 rounded-full text-sm font-medium bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100">
+            {{ ts.name }} <span class="text-xs">&#x1F512;</span>
+        </button>
+    </form>
+    {% endif %}
     {% endfor %}
+</div>
+{% endif %}
+
+{% if request.query_params.get('tree_requested') %}
+<div class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 mb-4 max-w-lg mx-auto text-center">
+    <p class="text-sm text-emerald-800 font-medium">Tree access requested! They'll see your request next time they visit.</p>
+</div>
+{% endif %}
+
+{% if tree_requests and not viewing_connected %}
+<!-- Tree Access Requests -->
+<div class="bg-blue-50 border-2 border-blue-400 rounded-xl p-5 mb-6 max-w-lg mx-auto shadow-md">
+    <div class="text-center mb-3">
+        <span class="text-2xl">&#x1F333;</span>
+        <h3 class="text-lg font-bold text-blue-800">Tree Access Request{{ 's' if tree_requests|length > 1 else '' }}</h3>
+        <p class="text-xs text-blue-600">They'd like to view your family tree and add people to it</p>
+    </div>
+    {% for req in tree_requests %}
+    <div class="flex items-center justify-between bg-white rounded-lg px-4 py-3 mb-2 shadow-sm">
+        <span class="text-sm font-bold text-gray-800">{{ req.name }}</span>
+        <div class="flex gap-2">
+            <form method="POST" action="/web/family-tree/grant-access/{{ req.tenant_id }}">
+                <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700">Allow</button>
+            </form>
+            <form method="POST" action="/web/family-tree/decline-access/{{ req.tenant_id }}"
+                  onsubmit="return confirm('Decline tree access from {{ req.name }}?')">
+                <button type="submit" class="bg-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-300">Decline</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if my_share_settings and not viewing_connected and session.role != 'family' %}
+<!-- My Tree Sharing Settings -->
+<div class="bg-white rounded-lg shadow p-3 mb-4">
+    <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs text-gray-400 uppercase tracking-wide mr-1">Share my tree with:</span>
+        {% for stid, info in my_share_settings.items() %}
+        <form method="POST" action="/web/family-tree/toggle-share/{{ stid }}" class="inline">
+            <button type="submit" class="px-3 py-1.5 rounded-full text-sm font-medium border {% if info.sharing %}bg-emerald-50 text-emerald-700 border-emerald-300{% else %}bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100{% endif %}">
+                {% if info.sharing %}&#x2705;{% else %}&#x1F512;{% endif %} {{ info.name }}
+            </button>
+        </form>
+        {% endfor %}
+    </div>
 </div>
 {% endif %}
 
@@ -38,7 +97,7 @@
 
 <!-- Add member form (hidden by default) -->
 <div id="add-form" class="hidden bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
-    <h2 class="text-base font-semibold mb-3">Add a Family Member</h2>
+    <h2 class="text-base font-semibold mb-3">Add Family or Friends</h2>
     <form method="POST" action="/web/family-tree/add">
         {% if viewing_connected %}<input type="hidden" name="target_tid" value="{{ view_tid }}">{% endif %}
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">

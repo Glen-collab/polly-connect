@@ -317,6 +317,10 @@ class PollyDB:
             cf_cols = {row[1] for row in conn.execute("PRAGMA table_info(connected_families)").fetchall()}
             if "status" not in cf_cols:
                 conn.execute("ALTER TABLE connected_families ADD COLUMN status TEXT DEFAULT 'accepted'")
+            if "share_tree" not in cf_cols:
+                conn.execute("ALTER TABLE connected_families ADD COLUMN share_tree INTEGER DEFAULT 0")
+            if "tree_requested" not in cf_cols:
+                conn.execute("ALTER TABLE connected_families ADD COLUMN tree_requested INTEGER DEFAULT 0")
 
             # ── Shared Wall ──
             conn.execute("""
