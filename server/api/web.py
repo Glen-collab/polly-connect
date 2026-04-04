@@ -3104,6 +3104,21 @@ async def transcription_verify(request: Request, story_id: int,
     # Mark verified
     db.verify_story(story_id, verified_by, corrected_transcript or None,
                      tenant_id=tid)
+
+    # Sync corrected transcript to linked memory so book chapters use the edited version
+    if corrected_transcript:
+        try:
+            conn2 = db._get_connection()
+            conn2.execute("""
+                UPDATE memories SET text = ?, text_summary = ?
+                WHERE story_id = ? AND tenant_id = ?
+            """, (corrected_transcript, corrected_transcript[:200], story_id, tid))
+            conn2.commit()
+            if not db._conn:
+                conn2.close()
+        except Exception:
+            pass
+
     return RedirectResponse("/web/transcriptions", status_code=303)
 
 

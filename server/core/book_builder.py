@@ -537,11 +537,33 @@ Family timeline (use these to calculate when events happened):
             finally:
                 pass
 
+        # Build owner profile block
+        owner_block = ""
+        if tenant_id:
+            try:
+                conn = self.db._get_connection()
+                owner_prof = conn.execute(
+                    "SELECT name, familiar_name, hometown, birth_year, location_city FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                    (tenant_id,)
+                ).fetchone()
+                if owner_prof:
+                    oname = owner_prof[1] or owner_prof[0] or speaker or "the owner"
+                    parts = [f"The subject of this book is {oname}."]
+                    if owner_prof[3]:
+                        parts.append(f"Born in {owner_prof[3]}.")
+                    if owner_prof[2]:
+                        parts.append(f"Grew up in {owner_prof[2]}.")
+                    if owner_prof[4] and owner_prof[4] != owner_prof[2]:
+                        parts.append(f"Currently lives in {owner_prof[4]}.")
+                    owner_block = "\n" + " ".join(parts) + "\n"
+            except Exception:
+                pass
+
         prompt = f"""You are writing a chapter of a family legacy book.
 Chapter {chapter.get('chapter_number', '?')}: "{chapter['title']}"
 Theme: {chapter['bucket'].replace('_', ' ')}
 Life phase: {chapter['life_phase']}
-{timeline_block}{family_block}{continuity_block}
+{owner_block}{timeline_block}{family_block}{continuity_block}
 Here are the memories to weave into this chapter (sorted chronologically):
 
 {chr(10).join(memory_texts)}
