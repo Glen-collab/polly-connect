@@ -3795,6 +3795,19 @@ async def shared_wall_page(request: Request, connected_tenant_id: int):
     reactions = db.get_wall_reactions(item_ids) if item_ids else {}
     comments = db.get_wall_comments(item_ids) if item_ids else {}
 
+    # Mark wall as visited (clears badge on family tree)
+    try:
+        import sqlite3 as _sq
+        conn_w = db._get_connection()
+        conn_w.execute(
+            "UPDATE connected_families SET last_wall_visit = datetime('now') WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+            (tid, connected_tenant_id))
+        conn_w.commit()
+        if not db._conn:
+            conn_w.close()
+    except Exception:
+        pass
+
     return templates.TemplateResponse("shared_wall.html", {
         "request": request,
         "session": session,

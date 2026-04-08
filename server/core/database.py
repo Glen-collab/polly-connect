@@ -321,6 +321,8 @@ class PollyDB:
                 conn.execute("ALTER TABLE connected_families ADD COLUMN share_tree INTEGER DEFAULT 0")
             if "tree_requested" not in cf_cols:
                 conn.execute("ALTER TABLE connected_families ADD COLUMN tree_requested INTEGER DEFAULT 0")
+            if "last_wall_visit" not in cf_cols:
+                conn.execute("ALTER TABLE connected_families ADD COLUMN last_wall_visit TIMESTAMP")
 
             # ── Shared Wall ──
             conn.execute("""
@@ -1268,21 +1270,19 @@ class PollyDB:
                 conn.close()
 
     def get_wall_new_count(self, from_tenant_id: int, to_tenant_id: int) -> int:
-        """Count wall items shared TO this tenant that they haven't interacted with (no reaction or comment)."""
+        """Count wall items shared TO this tenant since their last wall visit."""
         conn = self._get_connection()
         try:
-            count = conn.execute("""
-                SELECT COUNT(*) FROM shared_wall_items w
-                WHERE w.from_tenant_id = ? AND w.to_tenant_id = ?
-                AND NOT EXISTS (
-                    SELECT 1 FROM wall_reactions r
-                    WHERE r.wall_item_id = w.id AND r.tenant_id = ?
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM wall_comments c
-                    WHERE c.wall_item_id = w.id AND c.tenant_id = ?
-                )
-            """, (from_tenant_id, to_tenant_id, to_tenant_id, to_tenant_id)).fetchone()[0]
+            # Get last visit timestamp
+            row = conn.execute(
+                "SELECT last_wall_visit FROM connected_families WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+                (to_tenant_id, from_tenant_id)
+            ).fetchone()
+            last_visit = row[0] if row and row[0] else "2000-01-01"
+            count = conn.execute(
+                "SELECT COUNT(*) FROM shared_wall_items WHERE from_tenant_id = ? AND to_tenant_id = ? AND created_at > ?",
+                (from_tenant_id, to_tenant_id, last_visit)
+            ).fetchone()[0]
             return count
         finally:
             if not self._conn:
