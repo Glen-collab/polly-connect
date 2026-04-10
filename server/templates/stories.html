@@ -43,6 +43,9 @@
             {% endif %}
             {% endif %}
             {% if story.id %}
+            <button type="button" onclick="toggleVerify({{ story.id }})" id="verify-btn-{{ story.id }}"
+                    class="text-lg leading-none {% if story.verified %}text-emerald-600{% else %}text-gray-300 hover:text-emerald-400{% endif %}"
+                    title="{% if story.verified %}In book (click to remove){% else %}Add to book{% endif %}">&#x2714;</button>
             <a href="/web/stories/{{ story.id }}/edit" class="text-sm text-emerald-600 hover:underline">Edit</a>
             <button type="button" onclick="toggleInlineEdit({{ story.id }})" id="inline-edit-btn-{{ story.id }}" class="text-sm text-blue-600 hover:underline">Quick Edit</button>
             <button type="button" onclick="autoFormatStory({{ story.id }})" id="format-btn-{{ story.id }}" class="text-sm text-blue-600 hover:underline">Auto-Format</button>
@@ -319,6 +322,26 @@ function stopRecording() {
     .catch(function(err) {
         document.getElementById('rec-error-msg').textContent = 'Upload failed. Check your connection and try again.';
         showState('error');
+    });
+}
+
+// --- Verify Toggle ---
+function toggleVerify(id) {
+    var btn = document.getElementById('verify-btn-' + id);
+    fetch('/web/stories/' + id + '/toggle-verify', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            if (data.verified) {
+                btn.classList.remove('text-gray-300', 'hover:text-emerald-400');
+                btn.classList.add('text-emerald-600');
+                btn.title = 'In book (click to remove)';
+            } else {
+                btn.classList.remove('text-emerald-600');
+                btn.classList.add('text-gray-300', 'hover:text-emerald-400');
+                btn.title = 'Add to book';
+            }
+        }
     });
 }
 

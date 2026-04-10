@@ -1776,6 +1776,35 @@ async def story_edit_save(request: Request, story_id: int):
     return RedirectResponse(f"/web/stories/{story_id}/edit", status_code=303)
 
 
+@router.post("/stories/{story_id}/toggle-verify")
+async def story_toggle_verify(request: Request, story_id: int):
+    """Toggle verified status for book inclusion."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    conn = db._get_connection()
+    try:
+        current = conn.execute(
+            "SELECT verified FROM stories WHERE id = ? AND tenant_id = ?",
+            (story_id, tid)
+        ).fetchone()
+        if not current:
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        new_val = 0 if current[0] else 1
+        conn.execute(
+            "UPDATE stories SET verified = ?, verified_at = datetime('now') WHERE id = ? AND tenant_id = ?",
+            (new_val, story_id, tid))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return JSONResponse({"ok": True, "verified": bool(new_val)})
+
+
 @router.post("/stories/{story_id}/inline-save")
 async def story_inline_save(request: Request, story_id: int):
     """Save transcript from inline edit on stories page."""
