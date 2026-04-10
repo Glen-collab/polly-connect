@@ -1817,7 +1817,8 @@ async def story_auto_format(request: Request):
     if len(transcript) > 20000:
         return JSONResponse({"error": "Transcript too long (max 20,000 chars)"}, status_code=400)
 
-    from config import OPENAI_API_KEY
+    import os
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     if not OPENAI_API_KEY:
         return JSONResponse({"error": "AI not available"}, status_code=503)
 

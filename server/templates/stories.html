@@ -396,15 +396,26 @@ function autoFormatStory(id) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.ok) {
-            // Show in edit mode with formatted text
-            textEl.classList.add('hidden');
-            textarea.classList.remove('hidden');
-            textarea.value = data.formatted;
-            document.getElementById('save-btn-' + id).classList.remove('hidden');
-            document.getElementById('cancel-btn-' + id).classList.remove('hidden');
-            document.getElementById('inline-edit-btn-' + id).classList.add('hidden');
-            btn.textContent = 'Auto-Format';
-            btn.disabled = false;
+            // Auto-save the formatted text immediately
+            fetch('/web/stories/' + id + '/inline-save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'transcript=' + encodeURIComponent(data.formatted),
+            }).then(function(r) { return r.json(); }).then(function(saveData) {
+                if (saveData.ok) {
+                    textEl.textContent = data.formatted;
+                    cancelInlineEdit(id);
+                    btn.textContent = 'Formatted!';
+                    btn.classList.remove('text-blue-600');
+                    btn.classList.add('text-emerald-600');
+                    setTimeout(function() {
+                        btn.textContent = 'Auto-Format';
+                        btn.classList.remove('text-emerald-600');
+                        btn.classList.add('text-blue-600');
+                        btn.disabled = false;
+                    }, 2000);
+                }
+            });
         } else {
             alert(data.error || 'Formatting failed');
             btn.textContent = 'Auto-Format';
