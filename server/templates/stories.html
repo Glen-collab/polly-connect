@@ -31,8 +31,9 @@
         {% if story.question_text %}
         <p class="text-xs text-blue-600 italic mb-1">Q: {{ story.question_text }}</p>
         {% endif %}
-        <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap">{{ story.corrected_transcript or story.transcript or "Transcription pending..." }}</p>
-        <div class="flex items-center gap-3 mt-2">
+        <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap" id="story-text-{{ story.id }}">{{ story.corrected_transcript or story.transcript or "Transcription pending..." }}</p>
+        <textarea id="story-edit-{{ story.id }}" class="hidden w-full border rounded px-3 py-2 text-sm sm:text-base leading-relaxed mt-1" rows="8"></textarea>
+        <div class="flex items-center gap-3 mt-2 flex-wrap">
             {% if story.audio_s3_key %}
             <audio controls preload="none" class="h-8">
                 <source src="/static/recordings/{{ story.audio_s3_key }}" type="audio/wav">
@@ -43,6 +44,10 @@
             {% endif %}
             {% if story.id %}
             <a href="/web/stories/{{ story.id }}/edit" class="text-sm text-emerald-600 hover:underline">Edit</a>
+            <button type="button" onclick="toggleInlineEdit({{ story.id }})" id="inline-edit-btn-{{ story.id }}" class="text-sm text-blue-600 hover:underline">Quick Edit</button>
+            <button type="button" onclick="autoFormatStory({{ story.id }})" id="format-btn-{{ story.id }}" class="text-sm text-blue-600 hover:underline">Auto-Format</button>
+            <button type="button" onclick="saveInlineEdit({{ story.id }})" id="save-btn-{{ story.id }}" class="hidden text-sm bg-emerald-600 text-white px-3 py-1 rounded hover:bg-emerald-700">Save</button>
+            <button type="button" onclick="cancelInlineEdit({{ story.id }})" id="cancel-btn-{{ story.id }}" class="hidden text-sm text-gray-500 hover:underline">Cancel</button>
             {% endif %}
         </div>
         <div class="flex items-center gap-3 mt-3 pt-3 border-t">
@@ -314,6 +319,102 @@ function stopRecording() {
     .catch(function(err) {
         document.getElementById('rec-error-msg').textContent = 'Upload failed. Check your connection and try again.';
         showState('error');
+    });
+}
+
+// --- Inline Edit & Auto-Format ---
+function toggleInlineEdit(id) {
+    var textEl = document.getElementById('story-text-' + id);
+    var textarea = document.getElementById('story-edit-' + id);
+    var saveBtn = document.getElementById('save-btn-' + id);
+    var cancelBtn = document.getElementById('cancel-btn-' + id);
+    var editBtn = document.getElementById('inline-edit-btn-' + id);
+
+    textarea.value = textEl.textContent.trim();
+    textEl.classList.add('hidden');
+    textarea.classList.remove('hidden');
+    saveBtn.classList.remove('hidden');
+    cancelBtn.classList.remove('hidden');
+    editBtn.classList.add('hidden');
+    textarea.focus();
+}
+
+function cancelInlineEdit(id) {
+    document.getElementById('story-text-' + id).classList.remove('hidden');
+    document.getElementById('story-edit-' + id).classList.add('hidden');
+    document.getElementById('save-btn-' + id).classList.add('hidden');
+    document.getElementById('cancel-btn-' + id).classList.add('hidden');
+    document.getElementById('inline-edit-btn-' + id).classList.remove('hidden');
+}
+
+function saveInlineEdit(id) {
+    var textarea = document.getElementById('story-edit-' + id);
+    var saveBtn = document.getElementById('save-btn-' + id);
+    saveBtn.textContent = 'Saving...';
+    saveBtn.disabled = true;
+
+    fetch('/web/stories/' + id + '/inline-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'transcript=' + encodeURIComponent(textarea.value),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            document.getElementById('story-text-' + id).textContent = textarea.value;
+            cancelInlineEdit(id);
+            saveBtn.textContent = 'Save';
+            saveBtn.disabled = false;
+        } else {
+            alert(data.error || 'Save failed');
+            saveBtn.textContent = 'Save';
+            saveBtn.disabled = false;
+        }
+    })
+    .catch(function() {
+        alert('Connection error');
+        saveBtn.textContent = 'Save';
+        saveBtn.disabled = false;
+    });
+}
+
+function autoFormatStory(id) {
+    var textEl = document.getElementById('story-text-' + id);
+    var textarea = document.getElementById('story-edit-' + id);
+    var btn = document.getElementById('format-btn-' + id);
+    var text = textarea.classList.contains('hidden') ? textEl.textContent.trim() : textarea.value.trim();
+    if (!text) return;
+
+    btn.textContent = 'Formatting...';
+    btn.disabled = true;
+
+    fetch('/web/stories/auto-format', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'transcript=' + encodeURIComponent(text),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            // Show in edit mode with formatted text
+            textEl.classList.add('hidden');
+            textarea.classList.remove('hidden');
+            textarea.value = data.formatted;
+            document.getElementById('save-btn-' + id).classList.remove('hidden');
+            document.getElementById('cancel-btn-' + id).classList.remove('hidden');
+            document.getElementById('inline-edit-btn-' + id).classList.add('hidden');
+            btn.textContent = 'Auto-Format';
+            btn.disabled = false;
+        } else {
+            alert(data.error || 'Formatting failed');
+            btn.textContent = 'Auto-Format';
+            btn.disabled = false;
+        }
+    })
+    .catch(function() {
+        alert('Connection error');
+        btn.textContent = 'Auto-Format';
+        btn.disabled = false;
     });
 }
 </script>

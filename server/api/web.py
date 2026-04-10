@@ -1776,6 +1776,33 @@ async def story_edit_save(request: Request, story_id: int):
     return RedirectResponse(f"/web/stories/{story_id}/edit", status_code=303)
 
 
+@router.post("/stories/{story_id}/inline-save")
+async def story_inline_save(request: Request, story_id: int):
+    """Save transcript from inline edit on stories page."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    form = await request.form()
+    transcript = (form.get("transcript") or "").strip()
+    if not transcript:
+        return JSONResponse({"error": "No transcript"}, status_code=400)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "UPDATE stories SET transcript = ? WHERE id = ? AND tenant_id = ?",
+            (transcript, story_id, tid))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return JSONResponse({"ok": True})
+
+
 @router.post("/stories/auto-format")
 async def story_auto_format(request: Request):
     """Use GPT to clean up a raw transcript into readable prose."""
