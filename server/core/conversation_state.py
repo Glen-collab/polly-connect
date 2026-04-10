@@ -3,6 +3,7 @@ Conversation state management for Polly Connect.
 Tracks per-device conversation mode for family storytelling flow.
 """
 
+import time
 from enum import Enum
 from typing import Dict, List, Optional
 
@@ -47,7 +48,8 @@ class ConversationState:
     """Tracks the current conversation state for a single device/session."""
 
     def __init__(self):
-        self.mode: ConversationMode = ConversationMode.COMMAND
+        self._mode: ConversationMode = ConversationMode.COMMAND
+        self.mode_set_at: float = time.monotonic()
         self.speaker_name: Optional[str] = None
         self.current_question: Optional[str] = None
         self.story_parts: List[str] = []
@@ -69,6 +71,15 @@ class ConversationState:
         # Voice volume (10-100%, persists across reset)
         self.voice_volume: int = 100
 
+    @property
+    def mode(self) -> ConversationMode:
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: ConversationMode):
+        self._mode = value
+        self.mode_set_at = time.monotonic()
+
     def reset(self):
         self.mode = ConversationMode.COMMAND
         self.speaker_name = None
@@ -81,6 +92,16 @@ class ConversationState:
         self.pending_status = None
         self.pending_polly_target = None
         # tenant_id and user_id intentionally NOT reset (device-level)
+
+    def soft_reset(self, max_age_seconds: float = 300.0):
+        """Reset only if conversational state is stale (>5 min old).
+        Preserves STORY_PROMPT/FOLLOWUP_WAIT across brief reconnects
+        so users don't lose their answer when WiFi blips."""
+        if self.is_conversational and self.mode_set_at > 0:
+            age = time.monotonic() - self.mode_set_at
+            if age < max_age_seconds:
+                return  # Keep conversational state — user may still be answering
+        self.reset()
 
     @property
     def silence_timeout(self) -> float:
