@@ -44,8 +44,7 @@
             {% endif %}
             {% if story.id %}
             <button type="button" onclick="toggleVerify({{ story.id }})" id="verify-btn-{{ story.id }}"
-                    class="text-lg leading-none {% if story.verified %}text-emerald-600{% else %}text-gray-300 hover:text-emerald-400{% endif %}"
-                    title="{% if story.verified %}In book (click to remove){% else %}Add to book{% endif %}">&#x2714;</button>
+                    class="text-xs font-medium px-2 py-0.5 rounded {% if story.verified %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-500 hover:bg-emerald-50 hover:text-emerald-600{% endif %}">{% if story.verified %}&#x2714; Verified{% else %}Verify{% endif %}</button>
             <a href="/web/stories/{{ story.id }}/edit" class="text-sm text-emerald-600 hover:underline">Edit</a>
             <button type="button" onclick="toggleInlineEdit({{ story.id }})" id="inline-edit-btn-{{ story.id }}" class="text-sm text-blue-600 hover:underline">Quick Edit</button>
             <button type="button" onclick="autoFormatStory({{ story.id }})" id="format-btn-{{ story.id }}" class="text-sm text-blue-600 hover:underline">Auto-Format</button>
@@ -333,13 +332,11 @@ function toggleVerify(id) {
     .then(function(data) {
         if (data.ok) {
             if (data.verified) {
-                btn.classList.remove('text-gray-300', 'hover:text-emerald-400');
-                btn.classList.add('text-emerald-600');
-                btn.title = 'In book (click to remove)';
+                btn.className = 'text-xs font-medium px-2 py-0.5 rounded bg-emerald-100 text-emerald-700';
+                btn.innerHTML = '&#x2714; Verified';
             } else {
-                btn.classList.remove('text-emerald-600');
-                btn.classList.add('text-gray-300', 'hover:text-emerald-400');
-                btn.title = 'Add to book';
+                btn.className = 'text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-500 hover:bg-emerald-50 hover:text-emerald-600';
+                btn.textContent = 'Verify';
             }
         }
     });
@@ -419,7 +416,7 @@ function autoFormatStory(id) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.ok) {
-            // Auto-save the formatted text immediately
+            // Auto-save the formatted text and verify
             fetch('/web/stories/' + id + '/inline-save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -428,6 +425,18 @@ function autoFormatStory(id) {
                 if (saveData.ok) {
                     textEl.textContent = data.formatted;
                     cancelInlineEdit(id);
+                    // Auto-verify after formatting
+                    var verifyBtn = document.getElementById('verify-btn-' + id);
+                    if (verifyBtn && verifyBtn.textContent.trim() === 'Verify') {
+                        fetch('/web/stories/' + id + '/toggle-verify', { method: 'POST' })
+                        .then(function(r) { return r.json(); })
+                        .then(function(vd) {
+                            if (vd.ok && vd.verified) {
+                                verifyBtn.className = 'text-xs font-medium px-2 py-0.5 rounded bg-emerald-100 text-emerald-700';
+                                verifyBtn.innerHTML = '&#x2714; Verified';
+                            }
+                        });
+                    }
                     btn.textContent = 'Formatted!';
                     btn.classList.remove('text-blue-600');
                     btn.classList.add('text-emerald-600');
