@@ -1822,8 +1822,8 @@ async def story_inline_save(request: Request, story_id: int):
     conn = db._get_connection()
     try:
         conn.execute(
-            "UPDATE stories SET transcript = ? WHERE id = ? AND tenant_id = ?",
-            (transcript, story_id, tid))
+            "UPDATE stories SET transcript = ?, corrected_transcript = ? WHERE id = ? AND tenant_id = ?",
+            (transcript, transcript, story_id, tid))
         conn.commit()
     finally:
         if not db._conn:
