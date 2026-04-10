@@ -73,13 +73,19 @@
 
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Transcript</label>
-            <textarea name="transcript" rows="16"
+            <textarea name="transcript" id="transcript-area" rows="16"
                       class="w-full border rounded px-3 py-2 text-sm sm:text-base leading-relaxed">{{ story.transcript or '' }}</textarea>
         </div>
-        <button type="submit"
-                class="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-emerald-700 text-sm sm:text-base">
-            Save Changes
-        </button>
+        <div class="flex flex-wrap gap-3">
+            <button type="submit"
+                    class="flex-1 sm:flex-none bg-emerald-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-emerald-700 text-sm sm:text-base">
+                Save Changes
+            </button>
+            <button type="button" onclick="autoFormat()" id="format-btn"
+                    class="flex-1 sm:flex-none bg-blue-600 text-white px-6 py-3 sm:py-2 rounded hover:bg-blue-700 text-sm sm:text-base">
+                Auto-Format
+            </button>
+        </div>
     </div>
 </form>
 
@@ -91,4 +97,54 @@
     </form>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function autoFormat() {
+    var textarea = document.getElementById('transcript-area');
+    var btn = document.getElementById('format-btn');
+    var text = textarea.value.trim();
+    if (!text) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Formatting...';
+    btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+    btn.classList.add('bg-gray-400');
+
+    fetch('/web/stories/auto-format', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'transcript=' + encodeURIComponent(text),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            textarea.value = data.formatted;
+            btn.textContent = 'Formatted!';
+            btn.classList.remove('bg-gray-400');
+            btn.classList.add('bg-emerald-500');
+            setTimeout(function() {
+                btn.textContent = 'Auto-Format';
+                btn.classList.remove('bg-emerald-500');
+                btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                btn.disabled = false;
+            }, 2000);
+        } else {
+            alert(data.error || 'Formatting failed');
+            btn.textContent = 'Auto-Format';
+            btn.classList.remove('bg-gray-400');
+            btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            btn.disabled = false;
+        }
+    })
+    .catch(function() {
+        alert('Connection error — try again');
+        btn.textContent = 'Auto-Format';
+        btn.classList.remove('bg-gray-400');
+        btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+        btn.disabled = false;
+    });
+}
+</script>
 {% endblock %}

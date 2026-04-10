@@ -1776,6 +1776,48 @@ async def story_edit_save(request: Request, story_id: int):
     return RedirectResponse(f"/web/stories/{story_id}/edit", status_code=303)
 
 
+@router.post("/stories/auto-format")
+async def story_auto_format(request: Request):
+    """Use GPT to clean up a raw transcript into readable prose."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    form = await request.form()
+    transcript = (form.get("transcript") or "").strip()
+    if not transcript:
+        return JSONResponse({"error": "No transcript"}, status_code=400)
+    if len(transcript) > 20000:
+        return JSONResponse({"error": "Transcript too long (max 20,000 chars)"}, status_code=400)
+
+    from config import OPENAI_API_KEY
+    if not OPENAI_API_KEY:
+        return JSONResponse({"error": "AI not available"}, status_code=503)
+
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": (
+                    "You are a transcript editor. Take the raw speech-to-text transcript below and "
+                    "clean it up into readable prose. Add proper punctuation, capitalization, and "
+                    "paragraph breaks. Fix obvious speech-to-text errors. Keep the speaker's voice, "
+                    "word choices, and meaning exactly the same — do NOT rewrite, summarize, or add "
+                    "words that weren't said. Just make it readable."
+                )},
+                {"role": "user", "content": transcript},
+            ],
+            temperature=0.3,
+            max_tokens=4000,
+        )
+        formatted = response.choices[0].message.content.strip()
+        return JSONResponse({"ok": True, "formatted": formatted})
+    except Exception as e:
+        return JSONResponse({"error": f"AI error: {str(e)}"}, status_code=500)
+
+
 @router.get("/stories/{story_id}/qr.png")
 async def story_qr_code(request: Request, story_id: int):
     session = await get_web_session(request)
