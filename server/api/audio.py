@@ -831,11 +831,14 @@ async def _process_command(
         await websocket.send_json({"event": "response", "text": "I didn't hear anything.", "audio": None})
         return 0.0
 
-    # Save WAV first for conversational recordings (story answers)
-    # Audio is preserved even if transcription or connection fails
+    # Save WAV for any substantial recording (>10 seconds of audio)
+    # This is a safety net: audio is preserved even if state was lost,
+    # transcription fails, or connection drops. Story answers AND long
+    # command recordings both get saved.
     _saved_wav_filename = None
     conv_state_check = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
-    if conv_state_check and conv_state_check.is_conversational and len(command_audio) > 16000:
+    _min_save_bytes = settings.SAMPLE_RATE * 2 * 10  # 10 seconds
+    if len(command_audio) > _min_save_bytes:
         try:
             import uuid as _uuid
             wav_buf = io.BytesIO()
@@ -919,8 +922,8 @@ async def _process_command(
     logger.info(f"Transcription: {transcription}")
 
     if not transcription:
-        # If in story mode with saved audio, still preserve it as a story
-        if _saved_wav_filename and conv_state_check and conv_state_check.is_conversational:
+        # If we have saved audio, preserve it as a story regardless of mode
+        if _saved_wav_filename:
             try:
                 _db = getattr(websocket.app.state, "db", None)
                 _tid = conv_state_check.tenant_id if conv_state_check else 1
@@ -1246,6 +1249,35 @@ async def _process_command(
     # Generate and send TTS audio (with pronunciation guide)
     duration = await _send_tts(websocket, tts, response_text, squawk_mgr=squawk_mgr,
                                device_id=device_id, pronunciations=_pronunciations)
+
+    # SAFETY NET: If we saved a long WAV but the intent was NOT story_answer,
+    # the recording may have been misclassified due to a reconnect or parser error.
+    # Save it as a story anyway — the audio is too valuable to lose.
+    if (_saved_wav_filename
+            and intent_result.get("intent") != "story_answer"
+            and transcription
+            and len(transcription) > 100):
+        try:
+            _db = getattr(websocket.app.state, "db", None)
+            _conv = cmd._get_state(device_id) if hasattr(cmd, '_get_state') else None
+            _tid = _conv.tenant_id if _conv else 1
+            _speaker = None
+            try:
+                _usr = _db.get_or_create_user(tenant_id=_tid) if _db else {}
+                _speaker = _usr.get("name") or None
+            except Exception:
+                pass
+            _db.save_story(
+                transcript=transcription,
+                audio_s3_key=_saved_wav_filename,
+                speaker_name=_speaker,
+                source="voice",
+                duration_seconds=len(command_audio) / (settings.SAMPLE_RATE * 2),
+                tenant_id=_tid,
+            )
+            logger.info(f"Safety net: saved misclassified recording as story (intent was {intent_result.get('intent')})")
+        except Exception as e:
+            logger.warning(f"Safety net story save failed: {e}")
 
     # Maybe squawk after responding (parrot personality)
     if squawk_mgr:
