@@ -593,8 +593,20 @@ class SquawkManager:
                 # Notify ESP32 that ambient sound is starting
                 await ws.send_json({"event": "squawk_start"})
 
-                chunk_size = 8000
-                for i in range(0, len(wav_data), chunk_size):
+                # Adaptive chunking: pace sends based on audio length
+                # to avoid overwhelming ESP32's TCP/WebSocket buffer
+                total_len = len(wav_data)
+                if total_len > 128000:  # >4s — voice messages, long clips
+                    chunk_size = 4000
+                    chunk_delay = 0.08
+                elif total_len > 64000:  # >2s — medium clips
+                    chunk_size = 6000
+                    chunk_delay = 0.06
+                else:  # short squawk clips
+                    chunk_size = 8000
+                    chunk_delay = 0.05
+
+                for i in range(0, total_len, chunk_size):
                     if not self._playing.get(device_id, False):
                         logger.info(f"Squawk/chatter interrupted → {device_id}")
                         break
@@ -603,10 +615,10 @@ class SquawkManager:
                     await ws.send_json({
                         "event": "audio_chunk",
                         "audio": chunk_b64,
-                        "final": (i + chunk_size >= len(wav_data)),
+                        "final": (i + chunk_size >= total_len),
                         "squawk": True,
                     })
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(chunk_delay)
 
                 await ws.send_json({"event": "squawk_end"})
             except Exception as e:
