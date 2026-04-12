@@ -401,6 +401,36 @@ class PollyDB:
                 )
             """)
 
+            # ── Chatter Groups ──
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS chatter_groups (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    creator_tenant_id INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS chatter_group_members (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    group_id INTEGER NOT NULL,
+                    tenant_id INTEGER NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'member',
+                    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_read_at TIMESTAMP DEFAULT '2000-01-01',
+                    UNIQUE(group_id, tenant_id),
+                    FOREIGN KEY (group_id) REFERENCES chatter_groups(id)
+                )
+            """)
+
+            # Migration: add group_id to aviary_posts
+            ap_cols = {row[1] for row in conn.execute("PRAGMA table_info(aviary_posts)").fetchall()}
+            if "group_id" not in ap_cols:
+                conn.execute("ALTER TABLE aviary_posts ADD COLUMN group_id INTEGER")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_aviary_group ON aviary_posts(group_id)")
+
             # ── Multi-tenant tables ──
 
             conn.execute("""

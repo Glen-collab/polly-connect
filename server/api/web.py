@@ -1314,33 +1314,21 @@ async def dashboard(request: Request):
     claim_error = request.query_params.get("claim_error")
     claim_success = request.query_params.get("claim_success")
 
-    # Count aviary posts mentioning me since last visit
-    aviary_badge = 0
+    # Count unread chatter posts across all groups
+    chatter_badge = 0
     try:
         import sqlite3
         conn = db._get_connection()
         conn.row_factory = sqlite3.Row
-        my_name = session.get("name", "")
-        # Get connected tenant IDs
-        connected = conn.execute(
-            "SELECT connected_tenant_id FROM connected_families WHERE tenant_id = ? AND status = 'accepted'",
-            (tid,)
-        ).fetchall()
-        visible_tids = [tid] + [c["connected_tenant_id"] for c in connected]
-        placeholders = ",".join("?" * len(visible_tids))
-        # Get last visit time
-        user = db.get_or_create_user(tenant_id=tid)
-        last_visit = user.get("last_aviary_visit") or "2000-01-01"
-        # Count new posts that @mention me (from OTHER tenants)
-        if my_name:
-            row = conn.execute(f"""
-                SELECT COUNT(*) as cnt FROM aviary_posts
-                WHERE tenant_id IN ({placeholders})
-                AND tenant_id != ?
-                AND content LIKE ?
-                AND created_at > ?
-            """, visible_tids + [tid, f"%@{my_name}%", last_visit]).fetchone()
-            aviary_badge = row["cnt"] if row else 0
+        my_groups = conn.execute("""
+            SELECT group_id, last_read_at FROM chatter_group_members WHERE tenant_id = ?
+        """, (tid,)).fetchall()
+        for g in my_groups:
+            cnt = conn.execute(
+                "SELECT COUNT(*) as cnt FROM aviary_posts WHERE group_id = ? AND tenant_id != ? AND created_at > ?",
+                (g["group_id"], tid, g["last_read_at"])
+            ).fetchone()
+            chatter_badge += cnt["cnt"] if cnt else 0
     except Exception:
         pass
 
@@ -1351,7 +1339,7 @@ async def dashboard(request: Request):
         "has_device": has_device,
         "claim_error": claim_error,
         "claim_success": claim_success,
-        "aviary_badge": aviary_badge,
+        "chatter_badge": chatter_badge,
     })
 
 
@@ -4199,7 +4187,7 @@ async def photos_list_api(request: Request):
     } for p in photos])
 
 
-# ── Chatter (community feed) ──
+# ── Chatter (group-based community feed) ──
 
 def _time_ago(created_at_str):
     """Human-readable time ago from ISO timestamp."""
@@ -4229,8 +4217,51 @@ def _time_ago(created_at_str):
         return ""
 
 
+def _load_posts(conn, group_id, tid):
+    """Load posts for a group with reactions and comments."""
+    import re
+    from markupsafe import escape
+    rows = conn.execute("""
+        SELECT ap.*, t.name as household_name
+        FROM aviary_posts ap
+        JOIN tenants t ON ap.tenant_id = t.id
+        WHERE ap.group_id = ?
+        ORDER BY ap.created_at DESC
+        LIMIT 100
+    """, (group_id,)).fetchall()
+
+    posts = []
+    for row in rows:
+        post = dict(row)
+        post["time_ago"] = _time_ago(post["created_at"])
+        raw = str(escape(post.get("content") or ""))
+        post["content_html"] = re.sub(
+            r'@([\w\s]+?)(?=\s@|\s*$|[.,!?;:])',
+            r'<span class="bg-orange-100 text-orange-700 px-1 rounded font-medium">@\1</span>',
+            raw
+        )
+        reactions = conn.execute(
+            "SELECT reaction, COUNT(*) as cnt FROM aviary_reactions WHERE post_id = ? GROUP BY reaction",
+            (post["id"],)
+        ).fetchall()
+        post["reaction_counts"] = {r["reaction"]: r["cnt"] for r in reactions}
+        my_react = conn.execute(
+            "SELECT reaction FROM aviary_reactions WHERE post_id = ? AND tenant_id = ?",
+            (post["id"], tid)
+        ).fetchone()
+        post["my_reaction"] = my_react["reaction"] if my_react else ""
+        comments = conn.execute(
+            "SELECT * FROM aviary_comments WHERE post_id = ? ORDER BY created_at ASC",
+            (post["id"],)
+        ).fetchall()
+        post["comments"] = [dict(c) for c in comments]
+        posts.append(post)
+    return posts
+
+
 @router.get("/chatter", response_class=HTMLResponse)
-async def aviary_page(request: Request):
+async def chatter_groups_list(request: Request):
+    """Show list of chatter groups the user belongs to."""
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -4243,92 +4274,121 @@ async def aviary_page(request: Request):
     try:
         conn.row_factory = sqlite3.Row
 
-        # Get my connected tenant IDs (accepted only)
-        connected = conn.execute(
-            "SELECT connected_tenant_id FROM connected_families WHERE tenant_id = ? AND status = 'accepted'",
-            (tid,)
-        ).fetchall()
-        visible_tids = [tid] + [c["connected_tenant_id"] for c in connected]
-        placeholders = ",".join("?" * len(visible_tids))
+        # Get groups I'm a member of
+        groups = []
+        my_groups = conn.execute("""
+            SELECT gm.group_id, gm.last_read_at, gm.role,
+                   g.name, g.creator_tenant_id, g.created_at
+            FROM chatter_group_members gm
+            JOIN chatter_groups g ON gm.group_id = g.id
+            WHERE gm.tenant_id = ?
+            ORDER BY g.created_at DESC
+        """, (tid,)).fetchall()
 
-        # Fetch posts from all visible tenants
-        rows = conn.execute(f"""
-            SELECT ap.*, t.name as household_name
-            FROM aviary_posts ap
-            JOIN tenants t ON ap.tenant_id = t.id
-            WHERE ap.tenant_id IN ({placeholders})
-            ORDER BY ap.created_at DESC
-            LIMIT 100
-        """, visible_tids).fetchall()
-
-        posts = []
-        for row in rows:
-            post = dict(row)
-            post["time_ago"] = _time_ago(post["created_at"])
-
-            # Render @mentions as styled HTML
-            import re
-            from markupsafe import escape
-            raw = str(escape(post.get("content") or ""))
-            post["content_html"] = re.sub(
-                r'@([\w\s]+?)(?=\s@|\s*$|[.,!?;:])',
-                r'<span class="bg-orange-100 text-orange-700 px-1 rounded font-medium">@\1</span>',
-                raw
-            )
-
-            # Reactions
-            reactions = conn.execute(
-                "SELECT reaction, COUNT(*) as cnt FROM aviary_reactions WHERE post_id = ? GROUP BY reaction",
-                (post["id"],)
-            ).fetchall()
-            post["reaction_counts"] = {r["reaction"]: r["cnt"] for r in reactions}
-
-            my_react = conn.execute(
-                "SELECT reaction FROM aviary_reactions WHERE post_id = ? AND tenant_id = ?",
-                (post["id"], tid)
+        for g in my_groups:
+            gd = dict(g)
+            # Count unread posts
+            unread = conn.execute(
+                "SELECT COUNT(*) as cnt FROM aviary_posts WHERE group_id = ? AND tenant_id != ? AND created_at > ?",
+                (g["group_id"], tid, g["last_read_at"])
             ).fetchone()
-            post["my_reaction"] = my_react["reaction"] if my_react else ""
+            gd["unread"] = unread["cnt"] if unread else 0
+            # Member count
+            mc = conn.execute(
+                "SELECT COUNT(*) as cnt FROM chatter_group_members WHERE group_id = ?",
+                (g["group_id"],)
+            ).fetchone()
+            gd["member_count"] = mc["cnt"] if mc else 0
+            # Last post preview
+            last_post = conn.execute(
+                "SELECT author_name, content, content_type, created_at FROM aviary_posts WHERE group_id = ? ORDER BY created_at DESC LIMIT 1",
+                (g["group_id"],)
+            ).fetchone()
+            if last_post:
+                gd["last_author"] = last_post["author_name"]
+                gd["last_preview"] = (last_post["content"] or f"[{last_post['content_type']}]")[:60]
+                gd["last_time"] = _time_ago(last_post["created_at"])
+            else:
+                gd["last_author"] = None
+                gd["last_preview"] = "No messages yet"
+                gd["last_time"] = ""
+            groups.append(gd)
 
-            # Comments
-            comments = conn.execute(
-                "SELECT * FROM aviary_comments WHERE post_id = ? ORDER BY created_at ASC",
-                (post["id"],)
-            ).fetchall()
-            post["comments"] = [dict(c) for c in comments]
+        # Get connected families for creating new groups
+        connections = conn.execute("""
+            SELECT cf.connected_tenant_id, cf.connected_tenant_name,
+                   COALESCE(a.name, up.name, cf.connected_tenant_name) as display_name
+            FROM connected_families cf
+            LEFT JOIN accounts a ON a.tenant_id = cf.connected_tenant_id AND a.role = 'owner'
+            LEFT JOIN user_profiles up ON up.tenant_id = cf.connected_tenant_id
+            WHERE cf.tenant_id = ? AND cf.status = 'accepted'
+        """, (tid,)).fetchall()
+        connections = [dict(c) for c in connections]
 
-            posts.append(post)
     finally:
         if not db._conn:
             conn.close()
 
-    # Mark visit time for badge tracking
-    try:
-        conn2 = db._get_connection()
-        conn2.execute("""
-            UPDATE user_profiles SET last_aviary_visit = datetime('now')
-            WHERE tenant_id = ?
-        """, (tid,))
-        conn2.commit()
-        if not db._conn:
-            conn2.close()
-    except Exception:
-        pass
-
     return templates.TemplateResponse("chatter.html", {
         "request": request,
         "session": session,
-        "posts": posts,
+        "groups": groups,
+        "connections": connections,
     })
 
 
+@router.post("/chatter/create-group")
+async def chatter_create_group(request: Request):
+    """Create a new chatter group and invite members."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    form = await request.form()
+    name = (form.get("name") or "").strip()
+    if not name:
+        return RedirectResponse("/web/chatter", status_code=303)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+        # Create group
+        conn.execute(
+            "INSERT INTO chatter_groups (name, creator_tenant_id) VALUES (?, ?)",
+            (name, tid))
+        group_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        # Add creator as admin
+        conn.execute(
+            "INSERT INTO chatter_group_members (group_id, tenant_id, role, last_read_at) VALUES (?, ?, 'admin', datetime('now'))",
+            (group_id, tid))
+        # Add selected members
+        member_tids = form.getlist("members")
+        for mtid in member_tids:
+            if mtid.isdigit() and int(mtid) != tid:
+                conn.execute(
+                    "INSERT OR IGNORE INTO chatter_group_members (group_id, tenant_id, role) VALUES (?, ?, 'member')",
+                    (group_id, int(mtid)))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
+
+
 @router.get("/chatter/people")
-async def aviary_people(request: Request):
-    """Return list of taggable people for @ mentions."""
+async def chatter_people(request: Request):
+    """Return list of taggable people for @ mentions, scoped to group if provided."""
     session = await get_web_session(request)
     if not session:
         return JSONResponse({"people": []})
     db = request.app.state.db
     tid = session["tenant_id"]
+    group_id = request.query_params.get("group_id")
     import sqlite3
     conn = db._get_connection()
     try:
@@ -4336,39 +4396,37 @@ async def aviary_people(request: Request):
         people = []
         seen = set()
 
-        # Connected account holders
-        connected = conn.execute("""
-            SELECT cf.connected_tenant_id, t.name as household,
-                   COALESCE(a.name, up.name) as person_name
-            FROM connected_families cf
-            JOIN tenants t ON cf.connected_tenant_id = t.id
-            LEFT JOIN accounts a ON a.tenant_id = cf.connected_tenant_id AND a.role = 'owner'
-            LEFT JOIN user_profiles up ON up.tenant_id = cf.connected_tenant_id
-            WHERE cf.tenant_id = ? AND cf.status = 'accepted'
-        """, (tid,)).fetchall()
-        for row in connected:
-            name = row["person_name"]
-            if name and name.lower() not in seen:
-                seen.add(name.lower())
-                people.append({"name": name, "household": row["household"]})
-
-        # My own family members
-        members = conn.execute(
-            "SELECT name FROM family_members WHERE tenant_id = ?", (tid,)
-        ).fetchall()
-        for m in members:
-            if m["name"] and m["name"].lower() not in seen:
-                seen.add(m["name"].lower())
-                people.append({"name": m["name"], "household": ""})
-
-        # My own household members (other accounts on my tenant)
-        my_accounts = conn.execute(
-            "SELECT name FROM accounts WHERE tenant_id = ?", (tid,)
-        ).fetchall()
-        for a in my_accounts:
-            if a["name"] and a["name"].lower() not in seen:
-                seen.add(a["name"].lower())
-                people.append({"name": a["name"], "household": ""})
+        if group_id and group_id.isdigit():
+            # Scope to group members
+            members = conn.execute("""
+                SELECT gm.tenant_id, COALESCE(a.name, up.name) as person_name, t.name as household
+                FROM chatter_group_members gm
+                LEFT JOIN accounts a ON a.tenant_id = gm.tenant_id AND a.role = 'owner'
+                LEFT JOIN user_profiles up ON up.tenant_id = gm.tenant_id
+                LEFT JOIN tenants t ON gm.tenant_id = t.id
+                WHERE gm.group_id = ? AND gm.tenant_id != ?
+            """, (int(group_id), tid)).fetchall()
+            for row in members:
+                name = row["person_name"]
+                if name and name.lower() not in seen:
+                    seen.add(name.lower())
+                    people.append({"name": name, "household": row["household"] or ""})
+        else:
+            # Fall back to all connections
+            connected = conn.execute("""
+                SELECT cf.connected_tenant_id, t.name as household,
+                       COALESCE(a.name, up.name) as person_name
+                FROM connected_families cf
+                JOIN tenants t ON cf.connected_tenant_id = t.id
+                LEFT JOIN accounts a ON a.tenant_id = cf.connected_tenant_id AND a.role = 'owner'
+                LEFT JOIN user_profiles up ON up.tenant_id = cf.connected_tenant_id
+                WHERE cf.tenant_id = ? AND cf.status = 'accepted'
+            """, (tid,)).fetchall()
+            for row in connected:
+                name = row["person_name"]
+                if name and name.lower() not in seen:
+                    seen.add(name.lower())
+                    people.append({"name": name, "household": row["household"]})
 
         people.sort(key=lambda p: p["name"].lower())
         return JSONResponse({"people": people})
@@ -4377,40 +4435,131 @@ async def aviary_people(request: Request):
             conn.close()
 
 
-@router.post("/chatter/post")
-async def aviary_create_post(request: Request):
+@router.get("/chatter/{group_id}", response_class=HTMLResponse)
+async def chatter_group_feed(request: Request, group_id: int):
+    """View a specific chatter group's feed."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+
+        # Verify membership
+        member = conn.execute(
+            "SELECT * FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+            (group_id, tid)
+        ).fetchone()
+        if not member:
+            return RedirectResponse("/web/chatter", status_code=303)
+
+        group = conn.execute("SELECT * FROM chatter_groups WHERE id = ?", (group_id,)).fetchone()
+        if not group:
+            return RedirectResponse("/web/chatter", status_code=303)
+        group = dict(group)
+
+        posts = _load_posts(conn, group_id, tid)
+
+        # Get group members for display
+        members = conn.execute("""
+            SELECT gm.tenant_id, gm.role, COALESCE(a.name, up.name, t.name) as display_name
+            FROM chatter_group_members gm
+            LEFT JOIN accounts a ON a.tenant_id = gm.tenant_id AND a.role = 'owner'
+            LEFT JOIN user_profiles up ON up.tenant_id = gm.tenant_id
+            LEFT JOIN tenants t ON gm.tenant_id = t.id
+            WHERE gm.group_id = ?
+        """, (group_id,)).fetchall()
+        members = [dict(m) for m in members]
+
+        # Get connections not yet in this group (for inviting)
+        connections = conn.execute("""
+            SELECT cf.connected_tenant_id, COALESCE(a.name, up.name, cf.connected_tenant_name) as display_name
+            FROM connected_families cf
+            LEFT JOIN accounts a ON a.tenant_id = cf.connected_tenant_id AND a.role = 'owner'
+            LEFT JOIN user_profiles up ON up.tenant_id = cf.connected_tenant_id
+            WHERE cf.tenant_id = ? AND cf.status = 'accepted'
+            AND cf.connected_tenant_id NOT IN (
+                SELECT tenant_id FROM chatter_group_members WHERE group_id = ?
+            )
+        """, (tid, group_id)).fetchall()
+        invitable = [dict(c) for c in connections]
+
+        # Mark as read
+        conn.execute(
+            "UPDATE chatter_group_members SET last_read_at = datetime('now') WHERE group_id = ? AND tenant_id = ?",
+            (group_id, tid))
+        conn.commit()
+
+    finally:
+        if not db._conn:
+            conn.close()
+
+    is_admin = member["role"] == "admin"
+
+    return templates.TemplateResponse("chatter_group.html", {
+        "request": request,
+        "session": session,
+        "group": group,
+        "posts": posts,
+        "members": members,
+        "invitable": invitable,
+        "is_admin": is_admin,
+    })
+
+
+@router.post("/chatter/{group_id}/post")
+async def chatter_group_post(request: Request, group_id: int):
+    """Create a post in a chatter group."""
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
         return RedirectResponse("/web/login", status_code=302)
 
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+
+    # Verify membership
+    conn = db._get_connection()
+    try:
+        member = conn.execute(
+            "SELECT 1 FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+            (group_id, tid)
+        ).fetchone()
+        if not member:
+            return RedirectResponse("/web/chatter", status_code=303)
+    finally:
+        if not db._conn:
+            conn.close()
+
     form = await request.form()
     content = (form.get("content") or "").strip()
     photo_file = form.get("photo")
     audio_file = form.get("audio")
-    db = request.app.state.db
-    tid = session["tenant_id"]
     author = session.get("name", "Someone")
 
     photo_filename = None
     audio_filename = None
 
-    # Handle photo upload
     if photo_file and hasattr(photo_file, "read"):
         photo_data = await photo_file.read()
         if len(photo_data) > 0:
-            photo_filename = f"aviary_{uuid.uuid4().hex[:8]}.jpg"
+            photo_filename = f"chatter_{uuid.uuid4().hex[:8]}.jpg"
             photos_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "photos")
             os.makedirs(photos_dir, exist_ok=True)
             with open(os.path.join(photos_dir, photo_filename), "wb") as f:
                 f.write(photo_data)
 
-    # Handle voice upload
     if audio_file and hasattr(audio_file, "read"):
         import subprocess
         audio_data = await audio_file.read()
         if len(audio_data) > 0:
-            audio_filename = f"aviary_{uuid.uuid4().hex[:8]}.wav"
+            audio_filename = f"chatter_{uuid.uuid4().hex[:8]}.wav"
             recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
             os.makedirs(recordings_dir, exist_ok=True)
             raw_path = os.path.join(recordings_dir, audio_filename + ".raw")
@@ -4430,7 +4579,7 @@ async def aviary_create_post(request: Request):
                     os.remove(raw_path)
 
     if not content and not photo_filename and not audio_filename:
-        return RedirectResponse("/web/chatter", status_code=303)
+        return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
 
     content_type = "text"
     if photo_filename:
@@ -4438,23 +4587,121 @@ async def aviary_create_post(request: Request):
     elif audio_filename:
         content_type = "voice"
 
-    import sqlite3
     conn = db._get_connection()
     try:
         conn.execute("""
-            INSERT INTO aviary_posts (tenant_id, author_name, content_type, content, photo_filename, audio_filename)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (tid, author, content_type, content or None, photo_filename, audio_filename))
+            INSERT INTO aviary_posts (tenant_id, author_name, content_type, content, photo_filename, audio_filename, group_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (tid, author, content_type, content or None, photo_filename, audio_filename, group_id))
         conn.commit()
     finally:
         if not db._conn:
             conn.close()
 
+    return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
+
+
+@router.post("/chatter/{group_id}/invite")
+async def chatter_group_invite(request: Request, group_id: int):
+    """Invite a connection to a chatter group."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    form = await request.form()
+    invitee_tid = form.get("invitee_tid", "")
+    if not invitee_tid or not invitee_tid.isdigit():
+        return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        # Verify I'm a member
+        member = conn.execute(
+            "SELECT 1 FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+            (group_id, tid)
+        ).fetchone()
+        if not member:
+            return RedirectResponse("/web/chatter", status_code=303)
+        # Add them directly (no pending invite flow — keep it simple)
+        conn.execute(
+            "INSERT OR IGNORE INTO chatter_group_members (group_id, tenant_id, role) VALUES (?, ?, 'member')",
+            (group_id, int(invitee_tid)))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
+
+
+@router.post("/chatter/{group_id}/leave")
+async def chatter_group_leave(request: Request, group_id: int):
+    """Leave a chatter group."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "DELETE FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+            (group_id, tid))
+        # If no members left, delete the group and its posts
+        remaining = conn.execute(
+            "SELECT COUNT(*) as cnt FROM chatter_group_members WHERE group_id = ?",
+            (group_id,)
+        ).fetchone()
+        if remaining and remaining[0] == 0:
+            conn.execute("DELETE FROM aviary_posts WHERE group_id = ?", (group_id,))
+            conn.execute("DELETE FROM chatter_groups WHERE id = ?", (group_id,))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
     return RedirectResponse("/web/chatter", status_code=303)
 
 
+@router.post("/chatter/{group_id}/remove-member")
+async def chatter_group_remove_member(request: Request, group_id: int):
+    """Remove a member from a chatter group (admin only)."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    form = await request.form()
+    remove_tid = form.get("remove_tid", "")
+    if not remove_tid or not remove_tid.isdigit():
+        return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        # Verify I'm admin
+        me = conn.execute(
+            "SELECT role FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+            (group_id, tid)
+        ).fetchone()
+        if not me or me[0] != "admin":
+            return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
+        conn.execute(
+            "DELETE FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+            (group_id, int(remove_tid)))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
+
+
 @router.post("/chatter/{post_id}/delete")
-async def aviary_delete_post(request: Request, post_id: int):
+async def chatter_delete_post(request: Request, post_id: int):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -4463,6 +4710,9 @@ async def aviary_delete_post(request: Request, post_id: int):
     import sqlite3
     conn = db._get_connection()
     try:
+        post = conn.execute("SELECT group_id FROM aviary_posts WHERE id = ? AND tenant_id = ?",
+                            (post_id, session["tenant_id"])).fetchone()
+        group_id = post[0] if post else None
         conn.execute("DELETE FROM aviary_posts WHERE id = ? AND tenant_id = ?",
                      (post_id, session["tenant_id"]))
         conn.execute("DELETE FROM aviary_reactions WHERE post_id = ?", (post_id,))
@@ -4471,11 +4721,13 @@ async def aviary_delete_post(request: Request, post_id: int):
     finally:
         if not db._conn:
             conn.close()
+    if group_id:
+        return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
     return RedirectResponse("/web/chatter", status_code=303)
 
 
 @router.post("/chatter/{post_id}/react")
-async def aviary_react(request: Request, post_id: int):
+async def chatter_react(request: Request, post_id: int):
     session = await get_web_session(request)
     if not session:
         return JSONResponse({"error": "Not logged in"}, status_code=401)
@@ -4496,10 +4748,8 @@ async def aviary_react(request: Request, post_id: int):
         if existing:
             conn.execute("DELETE FROM aviary_reactions WHERE id = ?", (existing[0],))
             if existing[1] == reaction:
-                # Same emoji tapped again — toggle off
                 conn.commit()
                 return JSONResponse({"ok": True, "action": "removed", "old": old_reaction})
-        # New or different emoji — insert it
         conn.execute(
             "INSERT INTO aviary_reactions (post_id, tenant_id, reactor_name, reaction) VALUES (?, ?, ?, ?)",
             (post_id, tid, session.get("name", ""), reaction))
@@ -4511,7 +4761,7 @@ async def aviary_react(request: Request, post_id: int):
 
 
 @router.post("/chatter/{post_id}/comment")
-async def aviary_comment(request: Request, post_id: int):
+async def chatter_comment(request: Request, post_id: int):
     session = await get_web_session(request)
     if not session:
         return JSONResponse({"error": "Not logged in"}, status_code=401)
@@ -4536,7 +4786,7 @@ async def aviary_comment(request: Request, post_id: int):
 
 
 @router.post("/chatter/{post_id}/save-to-stories")
-async def aviary_save_to_stories(request: Request, post_id: int):
+async def chatter_save_to_stories(request: Request, post_id: int):
     """Save any Chatter post to your own stories."""
     session = await get_web_session(request)
     if not session:
@@ -4552,7 +4802,6 @@ async def aviary_save_to_stories(request: Request, post_id: int):
             return JSONResponse({"error": "Post not found"}, status_code=404)
         post = dict(post)
 
-        # Build transcript
         attribution = f"[From Chatter — posted by {post['author_name']}]"
         transcript = post.get("content") or ""
         if transcript:
@@ -4560,13 +4809,11 @@ async def aviary_save_to_stories(request: Request, post_id: int):
         else:
             transcript = attribution
 
-        # Save as story
         conn.execute("""
             INSERT INTO stories (tenant_id, transcript, speaker_name, source, audio_filename, created_at)
             VALUES (?, ?, ?, 'aviary', ?, CURRENT_TIMESTAMP)
         """, (tid, transcript, post["author_name"], post.get("audio_filename")))
 
-        # If it has a photo, copy it to the user's photos too
         if post.get("photo_filename"):
             conn.execute("""
                 INSERT INTO photos (tenant_id, filename, caption, created_at)
