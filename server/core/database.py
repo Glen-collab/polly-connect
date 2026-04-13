@@ -981,13 +981,13 @@ class PollyDB:
             my_name = my_tenant["name"] if my_tenant else "Unknown"
             target_name = target["name"]
 
-            # Sender side: instantly accepted (can message right away)
+            # Sender side: instantly accepted, tree shared, wall visit set to now
             conn.execute(
-                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'accepted')",
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status, share_tree, last_wall_visit) VALUES (?, ?, ?, 'accepted', 1, datetime('now'))",
                 (tenant_id, target_tid, target_name))
-            # Target side: pending (they need to accept)
+            # Target side: pending, tree pre-shared, wall visit set to now
             conn.execute(
-                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'pending')",
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status, share_tree, last_wall_visit) VALUES (?, ?, ?, 'pending', 1, datetime('now'))",
                 (target_tid, tenant_id, my_name))
             conn.commit()
             return {"connected_tenant_id": target_tid, "connected_tenant_name": target_name}
@@ -1020,13 +1020,13 @@ class PollyDB:
             my_name = my_tenant["name"] if my_tenant else "Unknown"
             target_name = target_tenant["name"]
 
-            # Sender side: instantly accepted, tree shared
+            # Sender side: instantly accepted, tree shared, wall visit set to now
             conn.execute(
-                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status, share_tree) VALUES (?, ?, ?, 'accepted', 1)",
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status, share_tree, last_wall_visit) VALUES (?, ?, ?, 'accepted', 1, datetime('now'))",
                 (tenant_id, target_tenant_id, target_name))
-            # Target side: pending (they need to accept), tree pre-shared so it unlocks on accept
+            # Target side: pending (they need to accept), tree pre-shared, wall visit set to now
             conn.execute(
-                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status, share_tree) VALUES (?, ?, ?, 'pending', 1)",
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status, share_tree, last_wall_visit) VALUES (?, ?, ?, 'pending', 1, datetime('now'))",
                 (target_tenant_id, tenant_id, my_name))
             conn.commit()
             return {"connected_tenant_id": target_tenant_id, "connected_tenant_name": target_name}
