@@ -5711,6 +5711,30 @@ async def invite_record_voice(request: Request, member_id: int):
     return JSONResponse({"ok": True, "filename": filename})
 
 
+@router.get("/api/connected-devices/{target_tid}")
+async def connected_devices_info(request: Request, target_tid: int):
+    """Get device info for a connected family (for message modal)."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"count": 0, "devices": []})
+    db = request.app.state.db
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+        devices = conn.execute(
+            "SELECT device_id, name FROM devices WHERE tenant_id = ? AND claimed_at IS NOT NULL",
+            (target_tid,)
+        ).fetchall()
+        return JSONResponse({
+            "count": len(devices),
+            "devices": [{"device_id": d["device_id"], "name": d["name"]} for d in devices],
+        })
+    finally:
+        if not db._conn:
+            conn.close()
+
+
 @router.get("/api/family-tree/{member_id}/photos")
 async def family_member_photos(request: Request, member_id: int):
     session = await get_web_session(request)

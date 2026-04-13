@@ -45,6 +45,8 @@
                 {% endfor %}
             </select>
         </div>
+        {% elif devices|length == 0 %}
+        <p class="text-xs text-gray-400 mb-3">No Polly device yet — message will appear on the web portal</p>
         {% endif %}
         <div class="mb-3">
             <label class="block text-sm text-gray-600 mb-1">Message</label>

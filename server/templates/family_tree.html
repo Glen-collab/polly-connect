@@ -319,6 +319,7 @@
             <h2 id="connected-modal-name" class="text-lg font-semibold"></h2>
             <button onclick="closeConnectedModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
         </div>
+        <div id="connected-device-info" class="text-xs text-gray-400 mb-3"></div>
         <form method="POST" action="/web/messages/send-connected">
             <input type="hidden" name="connected_tenant_id" id="connected-modal-tid">
             <textarea name="message" required rows="3" placeholder="Type your message..."
@@ -640,6 +641,21 @@ function showConnectedModal(name, tid) {
     document.getElementById('connected-modal-disconnect').action = '/web/settings/connections/' + tid + '/remove';
     document.getElementById('connected-modal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+    // Load device info
+    var info = document.getElementById('connected-device-info');
+    info.textContent = '';
+    fetch('/web/api/connected-devices/' + tid)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.count === 0) {
+            info.innerHTML = '&#x1F4F1; No Polly device yet &mdash; message will appear on their web portal';
+        } else if (data.count === 1) {
+            info.innerHTML = '&#x1F99C; Message will play on their Polly: <strong>' + (data.devices[0].name || data.devices[0].device_id) + '</strong>';
+        } else {
+            info.innerHTML = '&#x1F99C; ' + data.count + ' devices: ' + data.devices.map(function(d) { return d.name || d.device_id; }).join(', ');
+        }
+    })
+    .catch(function() {});
 }
 
 function closeConnectedModal() {
