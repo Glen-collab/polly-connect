@@ -1020,13 +1020,13 @@ class PollyDB:
             my_name = my_tenant["name"] if my_tenant else "Unknown"
             target_name = target_tenant["name"]
 
-            # Sender side: instantly accepted
+            # Sender side: instantly accepted, tree shared
             conn.execute(
-                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'accepted')",
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status, share_tree) VALUES (?, ?, ?, 'accepted', 1)",
                 (tenant_id, target_tenant_id, target_name))
-            # Target side: pending (they need to accept)
+            # Target side: pending (they need to accept), tree pre-shared so it unlocks on accept
             conn.execute(
-                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status) VALUES (?, ?, ?, 'pending')",
+                "INSERT INTO connected_families (tenant_id, connected_tenant_id, connected_tenant_name, status, share_tree) VALUES (?, ?, ?, 'pending', 1)",
                 (target_tenant_id, tenant_id, my_name))
             conn.commit()
             return {"connected_tenant_id": target_tenant_id, "connected_tenant_name": target_name}
@@ -1047,10 +1047,14 @@ class PollyDB:
             if not pending:
                 return False
 
-            # Update to accepted
+            # Update to accepted and auto-share trees both ways
             conn.execute(
-                "UPDATE connected_families SET status = 'accepted' WHERE id = ?",
+                "UPDATE connected_families SET status = 'accepted', share_tree = 1 WHERE id = ?",
                 (pending["id"],))
+            # Also share on the other side
+            conn.execute(
+                "UPDATE connected_families SET share_tree = 1 WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+                (requester_tenant_id, tenant_id))
 
             # Get the requester's owner name to add to accepter's family tree
             requester_user = conn.execute(
