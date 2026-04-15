@@ -1746,16 +1746,16 @@ async def story_edit_save(request: Request, story_id: int):
     try:
         if question_text is not None:
             conn.execute("""
-                UPDATE stories SET transcript = ?, speaker_name = ?, question_text = ?,
+                UPDATE stories SET transcript = ?, corrected_transcript = ?, speaker_name = ?, question_text = ?,
                        qr_in_book = ?, photo_in_book = ?, private = ?
                 WHERE id = ? AND tenant_id = ?
-            """, (transcript, speaker_name or None, question_text or None,
+            """, (transcript, transcript, speaker_name or None, question_text or None,
                   qr_in_book, photo_in_book, private, story_id, session["tenant_id"]))
         else:
             conn.execute("""
-                UPDATE stories SET transcript = ?, speaker_name = ?, qr_in_book = ?, photo_in_book = ?, private = ?
+                UPDATE stories SET transcript = ?, corrected_transcript = ?, speaker_name = ?, qr_in_book = ?, photo_in_book = ?, private = ?
                 WHERE id = ? AND tenant_id = ?
-            """, (transcript, speaker_name or None, qr_in_book, photo_in_book, private, story_id, session["tenant_id"]))
+            """, (transcript, transcript, speaker_name or None, qr_in_book, photo_in_book, private, story_id, session["tenant_id"]))
         conn.commit()
     finally:
         if not db._conn:
@@ -1791,6 +1791,37 @@ async def story_toggle_verify(request: Request, story_id: int):
             conn.close()
 
     return JSONResponse({"ok": True, "verified": bool(new_val)})
+
+
+@router.post("/stories/{story_id}/toggle-qr")
+async def story_toggle_qr(request: Request, story_id: int):
+    """Toggle QR in book status."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    if session.get("role") == "family":
+        return JSONResponse({"error": "Not allowed"}, status_code=403)
+
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    conn = db._get_connection()
+    try:
+        current = conn.execute(
+            "SELECT qr_in_book FROM stories WHERE id = ? AND tenant_id = ?",
+            (story_id, tid)
+        ).fetchone()
+        if not current:
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        new_val = 0 if current[0] else 1
+        conn.execute(
+            "UPDATE stories SET qr_in_book = ? WHERE id = ? AND tenant_id = ?",
+            (new_val, story_id, tid))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return JSONResponse({"ok": True, "qr_in_book": bool(new_val)})
 
 
 @router.post("/stories/{story_id}/inline-save")

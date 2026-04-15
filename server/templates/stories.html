@@ -56,11 +56,8 @@
             {% if story.audio_s3_key %}
             <img src="/web/stories/{{ story.id }}/qr.png" alt="QR" class="w-16 h-16" loading="lazy">
             <div class="flex-1">
-                {% if story.qr_in_book %}
-                <span class="text-xs text-emerald-600 font-medium">QR in book</span>
-                {% else %}
-                <span class="text-xs text-gray-400">QR not in book</span>
-                {% endif %}
+                <button type="button" onclick="toggleQr({{ story.id }})" id="qr-btn-{{ story.id }}"
+                        class="text-xs font-medium px-2 py-0.5 rounded {% if story.qr_in_book %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600{% endif %}">{% if story.qr_in_book %}&#x2714; QR in book{% else %}QR not in book{% endif %}</button>
                 {% if story.photo_id %}
                 &middot;
                 {% if story.photo_in_book %}
@@ -337,6 +334,24 @@ function toggleVerify(id) {
             } else {
                 btn.className = 'text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-500 hover:bg-emerald-50 hover:text-emerald-600';
                 btn.textContent = 'Verify';
+            }
+        }
+    });
+}
+
+// --- QR in Book Toggle ---
+function toggleQr(id) {
+    var btn = document.getElementById('qr-btn-' + id);
+    fetch('/web/stories/' + id + '/toggle-qr', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            if (data.qr_in_book) {
+                btn.className = 'text-xs font-medium px-2 py-0.5 rounded bg-emerald-100 text-emerald-700';
+                btn.innerHTML = '&#x2714; QR in book';
+            } else {
+                btn.className = 'text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600';
+                btn.textContent = 'QR not in book';
             }
         }
     });
