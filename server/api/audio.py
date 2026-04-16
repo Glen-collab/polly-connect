@@ -711,13 +711,15 @@ async def continuous_stream(websocket: WebSocket):
 
                         # Send instant acknowledgment chirp (pre-cached, ~0.3s)
                         # Skip in conversational mode — we might decide nobody spoke
+                        # Skip during quiet hours — wake word false positives shouldn't squawk at night
                         ack_cache = getattr(app.state, "ack_cache", None)
                         is_conversational = conv_state and conv_state.is_conversational
-                        if ack_cache and ack_cache.ready and not is_conversational:
+                        in_quiet = squawk_mgr and squawk_mgr.is_snoozed(device_id) if squawk_mgr else False
+                        if ack_cache and ack_cache.ready and not is_conversational and not in_quiet:
                             ack_dur = await ack_cache.send_ack(
                                 websocket, squawk_mgr=squawk_mgr, device_id=device_id)
                             if ack_dur > 0:
-                                logger.info(f"Ack chirp sent ({ack_dur:.2f}s)")
+                                logger.info(f"Ack chirp sent ({ack_dur:.2f}s) → {device_id}")
 
                         pre_transcription = None
 
