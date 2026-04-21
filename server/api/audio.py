@@ -647,6 +647,12 @@ async def continuous_stream(websocket: WebSocket):
                             command_start_time = time.monotonic()
                             await websocket.send_json({"event": "conversation_listening"})
                     elif detector.detected(chunk_int16):
+                        # Silent during quiet hours — false triggers shouldn't wake the household.
+                        # Ambient squawks are already gated; this gates the wake-word response path too.
+                        if squawk_mgr and squawk_mgr.is_snoozed(device_id):
+                            logger.info(f"Wake word ignored (quiet hours/snoozed) → {device_id}")
+                            detector.reset()
+                            continue
                         # Ignore triggers during cooldown after response (speaker feedback)
                         if time.monotonic() - last_response_time < RESPONSE_COOLDOWN:
                             continue
