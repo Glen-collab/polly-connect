@@ -107,8 +107,9 @@ async def login_page(request: Request):
     if session:
         return RedirectResponse("/web/dashboard", status_code=302)
     invite_id = request.query_params.get("invite", "")
+    error = request.query_params.get("error") or None
     return templates.TemplateResponse("login.html", {
-        "request": request, "error": None, "email": "", "session": None,
+        "request": request, "error": error, "email": "", "session": None,
         "invite_id": invite_id,
     })
 

@@ -220,8 +220,14 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                 from core.csrf import validate_csrf_token
                 session_id = request.cookies.get("polly_session", "anonymous")
                 if not csrf_token or not validate_csrf_token(csrf_token, session_id):
-                    from starlette.responses import Response as _Resp
-                    return _Resp("CSRF validation failed", status_code=403)
+                    # Token mismatch usually means a stale cached page (e.g. an
+                    # installed PWA serving an old login form). Bounce the user
+                    # back to a freshly rendered login page instead of a 403
+                    # white page so they can try again.
+                    from starlette.responses import RedirectResponse as _Redir
+                    import urllib.parse as _up
+                    msg = _up.quote("Your session expired — please try again.")
+                    return _Redir(f"/web/login?error={msg}", status_code=303)
 
         return await call_next(request)
 
