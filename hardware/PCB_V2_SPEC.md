@@ -3,6 +3,8 @@
 ## Status
 **Schematic + PCB layout finalized by Paul P. (Upwork), April 17, 2026.** Glen approved; Paul closed his contract April 20 with ~24 hours logged. A separate designer was engaged to produce the manufacturing files (gerbers, BOM, CPL) from Paul's KiCad output and has not responded as of this file's date — if they don't surface, a new designer can pick this up directly from Paul's KiCad files.
 
+**Final board render from Paul**: [`polly-board/polly_board_v2_final.png`](polly-board/polly_board_v2_final.png). This is what the delivered design looks like — dimensions, component placement, and test-point layout along the bottom edge all visible. A new designer should match this render exactly when producing manufacturing files.
+
 **What a new designer needs to know:**
 - The **schematic and board layout are done**. The remaining work is purely producing JLCPCB-ready manufacturing outputs: gerbers, drill files, a BOM CSV in LCSC format, and a CPL/POS CSV for pick-and-place.
 - Paul's final KiCad files should live in `hardware/polly-board/` — if they're missing from the repo, Glen needs to get them from Paul before handoff.
@@ -24,7 +26,7 @@ Board comes from JLCPCB fully assembled. Zero hand soldering. Only two plug-in c
 - **Power**: USB-C 5V input → AMS1117-3.3 for 3.3V rail
 - **Buttons**: BOOT (GPIO0, doubles as "Story" button in firmware) + RESET (EN) — minimum 15 mm apart on the perch edge
 - **Programming**: USB-C for flashing. UART fallback exposed as **test points only** (no through-hole header, no DNP connector)
-- **Board size**: 36 mm × 45 mm (2-layer)
+- **Board size**: 45 mm × 35 mm (2-layer)
 
 ---
 
@@ -193,7 +195,7 @@ SW2 (Reset) ─── LED1 ─── U3 (Mic) ─── SW1 (Story/Boot)
 - **Alignment**: All four components should be flush with or within 1 mm of the Edge.Cuts boundary on the perch edge. The 3D-printed stump has precise cutouts for buttons, LED window, and mic hole — tolerances assume this alignment.
 - **USB-C connector (J1)**: Place on the **bottom edge** (the edge that faces down into the table). Power cable runs out the bottom of the stump, hidden from view. USB-C is only used for flashing and power, not daily interaction.
 - **JST connectors (J2 speaker, J3 LED eyes)**: Place on a non-perch edge (top or back). Wires run internally through the parrot body.
-- **Mid-board programming pads**: Expose UART as **test points only** (no through-hole header, no DNP connector, no castellated pads). Glen's rule: nothing exposed to the customer except USB-C and the two JSTs. Test points give a bench-tech probe access if firmware ever needs recovery.
+- **Programming test points**: In Paul's final render, the test points are laid out along the **bottom edge** alongside USB-C, as six labeled pads: **3P3, GND, EN, TX, RX, BOOT**. This is the UART fallback for field recovery — pogo-pin compatible, no through-hole header, no DNP connector. Nothing customer-facing beyond the USB-C plug and the two JSTs. Match the pad labels and ordering from the render.
 
 ### Routing
 - Keep analog audio traces (INMP441 SD, MAX98357A output) away from digital noise
@@ -207,7 +209,7 @@ SW2 (Reset) ─── LED1 ─── U3 (Mic) ─── SW1 (Story/Boot)
 - Keep clear under ESP32 antenna area
 
 ### Board Size
-- **Final: 36 mm × 45 mm** (reduced from the original 70×50 target once Paul saw component density on the reworked layout)
+- **Final: 45 mm × 35 mm** (width × height, per `polly-board/polly_board_v2_final.png`). Paul's Apr 14 intermediate was 36×45; the final delivered layout is 45×35 — always match the render, not any in-flight numbers from Upwork messages.
 - 2-layer (F.Cu + B.Cu)
 
 ---
@@ -280,7 +282,8 @@ Before generating manufacturing files, open the KiCad project and confirm:
 - [ ] ICS-43434 VDD tied to **+3.3V**, not +5V
 - [ ] MAX98357A VIN tied to **+5V (VBUS)**, not +3.3V
 - [ ] WS2812B DIN wired directly to GPIO48 (no series resistor — R4 removed from v1 design)
-- [ ] Board outline is **36 × 45 mm**
+- [ ] Board outline is **45 × 35 mm** (match `polly-board/polly_board_v2_final.png`)
+- [ ] Bottom-edge test points labeled **3P3, GND, EN, TX, RX, BOOT**
 
 Full fix list is in `hardware/polly-board/SCHEMATIC-FIXES.md` (20 original errors) and `hardware/polly-board/DESIGNER-REVIEW.md` (remaining issues after first revision). Paul's final design should have all of these resolved — this checklist is just a spot-check.
 
@@ -314,7 +317,7 @@ Full fix list is in `hardware/polly-board/SCHEMATIC-FIXES.md` (20 original error
 - **2026-04-09** — Paul flagged MSM261DGT003 as PDM (incompatible with firmware) and INMP441 as out of stock; Glen proposed ICS-43434 (TDK, I2S, LGA-6) as replacement
 - **2026-04-12** — Paul confirmed ICS-43434 in stock, proposed converting mid-board programming header to test points
 - **2026-04-13** — Glen confirmed: keep BOOT + RESET only (BOOT doubles as Story in firmware), 15 mm button separation, test points over header
-- **2026-04-14** — Paul delivered reworked layout at **36 × 45 mm**; MEMS mic confirmed I2S; programming header converted to test points
-- **2026-04-16** — Paul posted final PCB layout for review (`image (311).png` in Upwork thread)
+- **2026-04-14** — Paul delivered reworked layout at 36 × 45 mm; MEMS mic confirmed I2S; programming header converted to test points
+- **2026-04-16** — Paul posted final PCB layout for review (`image (311).png` in Upwork thread, archived in the repo as `polly-board/polly_board_v2_final.png`). Final board size **45 × 35 mm**, six labeled bottom-edge test points (3P3 / GND / EN / TX / RX / BOOT)
 - **2026-04-17** — Glen approved
 - **2026-04-20** — Paul closed contract, ~24 hours logged. Manufacturing-file generation handed to a separate designer (currently unresponsive as of 2026-04-24).
