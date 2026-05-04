@@ -6,43 +6,52 @@
     <div class="text-center mb-6">
         <img src="/static/polly_logo.png" alt="Polly" class="w-24 h-24 mx-auto mb-2">
         <h1 class="text-2xl font-bold text-emerald-700">Welcome to Polly Connect!</h1>
+        {% if signup_for == 'other' %}
         <p class="text-gray-500 text-sm mt-2">Let's get to know who Polly is for so we can personalize the experience.</p>
+        {% else %}
+        <p class="text-gray-500 text-sm mt-2">Let's get to know you so we can personalize the experience.</p>
+        {% endif %}
     </div>
 
     <form method="POST" action="/web/welcome" class="bg-white rounded-lg shadow p-5 sm:p-6">
+        {% if signup_for == 'other' %}
         <h2 class="text-lg font-semibold mb-1">Who is Polly for?</h2>
         <p class="text-xs text-gray-400 mb-4">This is the person Polly will talk to — the owner. You (the caretaker) are setting this up for them.</p>
+        {% else %}
+        <h2 class="text-lg font-semibold mb-1">Tell us about yourself</h2>
+        <p class="text-xs text-gray-400 mb-4">Polly will use this to personalize stories, weather, and memories for you.</p>
+        {% endif %}
 
         <div class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Their Full Name</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{% if signup_for == 'other' %}Their Full Name{% else %}Your Full Name{% endif %}</label>
                 <input type="text" name="name" value="{{ user.name or '' }}" required
                        class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                       placeholder="e.g. Evelyn Rogers">
+                       placeholder="{% if signup_for == 'other' %}e.g. Evelyn Rogers{% else %}e.g. Glen Rogers{% endif %}">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">What should Polly call them?</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{% if signup_for == 'other' %}What should Polly call them?{% else %}What should Polly call you?{% endif %}</label>
                 <input type="text" name="familiar_name" value="{{ user.familiar_name or '' }}"
                        class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                       placeholder="e.g. Grandma, Nana, Mom, Evelyn">
-                <p class="text-xs text-gray-400 mt-1">Polly will use this name when talking to them</p>
+                       placeholder="{% if signup_for == 'other' %}e.g. Grandma, Nana, Mom, Evelyn{% else %}e.g. Glen, Coach, Dad{% endif %}">
+                <p class="text-xs text-gray-400 mt-1">{% if signup_for == 'other' %}Polly will use this name when talking to them{% else %}Polly will use this name when talking to you{% endif %}</p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Where did they grow up?</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{% if signup_for == 'other' %}Where did they grow up?{% else %}Where did you grow up?{% endif %}</label>
                 <input type="text" name="hometown" value="{{ user.hometown or '' }}"
                        class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                        placeholder="e.g. Mauston, Wisconsin">
                 <p class="text-xs text-gray-400 mt-1">Used for nostalgia snippets and personalized stories</p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">What year were they born?</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{% if signup_for == 'other' %}What year were they born?{% else %}What year were you born?{% endif %}</label>
                 <input type="number" name="birth_year" value="{{ user.birth_year or '' }}"
                        class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                       placeholder="e.g. 1932" min="1800" max="2010">
-                <p class="text-xs text-gray-400 mt-1">Helps Polly reference the right era for memories</p>
+                       placeholder="{% if signup_for == 'other' %}e.g. 1932{% else %}e.g. 1965{% endif %}" min="1800" max="2010">
+                <p class="text-xs text-gray-400 mt-1">{% if signup_for == 'other' %}Helps Polly reference the right era for memories{% else %}Helps Polly reference the right era for your memories{% endif %}</p>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Their location (for weather)</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{% if signup_for == 'other' %}Their location (for weather){% else %}Your location (for weather){% endif %}</label>
                 <input type="text" name="location_city" value="{{ user.location_city or '' }}"
                        class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                        placeholder="e.g. Hartland, WI">
@@ -59,7 +68,7 @@
                    class="w-full border rounded-lg px-4 py-3 text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                    placeholder="000000"
                    style="max-width: 200px; margin: 0 auto; display: block;">
-            <input type="text" name="device_name" placeholder="Name your Polly (e.g. Grandma's Polly)"
+            <input type="text" name="device_name" placeholder="{% if signup_for == 'other' %}Name your Polly (e.g. Grandma's Polly){% else %}Name your Polly (e.g. My Polly){% endif %}"
                    class="w-full border rounded-lg px-4 py-3 mt-3 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                    style="max-width: 320px; margin: 0.75rem auto 0; display: block;">
             <p class="text-xs text-gray-400 mt-2 text-center">Don't have a code yet? No problem — you can add it later in Settings &rarr; Devices</p>

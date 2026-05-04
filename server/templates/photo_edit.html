@@ -49,7 +49,7 @@
                         <option value="">-- None --</option>
                         {% for story in stories %}
                         <option value="{{ story.id }}" {% if photo.story_id == story.id %}selected{% endif %}>
-                            #{{ story.id }} - {{ (story.corrected_transcript or story.transcript or "Untitled")[:50] }}{% if story.speaker_name %} ({{ story.speaker_name }}){% endif %}
+                            {{ (story.corrected_transcript or story.transcript or "Untitled")[:60] }}{% if story.speaker_name %} ({{ story.speaker_name }}){% endif %}
                         </option>
                         {% endfor %}
                     </select>

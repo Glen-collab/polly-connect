@@ -501,7 +501,7 @@ async def register_page(request: Request):
         return RedirectResponse("/web/dashboard", status_code=302)
     return templates.TemplateResponse("register.html", {
         "request": request, "error": None, "name": "", "email": "",
-        "household_name": "", "session": None,
+        "household_name": "", "signup_for": "self", "session": None,
     })
 
 
@@ -510,34 +510,36 @@ async def register_submit(request: Request, name: str = Form(...),
                             household_name: str = Form(...),
                             email: str = Form(...), password: str = Form(...),
                             password_confirm: str = Form(...),
-                            agree_terms: str = Form("")):
+                            agree_terms: str = Form(""),
+                            signup_for: str = Form("self")):
     db = request.app.state.db
     email = email.strip().lower()
+    signup_for = "other" if signup_for == "other" else "self"
 
     # Validation
     if not agree_terms:
         return templates.TemplateResponse("register.html", {
             "request": request, "error": "You must agree to the Terms of Service and Privacy Policy.",
             "name": name, "email": email, "household_name": household_name,
-            "session": None,
+            "signup_for": signup_for, "session": None,
         })
     if password != password_confirm:
         return templates.TemplateResponse("register.html", {
             "request": request, "error": "Passwords don't match.",
             "name": name, "email": email, "household_name": household_name,
-            "session": None,
+            "signup_for": signup_for, "session": None,
         })
     if len(password) < 6:
         return templates.TemplateResponse("register.html", {
             "request": request, "error": "Password must be at least 6 characters.",
             "name": name, "email": email, "household_name": household_name,
-            "session": None,
+            "signup_for": signup_for, "session": None,
         })
     if db.get_account_by_email(email):
         return templates.TemplateResponse("register.html", {
             "request": request, "error": "An account with this email already exists.",
             "name": name, "email": email, "household_name": household_name,
-            "session": None,
+            "signup_for": signup_for, "session": None,
         })
 
     # If no accounts exist yet, use tenant #1 (Default). Otherwise create new tenant.
@@ -562,8 +564,12 @@ async def register_submit(request: Request, name: str = Form(...),
     pw_hash = hash_password(password)
     account_id = db.create_account(email, pw_hash, name, tenant_id, role="owner")
 
-    # Ensure a user_profile exists for this tenant
-    db.get_or_create_user(name=name, tenant_id=tenant_id)
+    # Ensure a user_profile exists for this tenant.
+    # If signing up for self, the device user IS the account holder — prefill name.
+    # If signing up for someone else (caretaker flow), leave name blank so the
+    # welcome page asks for the elder's name explicitly.
+    profile_name = name if signup_for == "self" else ""
+    db.get_or_create_user(name=profile_name, tenant_id=tenant_id)
 
     # Notify admin of new registration
     try:
@@ -584,7 +590,7 @@ async def register_submit(request: Request, name: str = Form(...),
     )
     db.update_account_login(account_id)
 
-    response = RedirectResponse("/web/welcome", status_code=302)
+    response = RedirectResponse(f"/web/welcome?for={signup_for}", status_code=302)
     response.set_cookie(
         "polly_session", session_id,
         max_age=settings.SESSION_DURATION_HOURS * 3600,
@@ -778,11 +784,17 @@ async def welcome_page(request: Request):
         return redirect
     db = request.app.state.db
     user = db.get_or_create_user(tenant_id=session["tenant_id"])
+    # ?for=self|other tells the template whether the account holder IS the
+    # device user or is a caretaker setting Polly up for someone else.
+    # Default to "self" (preserves the original elder/caretaker copy only
+    # when the register page explicitly passes for=other).
+    signup_for = "other" if request.query_params.get("for") == "other" else "self"
     # Allow preview even if setup_complete (skip auto-redirect)
     return templates.TemplateResponse("welcome.html", {
         "request": request,
         "session": session,
         "user": user,
+        "signup_for": signup_for,
         "claim_code": "",
         "claim_error": None,
         "claim_success": None,
@@ -3545,6 +3557,46 @@ async def web_record_story(request: Request):
     form = await request.form()
     audio = form.get("audio")
     speaker_name = form.get("speaker_name", "")
+    typed_text = (form.get("transcript_text") or "").strip()
+
+    # Auto-set speaker name from family member if not provided
+    member_id = session.get("family_member_id")
+    if not speaker_name and member_id:
+        member = db.get_family_member_by_id(member_id)
+        if member:
+            speaker_name = member.get("name", "")
+
+    # Text-only path: no audio attached, just typed text
+    if not audio or getattr(audio, "filename", None) in (None, ""):
+        if not typed_text:
+            return JSONResponse({"error": "Type a memory or record audio."}, status_code=400)
+        user = db.get_or_create_user(tenant_id=tid)
+        story_id = db.save_story(
+            transcript=typed_text,
+            audio_s3_key=None,
+            speaker_name=speaker_name or None,
+            source="web_typed",
+            user_id=user["id"],
+            tenant_id=tid,
+            recorded_by_member_id=member_id,
+        )
+        memory_extractor = getattr(request.app.state, "memory_extractor", None)
+        if memory_extractor:
+            try:
+                await asyncio.to_thread(
+                    memory_extractor.extract_and_save_memories,
+                    db, typed_text, user["id"], tid,
+                    speaker_name=speaker_name or None,
+                    question_text=None,
+                )
+            except Exception as e:
+                logger.error(f"Memory extraction failed for typed memory: {e}")
+        return JSONResponse({
+            "transcript": typed_text,
+            "story_id": story_id,
+            "transcription_failed": False,
+            "message": "Memory saved!",
+        })
 
     audio_data = await audio.read()
     if len(audio_data) > MAX_AUDIO_SIZE:
@@ -3568,23 +3620,20 @@ async def web_record_story(request: Request):
     with open(wav_path, "wb") as f:
         f.write(wav_bytes)
 
-    # Try to transcribe, but keep audio regardless
+    # If user typed text alongside the recording, prefer the typed version as the
+    # transcript (cleaner) and skip the transcriber call entirely.
     transcription_failed = False
-    transcriber = request.app.state.transcriber
-    try:
-        transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
-    except Exception:
-        transcription = None
-    if not transcription or len(transcription.strip()) < 5:
-        transcription = "(no transcription — audio saved)"
-        transcription_failed = True
-
-    # Auto-set speaker name from family member if not provided
-    member_id = session.get("family_member_id")
-    if not speaker_name and member_id:
-        member = db.get_family_member_by_id(member_id)
-        if member:
-            speaker_name = member.get("name", "")
+    if typed_text:
+        transcription = typed_text
+    else:
+        transcriber = request.app.state.transcriber
+        try:
+            transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+        except Exception:
+            transcription = None
+        if not transcription or len(transcription.strip()) < 5:
+            transcription = "(no transcription — audio saved)"
+            transcription_failed = True
 
     # Save as story
     user = db.get_or_create_user(tenant_id=tid)
@@ -3621,9 +3670,7 @@ async def web_record_story(request: Request):
 
 
 @router.post("/photos/{photo_id}/record-story")
-async def photo_record_story(request: Request, photo_id: int,
-                              audio: UploadFile = File(...),
-                              speaker_name: str = Form("")):
+async def photo_record_story(request: Request, photo_id: int):
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
@@ -3640,37 +3687,10 @@ async def photo_record_story(request: Request, photo_id: int,
     if not photo:
         return JSONResponse({"error": "Photo not found"}, status_code=404)
 
-    # Read audio data
-    audio_data = await audio.read()
-    if len(audio_data) > MAX_AUDIO_SIZE:
-        return JSONResponse({"error": "Audio too large (max 5 minutes)"}, status_code=413)
-    if len(audio_data) < 1000:
-        return JSONResponse({"error": "Audio too short"}, status_code=400)
-
-    content_type = audio.content_type or ""
-    # Browser sends raw PCM int16 at 16kHz from our JS recorder
-    if "octet-stream" in content_type or "raw" in content_type:
-        wav_bytes = _build_wav(audio_data, sample_rate=16000)
-    elif "wav" in content_type:
-        wav_bytes = audio_data
-    else:
-        # Try treating as WAV anyway (browser might label it oddly)
-        wav_bytes = audio_data if audio_data[:4] == b'RIFF' else _build_wav(audio_data)
-
-    # Save WAV file for playback
-    recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
-    os.makedirs(recordings_dir, exist_ok=True)
-    wav_filename = f"photo_{photo_id}_{uuid.uuid4().hex[:8]}.wav"
-    wav_path = os.path.join(recordings_dir, wav_filename)
-    with open(wav_path, "wb") as f:
-        f.write(wav_bytes)
-
-    # Transcribe
-    transcriber = request.app.state.transcriber
-    transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
-
-    if not transcription or len(transcription.strip()) < 5:
-        transcription = "[Audio memory]"
+    form = await request.form()
+    audio = form.get("audio")
+    speaker_name = form.get("speaker_name", "")
+    typed_text = (form.get("transcript_text") or "").strip()
 
     # Build question context from photo caption + tags
     caption = photo.get("caption") or "this photo"
@@ -3683,13 +3703,51 @@ async def photo_record_story(request: Request, photo_id: int,
         if member:
             speaker_name = member.get("name", "")
 
+    # Text-only path: no audio attached
+    text_only = (not audio) or getattr(audio, "filename", None) in (None, "")
+    if text_only:
+        if not typed_text:
+            return JSONResponse({"error": "Type a memory or record audio."}, status_code=400)
+        wav_filename = None
+        transcription = typed_text
+    else:
+        audio_data = await audio.read()
+        if len(audio_data) > MAX_AUDIO_SIZE:
+            return JSONResponse({"error": "Audio too large (max 5 minutes)"}, status_code=413)
+        if len(audio_data) < 1000:
+            return JSONResponse({"error": "Audio too short"}, status_code=400)
+
+        content_type = audio.content_type or ""
+        if "octet-stream" in content_type or "raw" in content_type:
+            wav_bytes = _build_wav(audio_data, sample_rate=16000)
+        elif "wav" in content_type:
+            wav_bytes = audio_data
+        else:
+            wav_bytes = audio_data if audio_data[:4] == b'RIFF' else _build_wav(audio_data)
+
+        recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")
+        os.makedirs(recordings_dir, exist_ok=True)
+        wav_filename = f"photo_{photo_id}_{uuid.uuid4().hex[:8]}.wav"
+        wav_path = os.path.join(recordings_dir, wav_filename)
+        with open(wav_path, "wb") as f:
+            f.write(wav_bytes)
+
+        # Typed text alongside a recording wins as the transcript (cleaner than ASR).
+        if typed_text:
+            transcription = typed_text
+        else:
+            transcriber = request.app.state.transcriber
+            transcription = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+            if not transcription or len(transcription.strip()) < 5:
+                transcription = "[Audio memory]"
+
     # Save as story linked to the photo
     user = db.get_or_create_user(tenant_id=tid)
     story_id = db.save_story(
         transcript=transcription,
         audio_s3_key=wav_filename,
         speaker_name=speaker_name or None,
-        source="photo_story",
+        source="photo_story" if not text_only else "photo_typed",
         user_id=user["id"],
         tenant_id=tid,
         question_text=question_text,

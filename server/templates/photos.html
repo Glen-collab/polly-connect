@@ -36,7 +36,7 @@
                     <option value="">-- None --</option>
                     {% for story in stories %}
                     <option value="{{ story.id }}">
-                        #{{ story.id }} - {{ (story.corrected_transcript or story.transcript or "Untitled")[:50] }}{% if story.speaker_name %} ({{ story.speaker_name }}){% endif %}
+                        {{ (story.corrected_transcript or story.transcript or "Untitled")[:60] }}{% if story.speaker_name %} ({{ story.speaker_name }}){% endif %}
                     </option>
                     {% endfor %}
                 </select>
@@ -178,14 +178,28 @@
             <!-- Recording controls -->
             <div id="rec-controls" class="flex flex-col items-center gap-3">
                 <!-- Idle state -->
-                <div id="rec-idle">
-                    <button onclick="startRecording()" class="bg-red-500 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:bg-red-600 active:scale-95 transition">
-                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                        </svg>
-                    </button>
-                    <p class="text-xs text-gray-400 mt-2 text-center">Tap to record</p>
+                <div id="rec-idle" class="w-full">
+                    <div class="mb-3">
+                        <textarea id="recorder-text" rows="3" class="w-full border rounded px-3 py-2 text-sm"
+                                  placeholder="Type a memory about this photo..."></textarea>
+                        <button onclick="submitTextOnly()" class="mt-2 w-full bg-emerald-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700">
+                            Save as Text
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2 my-3">
+                        <div class="flex-1 h-px bg-gray-200"></div>
+                        <span class="text-xs text-gray-400">OR</span>
+                        <div class="flex-1 h-px bg-gray-200"></div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <button onclick="startRecording()" class="bg-red-500 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:bg-red-600 active:scale-95 transition">
+                            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                            </svg>
+                        </button>
+                        <p class="text-xs text-gray-400 mt-2 text-center">Tap to record</p>
+                    </div>
                 </div>
 
                 <!-- Recording state -->
@@ -373,6 +387,44 @@ function stopRecordingCleanup() {
     }
 }
 
+function submitTextOnly() {
+    var text = document.getElementById('recorder-text').value.trim();
+    if (!text) {
+        document.getElementById('rec-error-msg').textContent = 'Type a memory first, or use the recorder.';
+        showState('error');
+        return;
+    }
+    showState('uploading');
+    var formData = new FormData();
+    formData.append('transcript_text', text);
+    formData.append('speaker_name', document.getElementById('recorder-speaker').value || '');
+    fetch('/web/photos/' + currentPhotoId + '/record-story', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) {
+            document.getElementById('rec-error-msg').textContent = data.error;
+            showState('error');
+            return;
+        }
+        document.getElementById('rec-transcript').textContent = data.transcript || text;
+        showState('done');
+        var resultEl = document.getElementById('result-' + currentPhotoId);
+        if (resultEl) {
+            resultEl.classList.remove('hidden');
+            var preview = (data.transcript || text);
+            document.getElementById('result-text-' + currentPhotoId).textContent =
+                preview.substring(0, 150) + (preview.length > 150 ? '...' : '');
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('rec-error-msg').textContent = 'Save failed. Check your connection and try again.';
+        showState('error');
+    });
+}
+
 function stopRecording() {
     stopRecordingCleanup();
     showState('uploading');
@@ -388,6 +440,8 @@ function stopRecording() {
     var formData = new FormData();
     formData.append('audio', blob, 'recording.raw');
     formData.append('speaker_name', document.getElementById('recorder-speaker').value || '');
+    var typedText = document.getElementById('recorder-text').value.trim();
+    if (typedText) formData.append('transcript_text', typedText);
 
     fetch('/web/photos/' + currentPhotoId + '/record-story', {
         method: 'POST',

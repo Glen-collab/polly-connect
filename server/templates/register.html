@@ -14,8 +14,27 @@
         {% endif %}
 
         <form method="POST" action="/web/register" class="space-y-4">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <p class="text-sm font-medium text-gray-700 mb-2">Who is this Polly for?</p>
+                <div class="space-y-2">
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="radio" name="signup_for" value="self" id="signup-self"
+                               {% if signup_for != 'other' %}checked{% endif %}
+                               class="mt-1 text-emerald-600 focus:ring-emerald-500"
+                               onchange="updateSignupLabels()">
+                        <span class="text-sm text-gray-700"><span class="font-medium">Me</span> &mdash; I'll be the one talking to Polly</span>
+                    </label>
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="radio" name="signup_for" value="other" id="signup-other"
+                               {% if signup_for == 'other' %}checked{% endif %}
+                               class="mt-1 text-emerald-600 focus:ring-emerald-500"
+                               onchange="updateSignupLabels()">
+                        <span class="text-sm text-gray-700"><span class="font-medium">Someone I'm caring for</span> <span class="text-gray-400">(parent, grandparent, etc.)</span></span>
+                    </label>
+                </div>
+            </div>
             <div>
-                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+                <label for="name" class="block text-sm font-medium text-gray-700 mb-1"><span id="name-label">Your Name</span></label>
                 <input type="text" name="name" id="name" required
                        value="{{ name or '' }}"
                        class="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
@@ -69,4 +88,25 @@
         </p>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateSignupLabels() {
+    var other = document.getElementById('signup-other');
+    var nameLabel = document.getElementById('name-label');
+    var nameInput = document.getElementById('name');
+    var hhInput = document.getElementById('household_name');
+    if (other && other.checked) {
+        nameLabel.textContent = 'Your Name (the caretaker)';
+        nameInput.placeholder = 'e.g. Caleb';
+        hhInput.placeholder = 'e.g. The Johnson Family';
+    } else {
+        nameLabel.textContent = 'Your Name';
+        nameInput.placeholder = 'e.g. Glen';
+        hhInput.placeholder = "e.g. The Rogers Family or Caleb's Polly";
+    }
+}
+document.addEventListener('DOMContentLoaded', updateSignupLabels);
+</script>
 {% endblock %}
