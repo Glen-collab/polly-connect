@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polly Connect - For Every Voice. For Every Life.</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #f0f0ee;
+    color: #2d2d2d;
+  }
+
+  .page {
+    max-width: 8.5in;
+    margin: 0 auto;
+    background: white;
+    overflow: hidden;
+  }
+
+  /* ── Top Bar ── */
+  .top-bar {
+    background: #1a3a2a;
+    padding: 1rem 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .top-bar .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .top-bar .logo img {
+    height: 40px;
+    width: auto;
+  }
+
+  .top-bar .logo span {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .top-bar .patent {
+    font-size: 0.65rem;
+    color: #a8e6cf;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  /* ── Hero headline ── */
+  .headline {
+    text-align: center;
+    padding: 2rem 2rem 0.5rem;
+  }
+
+  .headline h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.6rem;
+    font-weight: 800;
+    color: #1a3a2a;
+    line-height: 1.15;
+    margin-bottom: 0.5rem;
+  }
+
+  .headline h1 em {
+    font-style: italic;
+    color: #3a7a55;
+  }
+
+  .headline p {
+    font-size: 1rem;
+    color: #666;
+    font-weight: 400;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  /* ── Three Photos ── */
+  .photos {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    padding: 1.5rem 2rem;
+    gap: 1rem;
+  }
+
+  .photo-card {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  }
+
+  .photo-card img {
+    width: 100%;
+    height: 260px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .photo-card .label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.75));
+    padding: 2.5rem 0.8rem 0.7rem;
+    text-align: center;
+  }
+
+  .photo-card .label h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0.15rem;
+  }
+
+  .photo-card .label p {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.85);
+    font-weight: 300;
+  }
+
+  /* ── Divider line ── */
+  .divider {
+    height: 3px;
+    background: linear-gradient(90deg, #a8e6cf, #2d5a3f, #a8e6cf);
+    margin: 0 2rem;
+    border-radius: 2px;
+  }
+
+  /* ── Three Pillars ── */
+  .pillars {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    padding: 1.5rem 1.5rem;
+  }
+
+  .pillar {
+    padding: 0.8rem 1.2rem;
+    text-align: center;
+  }
+
+  .pillar h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a3a2a;
+    margin-bottom: 0.4rem;
+  }
+
+  .pillar p {
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: #555;
+  }
+
+  /* ── Device callout ── */
+  .device-strip {
+    background: #f0f7f3;
+    padding: 1.2rem 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    border-top: 1px solid #d4edda;
+    border-bottom: 1px solid #d4edda;
+  }
+
+  .device-strip .device-icon {
+    flex: 0 0 70px;
+  }
+
+  .device-strip .device-icon img {
+    width: 70px;
+    height: 70px;
+    object-fit: contain;
+  }
+
+  .device-strip .device-text {
+    flex: 1;
+  }
+
+  .device-strip .device-text h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a3a2a;
+    margin-bottom: 0.2rem;
+  }
+
+  .device-strip .device-text p {
+    font-size: 0.78rem;
+    color: #555;
+    line-height: 1.45;
+  }
+
+  .device-strip .book-icon {
+    flex: 0 0 100px;
+  }
+
+  .device-strip .book-icon img {
+    width: 100px;
+    border-radius: 6px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+  }
+
+  /* ── CTA ── */
+  .cta {
+    text-align: center;
+    padding: 1.3rem 2rem;
+    background: #1a3a2a;
+    color: white;
+  }
+
+  .cta-url {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #a8e6cf;
+    margin-bottom: 0.2rem;
+  }
+
+  .cta-sub {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.7);
+    font-weight: 300;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { background: white; }
+    .page { box-shadow: none; max-width: 100%; }
+  }
+
+  @media screen and (max-width: 700px) {
+    .photos { grid-template-columns: 1fr; padding: 1rem; }
+    .photo-card img { height: 220px; }
+    .pillars { grid-template-columns: 1fr; }
+    .device-strip { flex-direction: column; text-align: center; }
+    .headline h1 { font-size: 1.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="logo">
+      <img src="LOGO_AND_IMAGES/polly_parrot_logo.png" alt="Polly">
+      <span>Polly Connect</span>
+    </div>
+    <div class="patent">Patent Pending</div>
+  </div>
+
+  <!-- HEADLINE -->
+  <div class="headline">
+    <h1>For Every Voice.<br>For <em>Every</em> Life.</h1>
+    <p>Polly captures your growth, your voice, and the moments that matter &mdash; whether you're 15 or 85.</p>
+  </div>
+
+  <!-- THREE PHOTOS -->
+  <div class="photos">
+    <div class="photo-card">
+      <img src="LOGO_AND_IMAGES/polly_diary.jpg" alt="Teen journaling with Polly">
+      <div class="label">
+        <h3>Her Journal</h3>
+        <p>Thoughts, dreams, growth</p>
+      </div>
+    </div>
+    <div class="photo-card">
+      <img src="LOGO_AND_IMAGES/polly_garage.jpg" alt="Man in garage with Polly">
+      <div class="label">
+        <h3>His Workshop</h3>
+        <p>Reminders, notes, hands-free</p>
+      </div>
+    </div>
+    <div class="photo-card">
+      <img src="LOGO_AND_IMAGES/grandmaandpolly.png" alt="Grandma and grandchild with Polly">
+      <div class="label">
+        <h3>Their Legacy</h3>
+        <p>Stories, prayers, family</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIVIDER -->
+  <div class="divider"></div>
+
+  <!-- THREE PILLARS -->
+  <div class="pillars">
+    <div class="pillar">
+      <h3>Reflect & Grow</h3>
+      <p>Life-stage prompts guide reflection from teen years to retirement. Not just remembering &mdash; understanding who you've become.</p>
+    </div>
+    <div class="pillar">
+      <h3>Connect Generations</h3>
+      <p>Everyone contributes stories, photos, prayers, and blessings. A living bridge between the people who matter most.</p>
+    </div>
+    <div class="pillar">
+      <h3>Simply Speak</h3>
+      <p>No apps. No tech headaches. Talk to Polly and your voice becomes part of a multimedia legacy &mdash; audio, photos, and a printed book.</p>
+    </div>
+  </div>
+
+  <!-- DEVICE CALLOUT -->
+  <div class="device-strip">
+    <div class="device-icon">
+      <img src="LOGO_AND_IMAGES/polly_parrot_logo.png" alt="Polly Device">
+    </div>
+    <div class="device-text">
+      <h3>The Device That Listens, Remembers, and Grows With You</h3>
+      <p>Place Polly anywhere &mdash; kitchen, garage, bedroom. It captures stories naturally, sends reminders, plays prayers and blessings, and turns your voice into a printed legacy book with QR codes that play your actual recordings.</p>
+    </div>
+    <div class="book-icon">
+      <img src="LOGO_AND_IMAGES/bookimage.png" alt="Legacy Book">
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta">
+    <div class="cta-url">polly-connect.com</div>
+    <div class="cta-sub">Your life, your voice, your growth &mdash; captured across generations.</div>
+  </div>
+
+</div>
+
+</body>
+</html>

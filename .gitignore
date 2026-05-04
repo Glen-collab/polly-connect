@@ -101,3 +101,13 @@ piper-sample-generator/
 
 # Windows artifacts
 nul
+
+# KiCad backups and broken-name exports
+hardware/wi_barbell-attachments/polly_pcb-backups/
+hardware/wi_barbell-attachments/${polly_pcb}.csv
+
+# Stale duplicate pos exports (canonical copies live in hardware/polly-board/)
+hardware/polly_pcb-top-pos.csv
+hardware/polly_pcb-bottom-pos.csv
+hardware/wi_barbell-attachments/polly_pcb-top-pos.csv
+hardware/wi_barbell-attachments/polly_pcb-bottom-pos.csv
