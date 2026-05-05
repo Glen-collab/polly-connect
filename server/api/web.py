@@ -1893,139 +1893,45 @@ async def story_auto_format(request: Request):
     speaker_hint = user.get("name") or ""
 
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=OPENAI_API_KEY)
-        system_prompt = (
-            "You are a transcript editor and biographer. Given a raw speech-to-text "
-            "transcript, produce TWO things:\n"
-            "1. A cleaned-up version of the same words (punctuation, capitalization, "
-            "   paragraph breaks, fix obvious STT errors). Keep the speaker's voice, "
-            "   word choices, and meaning exactly the same — do not rewrite, summarize, "
-            "   or add words that weren't said.\n"
-            "2. A classification of where this memory belongs in a life story.\n\n"
-            "Return STRICT JSON with these keys (no markdown, no commentary):\n"
-            "{\n"
-            '  "formatted": "<cleaned transcript>",\n'
-            '  "bucket": "<one of: ordinary_world | call_to_adventure | crossing_threshold | trials_allies_enemies | transformation | return_with_knowledge>",\n'
-            '  "life_phase": "<one of: childhood | adolescence | young_adult | adult | midlife | elder | reflection | unknown>",\n'
-            '  "estimated_year": <4-digit year mentioned in the story, or null>,\n'
-            '  "people": ["names of people mentioned"],\n'
-            '  "locations": ["named places"],\n'
-            '  "emotions": ["dominant emotions: joy, love, nostalgia, sadness, fear, anger, pride, gratitude, humor, courage, peace, adventure"],\n'
-            '  "summary": "<one-sentence summary, max 120 chars>"\n'
-            "}\n\n"
-            "Bucket guide (Jungian arc):\n"
-            "- ordinary_world: everyday life, family, routines, home, before things changed\n"
-            "- call_to_adventure: surprises, opportunities, turning points, 'something happened'\n"
-            "- crossing_threshold: decisions, leaving, starting over, first big step\n"
-            "- trials_allies_enemies: hard times, struggles, who helped or hurt\n"
-            "- transformation: how you changed, realized, grew\n"
-            "- return_with_knowledge: wisdom, advice, what you'd tell someone now\n\n"
-            "Life phase guide (use the speaker's age in the story, not now):\n"
-            f"- Speaker's birth year (if known): {birth_year or 'unknown'}\n"
-            "- childhood: 0-12, adolescence: 13-18, young_adult: 19-30,\n"
-            "  adult: 31-50, midlife: 51-70, elder: 70+, reflection: looking back from now"
+        parsed = await asyncio.to_thread(
+            _gpt_classify_story, transcript, birth_year, True
         )
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": transcript},
-            ],
-            temperature=0.2,
-            max_tokens=4000,
-            response_format={"type": "json_object"},
-        )
-        raw = response.choices[0].message.content.strip()
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            return JSONResponse({"error": "AI returned malformed JSON", "raw": raw[:500]}, status_code=500)
-
-        formatted = (parsed.get("formatted") or "").strip()
-        if not formatted:
-            return JSONResponse({"error": "AI returned no formatted text"}, status_code=500)
-
-        # If the caller passed a story_id, update its memory row in place so
-        # chapters reflect the GPT classification immediately.
-        memory_updated = False
-        if story_id_raw:
-            try:
-                story_id = int(story_id_raw)
-            except (TypeError, ValueError):
-                story_id = None
-            if story_id:
-                conn = db._get_connection()
-                try:
-                    conn.row_factory = __import__("sqlite3").Row
-                    mem = conn.execute(
-                        "SELECT id FROM memories WHERE story_id = ? AND tenant_id = ? LIMIT 1",
-                        (story_id, tid)
-                    ).fetchone()
-                    bucket = parsed.get("bucket") or "ordinary_world"
-                    life_phase = parsed.get("life_phase") or "unknown"
-                    est_year = parsed.get("estimated_year")
-                    people = parsed.get("people") or []
-                    locations = parsed.get("locations") or []
-                    emotions = parsed.get("emotions") or []
-                    summary = (parsed.get("summary") or "")[:120]
-                    if mem:
-                        conn.execute("""
-                            UPDATE memories
-                            SET bucket = ?, life_phase = ?, estimated_year = ?,
-                                text_summary = ?, text = ?,
-                                people = ?, locations = ?, emotions = ?
-                            WHERE id = ?
-                        """, (
-                            bucket, life_phase, est_year, summary, formatted,
-                            json.dumps(people), json.dumps(locations),
-                            json.dumps(emotions), mem["id"],
-                        ))
-                    else:
-                        # Story has no memory row yet — create one from the GPT output.
-                        memory_extractor = getattr(request.app.state, "memory_extractor", None)
-                        fp = ""
-                        if memory_extractor:
-                            fp = memory_extractor.compute_fingerprint({
-                                "bucket": bucket, "life_phase": life_phase,
-                                "people": people, "locations": locations,
-                                "emotions": emotions,
-                            })
-                        conn.execute("""
-                            INSERT INTO memories (story_id, speaker, bucket, life_phase,
-                                estimated_year, text_summary, text, people, locations,
-                                emotions, fingerprint, tenant_id)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            story_id, speaker_hint, bucket, life_phase, est_year,
-                            summary, formatted,
-                            json.dumps(people), json.dumps(locations),
-                            json.dumps(emotions), fp, tid,
-                        ))
-                    conn.commit()
-                    memory_updated = True
-                except Exception as e:
-                    logger.error(f"Auto-format memory update failed for story {story_id}: {e}")
-                finally:
-                    if not db._conn:
-                        conn.close()
-
-        return JSONResponse({
-            "ok": True,
-            "formatted": formatted,
-            "classification": {
-                "bucket": parsed.get("bucket"),
-                "life_phase": parsed.get("life_phase"),
-                "estimated_year": parsed.get("estimated_year"),
-                "people": parsed.get("people"),
-                "locations": parsed.get("locations"),
-                "emotions": parsed.get("emotions"),
-            },
-            "memory_updated": memory_updated,
-        })
+    except json.JSONDecodeError:
+        return JSONResponse({"error": "AI returned malformed JSON"}, status_code=500)
     except Exception as e:
         return JSONResponse({"error": f"AI error: {str(e)}"}, status_code=500)
+
+    formatted = (parsed.get("formatted") or "").strip()
+    if not formatted:
+        return JSONResponse({"error": "AI returned no formatted text"}, status_code=500)
+
+    # If the caller passed a story_id, update its memory row in place so
+    # chapters reflect the GPT classification immediately.
+    memory_updated = False
+    if story_id_raw:
+        try:
+            story_id = int(story_id_raw)
+        except (TypeError, ValueError):
+            story_id = None
+        if story_id:
+            memory_updated = _apply_gpt_classification(
+                db, story_id, tid, parsed,
+                fallback_text=formatted, speaker=speaker_hint,
+            )
+
+    return JSONResponse({
+        "ok": True,
+        "formatted": formatted,
+        "classification": {
+            "bucket": parsed.get("bucket"),
+            "life_phase": parsed.get("life_phase"),
+            "estimated_year": parsed.get("estimated_year"),
+            "people": parsed.get("people"),
+            "locations": parsed.get("locations"),
+            "emotions": parsed.get("emotions"),
+        },
+        "memory_updated": memory_updated,
+    })
 
 
 @router.get("/stories/{story_id}/qr.png")
@@ -2248,6 +2154,9 @@ async def story_share(request: Request):
                 )
             except Exception as e:
                 logger.error(f"Memory extraction failed for shared story: {e}")
+        # Run GPT classification in the background to upgrade the heuristic.
+        _schedule_gpt_reclassify(db, story_id, target_tid, text,
+                                  speaker=speaker_name)
 
     # Log to shared wall
     db.share_to_wall(tid, target_tid, "story", story_id)
@@ -3677,6 +3586,168 @@ def _photo_year(date_str: str):
     return int(m.group(1)) if m else None
 
 
+# ── GPT classification helpers ─────────────────────────────────────────
+# Used by /stories/auto-format (foreground) and as a fire-and-forget
+# background task after every story/photo/share save so chapter timeline
+# placement gets a GPT pass on every memory.
+
+def _gpt_classify_story(text: str, birth_year=None, include_formatting: bool = False) -> dict:
+    """Send the transcript to gpt-4o-mini and parse the JSON response.
+
+    When include_formatting=True the response also includes a 'formatted'
+    cleaned version of the transcript. When False we only get the
+    classification (cheaper and avoids accidentally rewriting voice).
+    Returns parsed dict or raises on AI/JSON failure."""
+    import os
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY not set")
+
+    from openai import OpenAI
+    client = OpenAI(api_key=OPENAI_API_KEY)
+
+    if include_formatting:
+        task_section = (
+            "Produce TWO things:\n"
+            "1. A cleaned-up version of the same words (punctuation, capitalization, "
+            "   paragraph breaks, fix obvious STT errors). Keep the speaker's voice, "
+            "   word choices, and meaning exactly the same — do not rewrite, summarize, "
+            "   or add words that weren't said.\n"
+            "2. A classification of where this memory belongs in a life story.\n\n"
+            "Return STRICT JSON with these keys (no markdown, no commentary):\n"
+            "{\n"
+            '  "formatted": "<cleaned transcript>",\n'
+        )
+    else:
+        task_section = (
+            "Classify where this memory belongs in a life story.\n\n"
+            "Return STRICT JSON with these keys (no markdown, no commentary):\n"
+            "{\n"
+        )
+
+    system_prompt = (
+        "You are a transcript editor and biographer. " + task_section +
+        '  "bucket": "<one of: ordinary_world | call_to_adventure | crossing_threshold | trials_allies_enemies | transformation | return_with_knowledge>",\n'
+        '  "life_phase": "<one of: childhood | adolescence | young_adult | adult | midlife | elder | reflection | unknown>",\n'
+        '  "estimated_year": <4-digit year mentioned in the story, or null>,\n'
+        '  "people": ["names of people mentioned"],\n'
+        '  "locations": ["named places"],\n'
+        '  "emotions": ["dominant emotions: joy, love, nostalgia, sadness, fear, anger, pride, gratitude, humor, courage, peace, adventure"],\n'
+        '  "summary": "<one-sentence summary, max 120 chars>"\n'
+        "}\n\n"
+        "Bucket guide (Jungian arc):\n"
+        "- ordinary_world: everyday life, family, routines, home, before things changed\n"
+        "- call_to_adventure: surprises, opportunities, turning points, 'something happened'\n"
+        "- crossing_threshold: decisions, leaving, starting over, first big step\n"
+        "- trials_allies_enemies: hard times, struggles, who helped or hurt\n"
+        "- transformation: how you changed, realized, grew\n"
+        "- return_with_knowledge: wisdom, advice, what you'd tell someone now\n\n"
+        "Life phase guide (use the speaker's age IN the story, not now):\n"
+        f"- Speaker's birth year (if known): {birth_year or 'unknown'}\n"
+        "- childhood: 0-12, adolescence: 13-18, young_adult: 19-30,\n"
+        "  adult: 31-50, midlife: 51-70, elder: 70+, reflection: looking back from now"
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text},
+        ],
+        temperature=0.2,
+        max_tokens=4000,
+        response_format={"type": "json_object"},
+    )
+    raw = response.choices[0].message.content.strip()
+    return json.loads(raw)
+
+
+def _apply_gpt_classification(db, story_id: int, tid: int, parsed: dict,
+                              fallback_text: str, speaker: str = None) -> bool:
+    """Upsert a memories row from a parsed GPT classification dict.
+    Returns True on success, False on failure."""
+    try:
+        bucket = parsed.get("bucket") or "ordinary_world"
+        life_phase = parsed.get("life_phase") or "unknown"
+        est_year = parsed.get("estimated_year")
+        people = parsed.get("people") or []
+        locations = parsed.get("locations") or []
+        emotions = parsed.get("emotions") or []
+        summary = (parsed.get("summary") or "")[:120]
+        text = (parsed.get("formatted") or fallback_text or "").strip()
+
+        import sqlite3 as _sq
+        conn = db._get_connection()
+        conn.row_factory = _sq.Row
+        mem = conn.execute(
+            "SELECT id FROM memories WHERE story_id = ? AND tenant_id = ? LIMIT 1",
+            (story_id, tid)
+        ).fetchone()
+        if mem:
+            conn.execute("""
+                UPDATE memories
+                SET bucket = ?, life_phase = ?, estimated_year = ?,
+                    text_summary = ?, text = ?,
+                    people = ?, locations = ?, emotions = ?
+                WHERE id = ?
+            """, (
+                bucket, life_phase, est_year, summary, text,
+                json.dumps(people), json.dumps(locations),
+                json.dumps(emotions), mem["id"],
+            ))
+        else:
+            conn.execute("""
+                INSERT INTO memories (story_id, speaker, bucket, life_phase,
+                    estimated_year, text_summary, text, people, locations,
+                    emotions, fingerprint, tenant_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                story_id, speaker, bucket, life_phase, est_year,
+                summary, text,
+                json.dumps(people), json.dumps(locations),
+                json.dumps(emotions), "", tid,
+            ))
+        conn.commit()
+        if not db._conn:
+            conn.close()
+        return True
+    except Exception as e:
+        logger.error(f"_apply_gpt_classification failed for story {story_id}: {e}")
+        return False
+
+
+def _gpt_reclassify_in_background(db, story_id: int, tid: int, text: str,
+                                  birth_year=None, speaker: str = None) -> None:
+    """Sync helper meant to run in asyncio.to_thread. Calls GPT and
+    updates the memory row. Failures are logged, not raised — heuristic
+    data already saved earlier remains in place if GPT is unavailable."""
+    try:
+        if not text or len(text.strip()) < 10:
+            return
+        parsed = _gpt_classify_story(text, birth_year=birth_year,
+                                      include_formatting=False)
+        _apply_gpt_classification(db, story_id, tid, parsed,
+                                   fallback_text=text, speaker=speaker)
+    except Exception as e:
+        logger.error(f"GPT background reclassify failed for story {story_id}: {e}")
+
+
+def _schedule_gpt_reclassify(db, story_id: int, tid: int, text: str,
+                              birth_year=None, speaker: str = None):
+    """Fire-and-forget GPT classification. Safe to call from any route —
+    if no event loop / no API key, falls through silently."""
+    import asyncio as _asyncio
+    try:
+        loop = _asyncio.get_running_loop()
+        loop.create_task(_asyncio.to_thread(
+            _gpt_reclassify_in_background,
+            db, story_id, tid, text, birth_year, speaker
+        ))
+    except RuntimeError:
+        # No running loop — skip; we'll catch this on next save or via backfill.
+        pass
+
+
 def _build_wav(pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1, sample_width: int = 2) -> bytes:
     """Wrap raw PCM int16 bytes in a WAV header."""
     buf = io.BytesIO()
@@ -3761,6 +3832,10 @@ async def web_record_story(request: Request):
                 )
             except Exception as e:
                 logger.error(f"Memory extraction failed for typed memory: {e}")
+        # Background GPT classification to upgrade the heuristic placement.
+        _schedule_gpt_reclassify(db, story_id, tid, typed_text,
+                                  birth_year=user.get("birth_year"),
+                                  speaker=speaker_name or None)
         return JSONResponse({
             "transcript": typed_text,
             "story_id": story_id,
@@ -3842,6 +3917,10 @@ async def web_record_story(request: Request):
                 )
             except Exception as e:
                 logger.error(f"Memory extraction failed for web recording: {e}")
+        # Background GPT classification to upgrade the heuristic placement.
+        _schedule_gpt_reclassify(db, story_id, tid, transcription,
+                                  birth_year=user.get("birth_year"),
+                                  speaker=speaker_name or None)
 
     return JSONResponse({
         "transcript": transcription,
@@ -4003,6 +4082,11 @@ async def photo_record_story(request: Request, photo_id: int):
                     _conn.close()
             except Exception as e:
                 logger.error(f"Failed to set estimated_year on memory {memory_id}: {e}")
+
+    # Background GPT classification to upgrade heuristic + photo-date placement.
+    _schedule_gpt_reclassify(db, story_id, tid, transcription,
+                              birth_year=user.get("birth_year"),
+                              speaker=speaker_name or None)
 
     # Add photo tags as story tags
     try:
