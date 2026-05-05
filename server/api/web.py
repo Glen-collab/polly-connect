@@ -3583,11 +3583,23 @@ async def web_record_story(request: Request):
         memory_extractor = getattr(request.app.state, "memory_extractor", None)
         if memory_extractor:
             try:
-                await asyncio.to_thread(
-                    memory_extractor.extract_and_save_memories,
-                    db, typed_text, user["id"], tid,
-                    speaker_name=speaker_name or None,
-                    question_text=None,
+                mem_data = memory_extractor.extract(
+                    text=typed_text,
+                    question=None,
+                    speaker=speaker_name or None,
+                )
+                db.save_memory(
+                    story_id=story_id,
+                    speaker=speaker_name or None,
+                    bucket=mem_data["bucket"],
+                    life_phase=mem_data["life_phase"],
+                    text_summary=mem_data["text_summary"],
+                    text=typed_text,
+                    people=mem_data["people"],
+                    locations=mem_data["locations"],
+                    emotions=mem_data["emotions"],
+                    fingerprint=memory_extractor.compute_fingerprint(mem_data),
+                    tenant_id=tid,
                 )
             except Exception as e:
                 logger.error(f"Memory extraction failed for typed memory: {e}")
@@ -3652,11 +3664,23 @@ async def web_record_story(request: Request):
         memory_extractor = getattr(request.app.state, "memory_extractor", None)
         if memory_extractor:
             try:
-                await asyncio.to_thread(
-                    memory_extractor.extract_and_save_memories,
-                    db, transcription, user["id"], tid,
-                    speaker_name=speaker_name or None,
-                    question_text=None,
+                mem_data = memory_extractor.extract(
+                    text=transcription,
+                    question=None,
+                    speaker=speaker_name or None,
+                )
+                db.save_memory(
+                    story_id=story_id,
+                    speaker=speaker_name or None,
+                    bucket=mem_data["bucket"],
+                    life_phase=mem_data["life_phase"],
+                    text_summary=mem_data["text_summary"],
+                    text=transcription,
+                    people=mem_data["people"],
+                    locations=mem_data["locations"],
+                    emotions=mem_data["emotions"],
+                    fingerprint=memory_extractor.compute_fingerprint(mem_data),
+                    tenant_id=tid,
                 )
             except Exception as e:
                 logger.error(f"Memory extraction failed for web recording: {e}")
