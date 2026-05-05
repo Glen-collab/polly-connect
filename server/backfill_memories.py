@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from core.database import Database
+from core.database import PollyDB
 from core.memory_extractor import MemoryExtractor
 
 
@@ -19,7 +19,7 @@ def main():
     db_path = os.path.normpath(db_path)
     print(f"DB: {db_path}")
 
-    db = Database(db_path=db_path)
+    db = PollyDB(db_path=db_path)
     extractor = MemoryExtractor()
 
     raw = sqlite3.connect(db_path)
