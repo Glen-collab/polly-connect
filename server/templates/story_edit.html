@@ -115,13 +115,13 @@ function autoFormat() {
     fetch('/web/stories/auto-format', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'transcript=' + encodeURIComponent(text),
+        body: 'transcript=' + encodeURIComponent(text) + '&story_id={{ story.id }}',
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.ok) {
             textarea.value = data.formatted;
-            btn.textContent = 'Formatted!';
+            btn.textContent = data.memory_updated ? 'Formatted + classified!' : 'Formatted!';
             btn.classList.remove('bg-gray-400');
             btn.classList.add('bg-emerald-500');
             setTimeout(function() {

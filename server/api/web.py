@@ -1866,13 +1866,16 @@ async def story_inline_save(request: Request, story_id: int):
 
 @router.post("/stories/auto-format")
 async def story_auto_format(request: Request):
-    """Use GPT to clean up a raw transcript into readable prose."""
+    """Use GPT to clean up a raw transcript and (optionally) classify it
+    into a Jungian bucket + life phase, then update the linked memory row
+    so the chapter outline reflects the AI's read of the story."""
     session = await get_web_session(request)
     if not session:
         return JSONResponse({"error": "Not logged in"}, status_code=401)
 
     form = await request.form()
     transcript = (form.get("transcript") or "").strip()
+    story_id_raw = form.get("story_id")
     if not transcript:
         return JSONResponse({"error": "No transcript"}, status_code=400)
     if len(transcript) > 20000:
@@ -1883,26 +1886,144 @@ async def story_auto_format(request: Request):
     if not OPENAI_API_KEY:
         return JSONResponse({"error": "AI not available"}, status_code=503)
 
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    user = db.get_or_create_user(tenant_id=tid)
+    birth_year = user.get("birth_year")
+    speaker_hint = user.get("name") or ""
+
     try:
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_API_KEY)
+        system_prompt = (
+            "You are a transcript editor and biographer. Given a raw speech-to-text "
+            "transcript, produce TWO things:\n"
+            "1. A cleaned-up version of the same words (punctuation, capitalization, "
+            "   paragraph breaks, fix obvious STT errors). Keep the speaker's voice, "
+            "   word choices, and meaning exactly the same — do not rewrite, summarize, "
+            "   or add words that weren't said.\n"
+            "2. A classification of where this memory belongs in a life story.\n\n"
+            "Return STRICT JSON with these keys (no markdown, no commentary):\n"
+            "{\n"
+            '  "formatted": "<cleaned transcript>",\n'
+            '  "bucket": "<one of: ordinary_world | call_to_adventure | crossing_threshold | trials_allies_enemies | transformation | return_with_knowledge>",\n'
+            '  "life_phase": "<one of: childhood | adolescence | young_adult | adult | midlife | elder | reflection | unknown>",\n'
+            '  "estimated_year": <4-digit year mentioned in the story, or null>,\n'
+            '  "people": ["names of people mentioned"],\n'
+            '  "locations": ["named places"],\n'
+            '  "emotions": ["dominant emotions: joy, love, nostalgia, sadness, fear, anger, pride, gratitude, humor, courage, peace, adventure"],\n'
+            '  "summary": "<one-sentence summary, max 120 chars>"\n'
+            "}\n\n"
+            "Bucket guide (Jungian arc):\n"
+            "- ordinary_world: everyday life, family, routines, home, before things changed\n"
+            "- call_to_adventure: surprises, opportunities, turning points, 'something happened'\n"
+            "- crossing_threshold: decisions, leaving, starting over, first big step\n"
+            "- trials_allies_enemies: hard times, struggles, who helped or hurt\n"
+            "- transformation: how you changed, realized, grew\n"
+            "- return_with_knowledge: wisdom, advice, what you'd tell someone now\n\n"
+            "Life phase guide (use the speaker's age in the story, not now):\n"
+            f"- Speaker's birth year (if known): {birth_year or 'unknown'}\n"
+            "- childhood: 0-12, adolescence: 13-18, young_adult: 19-30,\n"
+            "  adult: 31-50, midlife: 51-70, elder: 70+, reflection: looking back from now"
+        )
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": (
-                    "You are a transcript editor. Take the raw speech-to-text transcript below and "
-                    "clean it up into readable prose. Add proper punctuation, capitalization, and "
-                    "paragraph breaks. Fix obvious speech-to-text errors. Keep the speaker's voice, "
-                    "word choices, and meaning exactly the same — do NOT rewrite, summarize, or add "
-                    "words that weren't said. Just make it readable."
-                )},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": transcript},
             ],
-            temperature=0.3,
+            temperature=0.2,
             max_tokens=4000,
+            response_format={"type": "json_object"},
         )
-        formatted = response.choices[0].message.content.strip()
-        return JSONResponse({"ok": True, "formatted": formatted})
+        raw = response.choices[0].message.content.strip()
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return JSONResponse({"error": "AI returned malformed JSON", "raw": raw[:500]}, status_code=500)
+
+        formatted = (parsed.get("formatted") or "").strip()
+        if not formatted:
+            return JSONResponse({"error": "AI returned no formatted text"}, status_code=500)
+
+        # If the caller passed a story_id, update its memory row in place so
+        # chapters reflect the GPT classification immediately.
+        memory_updated = False
+        if story_id_raw:
+            try:
+                story_id = int(story_id_raw)
+            except (TypeError, ValueError):
+                story_id = None
+            if story_id:
+                conn = db._get_connection()
+                try:
+                    conn.row_factory = __import__("sqlite3").Row
+                    mem = conn.execute(
+                        "SELECT id FROM memories WHERE story_id = ? AND tenant_id = ? LIMIT 1",
+                        (story_id, tid)
+                    ).fetchone()
+                    bucket = parsed.get("bucket") or "ordinary_world"
+                    life_phase = parsed.get("life_phase") or "unknown"
+                    est_year = parsed.get("estimated_year")
+                    people = parsed.get("people") or []
+                    locations = parsed.get("locations") or []
+                    emotions = parsed.get("emotions") or []
+                    summary = (parsed.get("summary") or "")[:120]
+                    if mem:
+                        conn.execute("""
+                            UPDATE memories
+                            SET bucket = ?, life_phase = ?, estimated_year = ?,
+                                text_summary = ?, text = ?,
+                                people = ?, locations = ?, emotions = ?
+                            WHERE id = ?
+                        """, (
+                            bucket, life_phase, est_year, summary, formatted,
+                            json.dumps(people), json.dumps(locations),
+                            json.dumps(emotions), mem["id"],
+                        ))
+                    else:
+                        # Story has no memory row yet — create one from the GPT output.
+                        memory_extractor = getattr(request.app.state, "memory_extractor", None)
+                        fp = ""
+                        if memory_extractor:
+                            fp = memory_extractor.compute_fingerprint({
+                                "bucket": bucket, "life_phase": life_phase,
+                                "people": people, "locations": locations,
+                                "emotions": emotions,
+                            })
+                        conn.execute("""
+                            INSERT INTO memories (story_id, speaker, bucket, life_phase,
+                                estimated_year, text_summary, text, people, locations,
+                                emotions, fingerprint, tenant_id)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            story_id, speaker_hint, bucket, life_phase, est_year,
+                            summary, formatted,
+                            json.dumps(people), json.dumps(locations),
+                            json.dumps(emotions), fp, tid,
+                        ))
+                    conn.commit()
+                    memory_updated = True
+                except Exception as e:
+                    logger.error(f"Auto-format memory update failed for story {story_id}: {e}")
+                finally:
+                    if not db._conn:
+                        conn.close()
+
+        return JSONResponse({
+            "ok": True,
+            "formatted": formatted,
+            "classification": {
+                "bucket": parsed.get("bucket"),
+                "life_phase": parsed.get("life_phase"),
+                "estimated_year": parsed.get("estimated_year"),
+                "people": parsed.get("people"),
+                "locations": parsed.get("locations"),
+                "emotions": parsed.get("emotions"),
+            },
+            "memory_updated": memory_updated,
+        })
     except Exception as e:
         return JSONResponse({"error": f"AI error: {str(e)}"}, status_code=500)
 
@@ -2100,6 +2221,33 @@ async def story_share(request: Request):
         source="shared",
         tenant_id=target_tid,
     )
+
+    # Run heuristic memory extraction so shared stories show up in the
+    # recipient's book chapters (and not just on the wall).
+    if text:
+        memory_extractor = getattr(request.app.state, "memory_extractor", None)
+        if memory_extractor:
+            try:
+                mem_data = memory_extractor.extract(
+                    text=text,
+                    question=None,
+                    speaker=speaker_name,
+                )
+                db.save_memory(
+                    story_id=story_id,
+                    speaker=speaker_name,
+                    bucket=mem_data["bucket"],
+                    life_phase=mem_data["life_phase"],
+                    text_summary=mem_data["text_summary"],
+                    text=text,
+                    people=mem_data["people"],
+                    locations=mem_data["locations"],
+                    emotions=mem_data["emotions"],
+                    fingerprint=memory_extractor.compute_fingerprint(mem_data),
+                    tenant_id=target_tid,
+                )
+            except Exception as e:
+                logger.error(f"Memory extraction failed for shared story: {e}")
 
     # Log to shared wall
     db.share_to_wall(tid, target_tid, "story", story_id)
@@ -3519,6 +3667,16 @@ async def photo_toggle_book(request: Request, photo_id: int):
 
 MAX_AUDIO_SIZE = 30 * 1024 * 1024  # 30MB (~5 min at 16kHz mono)
 
+def _photo_year(date_str: str):
+    """Extract a 4-digit year from a free-form photo date_taken string.
+    Handles 'Summer 1996', '7/11/2014', '1964-06-15', 'Fall 2024', etc.
+    Returns int year or None."""
+    if not date_str:
+        return None
+    m = re.search(r'(19\d{2}|20\d{2})', str(date_str))
+    return int(m.group(1)) if m else None
+
+
 def _build_wav(pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1, sample_width: int = 2) -> bytes:
     """Wrap raw PCM int16 bytes in a WAV header."""
     buf = io.BytesIO()
@@ -3807,9 +3965,20 @@ async def photo_record_story(request: Request, photo_id: int):
             speaker=speaker_name or None,
         )
 
+        # If the photo has a date and the user has a birth_year on file,
+        # use the photo's date to place this memory on the timeline —
+        # the date is much more reliable than keyword-sniffing.
+        photo_year = _photo_year(date_taken)
+        if photo_year and user.get("birth_year"):
+            from core.book_builder import BookBuilder
+            age = photo_year - int(user["birth_year"])
+            current_age = (datetime.now().year - int(user["birth_year"])) if user.get("birth_year") else 50
+            bucket_from_date, phase_from_date = BookBuilder._age_to_bucket(age, current_age)
+            mem_data["bucket"] = bucket_from_date
+            mem_data["life_phase"] = phase_from_date
 
         fingerprint = memory_extractor.compute_fingerprint(mem_data)
-        db.save_memory(
+        memory_id = db.save_memory(
             story_id=story_id,
             speaker=speaker_name or None,
             bucket=mem_data["bucket"],
@@ -3822,6 +3991,18 @@ async def photo_record_story(request: Request, photo_id: int):
             fingerprint=fingerprint,
             tenant_id=tid,
         )
+        # Persist the year on the memory row so the book builder doesn't
+        # have to re-derive it from the photo on every chapter render.
+        if photo_year:
+            try:
+                _conn = db._get_connection()
+                _conn.execute("UPDATE memories SET estimated_year = ? WHERE id = ?",
+                              (photo_year, memory_id))
+                _conn.commit()
+                if not db._conn:
+                    _conn.close()
+            except Exception as e:
+                logger.error(f"Failed to set estimated_year on memory {memory_id}: {e}")
 
     # Add photo tags as story tags
     try:
