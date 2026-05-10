@@ -111,3 +111,8 @@ hardware/polly_pcb-top-pos.csv
 hardware/polly_pcb-bottom-pos.csv
 hardware/wi_barbell-attachments/polly_pcb-top-pos.csv
 hardware/wi_barbell-attachments/polly_pcb-bottom-pos.csv
+
+# KiCad ephemeral / regenerated artifacts
+hardware/**/fp-info-cache
+hardware/**/replicate_layout.log
+hardware/**/*.kicad_prl
