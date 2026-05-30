@@ -26,6 +26,20 @@ build/
 server/static/uploads/*
 !server/static/uploads/.gitkeep
 
+# Runtime user content (lives on the box, not in git)
+server/static/photos/
+server/static/covers/
+
+# Served OTA firmware images (binaries, served from the box only)
+server/static/firmware/
+
+# Runtime secret
+server/.csrf_secret
+
+# Archives (don't commit zips dropped into the repo; keep the tracked wake-word sample)
+*.zip
+!wake-word/hey_polly_samples.zip
+
 # IDE
 .idea/
 .vscode/
