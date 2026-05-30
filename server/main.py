@@ -99,6 +99,14 @@ async def lifespan(app: FastAPI):
 
     # Load data files (jokes, questions, config)
     app.state.data = DataLoader(settings.DATA_DIR)
+    # Wire question engine for the web "Ask Me a Question" button
+    try:
+        from core.question_engine import QuestionEngine
+        app.state.question_engine = QuestionEngine(app.state.db, app.state.data)
+        logger.info("Question engine ready")
+    except Exception as e:
+        logger.warning(f"Question engine init failed: {e}")
+        app.state.question_engine = None
     logger.info(f"Data loaded: {app.state.data.stats()}")
 
     # Initialize feature services
