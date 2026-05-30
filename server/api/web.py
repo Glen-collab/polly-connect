@@ -1864,6 +1864,57 @@ async def story_inline_save(request: Request, story_id: int):
     return JSONResponse({"ok": True})
 
 
+@router.get("/questions/next")
+async def web_next_question(request: Request, rand: int = 0):
+    """Return a guided question for the in-app 'Ask Me a Question' button.
+
+    Default: next unanswered question for the current week (per user).
+    ?rand=1: a random question from the current week ('Different question').
+    Falls back to a random question if the week is fully answered, so the
+    button always returns something.
+    """
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+
+    qe = getattr(request.app.state, "question_engine", None)
+    if not qe:
+        return JSONResponse({"ok": False, "error": "Questions unavailable"})
+
+    import random
+    q = None
+    if not rand:
+        db = request.app.state.db
+        tid = session["tenant_id"]
+        user = db.get_or_create_user(tenant_id=tid)
+        q = qe.get_next_question(user_id=user["id"])
+    if not q:
+        week_qs = qe.get_week_questions()
+        if not week_qs:
+            return JSONResponse({"ok": False, "error": "No questions available"})
+        q = random.choice(week_qs)
+
+    # theme/week live on the week block, not the individual question
+    week_num = qe.get_current_week()
+    theme = q.get("theme")
+    try:
+        for block in qe.data.questions:
+            if block.get("week") == week_num:
+                theme = theme or block.get("theme")
+                break
+    except Exception:
+        pass
+
+    return JSONResponse({
+        "ok": True,
+        "week": q.get("week") or week_num,
+        "theme": theme,
+        "question": q.get("question") or q.get("text"),
+        "question_id": q.get("id"),
+    })
+
+
 @router.post("/stories/auto-format")
 async def story_auto_format(request: Request):
     """Use GPT to clean up a raw transcript and (optionally) classify it

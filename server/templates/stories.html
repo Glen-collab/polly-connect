@@ -5,9 +5,14 @@
 <a href="/web/hub/stories" class="text-emerald-600 hover:underline text-sm">&larr; Stories</a>
 <div class="flex justify-between items-center mb-4 sm:mb-6 mt-1">
     <h1 class="text-xl sm:text-2xl font-bold">Stories &amp; Answers</h1>
-    <button onclick="openRecorder()" class="bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700 font-medium">
-        Record a Memory
-    </button>
+    <div class="flex gap-2">
+        <button onclick="askQuestion()" class="bg-amber-500 text-white px-4 py-2 rounded text-sm hover:bg-amber-600 font-medium">
+            Ask Me a Question
+        </button>
+        <button onclick="openRecorder()" class="bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700 font-medium">
+            Record a Memory
+        </button>
+    </div>
 </div>
 
 {% if request.query_params.get('nostalgia_saved') %}
@@ -122,6 +127,13 @@
             <input type="text" id="recorder-speaker" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. The kids, Grandma, everyone">
         </div>
 
+        <!-- Question banner (shown when answering a guided question) -->
+        <div id="question-banner" class="hidden bg-amber-50 border border-amber-200 rounded p-3 mb-3">
+            <p class="text-xs text-amber-700 mb-1" id="question-theme"></p>
+            <p class="text-sm font-medium text-amber-900" id="question-text-display"></p>
+            <button type="button" onclick="askQuestion(true)" class="text-xs text-amber-700 underline mt-1">Different question</button>
+        </div>
+
         <!-- Idle state -->
         <div id="rec-idle" class="w-full">
             <div class="mb-3">
@@ -201,11 +213,33 @@ var pcmChunks = [];
 var recordingStart = null;
 var timerInterval = null;
 var analyser = null;
+var currentQuestion = null;
 
 function openRecorder() {
+    currentQuestion = null;
+    document.getElementById('question-banner').classList.add('hidden');
     document.getElementById('recorder-modal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     resetRecorder();
+}
+
+async function askQuestion(reroll) {
+    try {
+        var res = await fetch('/web/questions/next' + (reroll ? '?rand=1' : ''));
+        var data = await res.json();
+        if (!data.ok) { alert(data.error || 'No questions available right now.'); return; }
+        currentQuestion = data.question;
+        var theme = data.theme ? String(data.theme).replace(/_/g, ' ') : '';
+        document.getElementById('question-theme').textContent =
+            theme + (data.week ? (theme ? ' · ' : '') + 'week ' + data.week : '');
+        document.getElementById('question-text-display').textContent = data.question;
+        document.getElementById('question-banner').classList.remove('hidden');
+        document.getElementById('recorder-modal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        resetRecorder();
+    } catch (err) {
+        alert('Could not load a question: ' + err.message);
+    }
 }
 
 function closeRecorder() {
@@ -309,6 +343,7 @@ function submitTextOnly() {
     var formData = new FormData();
     formData.append('transcript_text', text);
     formData.append('speaker_name', document.getElementById('recorder-speaker').value || '');
+    if (currentQuestion) formData.append('question_text', currentQuestion);
     fetch('/web/stories/record', {
         method: 'POST',
         body: formData
@@ -345,6 +380,7 @@ function stopRecording() {
     formData.append('speaker_name', document.getElementById('recorder-speaker').value || '');
     var typedText = document.getElementById('recorder-text').value.trim();
     if (typedText) formData.append('transcript_text', typedText);
+    if (currentQuestion) formData.append('question_text', currentQuestion);
 
     fetch('/web/stories/record', {
         method: 'POST',

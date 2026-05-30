@@ -411,13 +411,7 @@ function submitTextOnly() {
         }
         document.getElementById('rec-transcript').textContent = data.transcript || text;
         showState('done');
-        var resultEl = document.getElementById('result-' + currentPhotoId);
-        if (resultEl) {
-            resultEl.classList.remove('hidden');
-            var preview = (data.transcript || text);
-            document.getElementById('result-text-' + currentPhotoId).textContent =
-                preview.substring(0, 150) + (preview.length > 150 ? '...' : '');
-        }
+        showStoryEditor(currentPhotoId, data.story_id, data.transcript || text);
     })
     .catch(function(err) {
         document.getElementById('rec-error-msg').textContent = 'Save failed. Check your connection and try again.';
@@ -456,19 +450,61 @@ function stopRecording() {
         }
         document.getElementById('rec-transcript').textContent = data.transcript;
         showState('done');
-
-        // Update the photo card to show linked story
-        var resultEl = document.getElementById('result-' + currentPhotoId);
-        if (resultEl) {
-            resultEl.classList.remove('hidden');
-            document.getElementById('result-text-' + currentPhotoId).textContent =
-                data.transcript.substring(0, 150) + (data.transcript.length > 150 ? '...' : '');
-        }
+        showStoryEditor(currentPhotoId, data.story_id, data.transcript);
     })
     .catch(function(err) {
         document.getElementById('rec-error-msg').textContent = 'Upload failed. Check your connection and try again.';
         showState('error');
     });
+}
+
+// --- Inline story editor in the photo card (no trip to /web/stories) ---
+function showStoryEditor(photoId, storyId, transcript) {
+    var box = document.getElementById('result-' + photoId);
+    if (!box) return;
+    box.classList.remove('hidden');
+    if (!storyId) {
+        box.innerHTML = '<p class="text-xs text-emerald-700">Saved. Open Stories to edit.</p>';
+        return;
+    }
+    var esc = (transcript || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    box.innerHTML =
+        '<p class="text-xs text-emerald-700 font-medium mb-1">Story saved &mdash; fix names or wording:</p>' +
+        '<textarea id="ptext-' + storyId + '" rows="4" class="w-full border rounded p-2 text-sm">' + esc + '</textarea>' +
+        '<div class="flex items-center gap-3 mt-1">' +
+            '<button onclick="savePhotoStory(' + storyId + ')" class="text-xs text-emerald-700 font-medium hover:underline">Save</button>' +
+            '<button id="pfmt-' + storyId + '" onclick="autoFormatPhotoStory(' + storyId + ')" class="text-xs text-blue-600 hover:underline">Auto-Format</button>' +
+            '<span id="psaved-' + storyId + '" class="text-xs text-gray-400"></span>' +
+        '</div>';
+}
+
+function savePhotoStory(storyId) {
+    var text = document.getElementById('ptext-' + storyId).value;
+    var status = document.getElementById('psaved-' + storyId);
+    status.textContent = 'Saving...';
+    var fd = new FormData();
+    fd.append('transcript', text);
+    fetch('/web/stories/' + storyId + '/inline-save', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { status.textContent = d.ok ? '✔ saved' : (d.error || 'save failed'); })
+        .catch(function() { status.textContent = 'save failed'; });
+}
+
+function autoFormatPhotoStory(storyId) {
+    var btn = document.getElementById('pfmt-' + storyId);
+    var orig = btn.textContent;
+    btn.textContent = 'Formatting...';
+    var fd = new FormData();
+    fd.append('story_id', storyId);
+    fd.append('transcript', document.getElementById('ptext-' + storyId).value);
+    fetch('/web/stories/auto-format', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.ok) { document.getElementById('ptext-' + storyId).value = d.formatted; btn.textContent = '✔ Done'; }
+            else { btn.textContent = orig; alert(d.error || 'Auto-format failed'); }
+            setTimeout(function() { btn.textContent = orig; }, 2000);
+        })
+        .catch(function() { btn.textContent = orig; alert('Auto-format failed'); });
 }
 </script>
 {% endblock %}
