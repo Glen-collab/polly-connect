@@ -142,6 +142,7 @@ class BookBuilder:
             verification_status="verified" if verified_only else None,
             limit=9999,
             tenant_id=tenant_id,
+            in_book_only=True,
         )
 
         if not memories:

@@ -733,6 +733,12 @@ class PollyDB:
                 "estimated_year": "ALTER TABLE memories ADD COLUMN estimated_year INTEGER",
                 "owner_age": "ALTER TABLE memories ADD COLUMN owner_age INTEGER",
                 "year_confidence": "ALTER TABLE memories ADD COLUMN year_confidence TEXT DEFAULT 'none'",
+                # ── Legacy Funnel: every surface (story/photo/chatter/wall) feeds memories ──
+                "source": "ALTER TABLE memories ADD COLUMN source TEXT DEFAULT 'story'",
+                "source_ref": "ALTER TABLE memories ADD COLUMN source_ref INTEGER",
+                "include_in_book": "ALTER TABLE memories ADD COLUMN include_in_book INTEGER DEFAULT 1",
+                "is_quote": "ALTER TABLE memories ADD COLUMN is_quote INTEGER DEFAULT 0",
+                "story_value": "ALTER TABLE memories ADD COLUMN story_value REAL",
             }
             for col, sql in mem_migrations.items():
                 if col not in cols:
@@ -3334,12 +3340,17 @@ class PollyDB:
 
     def get_memories(self, speaker: str = None, bucket: str = None,
                      life_phase: str = None, verification_status: str = None,
-                     limit: int = 200, tenant_id: int = None) -> List[Dict]:
+                     limit: int = 200, tenant_id: int = None,
+                     in_book_only: bool = False) -> List[Dict]:
         conn = self._get_connection()
         try:
             conn.row_factory = sqlite3.Row
             query = "SELECT * FROM memories WHERE 1=1"
             params = []
+            if in_book_only:
+                # Legacy Funnel: respect the per-item 📖 toggle (NULL = legacy
+                # rows from before the funnel = treated as included)
+                query += " AND COALESCE(include_in_book, 1) = 1"
             if speaker:
                 query += " AND speaker LIKE ?"
                 params.append(f"%{speaker}%")

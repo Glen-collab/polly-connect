@@ -105,6 +105,17 @@
     </form>
 </div>
 
+<!-- Ask Polly to chime in -->
+<div class="max-w-2xl mx-auto mb-6 text-center">
+    <button id="polly-btn" onclick="askPolly()"
+            class="inline-flex items-center gap-2 bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow">
+        <span class="text-lg">&#x1F99C;</span>
+        <span id="polly-btn-label">Ask Polly to chime in</span>
+    </button>
+    <p class="text-xs text-gray-400 mt-1.5">Polly reads the conversation, adds her two cents, and saves the meaningful parts for your legacy book.</p>
+    <div id="polly-questions" class="hidden mt-3 flex flex-wrap gap-2 justify-center"></div>
+</div>
+
 {% if not posts %}
 <div class="text-center text-gray-400 mt-12 max-w-2xl mx-auto">
     <span class="text-5xl">&#x1F4AC;</span>
@@ -116,10 +127,11 @@
 <!-- Feed -->
 <div class="max-w-2xl mx-auto space-y-4" id="feed">
 {% for post in posts %}
-<div class="bg-white rounded-lg shadow p-4" id="post-{{ post.id }}">
+{% set is_polly = post.author_name and post.author_name.startswith('Polly') %}
+<div class="{% if is_polly %}bg-amber-50 border border-amber-200{% else %}bg-white{% endif %} rounded-lg shadow p-4" id="post-{{ post.id }}">
     <div class="flex items-center gap-3 mb-3">
-        <div class="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-sm">
-            {{ post.author_name[0]|upper if post.author_name else '?' }}
+        <div class="w-9 h-9 {% if is_polly %}bg-amber-200 text-lg{% else %}bg-orange-100 text-orange-600 font-bold text-sm{% endif %} rounded-full flex items-center justify-center">
+            {% if is_polly %}&#x1F99C;{% else %}{{ post.author_name[0]|upper if post.author_name else '?' }}{% endif %}
         </div>
         <div class="flex-1 min-w-0">
             <p class="font-semibold text-sm text-gray-800 truncate">{{ post.author_name }}</p>
@@ -373,6 +385,62 @@ function addComment(postId) {
             container.insertAdjacentHTML('beforeend', html);
             input.value = '';
         }
+    });
+}
+
+function askPolly() {
+    var btn = document.getElementById('polly-btn');
+    var label = document.getElementById('polly-btn-label');
+    btn.disabled = true;
+    label.textContent = 'Polly is listening...';
+    fetch('/web/chatter/' + groupId + '/polly', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        label.textContent = 'Ask Polly to chime in';
+        if (!data.ok) {
+            label.textContent = data.error || 'Polly is resting — try again';
+            setTimeout(function(){ label.textContent = 'Ask Polly to chime in'; }, 2500);
+            return;
+        }
+        // Drop Polly's reply into the top of the feed
+        var feed = document.getElementById('feed');
+        var emptyState = document.querySelector('#feed') ? null : null;
+        var bubble = document.createElement('div');
+        bubble.className = 'bg-amber-50 border border-amber-200 rounded-lg shadow p-4';
+        bubble.id = 'post-' + data.post_id;
+        bubble.innerHTML =
+            '<div class="flex items-center gap-3 mb-3">' +
+              '<div class="w-9 h-9 bg-amber-200 rounded-full flex items-center justify-center text-lg">🦜</div>' +
+              '<div class="flex-1 min-w-0"><p class="font-semibold text-sm text-gray-800">Polly 🦜</p>' +
+              '<p class="text-xs text-gray-400">just now</p></div></div>' +
+            '<p class="text-sm text-gray-700 whitespace-pre-wrap"></p>';
+        bubble.querySelector('p.text-sm').textContent = data.interjection;
+        if (feed) { feed.insertBefore(bubble, feed.firstChild); }
+
+        // Offer her follow-up questions as tap-to-answer chips
+        var qWrap = document.getElementById('polly-questions');
+        if (data.questions && data.questions.length) {
+            qWrap.innerHTML = '<p class="w-full text-xs text-gray-400 mb-1">Polly wonders… (tap to answer)</p>';
+            data.questions.forEach(function(q) {
+                var chip = document.createElement('button');
+                chip.className = 'bg-white border border-amber-300 text-amber-700 px-3 py-1.5 rounded-full text-xs hover:bg-amber-100';
+                chip.textContent = q;
+                chip.onclick = function() {
+                    var box = document.getElementById('post-content');
+                    box.value = q + '\n';
+                    box.focus();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+                qWrap.appendChild(chip);
+            });
+            qWrap.classList.remove('hidden');
+        }
+        bubble.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    })
+    .catch(function() {
+        btn.disabled = false;
+        label.textContent = 'Ask Polly to chime in';
     });
 }
 

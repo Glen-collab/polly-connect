@@ -160,12 +160,19 @@
     {% if memories %}
     <div class="space-y-4">
         {% for mem in memories %}
-        <div class="border-b pb-3 last:border-b-0">
+        <div class="border-b pb-3 last:border-b-0" id="mem-row-{{ mem.id }}">
             <div class="flex items-center gap-2 mb-1">
                 <span class="text-sm font-medium text-gray-700">{{ mem.speaker or 'Unknown' }}</span>
+                {% if mem.source and mem.source != 'story' and mem.source != 'voice' %}
+                <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded capitalize">{{ mem.source }}</span>
+                {% endif %}
                 {% if mem.verification_status == 'verified' %}
                 <span class="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Verified</span>
                 {% endif %}
+                <button onclick="toggleMemBook({{ mem.id }})" id="book-toggle-{{ mem.id }}"
+                        class="ml-auto text-xs text-gray-400 hover:text-red-500" title="Remove from book">
+                    &#x1F4D6; In book
+                </button>
                 {% set emo_list = mem.emotions if mem.emotions is iterable and mem.emotions is not string else (mem.emotions or '').split(',') %}
                 {% for emotion in emo_list if emotion.strip() if emotion is string %}
                 <span class="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded">{{ emotion.strip() }}</span>
@@ -190,4 +197,29 @@
     <p class="text-gray-400 text-sm">No memories assigned to this chapter yet.</p>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleMemBook(memId) {
+    fetch('/web/book/memory/' + memId + '/toggle-book', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.ok) return;
+        var row = document.getElementById('mem-row-' + memId);
+        var btn = document.getElementById('book-toggle-' + memId);
+        if (data.include_in_book) {
+            row.style.opacity = '1';
+            btn.innerHTML = '📖 In book';
+            btn.classList.remove('text-red-500');
+            btn.classList.add('text-gray-400');
+        } else {
+            row.style.opacity = '0.45';
+            btn.innerHTML = '✕ Excluded — tap to keep';
+            btn.classList.remove('text-gray-400');
+            btn.classList.add('text-red-500');
+        }
+    });
+}
+</script>
 {% endblock %}

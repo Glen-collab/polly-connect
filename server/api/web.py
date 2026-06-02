@@ -17,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 
 from core.web_auth import get_web_session, require_login, require_owner, require_admin, hash_password, verify_password
 from core.auth import generate_api_key
+from core import memory_capture
 from core.medications import format_time_12hr, _get_local_now
 from core.subscription import check_feature, get_subscription
 from config import settings
@@ -3981,6 +3982,84 @@ async def web_record_story(request: Request):
     })
 
 
+@router.post("/photos/{photo_id}/tell-story")
+async def photo_tell_story(request: Request, photo_id: int):
+    """Polly looks at a photo + its caption + family comments and tells its
+    story for the legacy book, pulling out quotable family lines."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    photo = db.get_photo_by_id(photo_id, tenant_id=tid)
+    if not photo:
+        return JSONResponse({"error": "Photo not found"}, status_code=404)
+
+    if memory_capture.already_captured(db, "photo", photo_id, tid):
+        return JSONResponse({"ok": True, "already": True,
+                             "narrative": "Polly already told this photo's story."})
+
+    vision = getattr(request.app.state, "vision", None)
+    if not vision or not vision.available:
+        return JSONResponse({"error": "Photo storytelling needs OPENAI_API_KEY."}, status_code=503)
+
+    filename = photo.get("filename")
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+    photo_path = None
+    for sub in ("uploads", "photos"):
+        cand = os.path.join(static_dir, sub, filename or "")
+        if filename and os.path.exists(cand):
+            photo_path = cand
+            break
+    if not photo_path:
+        return JSONResponse({"error": "Photo file missing."}, status_code=404)
+    with open(photo_path, "rb") as f:
+        img_bytes = f.read()
+
+    # Gather family comments left on this photo in Chatter (the "conversation")
+    import sqlite3
+    comments = []
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT ac.author_name as name, ac.comment as text
+            FROM aviary_comments ac
+            JOIN aviary_posts ap ON ac.post_id = ap.id
+            WHERE ap.photo_filename = ? AND ac.comment IS NOT NULL
+            ORDER BY ac.created_at ASC LIMIT 25
+        """, (filename,)).fetchall()
+        comments = [dict(r) for r in rows]
+    finally:
+        if not db._conn:
+            conn.close()
+
+    result = await asyncio.to_thread(
+        vision.narrate_photo, img_bytes, photo.get("caption") or "",
+        photo.get("date_taken") or "", comments)
+    if not result or not result.get("narrative"):
+        return JSONResponse({"error": "Polly couldn't read this photo — try another."}, status_code=502)
+
+    narrative = result["narrative"].strip()
+    # Narrative memory (carries the photo). force=True: dedupe was checked above.
+    memory_capture.capture(db, tid, narrative, "photo", source_ref=photo_id,
+                           speaker=None, analysis=result,
+                           photo_filename=filename, force=True)
+    # Quotable family lines → attributed pull-quotes
+    quotes = []
+    for q in (result.get("quotes") or []):
+        qt = (q.get("quote") or "").strip()
+        sp = (q.get("speaker") or "").strip() or None
+        if qt:
+            memory_capture.capture(db, tid, qt, "photo", source_ref=photo_id,
+                                   speaker=sp, analysis=result, is_quote=True,
+                                   force=True)
+            quotes.append({"speaker": sp or "Family", "quote": qt})
+
+    return JSONResponse({"ok": True, "narrative": narrative, "quotes": quotes})
+
+
 @router.post("/photos/{photo_id}/record-story")
 async def photo_record_story(request: Request, photo_id: int):
     session = await get_web_session(request)
@@ -4337,6 +4416,70 @@ async def shared_wall_page(request: Request, connected_tenant_id: int):
     })
 
 
+@router.post("/wall/{connected_tenant_id}/polly")
+async def wall_polly(request: Request, connected_tenant_id: int):
+    """Polly chimes into a shared Wall conversation and captures the meaningful
+    parts for the legacy book."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    connections = db.get_connected_families(tid)
+    if not any(c["connected_tenant_id"] == connected_tenant_id for c in connections):
+        return JSONResponse({"error": "Not connected"}, status_code=403)
+
+    items = db.get_wall_items(tid, connected_tenant_id, limit=20)
+    if not items:
+        return JSONResponse({"error": "Share a photo or memory first!"}, status_code=400)
+    item_ids = [i["id"] for i in items]
+    comments = db.get_wall_comments(item_ids) if item_ids else {}
+
+    lines = []
+    for it in reversed(items):  # oldest first
+        if it.get("caption"):
+            lines.append(f"[Photo] {it['caption']}")
+        for c in comments.get(it["id"], []):
+            cm = c.get("comment")
+            if cm:
+                lines.append(f"{c.get('tenant_name','Someone')}: {cm}")
+    thread_text = "\n".join(lines[-25:])
+    if not thread_text.strip():
+        return JSONResponse({"error": "Nothing to talk about yet — add a caption or comment!"}, status_code=400)
+
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        by = _birth_year_for(conn, tid)
+    finally:
+        if not db._conn:
+            conn.close()
+
+    result = await asyncio.to_thread(
+        memory_capture.polly_interjection, thread_text, None, by)
+    interjection = result.get("interjection") or "Tell me more? 🦜"
+    questions = result.get("questions") or []
+
+    # Polly leaves her comment on the most recent wall item
+    latest_item_id = items[0]["id"]
+    try:
+        db.add_wall_comment(latest_item_id, tid, "Polly 🦜",
+                            comment=interjection, audio_filename=None)
+    except Exception as e:
+        logger.info("Polly wall comment failed: %s", e)
+
+    try:
+        memory_capture.capture(db, tid, thread_text, "wall",
+                               source_ref=latest_item_id, speaker=None,
+                               analysis=result)
+    except Exception as e:
+        logger.info("Wall Polly capture skipped: %s", e)
+
+    return JSONResponse({"ok": True, "interjection": interjection,
+                         "questions": questions})
+
+
 @router.post("/wall/share-photo")
 async def wall_share_photo(request: Request):
     """Share a photo to a connected family's wall."""
@@ -4534,6 +4677,10 @@ async def wall_comment(request: Request, item_id: int):
                         comment=comment_text or None,
                         audio_filename=audio_key)
 
+    # Legacy Funnel: a heartfelt wall comment can become a memory too
+    if comment_text:
+        _schedule_capture(db, tid, None, comment_text, tenant_name, "wall")
+
     return JSONResponse({"ok": True, "name": tenant_name, "comment": comment_text or "", "audio": audio_key or ""})
 
 
@@ -4687,6 +4834,170 @@ def _load_posts(conn, group_id, tid):
         post["comments"] = [dict(c) for c in comments]
         posts.append(post)
     return posts
+
+
+def _birth_year_for(conn, tid):
+    """Owner's birth year for life-phase dating, or None."""
+    try:
+        row = conn.execute(
+            "SELECT birth_year FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+            (tid,)).fetchone()
+        return row[0] if row and row[0] else None
+    except Exception:
+        return None
+
+
+def _capture_if_valuable(db, tid, ref_id, text, speaker, source="chatter"):
+    """Sync helper for asyncio.to_thread: score an item, auto-capture if it
+    clears the story-value gate. Failures are logged, not raised."""
+    try:
+        analysis = memory_capture.score_and_classify(text)
+        if (analysis.get("story_value") or 0) >= memory_capture.STORY_VALUE_THRESHOLD:
+            memory_capture.capture(db, tid, text, source, source_ref=ref_id,
+                                   speaker=speaker, analysis=analysis)
+    except Exception as e:
+        logger.info("%s auto-capture skipped for %s: %s", source, ref_id, e)
+
+
+def _schedule_capture(db, tid, ref_id, text, speaker, source="chatter"):
+    """Fire-and-forget background capture. Safe from any route."""
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(asyncio.to_thread(
+            _capture_if_valuable, db, tid, ref_id, text, speaker, source))
+    except RuntimeError:
+        pass  # no running loop — skip silently
+
+
+def _recent_thread_text(conn, group_id, limit=8):
+    """Build a readable transcript of the last N non-Polly posts in a group."""
+    rows = conn.execute(
+        "SELECT author_name, content FROM aviary_posts "
+        "WHERE group_id = ? AND content IS NOT NULL AND content != '' "
+        "AND author_name NOT LIKE 'Polly%' "
+        "ORDER BY created_at DESC LIMIT ?",
+        (group_id, limit)
+    ).fetchall()
+    lines = [f"{r['author_name']}: {r['content']}" for r in reversed(rows)]
+    return "\n".join(lines)
+
+
+@router.post("/chatter/{group_id}/polly")
+async def chatter_polly(request: Request, group_id: int):
+    """Polly reads the recent conversation, chimes in (in-persona) as a post in
+    the feed, and captures the thread into the legacy memories table."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+        member = conn.execute(
+            "SELECT 1 FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+            (group_id, tid)).fetchone()
+        if not member:
+            return JSONResponse({"error": "Not a member"}, status_code=403)
+
+        thread_text = _recent_thread_text(conn, group_id)
+        if not thread_text:
+            return JSONResponse({"error": "Nothing to talk about yet — post something first!"}, status_code=400)
+
+        members = conn.execute("""
+            SELECT COALESCE(a.name, up.name, t.name) as nm
+            FROM chatter_group_members gm
+            LEFT JOIN accounts a ON a.tenant_id = gm.tenant_id AND a.role = 'owner'
+            LEFT JOIN user_profiles up ON up.tenant_id = gm.tenant_id
+            LEFT JOIN tenants t ON gm.tenant_id = t.id
+            WHERE gm.group_id = ?""", (group_id,)).fetchall()
+        names = [m["nm"] for m in members if m["nm"]]
+
+        last_post = conn.execute(
+            "SELECT id, author_name FROM aviary_posts WHERE group_id = ? "
+            "AND author_name NOT LIKE 'Polly%' ORDER BY created_at DESC LIMIT 1",
+            (group_id,)).fetchone()
+        last_post_id = last_post["id"] if last_post else None
+        last_author = last_post["author_name"] if last_post else None
+
+        by = _birth_year_for(conn, tid)
+    finally:
+        if not db._conn:
+            conn.close()
+
+    result = await asyncio.to_thread(
+        memory_capture.polly_interjection, thread_text, names, by)
+
+    interjection = result.get("interjection") or "Tell me more? 🦜"
+    questions = result.get("questions") or []
+
+    # Polly chimes into the feed like a member of the conversation
+    conn = db._get_connection()
+    try:
+        cur = conn.execute(
+            "INSERT INTO aviary_posts (tenant_id, author_name, content_type, "
+            "content, group_id) VALUES (?, 'Polly 🦜', 'text', ?, ?)",
+            (tid, interjection, group_id))
+        polly_post_id = cur.lastrowid
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    # Capture the conversation into the legacy book (Polly button = explicit
+    # invite, so capture regardless of score; reuse the GPT pass we already did)
+    try:
+        memory_capture.capture(db, tid, thread_text, "chatter",
+                               source_ref=last_post_id, speaker=last_author,
+                               analysis=result)
+    except Exception as e:
+        logger.info("Polly capture skipped: %s", e)
+
+    return JSONResponse({
+        "ok": True,
+        "interjection": interjection,
+        "questions": questions,
+        "post_id": polly_post_id,
+    })
+
+
+@router.post("/connect/invite")
+async def connect_invite(request: Request, friend_name: str = Form(...),
+                          friend_email: str = Form(...)):
+    """Email a friend a 'connect with me on Polly' invitation. Reuses the
+    existing family-invitation flow — Polly-internal only, no BSA wiring."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    friend_name = (friend_name or "").strip() or "Friend"
+    friend_email = (friend_email or "").strip().lower()
+    if "@" not in friend_email:
+        return RedirectResponse("/web/chatter?invite_err=1", status_code=303)
+
+    owner_name = session.get("name", "Someone")
+    tenant = db.get_tenant(tid)
+    family_code = (tenant.get("family_code") if tenant else None) or db.generate_family_code(tid)
+
+    invitation_id = db.save_family_invitation(
+        tenant_id=tid, family_member_id=None, inviter_name=owner_name,
+        invitee_name=friend_name, invitee_email=friend_email,
+        voice_filename=None, family_code=family_code,
+    )
+
+    import threading
+    from core.notify import send_family_invitation
+    threading.Thread(
+        target=send_family_invitation,
+        args=(owner_name, friend_name, friend_email, family_code, invitation_id, False),
+        daemon=True,
+    ).start()
+
+    return RedirectResponse(f"/web/chatter?invite_sent={friend_name}", status_code=303)
 
 
 @router.get("/chatter", response_class=HTMLResponse)
@@ -5019,14 +5330,20 @@ async def chatter_group_post(request: Request, group_id: int):
 
     conn = db._get_connection()
     try:
-        conn.execute("""
+        cur = conn.execute("""
             INSERT INTO aviary_posts (tenant_id, author_name, content_type, content, photo_filename, audio_filename, group_id)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (tid, author, content_type, content or None, photo_filename, audio_filename, group_id))
+        post_id = cur.lastrowid
         conn.commit()
     finally:
         if not db._conn:
             conn.close()
+
+    # Legacy Funnel: quietly score this post; high-value ones auto-capture into
+    # the memories table (low-value chatter just stays chatter). Fire-and-forget.
+    if content and content.strip():
+        _schedule_capture(db, tid, post_id, content.strip(), author, "chatter")
 
     return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
 
@@ -6911,6 +7228,33 @@ async def book_generate_status(request: Request):
     tid = session["tenant_id"]
     status = _draft_generation_status.get(tid, {"total": 0, "done": 0, "running": False, "msg": ""})
     return JSONResponse(status)
+
+
+@router.post("/book/memory/{memory_id}/toggle-book")
+async def book_memory_toggle(request: Request, memory_id: int):
+    """Flip whether a captured memory is included in the legacy book (📖)."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        row = conn.execute(
+            "SELECT COALESCE(include_in_book, 1) FROM memories WHERE id = ? AND tenant_id = ?",
+            (memory_id, tid)).fetchone()
+        if row is None:
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        new_val = 0 if row[0] else 1
+        conn.execute(
+            "UPDATE memories SET include_in_book = ? WHERE id = ? AND tenant_id = ?",
+            (new_val, memory_id, tid))
+        conn.commit()
+        return JSONResponse({"ok": True, "include_in_book": new_val})
+    finally:
+        if not db._conn:
+            conn.close()
 
 
 @router.get("/book/chapters/{chapter_num}", response_class=HTMLResponse)

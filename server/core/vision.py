@@ -109,3 +109,88 @@ class VisionService:
             logger.error(f"Vision service error: {e}")
 
         return []
+
+    def narrate_photo(self, image_bytes: bytes, caption: str = "",
+                      date_taken: str = "", comments=None) -> Optional[dict]:
+        """Look at a family photo (plus its caption and any comments people left)
+        and tell its story for the legacy book.
+
+        Returns a dict:
+          {
+            "narrative": "<warm 2-4 sentence story of the moment>",
+            "quotes": [{"speaker": "Mom", "quote": "..."}],   # pull-quotes
+            "bucket","life_phase","estimated_year","people","locations",
+            "emotions","summary","story_value"
+          }
+        or None on failure (caller falls back).
+        """
+        if not self.available:
+            return None
+        import urllib.request, urllib.error
+
+        b64 = base64.b64encode(image_bytes).decode("utf-8")
+        ctx = []
+        if caption:
+            ctx.append(f"Caption: {caption}")
+        if date_taken:
+            ctx.append(f"Date: {date_taken}")
+        if comments:
+            joined = "\n".join(f"- {c.get('name','Someone')}: {c.get('text','')}"
+                               for c in comments if c.get("text"))
+            if joined:
+                ctx.append("What family members said about this photo:\n" + joined)
+        context_block = "\n".join(ctx) if ctx else "(no caption provided)"
+
+        system = (
+            "You are a warm family biographer writing for a legacy book. Look at "
+            "the photo and read what the family said about it. Return STRICT JSON "
+            "(no markdown):\n{\n"
+            '  "narrative": "<2-4 warm sentences telling the story of this moment '
+            "for the book; describe what is happening and why it matters. Do NOT "
+            'invent specific names not provided.>",\n'
+            '  "quotes": [{"speaker":"<name>","quote":"<a short, heartfelt line '
+            'worth quoting from the comments>"}],\n'
+            '  "story_value": <0.0-1.0>,\n'
+            '  "bucket": "<ordinary_world | call_to_adventure | crossing_threshold '
+            '| trials_allies_enemies | transformation | return_with_knowledge>",\n'
+            '  "life_phase": "<childhood | adolescence | young_adult | adult | '
+            'midlife | elder | reflection | unknown>",\n'
+            '  "estimated_year": <year from the date, or null>,\n'
+            '  "people": ["names"], "locations": ["places"],\n'
+            '  "emotions": ["dominant emotions"],\n'
+            '  "summary": "<one sentence, max 120 chars>"\n}'
+        )
+        payload = {
+            "model": "gpt-4o",
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": [
+                    {"type": "text", "text": context_block},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:image/jpeg;base64,{b64}", "detail": "high"}},
+                ]},
+            ],
+            "max_tokens": 900,
+            "temperature": 0.5,
+            "response_format": {"type": "json_object"},
+        }
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {self.api_key}"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+            content = result["choices"][0]["message"]["content"].strip()
+            parsed = json.loads(content)
+            if not isinstance(parsed.get("quotes"), list):
+                parsed["quotes"] = []
+            return parsed
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")
+            logger.error(f"narrate_photo API error {e.code}: {body[:200]}")
+        except Exception as e:
+            logger.error(f"narrate_photo error: {e}")
+        return None

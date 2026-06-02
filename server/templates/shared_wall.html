@@ -68,6 +68,19 @@
 </div>
 {% endif %}
 
+<!-- Ask Polly to chime in -->
+{% if wall_items %}
+<div class="text-center mb-4">
+    <button id="wall-polly-btn" onclick="askWallPolly()"
+            class="inline-flex items-center gap-2 bg-gradient-to-r from-orange-400 to-amber-500 hover:from-orange-500 hover:to-amber-600 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow">
+        <span class="text-lg">&#x1F99C;</span>
+        <span id="wall-polly-label">Ask Polly to chime in</span>
+    </button>
+    <p class="text-xs text-gray-400 mt-1.5">Polly reads your wall, adds her two cents, and saves the meaningful parts for your legacy book.</p>
+    <div id="wall-polly-questions" class="hidden mt-3 flex flex-wrap gap-2 justify-center"></div>
+</div>
+{% endif %}
+
 <!-- Wall Feed -->
 {% if wall_items %}
 <div class="space-y-3">
@@ -202,6 +215,41 @@
 {% block scripts %}
 <script>
 var _wallTid = {{ connected_family.connected_tenant_id }};
+
+function askWallPolly() {
+    var btn = document.getElementById('wall-polly-btn');
+    var label = document.getElementById('wall-polly-label');
+    btn.disabled = true;
+    label.textContent = 'Polly is listening...';
+    fetch('/web/wall/' + _wallTid + '/polly', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        if (!data.ok) {
+            label.textContent = data.error || 'Try again';
+            setTimeout(function(){ label.textContent = 'Ask Polly to chime in'; }, 3000);
+            return;
+        }
+        label.textContent = 'Polly chimed in below 🦜';
+        var qWrap = document.getElementById('wall-polly-questions');
+        qWrap.innerHTML = '';
+        if (data.questions && data.questions.length) {
+            qWrap.innerHTML = '<p class="w-full text-xs text-gray-400 mb-1">Polly wonders…</p>';
+            data.questions.forEach(function(q) {
+                var chip = document.createElement('span');
+                chip.className = 'bg-white border border-amber-300 text-amber-700 px-3 py-1.5 rounded-full text-xs';
+                chip.textContent = q;
+                qWrap.appendChild(chip);
+            });
+            qWrap.classList.remove('hidden');
+        }
+        setTimeout(function(){ location.reload(); }, 1200);
+    })
+    .catch(function() {
+        btn.disabled = false;
+        label.textContent = 'Ask Polly to chime in';
+    });
+}
 var _wallRecorder = null;
 var _wallBlob = null;
 var _uploadFile = null;
