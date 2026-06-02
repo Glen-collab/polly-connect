@@ -497,11 +497,14 @@ Timeline context:
             import re as _re
             try:
                 conn = self.db._get_connection()
+                # Photos flow into the book regardless — a caption is nice but a
+                # date alone is enough to place the picture (with its QR).
                 unlinked_photos = conn.execute("""
                     SELECT id, caption, date_taken, tags
                     FROM photos WHERE tenant_id = ? AND in_book = 1
                     AND (story_id IS NULL OR story_id = 0)
-                    AND caption IS NOT NULL AND caption != ''
+                    AND ((caption IS NOT NULL AND caption != '')
+                         OR (date_taken IS NOT NULL AND date_taken != ''))
                 """, (tenant_id,)).fetchall()
                 for up in unlinked_photos:
                     caption = up[1] or ""
@@ -633,6 +636,12 @@ Here are the memories to weave into this chapter (sorted chronologically):
 Write a warm, narrative chapter (7-10 paragraphs) that:
 - Weaves these memories into a cohesive story in chronological order
 - Preserves the speaker's voice and emotional tone
+- MULTIPLE PERSPECTIVES: when two or more people remember the SAME event, day, or
+  photo differently, honor each person's version distinctly and attribute it by
+  name (e.g. "Her brother remembers the wedding as a chaotic, joyful blur, while
+  her sister-in-law recalls the quiet moment before the ceremony..."). NEVER force
+  contradictory memories into a single 'official' account — the differing
+  rememberances ARE the richness. Let them stand side by side.
 - Adds gentle transitions between memories
 - Opens with a scene-setting paragraph grounded in time and place
 - Closes with a reflective paragraph
