@@ -21,6 +21,10 @@ CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
 # Audio / I2S
 CONFIG_I2S_ISR_IRAM_SAFE=y
 
+# Console over native USB-Serial-JTAG (Paul's v2 board has no UART bridge —
+# this routes logs to COM3 so `idf.py monitor` works on the new board)
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
 # Performance
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_FREERTOS_HZ=1000

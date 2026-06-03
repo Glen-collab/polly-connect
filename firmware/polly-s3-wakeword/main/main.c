@@ -1188,7 +1188,9 @@ static esp_err_t ws_init(void)
         .uri = WS_URI,
         .buffer_size = WS_BUFFER_SIZE,
         .reconnect_timeout_ms = WS_RECONNECT_MS,
-        .network_timeout_ms = 10000,
+        .network_timeout_ms = 30000,        // 30s TCP timeout (was 10s — caused idle disconnects)
+        .ping_interval_sec = 20,            // RFC 6455 WebSocket ping every 20s (keeps connection alive)
+        .pingpong_timeout_sec = 60,         // allow up to 60s for pong (long recordings block sends)
         .task_stack = 8192,
     };
 

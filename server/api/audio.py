@@ -107,6 +107,12 @@ async def continuous_stream(websocket: WebSocket):
     still_there_prompted = False  # tracks if we've asked "still there?"
     accumulated_parts = []        # partial audio from before the prompt
 
+    # DB device id — set during connect when authenticated via a device key.
+    # Initialized here so the "ping" handler (line ~443) is safe even when the
+    # device authenticates with the GLOBAL key (device_info is None) — otherwise
+    # the first keepalive ping raises UnboundLocalError and drops the stream.
+    db_device_id = None
+
     # Story recording session (button-triggered WAV capture)
     story_session = None  # type: StoryRecordingSession
 
