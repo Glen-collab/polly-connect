@@ -1,0 +1,9 @@
+build/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+/b*.txt
+/f*.txt
+/mon*.txt
+/*_out.txt
