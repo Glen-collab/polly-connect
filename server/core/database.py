@@ -3013,19 +3013,23 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def update_narrative(self, narrative_id: int, narrative: str = None, status: str = None):
-        """Update a narrative's text and/or status."""
+    def update_narrative(self, narrative_id: int, narrative: str = None,
+                         status: str = None, query: str = None):
+        """Update a narrative's text, status, and/or topic (query).
+        Only the fields passed (not None) are changed."""
+        sets, params = [], []
+        if narrative is not None:
+            sets.append("narrative = ?"); params.append(narrative)
+        if status is not None:
+            sets.append("status = ?"); params.append(status)
+        if query is not None:
+            sets.append("query = ?"); params.append(query)
+        if not sets:
+            return
+        params.append(narrative_id)
         conn = self._get_connection()
         try:
-            if narrative is not None and status is not None:
-                conn.execute("UPDATE story_narratives SET narrative = ?, status = ? WHERE id = ?",
-                             (narrative, status, narrative_id))
-            elif narrative is not None:
-                conn.execute("UPDATE story_narratives SET narrative = ? WHERE id = ?",
-                             (narrative, narrative_id))
-            elif status is not None:
-                conn.execute("UPDATE story_narratives SET status = ? WHERE id = ?",
-                             (status, narrative_id))
+            conn.execute(f"UPDATE story_narratives SET {', '.join(sets)} WHERE id = ?", params)
             conn.commit()
         finally:
             if not self._conn:

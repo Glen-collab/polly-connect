@@ -6807,11 +6807,14 @@ async def narrative_keep(request: Request, narrative_id: int):
 
     form = await request.form()
     edited_text = form.get("narrative", "").strip()
+    edited_topic = form.get("query", "").strip()  # Topic field
     db = request.app.state.db
-    if edited_text:
-        db.update_narrative(narrative_id, narrative=edited_text, status="kept")
-    else:
-        db.update_narrative(narrative_id, status="kept")
+    db.update_narrative(
+        narrative_id,
+        narrative=edited_text or None,
+        status="kept",
+        query=edited_topic or None,
+    )
     return RedirectResponse("/web/narratives", status_code=303)
 
 

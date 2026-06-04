@@ -63,6 +63,12 @@
         <div id="edit-{{ n.id }}" class="hidden">
             <form method="POST" action="/web/narratives/{{ n.id }}/keep">
                 <div class="mb-3">
+                    <label class="block text-sm text-gray-600 mb-1">Topic <span class="text-gray-400">(fix spelling or names)</span></label>
+                    <input type="text" name="query" value="{{ n.query or '' }}"
+                           placeholder="e.g. Matt Lubinski"
+                           class="w-full border rounded px-3 py-2 text-sm">
+                </div>
+                <div class="mb-3">
                     <label class="block text-sm text-gray-600 mb-1">Narrative Text</label>
                     <textarea name="narrative" rows="6"
                               class="w-full border rounded px-3 py-2 text-sm sm:text-base leading-relaxed">{{ n.narrative }}</textarea>
