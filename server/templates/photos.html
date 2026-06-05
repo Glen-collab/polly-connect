@@ -94,14 +94,27 @@
             {% if photo.stories %}
             <div class="space-y-1 mb-2">
                 {% for ps in photo.stories %}
+                {% set ps_text = ps.corrected_transcript or ps.transcript or '' %}
                 <div class="bg-blue-50 rounded p-2">
                     <div class="flex items-center justify-between">
                         <p class="text-xs text-blue-700 font-medium">{{ ps.speaker_name or 'Someone' }}</p>
-                        {% if ps.audio_s3_key %}
-                        <a href="/web/listen/{{ ps.audio_s3_key }}" target="_blank" class="text-xs text-blue-500 hover:underline">Listen</a>
-                        {% endif %}
+                        <div class="flex items-center gap-2">
+                            {% if ps.audio_s3_key %}
+                            <a href="/web/listen/{{ ps.audio_s3_key }}" target="_blank" class="text-xs text-blue-500 hover:underline">Listen</a>
+                            {% endif %}
+                            <button type="button" onclick="togglePhotoStoryEdit({{ ps.id }})" class="text-xs text-emerald-600 hover:underline">Edit</button>
+                        </div>
                     </div>
-                    <p class="text-xs text-gray-500 mt-0.5">{{ (ps.transcript or '')[:80] }}{% if (ps.transcript or '')|length > 80 %}...{% endif %}</p>
+                    <p id="pprev-{{ ps.id }}" class="text-xs text-gray-500 mt-0.5">{{ ps_text[:80] }}{% if ps_text|length > 80 %}...{% endif %}</p>
+                    <div id="pedit-{{ ps.id }}" class="hidden mt-1">
+                        <textarea id="ptext-{{ ps.id }}" rows="4" class="w-full border rounded p-2 text-sm">{{ ps_text }}</textarea>
+                        <div class="flex items-center gap-3 mt-1">
+                            <button type="button" onclick="savePhotoStory({{ ps.id }})" class="text-xs text-emerald-700 font-medium hover:underline">Save</button>
+                            <button type="button" id="pfmt-{{ ps.id }}" onclick="autoFormatPhotoStory({{ ps.id }})" class="text-xs text-blue-600 hover:underline">Auto-Format</button>
+                            <button type="button" onclick="togglePhotoStoryEdit({{ ps.id }})" class="text-xs text-gray-500 hover:underline">Cancel</button>
+                            <span id="psaved-{{ ps.id }}" class="text-xs text-gray-400"></span>
+                        </div>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -456,6 +469,14 @@ function stopRecording() {
         document.getElementById('rec-error-msg').textContent = 'Upload failed. Check your connection and try again.';
         showState('error');
     });
+}
+
+// Toggle the inline editor for an already-saved photo story
+function togglePhotoStoryEdit(id) {
+    var ed = document.getElementById('pedit-' + id);
+    var prev = document.getElementById('pprev-' + id);
+    if (ed) ed.classList.toggle('hidden');
+    if (prev) prev.classList.toggle('hidden');
 }
 
 // --- Inline story editor in the photo card (no trip to /web/stories) ---
