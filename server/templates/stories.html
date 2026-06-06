@@ -40,12 +40,14 @@
         <textarea id="story-edit-{{ story.id }}" class="hidden w-full border rounded px-3 py-2 text-sm sm:text-base leading-relaxed mt-1" rows="8"></textarea>
         <div class="flex items-center gap-3 mt-2 flex-wrap">
             {% if story.audio_s3_key %}
-            <audio controls preload="none" class="h-8">
-                <source src="/static/recordings/{{ story.audio_s3_key }}" type="audio/wav">
-            </audio>
-            {% if story.duration_seconds %}
-            <span class="text-xs text-gray-400">{{ (story.duration_seconds / 60)|int }}:{{ '%02d' % (story.duration_seconds % 60)|int }}</span>
-            {% endif %}
+            <span id="audio-wrap-{{ story.id }}" class="inline-flex items-center gap-2 {% if not story.qr_in_book %}hidden{% endif %}">
+                <audio controls preload="none" class="h-8">
+                    <source src="/static/recordings/{{ story.audio_s3_key }}" type="audio/wav">
+                </audio>
+                {% if story.duration_seconds %}
+                <span class="text-xs text-gray-400">{{ (story.duration_seconds / 60)|int }}:{{ '%02d' % (story.duration_seconds % 60)|int }}</span>
+                {% endif %}
+            </span>
             {% endif %}
             {% if story.id %}
             <button type="button" onclick="toggleVerify({{ story.id }})" id="verify-btn-{{ story.id }}"
@@ -59,7 +61,7 @@
         </div>
         <div class="flex items-center gap-3 mt-3 pt-3 border-t">
             {% if story.audio_s3_key %}
-            <img src="/web/stories/{{ story.id }}/qr.png" alt="QR" class="w-16 h-16" loading="lazy">
+            <img id="qr-img-{{ story.id }}" src="/web/stories/{{ story.id }}/qr.png" alt="QR" class="w-16 h-16 {% if not story.qr_in_book %}hidden{% endif %}" loading="lazy">
             <div class="flex-1">
                 <button type="button" onclick="toggleQr({{ story.id }})" id="qr-btn-{{ story.id }}"
                         class="text-xs font-medium px-2 py-0.5 rounded {% if story.qr_in_book %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600{% endif %}">{% if story.qr_in_book %}&#x2714; QR in book{% else %}QR not in book{% endif %}</button>
@@ -428,12 +430,18 @@ function toggleQr(id) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.ok) {
+            var audioWrap = document.getElementById('audio-wrap-' + id);
+            var qrImg = document.getElementById('qr-img-' + id);
             if (data.qr_in_book) {
                 btn.className = 'text-xs font-medium px-2 py-0.5 rounded bg-emerald-100 text-emerald-700';
                 btn.innerHTML = '&#x2714; QR in book';
+                if (audioWrap) audioWrap.classList.remove('hidden');
+                if (qrImg) qrImg.classList.remove('hidden');
             } else {
                 btn.className = 'text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600';
                 btn.textContent = 'QR not in book';
+                if (audioWrap) audioWrap.classList.add('hidden');
+                if (qrImg) qrImg.classList.add('hidden');
             }
         }
     });
