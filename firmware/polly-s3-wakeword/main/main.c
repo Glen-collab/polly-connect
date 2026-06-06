@@ -64,7 +64,7 @@ static const char *TAG = "POLLY";
 /* --- Configuration --- */
 
 // Firmware version (for OTA updates)
-#define FW_VERSION      "1.0.0"
+#define FW_VERSION      "1.0.1"
 #define FW_VARIANT      "breadboard"
 
 // WiFi
@@ -541,6 +541,7 @@ static bool wifi_try_connect(const char *ssid, const char *pass)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
+    esp_wifi_set_ps(WIFI_PS_NONE);  // keep WiFi fully awake — prevents stale/half-dead connections
 
     EventBits_t bits = xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT,
                                             pdFALSE, pdFALSE, pdMS_TO_TICKS(15000));
@@ -564,6 +565,7 @@ static bool wifi_try_saved_networks(wifi_cred_t *creds, int cred_count)
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &empty_config));
     ESP_ERROR_CHECK(esp_wifi_start());
+    esp_wifi_set_ps(WIFI_PS_NONE);  // keep WiFi fully awake — prevents stale/half-dead connections
 
     wifi_scan_config_t scan_cfg = {
         .show_hidden = false,
@@ -1191,6 +1193,10 @@ static esp_err_t ws_init(void)
         .network_timeout_ms = 30000,        // 30s TCP timeout (was 10s — caused idle disconnects)
         .ping_interval_sec = 20,            // RFC 6455 WebSocket ping every 20s (keeps connection alive)
         .pingpong_timeout_sec = 60,         // allow up to 60s for pong (long recordings block sends)
+        .keep_alive_enable = true,          // OS-level TCP keepalive — detects a dead/half-open link
+        .keep_alive_idle = 10,              // start probing after 10s idle
+        .keep_alive_interval = 5,           // probe every 5s
+        .keep_alive_count = 3,              // 3 failed probes (~25s) -> drop + auto-reconnect
         .task_stack = 8192,
     };
 
