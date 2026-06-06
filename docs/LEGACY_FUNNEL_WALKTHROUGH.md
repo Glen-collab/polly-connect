@@ -1,6 +1,6 @@
 # Polly Legacy Funnel — What We Built (Owner Walkthrough)
 
-*Session: 2026-06-02. Everything below is LIVE on polly-connect.com and pushed to `master`.*
+*Started 2026-06-02, last updated 2026-06-06. Everything below is LIVE on polly-connect.com and pushed to `master`.*
 
 ---
 
@@ -78,6 +78,30 @@ the book only ever reads from that table.**
 - *(The underlying data was kept, so it's a one-flip revert if you ever want
   sharing back.)*
 
+### 8. Editing & cleanup refinements (June 3–6)
+- **Edit a photo's story text inline** — on the Photos page, each saved story now
+  has an **Edit** button that opens the text right there (Save / Auto-Format).
+  Before, you had to detour over to Stories to fix wording.
+- **Edit a Story Narrative's Topic** — fix a misspelled topic or name right in the
+  narrative editor (e.g. "matt levinsky" → "Matt Lubinski").
+- **Stories: QR + audio follow the in-book toggle** — flip a story's QR "out of
+  the book" and its QR code *and* audio player hide in the Stories view; toggle it
+  back in and they reappear (live, no reload). Toggle button always stays visible.
+
+### 9. The physical Polly device is LIVE 🦜 (June 3–6)
+- Paul's v2 PCB is fully working as a **standalone voice device** — no Home
+  Assistant, talks straight to your Polly Connect server.
+- **WiFi:** auto-connects to saved networks; for a new place it starts a
+  `Polly-Setup` hotspot — connect your phone, go to `192.168.4.1`, enter WiFi
+  (2.4 GHz only). It remembers networks.
+- **Use it:** say **"Hey Polly"** (normal, even tone) + your question — she answers
+  out the speaker. The **BOOT button** = "record my story" (records a full memory
+  until pressed again).
+- Fixed a server bug that was dropping the device connection every ~30s
+  (global-key devices crashed on the keepalive ping). Now rock-steady.
+- Speaker plugs into **CN1** (JST PH 2.0 mm 2-pin); the amp self-enables, no
+  firmware change needed.
+
 ---
 
 ## How capture decides — at a glance
@@ -154,6 +178,14 @@ the shape.
 3. **Per-source default switches** in Settings (e.g. "Wall off by default").
 4. **Tune the capture bar** up or down once you've felt it with real use.
 
+**Device-side polish (optional, not built):**
+5. **WiFi power-save off** (`esp_wifi_set_ps(WIFI_PS_NONE)`) — trims the occasional
+   reconnect (currently drops ~every 8–19 min, auto-heals in 5s; harmless).
+6. **Bigger response-audio buffer** — long replies (30s+) overflow the device's
+   960 KB buffer ("Response audio buffer full!"); bump it or cap reply length.
+7. **Photo in/out toggle to match QR** — mirror the QR+audio show/hide for the
+   photo's own in-book toggle if wanted.
+
 ---
 
 ## Technical notes (for reference)
@@ -164,7 +196,12 @@ the shape.
   `is_quote`, `story_value` (additive migration, applied to live DB).
 - **Blueprint:** `docs/POLLY_LEGACY_FUNNEL.md` (architecture).
 - **Provider:** OpenAI (gpt-4o-mini for text, gpt-4o for vision).
-- **Commits on `master`:** Legacy Funnel build, family-tree cleanup, photo
-  rework. All deployed to `ec2-user@3.19.135.182:/opt/polly-connect`,
-  `polly-connect.service` healthy.
+- **Commits on `master` (this run):** Legacy Funnel build → family-tree cleanup →
+  photo rework → WebSocket `db_device_id` server fix → editable narrative Topic →
+  inline photo-story edit → Stories QR+audio show/hide. All deployed to
+  `ec2-user@3.19.135.182:/opt/polly-connect`, `polly-connect.service` healthy.
+- **Device firmware:** `firmware/polly-s3-wakeword` (ESP-IDF) runs Paul's v2
+  board; `firmware/polly-v2-bringup` is the hardware bring-up test. Pin map +
+  build notes in the project memory.
+- **Provider:** OpenAI (gpt-4o-mini for text, gpt-4o for vision).
 - **Boundary kept:** zero entanglement with the BSA / WorkoutTracker stack.
