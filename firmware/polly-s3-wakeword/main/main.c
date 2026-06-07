@@ -64,7 +64,7 @@ static const char *TAG = "POLLY";
 /* --- Configuration --- */
 
 // Firmware version (for OTA updates)
-#define FW_VERSION      "1.0.1"
+#define FW_VERSION      "1.0.2"
 #define FW_VARIANT      "breadboard"
 
 // WiFi
@@ -80,7 +80,7 @@ static const char *TAG = "POLLY";
 
 // Device identity & API key (change these per-device when flashing)
 #define DEVICE_ID       "polly001"
-#define DEVICE_API_KEY  ""  // Leave empty to use global key, or paste per-device key here
+#define DEVICE_API_KEY  "oyiyfCEOd0QXTv5EPL8f9XBnFkNDAp8UwoTi5yRzAVw"  // polly001 registered to tenant 1 (Glen)
 
 // I2S Microphone (INMP441) pins
 #define I2S_MIC_SCK     GPIO_NUM_6
