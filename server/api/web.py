@@ -4903,6 +4903,9 @@ async def connect_invite(request: Request, friend_name: str = Form(...),
 
     owner_name = session.get("name", "Someone")
     tenant = db.get_tenant(tid)
+    # family_code is still required by the invitation record (NOT NULL) but is
+    # NEVER emailed to a Chatter invitee — that household code would grant full
+    # account access. The Chatter invite only links to the separate-account signup.
     family_code = (tenant.get("family_code") if tenant else None) or db.generate_family_code(tid)
 
     invitation_id = db.save_family_invitation(
@@ -4912,10 +4915,10 @@ async def connect_invite(request: Request, friend_name: str = Form(...),
     )
 
     import threading
-    from core.notify import send_family_invitation
+    from core.notify import send_chatter_invitation
     threading.Thread(
-        target=send_family_invitation,
-        args=(owner_name, friend_name, friend_email, family_code, invitation_id, False),
+        target=send_chatter_invitation,
+        args=(owner_name, friend_name, friend_email, invitation_id),
         daemon=True,
     ).start()
 
