@@ -50,6 +50,14 @@ CHAPTER_TEMPLATES = [
 ]
 
 
+# The 6 life-arc buckets. The book is "ready" when each holds enough memories.
+LIFE_BUCKETS = [
+    "ordinary_world", "call_to_adventure", "crossing_threshold",
+    "trials_allies_enemies", "transformation", "return_with_knowledge",
+]
+MIN_PER_BUCKET = 5  # memories per bucket before a life stage counts as "full"
+
+
 class BookBuilder:
     """Assembles memories into chapter outlines and narrative drafts."""
 
@@ -58,6 +66,25 @@ class BookBuilder:
         self.followup_gen = followup_generator
         self._ai_available = (followup_generator is not None
                               and followup_generator.available)
+
+    def book_readiness(self, speaker: str = None, tenant_id: int = None) -> Dict:
+        """Is the book 'full' enough to generate? Ready when every life-stage
+        bucket has at least MIN_PER_BUCKET in-book memories."""
+        mems = self.db.get_memories(speaker=speaker, limit=9999,
+                                    tenant_id=tenant_id, in_book_only=True)
+        counts = {b: 0 for b in LIFE_BUCKETS}
+        for m in mems:
+            b = m.get("bucket") or "ordinary_world"
+            if b in counts:
+                counts[b] += 1
+        ready_buckets = [b for b, c in counts.items() if c >= MIN_PER_BUCKET]
+        return {
+            "ready": len(ready_buckets) == len(LIFE_BUCKETS),
+            "counts": counts,
+            "ready_count": len(ready_buckets),
+            "total_buckets": len(LIFE_BUCKETS),
+            "min_per_bucket": MIN_PER_BUCKET,
+        }
 
     @staticmethod
     def _age_to_bucket(age: int, current_age: int) -> tuple:
@@ -280,6 +307,38 @@ class BookBuilder:
                 "status": "ready" if len(chunk) >= template["min_memories"] else "needs_more",
             })
             chapter_num += 1
+
+        # Richness: spill ALL leftover memories into extra chapters so the whole
+        # library is used (fuller library -> bigger, richer book). Covers both
+        # surplus beyond a template's chunk AND memories whose bucket/phase has
+        # no matching template at all (which would otherwise be dropped).
+        for key, group_memories in grouped.items():
+            offset = assigned.get(key, 0)
+            remaining = group_memories[offset:]
+            if not remaining:
+                continue
+            bucket, life_phase = key
+            base_title = next(
+                (t["title_template"] for t in CHAPTER_TEMPLATES
+                 if (t["bucket"], t["life_phase"]) == key),
+                bucket.replace("_", " ").title())
+            for start in range(0, len(remaining), 10):
+                chunk = remaining[start:start + 10]
+                if len(chunk) < 2:
+                    continue
+                years = [m.get("estimated_year") for m in chunk if m.get("estimated_year")]
+                chapters.append({
+                    "chapter_number": chapter_num,
+                    "title": f"{base_title} (more)",
+                    "bucket": bucket,
+                    "life_phase": life_phase,
+                    "memory_count": len(chunk),
+                    "memory_ids": [m["id"] for m in chunk],
+                    "year_range": (min(years), max(years)) if years else None,
+                    "status": "ready" if len(chunk) >= 5 else "needs_more",
+                })
+                chapter_num += 1
+            assigned[key] = len(group_memories)
 
         return chapters
 

@@ -11,6 +11,51 @@
     </a>
 </div>
 
+{% if msg %}
+<div class="bg-blue-50 border border-blue-200 text-blue-700 rounded-lg p-3 mb-4 text-sm text-center">{{ msg }}</div>
+{% endif %}
+
+<!-- Book readiness + Buy the Book -->
+{% if readiness %}
+<div class="bg-white rounded-xl shadow p-4 sm:p-5 mb-6 border-2
+    {% if book_purchased %}border-emerald-300{% elif readiness.ready %}border-amber-300{% else %}border-gray-200{% endif %}">
+    {% if book_purchased %}
+        <div class="flex items-center gap-2 mb-1">
+            <span class="text-xl">&#x2705;</span>
+            <h2 class="text-lg font-bold text-emerald-700">Your Legacy Book is unlocked</h2>
+        </div>
+        <p class="text-sm text-gray-600">Generate your chapters one at a time below, then export the print-ready PDF.</p>
+    {% elif readiness.ready %}
+        <div class="flex items-center gap-2 mb-1">
+            <span class="text-xl">&#x1F389;</span>
+            <h2 class="text-lg font-bold text-amber-700">Your book is ready to write!</h2>
+        </div>
+        <p class="text-sm text-gray-600 mb-3">All {{ readiness.total_buckets }} life stages are full. Unlock your book to generate every chapter and export a print-ready PDF.</p>
+        <form method="POST" action="/web/book/buy">
+            <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-2.5 rounded-lg">
+                &#x1F4D6; Buy the Book &mdash; $79 one-time
+            </button>
+        </form>
+        <p class="text-xs text-gray-400 mt-2">You can preview a couple of chapters free below.</p>
+    {% else %}
+        <div class="flex items-center gap-2 mb-1">
+            <span class="text-xl">&#x1F4DD;</span>
+            <h2 class="text-lg font-bold text-gray-700">Keep recording — {{ readiness.ready_count }} of {{ readiness.total_buckets }} life stages full</h2>
+        </div>
+        <p class="text-sm text-gray-600 mb-3">Your book unlocks once every life stage has at least {{ readiness.min_per_bucket }} memories. Use "Ask Me a Question" to fill the gaps.</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {% for b, c in readiness.counts.items() %}
+            <div class="flex items-center justify-between text-xs rounded px-2 py-1
+                {% if c >= readiness.min_per_bucket %}bg-emerald-50 text-emerald-700{% else %}bg-gray-50 text-gray-500{% endif %}">
+                <span>{{ readiness.bucket_labels[b] }}</span>
+                <span class="font-mono">{% if c >= readiness.min_per_bucket %}&#x2714;{% else %}{{ c }}/{{ readiness.min_per_bucket }}{% endif %}</span>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+{% endif %}
+
 <!-- Progress Overview -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
     <div class="bg-white rounded-lg shadow p-4 text-center">

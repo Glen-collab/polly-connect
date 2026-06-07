@@ -132,9 +132,10 @@ def check_feature(db, tenant_id: int, feature: str) -> bool:
         count = _count_photo_stories(db, tenant_id)
         return count < limits["max_photo_stories"]
     elif feature == "book_export":
-        return limits["book_export"]
+        # Unlocked by the one-time "Buy the Book" purchase OR by a tier that includes it
+        return limits["book_export"] or _book_purchased(db, tenant_id)
     elif feature == "book_qr":
-        return limits["book_qr_codes"]
+        return limits["book_qr_codes"] or _book_purchased(db, tenant_id)
     elif feature == "phone_recording":
         return limits["phone_recording"]
     elif feature == "family_tree_edit":
@@ -235,6 +236,64 @@ def create_checkout_session(db, tenant_id: int, tier: str,
         return None
 
 
+def _book_purchased(db, tenant_id: int) -> bool:
+    """True if this tenant has bought the one-time Legacy Book unlock."""
+    if tenant_id == ADMIN_TENANT_ID:
+        return True
+    try:
+        conn = db._get_connection()
+        try:
+            row = conn.execute(
+                "SELECT book_purchased FROM tenants WHERE id = ?", (tenant_id,)
+            ).fetchone()
+            return bool(row and row[0])
+        finally:
+            if not db._conn:
+                conn.close()
+    except Exception:
+        return False
+
+
+def create_book_checkout_session(db, tenant_id: int,
+                                 success_url: str = None,
+                                 cancel_url: str = None) -> Optional[str]:
+    """One-time 'Buy the Book' checkout — unlocks full generation + export."""
+    stripe = _get_stripe()
+    if not stripe:
+        return None
+    try:
+        # Find or create the one-time book product/price
+        products = stripe.Product.search(query=f"name:'{BOOK_PRICE['name']}'")
+        product = products.data[0] if products.data else stripe.Product.create(
+            name=BOOK_PRICE["name"],
+            description="Unlock your full Polly legacy book — all chapters + print-ready PDF.",
+        )
+        price_id = None
+        for p in stripe.Price.list(product=product.id, active=True).data:
+            if p.unit_amount == BOOK_PRICE["amount"] and not p.recurring:
+                price_id = p.id
+                break
+        if not price_id:
+            price_id = stripe.Price.create(
+                product=product.id, unit_amount=BOOK_PRICE["amount"], currency="usd",
+            ).id
+
+        customer_id = _get_or_create_customer(stripe, db, tenant_id)
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            line_items=[{"price": price_id, "quantity": 1}],
+            mode="payment",
+            success_url=success_url or "https://polly-connect.com/web/book?book_bought=1",
+            cancel_url=cancel_url or "https://polly-connect.com/web/book",
+            metadata={"tenant_id": str(tenant_id), "purchase": "book"},
+        )
+        return session.url
+    except Exception as e:
+        logger.error(f"Stripe book checkout failed: {e}")
+        return None
+
+
 def create_billing_portal_session(db, tenant_id: int,
                                    return_url: str = None) -> Optional[str]:
     """Create a Stripe Billing Portal session for managing subscription."""
@@ -272,8 +331,14 @@ def handle_webhook_event(db, event) -> bool:
     data = event["data"]["object"]
 
     if event_type == "checkout.session.completed":
-        tenant_id = int(data.get("metadata", {}).get("tenant_id", 0))
-        tier = data.get("metadata", {}).get("tier", "basic")
+        meta = data.get("metadata", {})
+        tenant_id = int(meta.get("tenant_id", 0))
+        # One-time "Buy the Book" purchase
+        if tenant_id and meta.get("purchase") == "book":
+            db.set_book_purchased(tenant_id)
+            logger.info(f"Book purchased: tenant={tenant_id}")
+            return True
+        tier = meta.get("tier", "basic")
         subscription_id = data.get("subscription")
         if tenant_id and subscription_id:
             _activate_subscription(db, tenant_id, tier, subscription_id)
@@ -366,11 +431,15 @@ def _count_reminders(db, tenant_id: int) -> int:
 _price_cache = {}
 
 PRICE_CONFIG = {
-    ("basic", "month"): {"amount": 999, "name": "Polly Basic Monthly"},
-    ("basic", "year"): {"amount": 9900, "name": "Polly Basic Annual"},
+    # $5.99/mo "Record Your Legacy" — the get-people-in-the-door entry tier
+    ("basic", "month"): {"amount": 599, "name": "Polly — Record Your Legacy (Monthly)"},
+    ("basic", "year"): {"amount": 5990, "name": "Polly — Record Your Legacy (Annual)"},
     ("legacy", "month"): {"amount": 1999, "name": "Polly Legacy Monthly"},
     ("legacy", "year"): {"amount": 19900, "name": "Polly Legacy Annual"},
 }
+
+# One-time "Buy the Book" purchase — unlocks full chapter generation + export.
+BOOK_PRICE = {"amount": 7900, "name": "Polly — Your Legacy Book"}  # $79 one-time
 
 
 def _get_or_create_price(stripe, tier: str, interval: str) -> Optional[str]:

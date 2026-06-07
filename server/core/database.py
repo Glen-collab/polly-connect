@@ -859,6 +859,8 @@ class PollyDB:
                 "stripe_customer_id": "ALTER TABLE tenants ADD COLUMN stripe_customer_id TEXT",
                 "stripe_subscription_id": "ALTER TABLE tenants ADD COLUMN stripe_subscription_id TEXT",
                 "trial_ends_at": "ALTER TABLE tenants ADD COLUMN trial_ends_at TIMESTAMP",
+                # One-time "Buy the Book" unlock (separate from monthly tier)
+                "book_purchased": "ALTER TABLE tenants ADD COLUMN book_purchased INTEGER DEFAULT 0",
             }
             for col, sql in sub_migrations.items():
                 if col not in cols:
@@ -987,6 +989,29 @@ class PollyDB:
             conn.execute(
                 "UPDATE tenants SET subscription_tier = ?, subscription_status = ? WHERE id = ?",
                 (tier, status, tenant_id))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def is_book_purchased(self, tenant_id: int) -> bool:
+        """True if this tenant bought the one-time Legacy Book unlock."""
+        conn = self._get_connection()
+        try:
+            row = conn.execute(
+                "SELECT book_purchased FROM tenants WHERE id = ?", (tenant_id,)
+            ).fetchone()
+            return bool(row and row[0])
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def set_book_purchased(self, tenant_id: int, purchased: bool = True):
+        """Mark the one-time Legacy Book unlock for a tenant."""
+        conn = self._get_connection()
+        try:
+            conn.execute("UPDATE tenants SET book_purchased = ? WHERE id = ?",
+                         (1 if purchased else 0, tenant_id))
             conn.commit()
         finally:
             if not self._conn:

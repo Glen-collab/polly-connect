@@ -7128,6 +7128,11 @@ async def book_overview(request: Request):
         except (ValueError, TypeError):
             pass
 
+    # Book gating: readiness (buckets full) + one-time purchase
+    readiness = book_builder.book_readiness(tenant_id=tid)
+    book_purchased = check_feature(db, tid, "book_export")
+    readiness["bucket_labels"] = {b: BUCKET_LABELS.get(b, b) for b in readiness["counts"]}
+
     return templates.TemplateResponse("book.html", {
         "request": request,
         "session": session,
@@ -7138,7 +7143,59 @@ async def book_overview(request: Request):
         "phase_coverage": phase_coverage,
         "gap_report": gap_report,
         "cover_config": cover_config,
+        "readiness": readiness,
+        "book_purchased": book_purchased,
+        "msg": request.query_params.get("msg"),
+        "show_buy": request.query_params.get("buy") == "1" or request.query_params.get("book_bought") == "1",
+        "book_bought": request.query_params.get("book_bought") == "1",
     })
+
+
+@router.post("/book/buy")
+async def book_buy(request: Request):
+    """Start the one-time 'Buy the Book' checkout."""
+    session = await get_web_session(request)
+    redirect = require_owner(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    from core.subscription import create_book_checkout_session
+    import urllib.parse as _up
+    url = create_book_checkout_session(
+        db, tid,
+        success_url="https://polly-connect.com/web/book/buy/success?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url="https://polly-connect.com/web/book")
+    if url:
+        return RedirectResponse(url, status_code=303)
+    return RedirectResponse("/web/book?msg=" + _up.quote("Couldn't start checkout — please try again."), status_code=303)
+
+
+@router.get("/book/buy/success")
+async def book_buy_success(request: Request):
+    """Stripe redirects here after a successful book purchase — verify + unlock
+    (the webhook also unlocks, this is the no-webhook-needed fallback)."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import urllib.parse as _up
+    sid = request.query_params.get("session_id")
+    if sid:
+        try:
+            from core.subscription import _get_stripe
+            stripe = _get_stripe()
+            if stripe:
+                cs = stripe.checkout.Session.retrieve(sid)
+                paid = cs and cs.get("payment_status") == "paid"
+                same = str((cs.get("metadata") or {}).get("tenant_id")) == str(tid)
+                if paid and same:
+                    db.set_book_purchased(tid)
+        except Exception as e:
+            logger.warning(f"book buy success verify failed: {e}")
+    return RedirectResponse("/web/book?book_bought=1&msg=" + _up.quote("Your Legacy Book is unlocked! Generate your chapters one at a time."), status_code=303)
 
 
 @router.get("/book/chapters", response_class=HTMLResponse)
@@ -7303,17 +7360,22 @@ async def book_chapter_generate(request: Request, chapter_num: int):
 
     db = request.app.state.db
     tid = session["tenant_id"]
+    book_builder = request.app.state.book_builder
 
-    # Check chapter limit (trial/basic get 2 preview chapters)
-    from core.subscription import get_tier_limits, get_subscription
+    from core.subscription import get_tier_limits, get_subscription, check_feature
+    import urllib.parse as _up
     sub = get_subscription(db, tid)
     limits = get_tier_limits(sub["tier"])
-    if sub["status"] in ("expired", "canceled"):
-        return RedirectResponse("/web/pricing?msg=Subscribe to generate chapters.", status_code=303)
-    if chapter_num > limits["book_preview_chapters"]:
-        return RedirectResponse("/web/pricing?msg=Upgrade to Polly Legacy to generate all chapters.", status_code=303)
-
-    book_builder = request.app.state.book_builder
+    is_admin = session.get("is_admin")
+    if sub["status"] in ("expired", "canceled") and not is_admin:
+        return RedirectResponse("/web/pricing?msg=" + _up.quote("Subscribe to build your legacy book."), status_code=303)
+    # Gate 1: the book must be "full" (every life stage ready) before any generation
+    if not is_admin and not book_builder.book_readiness(tenant_id=tid)["ready"]:
+        return RedirectResponse("/web/book?msg=" + _up.quote("Keep recording — your book unlocks once every life stage is full."), status_code=303)
+    # Gate 2: past the free preview, generating requires the one-time Book purchase
+    purchased = check_feature(db, tid, "book_export")
+    if not purchased and chapter_num > limits["book_preview_chapters"]:
+        return RedirectResponse("/web/book?buy=1&msg=" + _up.quote("Buy the Book to generate all your chapters."), status_code=303)
 
     chapters = book_builder.generate_chapter_outline(tenant_id=tid)
     chapter = None
@@ -7380,7 +7442,13 @@ _draft_generation_status = {}  # tenant_id -> {"total": N, "done": N, "running":
 
 @router.post("/book/chapters/generate-all")
 async def book_generate_all_drafts(request: Request):
-    """Kick off background draft generation for all chapters."""
+    """Disabled: the book is written one chapter at a time (deliberate, not an
+    all-at-once regenerate-everything button)."""
+    import urllib.parse as _up
+    return RedirectResponse(
+        "/web/book/chapters?msg=" + _up.quote("Write your book one chapter at a time — open a chapter and generate it."),
+        status_code=303)
+
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
