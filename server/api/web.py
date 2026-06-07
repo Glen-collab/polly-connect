@@ -4896,16 +4896,42 @@ async def connect_invite(request: Request, friend_name: str = Form(...),
     db = request.app.state.db
     tid = session["tenant_id"]
 
+    import threading
+    import urllib.parse as _up
     friend_name = (friend_name or "").strip() or "Friend"
     friend_email = (friend_email or "").strip().lower()
     if "@" not in friend_email:
         return RedirectResponse("/web/chatter?invite_err=1", status_code=303)
 
     owner_name = session.get("name", "Someone")
+
+    # Does this friend already have a Polly account?
+    existing = db.get_account_by_email(friend_email)
+    if existing and existing.get("tenant_id") == tid:
+        return RedirectResponse("/web/chatter?invite_err=" + _up.quote("That's your own account."),
+                                status_code=303)
+
+    if existing:
+        # Existing Polly user → send a friend (connect) request, no signup, no code.
+        # They accept it inside their own app; gives Chatter + Wall only.
+        result = db.send_friend_request_by_tenant(tid, existing["tenant_id"])
+        if not result:
+            return RedirectResponse(
+                "/web/chatter?invite_err=" + _up.quote(f"You're already connected with {friend_name} (or a request is pending)."),
+                status_code=303)
+        from core.notify import send_chatter_connect_request
+        threading.Thread(
+            target=send_chatter_connect_request,
+            args=(owner_name, friend_name, friend_email),
+            daemon=True,
+        ).start()
+        return RedirectResponse(f"/web/chatter?invite_sent={friend_name}", status_code=303)
+
+    # New user → Chatter signup invite (own account, no household code emailed).
     tenant = db.get_tenant(tid)
-    # family_code is still required by the invitation record (NOT NULL) but is
-    # NEVER emailed to a Chatter invitee — that household code would grant full
-    # account access. The Chatter invite only links to the separate-account signup.
+    # family_code is required by the invitation record (NOT NULL) but is NEVER
+    # emailed to a Chatter invitee — that household code would grant full account
+    # access. The Chatter invite only links to the separate-account signup.
     family_code = (tenant.get("family_code") if tenant else None) or db.generate_family_code(tid)
 
     invitation_id = db.save_family_invitation(
@@ -4914,7 +4940,6 @@ async def connect_invite(request: Request, friend_name: str = Form(...),
         voice_filename=None, family_code=family_code,
     )
 
-    import threading
     from core.notify import send_chatter_invitation
     threading.Thread(
         target=send_chatter_invitation,

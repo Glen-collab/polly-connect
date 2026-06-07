@@ -174,3 +174,38 @@ def send_chatter_invitation(inviter_name: str, invitee_name: str, invitee_email:
     </div>
     """
     return send_notification(subject, body, to_email=invitee_email)
+
+
+def send_chatter_connect_request(inviter_name: str, invitee_name: str, invitee_email: str,
+                                 base_url: str = "https://polly-connect.com"):
+    """Heads-up email for someone who ALREADY has a Polly account: a friend wants
+    to connect on Chatter. They accept the pending request inside their own app —
+    no signup, no access code, keeps their account separate."""
+    login_url = f"{base_url}/web/login"
+    subject = f"{inviter_name} wants to connect with you on Polly"
+    body = f"""
+    <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto;">
+        <div style="text-align: center; padding: 20px 0;">
+            <span style="font-size: 48px;">&#x1F99C;</span>
+            <h1 style="color: #d97706; font-size: 24px; margin: 10px 0 5px 0;">Polly Connect</h1>
+        </div>
+        <h2 style="color: #1f2937; font-size: 20px; text-align: center;">Hi {invitee_name}!</h2>
+        <p style="color: #374151; font-size: 15px; line-height: 1.6; text-align: center;">
+            <strong>{inviter_name}</strong> wants to connect with you on <strong>Chatter</strong>.
+            You already have a Polly account &mdash; just open Polly and accept the request
+            to start chatting and sharing memories together.
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+            <a href="{login_url}"
+               style="display: inline-block; background: #ea580c; color: white; font-size: 18px;
+                      font-weight: bold; padding: 14px 32px; border-radius: 8px;
+                      text-decoration: none;">
+                Open Polly &amp; Accept
+            </a>
+        </div>
+        <p style="color: #9ca3af; font-size: 11px; text-align: center; margin-top: 30px;">
+            Polly Connect &mdash; turning everyday conversations into a family legacy
+        </p>
+    </div>
+    """
+    return send_notification(subject, body, to_email=invitee_email)
