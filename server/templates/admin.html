@@ -60,6 +60,12 @@
 </div>
 
 <!-- Tenants / Customers -->
+{% if request.query_params.get('msg') %}
+<div class="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg p-3 mb-3 text-sm">{{ request.query_params.get('msg') }}</div>
+{% endif %}
+{% if request.query_params.get('err') %}
+<div class="bg-red-50 border border-red-200 text-red-600 rounded-lg p-3 mb-3 text-sm">{{ request.query_params.get('err') }}</div>
+{% endif %}
 <div class="bg-white rounded-xl shadow mb-8">
     <div class="px-5 py-4 border-b border-gray-100">
         <h2 class="text-xl font-semibold text-gray-800">Customers</h2>
@@ -73,6 +79,7 @@
                     <th class="px-5 py-3 font-medium">Family Code</th>
                     <th class="px-5 py-3 font-medium">Tier</th>
                     <th class="px-5 py-3 font-medium">Created</th>
+                    <th class="px-5 py-3 font-medium">Manage</th>
                 </tr>
             </thead>
             <tbody>
@@ -96,6 +103,24 @@
                         </span>
                     </td>
                     <td class="px-5 py-3 text-gray-500 text-xs">{{ t.created_at or '' }}</td>
+                    <td class="px-5 py-3">
+                        <div class="flex items-center gap-2">
+                            <form method="POST" action="/web/admin/tenant/{{ t.id }}/subscription" class="flex items-center gap-1">
+                                <select name="tier" class="border rounded px-2 py-1 text-xs">
+                                    <option value="trial" {% if t.subscription_tier == 'trial' %}selected{% endif %}>Free</option>
+                                    <option value="basic" {% if t.subscription_tier == 'basic' %}selected{% endif %}>Basic</option>
+                                    <option value="legacy" {% if t.subscription_tier == 'legacy' %}selected{% endif %}>Legacy</option>
+                                </select>
+                                <button type="submit" class="text-xs bg-emerald-600 text-white px-2 py-1 rounded hover:bg-emerald-700">Save</button>
+                            </form>
+                            {% if t.id != 1 and t.id != session.tenant_id %}
+                            <form method="POST" action="/web/admin/tenant/{{ t.id }}/delete"
+                                  onsubmit="return confirm('Permanently DELETE {{ t.name }} (tenant {{ t.id }}) and ALL their data? This cannot be undone.');">
+                                <button type="submit" class="text-xs text-red-500 hover:text-red-700 px-2 py-1">Delete</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -8709,6 +8709,37 @@ async def admin_dashboard(request: Request):
     })
 
 
+@router.post("/admin/tenant/{target_tid}/subscription")
+async def admin_set_subscription(request: Request, target_tid: int, tier: str = Form(...)):
+    """ADMIN: change a tenant's subscription tier."""
+    session = await get_web_session(request)
+    redirect = require_admin(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    if tier not in ("trial", "basic", "legacy"):
+        return RedirectResponse("/web/admin?err=Invalid+tier", status_code=303)
+    db.set_tenant_subscription(target_tid, tier, "active")
+    import urllib.parse as _up
+    return RedirectResponse("/web/admin?msg=" + _up.quote(f"Tenant {target_tid} set to {tier}"), status_code=303)
+
+
+@router.post("/admin/tenant/{target_tid}/delete")
+async def admin_delete_tenant(request: Request, target_tid: int):
+    """ADMIN: permanently delete a tenant + all its data."""
+    session = await get_web_session(request)
+    redirect = require_admin(session)
+    if redirect:
+        return redirect
+    import urllib.parse as _up
+    if target_tid == session.get("tenant_id") or target_tid == 1:
+        return RedirectResponse("/web/admin?err=" + _up.quote("Can't delete the owner / your own account."), status_code=303)
+    db = request.app.state.db
+    deleted = db.delete_tenant(target_tid)
+    total = sum(deleted.values())
+    return RedirectResponse("/web/admin?msg=" + _up.quote(f"Deleted tenant {target_tid} ({total} rows removed)"), status_code=303)
+
+
 # ── Firmware OTA Management ──
 
 @router.get("/firmware", response_class=HTMLResponse)

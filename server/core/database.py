@@ -955,6 +955,43 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def delete_tenant(self, tenant_id: int) -> Dict[str, int]:
+        """ADMIN: permanently delete a tenant and all of its data. Sweeps every
+        table that has a tenant_id column, then removes the tenant row itself.
+        Returns {table: rows_deleted}."""
+        conn = self._get_connection()
+        try:
+            tables = [r[0] for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            deleted = {}
+            for t in tables:
+                if t == "tenants":
+                    continue
+                cols = [c[1] for c in conn.execute(f"PRAGMA table_info({t})").fetchall()]
+                if "tenant_id" in cols:
+                    cur = conn.execute(f"DELETE FROM {t} WHERE tenant_id = ?", (tenant_id,))
+                    if cur.rowcount:
+                        deleted[t] = cur.rowcount
+            cur = conn.execute("DELETE FROM tenants WHERE id = ?", (tenant_id,))
+            deleted["tenants"] = cur.rowcount
+            conn.commit()
+            return deleted
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def set_tenant_subscription(self, tenant_id: int, tier: str, status: str = "active"):
+        """ADMIN: set a tenant's subscription tier + status (trial|basic|legacy)."""
+        conn = self._get_connection()
+        try:
+            conn.execute(
+                "UPDATE tenants SET subscription_tier = ?, subscription_status = ? WHERE id = ?",
+                (tier, status, tenant_id))
+            conn.commit()
+        finally:
+            if not self._conn:
+                conn.close()
+
     # ── Connected families (cross-tenant) ──
 
     def send_friend_request(self, tenant_id: int, target_family_code: str) -> Optional[Dict]:
