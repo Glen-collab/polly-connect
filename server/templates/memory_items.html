@@ -16,7 +16,7 @@
 
 {% if deleted %}
 <div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-4 max-w-lg mx-auto">
-    <p class="text-red-800 text-sm font-medium">Item removed.</p>
+    <p class="text-red-800 text-sm font-medium">{% if deleted|int > 1 %}{{ deleted }} items removed.{% else %}Item removed.{% endif %}</p>
 </div>
 {% endif %}
 
@@ -117,17 +117,31 @@
 <!-- Items List -->
 <div class="max-w-lg mx-auto">
     {% if items %}
+    <!-- Bulk action bar -->
+    <div class="flex items-center justify-between bg-white rounded-lg shadow px-4 py-2 mb-3 sticky top-2 z-10">
+        <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input type="checkbox" id="select-all" onchange="toggleSelectAll(this)" class="rounded">
+            Select all
+        </label>
+        <button type="button" id="bulk-delete-btn" onclick="bulkDelete()" disabled
+                class="text-sm bg-red-500 text-white px-4 py-1.5 rounded-lg font-medium hover:bg-red-600 disabled:bg-gray-200 disabled:text-gray-400">
+            Delete selected (<span id="sel-count">0</span>)
+        </button>
+    </div>
     <div class="space-y-3">
         {% for item in items %}
         <div class="bg-white rounded-lg shadow p-4">
             <div id="item-view-{{ item.id }}" class="flex items-start justify-between">
-                <div>
+                <div class="flex items-start gap-3">
+                    <input type="checkbox" class="item-cb mt-1 rounded" value="{{ item.id }}" onchange="updateBulkBar()">
+                    <div>
                     <p class="font-semibold text-gray-800">{{ item.item }}</p>
                     <p class="text-sm text-gray-500">{{ item.prep or 'on' }} <span class="text-amber-700 font-medium">{{ item.location }}</span></p>
                     {% if item.context %}
                     <p class="text-xs text-gray-400 mt-1">{{ item.context }}</p>
                     {% endif %}
                     <p class="text-xs text-gray-400 mt-1">Updated {{ item.updated_at }}</p>
+                    </div>
                 </div>
                 <div class="flex flex-col gap-1 ml-3">
                     <button type="button" onclick="document.getElementById('item-view-{{ item.id }}').classList.add('hidden'); document.getElementById('item-edit-{{ item.id }}').classList.remove('hidden');"
@@ -167,4 +181,37 @@
     <p class="text-center text-gray-400 py-8">No items stored yet. Tell Polly where things are, or add one above.</p>
     {% endif %}
 </div>
+
+<script>
+function selectedCheckboxes() {
+    return Array.prototype.slice.call(document.querySelectorAll('.item-cb:checked'));
+}
+function updateBulkBar() {
+    var n = selectedCheckboxes().length;
+    document.getElementById('sel-count').textContent = n;
+    document.getElementById('bulk-delete-btn').disabled = (n === 0);
+    var all = document.querySelectorAll('.item-cb').length;
+    var sa = document.getElementById('select-all');
+    if (sa) sa.checked = (n > 0 && n === all);
+}
+function toggleSelectAll(cb) {
+    document.querySelectorAll('.item-cb').forEach(function(c) { c.checked = cb.checked; });
+    updateBulkBar();
+}
+function bulkDelete() {
+    var ids = selectedCheckboxes().map(function(c) { return c.value; });
+    if (!ids.length) return;
+    if (!confirm('Delete ' + ids.length + ' item' + (ids.length > 1 ? 's' : '') + '? This cannot be undone.')) return;
+    var f = document.createElement('form');
+    f.method = 'POST';
+    f.action = '/web/memory/items/delete-bulk';
+    ids.forEach(function(id) {
+        var i = document.createElement('input');
+        i.type = 'hidden'; i.name = 'ids'; i.value = id;
+        f.appendChild(i);
+    });
+    document.body.appendChild(f);
+    f.submit();
+}
+</script>
 {% endblock %}

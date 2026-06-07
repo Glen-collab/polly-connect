@@ -1524,6 +1524,21 @@ async def memory_items_delete(request: Request,
     return RedirectResponse("/web/memory/items?deleted=1", status_code=303)
 
 
+@router.post("/memory/items/delete-bulk")
+async def memory_items_delete_bulk(request: Request):
+    """Delete multiple stored items at once (multi-select)."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    form = await request.form()
+    ids = form.getlist("ids")
+    n = db.delete_items_by_ids(ids, tenant_id=tid)
+    return RedirectResponse(f"/web/memory/items?deleted={n}", status_code=303)
+
+
 @router.get("/memory/photo-index")
 async def memory_photo_index_page(request: Request):
     """Redirect old photo-index page to unified stored items."""

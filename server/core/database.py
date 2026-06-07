@@ -2148,6 +2148,26 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
+    def delete_items_by_ids(self, ids: list, tenant_id: int = None) -> int:
+        """Bulk-delete stored items by id (tenant-scoped). Returns rows deleted."""
+        ids = [int(i) for i in ids if str(i).isdigit()]
+        if not ids:
+            return 0
+        conn = self._get_connection()
+        try:
+            placeholders = ",".join("?" * len(ids))
+            params = list(ids)
+            q = f"DELETE FROM items WHERE id IN ({placeholders})"
+            if tenant_id:
+                q += " AND tenant_id = ?"
+                params.append(tenant_id)
+            cursor = conn.execute(q, params)
+            conn.commit()
+            return cursor.rowcount
+        finally:
+            if not self._conn:
+                conn.close()
+
     def delete_by_id(self, item_id: int) -> bool:
         conn = self._get_connection()
         try:
