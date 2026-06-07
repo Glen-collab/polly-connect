@@ -16,14 +16,10 @@
 </div>
 {% endif %}
 
-<!-- Trial Banner -->
-{% if subscription and subscription.tier == 'trial' and subscription.status == 'active' %}
+<!-- Free plan banner -->
+{% if subscription and subscription.tier == 'trial' %}
 <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-6 text-sm text-emerald-800 font-medium text-center max-w-2xl mx-auto">
-    You're on your <strong>free trial</strong> &mdash; {{ subscription.trial_days_left }} days remaining.
-</div>
-{% elif subscription and subscription.status == 'expired' %}
-<div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-6 text-sm text-red-800 font-medium text-center max-w-2xl mx-auto">
-    Your free trial has ended. Subscribe to keep building your family legacy. Your stories are safe &mdash; they're waiting for you.
+    You're on the <strong>Free plan</strong> &mdash; Chatter &amp; Wall are free forever, plus up to 10 stories. Upgrade to <strong>Record Your Legacy</strong> for unlimited.
 </div>
 {% endif %}
 
@@ -53,9 +49,9 @@
                 <li>&#10003; Book preview (2 chapters)</li>
             </ul>
         </div>
-        {% if subscription and subscription.tier == 'trial' and subscription.status == 'active' %}
+        {% if subscription and subscription.tier == 'trial' %}
         <div class="text-center shrink-0">
-            <span class="text-sm font-bold text-blue-600">{{ subscription.trial_days_left }} days left</span>
+            <span class="text-sm font-bold text-emerald-600">Your plan</span>
         </div>
         {% elif not session %}
         <a href="/web/register"
@@ -146,7 +142,7 @@
 
 <!-- Free Trial Note -->
 <div class="text-center mt-6 text-xs text-gray-400 max-w-2xl mx-auto">
-    All plans include a 30-day free trial. Cancel anytime. Your stories are always yours.
+    Start free forever &mdash; Chatter, Wall, and up to 10 stories. Upgrade to unlimited anytime, cancel whenever. Your stories are always yours.
 </div>
 {% endblock %}
 
