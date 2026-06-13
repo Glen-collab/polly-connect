@@ -40,11 +40,11 @@
             {% if story.question_text %}
             <p class="text-xs text-blue-600 italic mb-2">Q: {{ story.question_text }}</p>
             {% endif %}
-            <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap mb-3">{{ story.corrected_transcript or story.transcript or "No transcript" }}</p>
+            <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap break-words mb-3">{{ story.corrected_transcript or story.transcript or "No transcript" }}</p>
             {% if story.corrected_transcript and story.transcript != story.corrected_transcript %}
             <details class="mb-3">
                 <summary class="text-xs text-gray-400 cursor-pointer">Show original transcript</summary>
-                <p class="text-gray-400 text-xs sm:text-sm mt-1 whitespace-pre-wrap">{{ story.transcript }}</p>
+                <p class="text-gray-400 text-xs sm:text-sm mt-1 whitespace-pre-wrap break-words">{{ story.transcript }}</p>
             </details>
             {% endif %}
             {% if story.verified_by %}

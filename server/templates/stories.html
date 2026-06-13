@@ -36,7 +36,7 @@
         {% if story.question_text %}
         <p class="text-xs text-blue-600 italic mb-1">Q: {{ story.question_text }}</p>
         {% endif %}
-        <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap" id="story-text-{{ story.id }}">{{ story.corrected_transcript or story.transcript or "Transcription pending..." }}</p>
+        <p class="text-sm sm:text-base text-gray-700 whitespace-pre-wrap break-words" id="story-text-{{ story.id }}">{{ story.corrected_transcript or story.transcript or "Transcription pending..." }}</p>
         <textarea id="story-edit-{{ story.id }}" class="hidden w-full border rounded px-3 py-2 text-sm sm:text-base leading-relaxed mt-1" rows="8"></textarea>
         <div class="flex items-center gap-3 mt-2 flex-wrap">
             {% if story.audio_s3_key %}

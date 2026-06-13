@@ -113,7 +113,7 @@
         {% if item.story.question_text %}
         <p class="text-xs text-blue-600 italic mb-1">Q: {{ item.story.question_text }}</p>
         {% endif %}
-        <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ item.story.corrected_transcript or item.story.transcript }}</p>
+        <p class="text-sm text-gray-700 whitespace-pre-wrap break-words">{{ item.story.corrected_transcript or item.story.transcript }}</p>
         {% if item.story.audio_s3_key %}
         <audio controls preload="none" class="h-8 mt-2">
             <source src="/static/recordings/{{ item.story.audio_s3_key }}" type="audio/wav">
