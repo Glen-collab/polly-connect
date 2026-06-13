@@ -14,6 +14,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Segoe UI', system-ui, sans-serif; }
+        /* Kill horizontal drift everywhere. iOS Safari ignores overflow-x:hidden
+           when it's only on <body>, so it must be on <html> too. */
+        html, body { overflow-x: hidden; max-width: 100%; }
+        /* Native media (esp. the <audio> player's 300px default) must never
+           exceed its column on narrow phones. */
+        audio, video, img, iframe { max-width: 100%; }
         /* Sub-nav dropdown (desktop) */
         .nav-group:hover .nav-dropdown { display: block; }
         .nav-dropdown { display: none; position: absolute; top: 100%; left: 0; z-index: 50; }
