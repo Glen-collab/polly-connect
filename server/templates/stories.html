@@ -95,7 +95,7 @@
 
 <!-- Pagination -->
 {% if total_pages > 1 %}
-<div class="flex justify-center items-center gap-2 mt-6">
+<div class="flex flex-wrap justify-center items-center gap-2 mt-6">
     {% if page > 1 %}
     <a href="/web/stories?page={{ page - 1 }}"
        class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">&larr; Prev</a>
