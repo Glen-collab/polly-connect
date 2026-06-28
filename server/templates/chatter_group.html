@@ -114,6 +114,36 @@
     </button>
     <p class="text-xs text-gray-400 mt-1.5">Polly reads the whole conversation and chimes in like one of the group. Chime in as often as you like — nothing is saved to your book unless you choose to.</p>
     <div id="polly-questions" class="hidden mt-3 flex flex-wrap gap-2 justify-center"></div>
+    <div class="mt-3">
+        <button id="narrate-btn" onclick="narrateForBook()"
+                class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-full text-sm font-semibold shadow">
+            <span class="text-base">&#x1F4D6;</span>
+            <span id="narrate-btn-label">Narrate this for my book</span>
+        </button>
+        <p class="text-xs text-gray-400 mt-1.5">Polly turns the whole conversation into a story you can edit and name — then add it to your legacy book.</p>
+    </div>
+</div>
+
+<!-- Narrate-for-book modal -->
+<div id="narrate-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-5 max-h-[90vh] overflow-y-auto">
+        <h2 class="text-lg font-semibold mb-1">Add this to your book</h2>
+        <p class="text-xs text-gray-500 mb-4">Polly wove your conversation into a story. Edit it, fix any names, give it a title, then add it to your legacy book.</p>
+        <div class="mb-3">
+            <label class="block text-sm text-gray-600 mb-1">Title</label>
+            <input type="text" id="narrate-title" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. College Life">
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm text-gray-600 mb-1">Narrative</label>
+            <textarea id="narrate-text" rows="12" class="w-full border rounded px-3 py-2 text-sm sm:text-base leading-relaxed"></textarea>
+        </div>
+        <div class="flex gap-2">
+            <button id="narrate-save-btn" onclick="saveNarrative()"
+                    class="flex-1 sm:flex-none bg-emerald-600 text-white px-5 py-2.5 rounded text-sm font-medium hover:bg-emerald-700">Add to my book</button>
+            <button onclick="closeNarrate()"
+                    class="flex-1 sm:flex-none bg-gray-200 text-gray-700 px-5 py-2.5 rounded text-sm hover:bg-gray-300">Cancel</button>
+        </div>
+    </div>
 </div>
 
 {% if not posts %}
@@ -451,6 +481,65 @@ function saveToStories(postId) {
     .then(function(r) { return r.json(); }).then(function(data) {
         if (data.ok) { btn.textContent = 'Saved to Stories!'; btn.classList.remove('text-orange-600'); btn.classList.add('text-emerald-600'); }
         else { btn.textContent = data.error || 'Error'; }
+    });
+}
+
+function narrateForBook() {
+    var btn = document.getElementById('narrate-btn');
+    var label = document.getElementById('narrate-btn-label');
+    btn.disabled = true;
+    label.textContent = 'Polly is writing your story...';
+    fetch('/web/chatter/' + groupId + '/narrate', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        label.textContent = 'Narrate this for my book';
+        if (!data.ok) { alert(data.error || 'Could not narrate right now — try again.'); return; }
+        document.getElementById('narrate-title').value = data.title || '';
+        document.getElementById('narrate-text').value = data.narrative || '';
+        document.getElementById('narrate-modal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    })
+    .catch(function() {
+        btn.disabled = false;
+        label.textContent = 'Narrate this for my book';
+        alert('Connection error — try again.');
+    });
+}
+
+function closeNarrate() {
+    document.getElementById('narrate-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function saveNarrative() {
+    var saveBtn = document.getElementById('narrate-save-btn');
+    var title = document.getElementById('narrate-title').value.trim();
+    var narrative = document.getElementById('narrate-text').value.trim();
+    if (!narrative) { alert('There is nothing to save.'); return; }
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Adding...';
+    var body = 'title=' + encodeURIComponent(title) + '&narrative=' + encodeURIComponent(narrative);
+    fetch('/web/chatter/' + groupId + '/narrate/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body,
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Add to my book';
+        if (data.ok) {
+            closeNarrate();
+            alert('Added to your book! You can find it in Stories & Answers.');
+        } else {
+            alert(data.error || 'Could not save — try again.');
+        }
+    })
+    .catch(function() {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Add to my book';
+        alert('Connection error — try again.');
     });
 }
 </script>

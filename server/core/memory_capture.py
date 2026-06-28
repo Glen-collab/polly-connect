@@ -252,6 +252,36 @@ def polly_interjection(thread_text: str, member_names=None, birth_year=None,
         return result
 
 
+def narrate_group(thread_text: str, theme=None) -> dict:
+    """Weave a whole Chatter group's conversation (posts + comments) into a
+    warm narrative for the legacy book. The user reviews/edits and names it
+    before it's saved. Returns {title, narrative}. Never raises.
+    """
+    thread_text = (thread_text or "").strip()
+    system = (
+        POLLY_PERSONA + "\n\nBelow is a whole conversation among a group of "
+        "friends or family sharing memories"
+        + (f", themed around '{theme}'" if theme else "")
+        + ". Weave it into a warm, flowing narrative for a keepsake legacy book — "
+        "tell it like a story that captures the people, the moments, the humor and "
+        "the heart of what everyone shared. Keep real names exactly as written. "
+        "Return STRICT JSON (no markdown):\n{\n"
+        '  "title": "<a short, warm title for this narrative'
+        + (f' (something like \"{theme}\")' if theme else "") + '>",\n'
+        '  "narrative": "<2-5 warm paragraphs weaving the conversation into a story>"\n}'
+    )
+    try:
+        parsed = _chat_json(system, thread_text, max_tokens=1200)
+        title = (str(parsed.get("title") or theme or "Our Story")).strip()
+        narrative = (str(parsed.get("narrative") or "")).strip()
+        if not narrative:
+            narrative = thread_text
+        return {"title": title, "narrative": narrative}
+    except Exception as e:
+        logger.info("narrate_group fell back: %s", e)
+        return {"title": theme or "Our Story", "narrative": thread_text}
+
+
 # ── Capture: write the memory (the funnel's collection point) ─────────────
 
 def _birth_year(conn, tenant_id):

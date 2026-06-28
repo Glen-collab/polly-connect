@@ -172,6 +172,9 @@ async def login_submit(request: Request, email: str = Form(...),
                 db.send_friend_request_by_tenant(my_tid, inviter_tid)
                 db.accept_friend_request(my_tid, inviter_tid)
                 _auto_add_inviter_to_tree(db, my_tid, invitation)
+                # Bidirectional: add me into the inviter's tree too.
+                _add_friend_to_tree(db, inviter_tid, account.get("name"),
+                                    account.get("email"))
                 db.update_invitation_status(int(invite_id_val), "converted",
                                             converted_tenant_id=my_tid)
 
@@ -711,8 +714,10 @@ async def invite_signup_submit(request: Request,
             if result:
                 # Auto-accept from inviter's side too (no pending state)
                 db.accept_friend_request(new_tid, inviter_tid)
-            # Add inviter to new user's family tree
+            # Add inviter to new user's family tree …
             _auto_add_inviter_to_tree(db, new_tid, invitation)
+            # … and the new friend into the inviter's tree (bidirectional).
+            _add_friend_to_tree(db, inviter_tid, name.strip(), email)
             # Mark invitation converted
             db.update_invitation_status(int(invite_id_str), "converted",
                                         converted_tenant_id=new_tid)
@@ -743,6 +748,31 @@ async def invite_signup_submit(request: Request,
         httponly=True, samesite="lax",
     )
     return response
+
+
+def _add_friend_to_tree(db, owner_tid: int, friend_name: str, friend_email: str = None):
+    """Add a newly connected friend into owner_tid's family tree (ordered by
+    date via created_at default) as a 'friend', if not already present. This is
+    the reverse of _auto_add_inviter_to_tree so connections land in BOTH trees."""
+    if not owner_tid or not friend_name or not friend_name.strip():
+        return
+    import sqlite3 as _sq
+    conn = db._get_connection()
+    try:
+        conn.row_factory = _sq.Row
+        existing = conn.execute(
+            "SELECT 1 FROM family_members WHERE LOWER(name) = ? AND tenant_id = ?",
+            (friend_name.lower().strip(), owner_tid)).fetchone()
+        if not existing:
+            conn.execute("""
+                INSERT INTO family_members (name, name_normalized, relationship, relation_to_owner,
+                generation, tenant_id, added_by, email)
+                VALUES (?, ?, 'friend', 'friend', 0, ?, 'Polly Connect', ?)
+            """, (friend_name.strip(), friend_name.lower().strip(), owner_tid, friend_email))
+            conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
 
 
 def _auto_add_inviter_to_tree(db, new_tid: int, invitation: dict):
@@ -4904,6 +4934,101 @@ async def chatter_polly(request: Request, group_id: int):
     })
 
 
+@router.post("/chatter/{group_id}/narrate")
+async def chatter_narrate(request: Request, group_id: int):
+    """Read the WHOLE group history (every post + comment) and weave it into a
+    narrative for the legacy book. Returns it for the user to edit + name —
+    nothing is saved until they confirm via /narrate/save."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+        member = conn.execute(
+            "SELECT 1 FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+            (group_id, tid)).fetchone()
+        if not member:
+            return JSONResponse({"error": "Not a member"}, status_code=403)
+        thread_text = _recent_thread_text(conn, group_id, limit=400)
+        if not thread_text:
+            return JSONResponse({"error": "Nothing to narrate yet — share some memories first!"}, status_code=400)
+        grp = conn.execute("SELECT name FROM chatter_groups WHERE id = ?",
+                           (group_id,)).fetchone()
+        theme = grp["name"] if grp else None
+    finally:
+        if not db._conn:
+            conn.close()
+
+    result = await asyncio.to_thread(memory_capture.narrate_group, thread_text, theme)
+    return JSONResponse({
+        "ok": True,
+        "title": result.get("title") or theme or "Our Story",
+        "narrative": result.get("narrative") or "",
+    })
+
+
+@router.post("/chatter/{group_id}/narrate/save")
+async def chatter_narrate_save(request: Request, group_id: int):
+    """Save the user's (edited, named) narrative into the legacy book — as a
+    VERIFIED story so the device's 'tell me about <name>' can speak it, plus a
+    book memory."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    form = await request.form()
+    title = (form.get("title") or "Our Story").strip()
+    narrative = (form.get("narrative") or "").strip()
+    if not narrative:
+        return JSONResponse({"error": "Nothing to save."}, status_code=400)
+
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+        member = conn.execute(
+            "SELECT 1 FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+            (group_id, tid)).fetchone()
+        if not member:
+            return JSONResponse({"error": "Not a member"}, status_code=403)
+    finally:
+        if not db._conn:
+            conn.close()
+
+    verifier = session.get("name") or "Me"
+    # capture() creates the story + book memory; then mark that story verified
+    # and give it the user's clean, named narrative for display.
+    try:
+        mem_id = memory_capture.capture(
+            db, tid, narrative, "chatter_narrative",
+            speaker=title, include_in_book=1, force=True)
+    except Exception as e:
+        logger.info("Narrative capture failed: %s", e)
+        mem_id = 0
+
+    if not mem_id:
+        return JSONResponse({"error": "Could not save — try again."}, status_code=500)
+
+    conn = db._get_connection()
+    try:
+        conn.execute(
+            "UPDATE stories SET verified = 1, verified_by = ?, "
+            "verified_at = CURRENT_TIMESTAMP, corrected_transcript = ?, "
+            "speaker_name = ? WHERE id = (SELECT story_id FROM memories WHERE id = ?)",
+            (verifier, narrative, title, mem_id))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    return JSONResponse({"ok": True})
+
+
 @router.post("/connect/invite")
 async def connect_invite(request: Request, friend_name: str = Form(...),
                           friend_email: str = Form(...)):
@@ -5288,6 +5413,20 @@ async def chatter_group_post(request: Request, group_id: int):
                 audio_filename = None
                 if os.path.exists(raw_path):
                     os.remove(raw_path)
+            # Transcribe the voice message so friends' voices are both heard
+            # (playback) AND woven into narratives/stories. Best-effort: on
+            # failure the post just stays audio-only.
+            if audio_filename and not (content and content.strip()):
+                try:
+                    transcriber = request.app.state.transcriber
+                    if transcriber and transcriber.available:
+                        with open(wav_path, "rb") as _wf:
+                            wav_bytes = _wf.read()
+                        spoken = await asyncio.to_thread(transcriber.transcribe, wav_bytes)
+                        if spoken and spoken.strip():
+                            content = spoken.strip()
+                except Exception as e:
+                    logger.info("Chatter voice transcription skipped: %s", e)
 
     if not content and not photo_filename and not audio_filename:
         return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)

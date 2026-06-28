@@ -34,7 +34,7 @@
         </svg>
         <span class="text-lg sm:text-xl font-bold">Family</span>
     </a>
-    <a href="/web/chatter" class="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95 relative">
+    <a href="/web/chatter" class="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl p-6 sm:p-8 text-center shadow-lg transition active:scale-95 relative{% if chatter_badge %} ring-4 ring-blue-300 animate-pulse{% endif %}">
         {% if chatter_badge %}
         <span class="absolute top-2 right-2 bg-blue-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow">{{ chatter_badge }}</span>
         {% endif %}
