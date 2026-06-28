@@ -4806,16 +4806,29 @@ def _schedule_capture(db, tid, ref_id, text, speaker, source="chatter"):
         pass  # no running loop — skip silently
 
 
-def _recent_thread_text(conn, group_id, limit=8):
-    """Build a readable transcript of the last N non-Polly posts in a group."""
-    rows = conn.execute(
-        "SELECT author_name, content FROM aviary_posts "
+def _recent_thread_text(conn, group_id, limit=60):
+    """Build a readable transcript of the whole campfire in a group — every
+    post AND every comment, in chronological order, excluding Polly's own
+    chime-ins. This is what Polly reads to interject and what gets funneled
+    into the legacy book, so she sees the full back-and-forth, not just posts."""
+    posts = conn.execute(
+        "SELECT created_at, author_name, content AS body FROM aviary_posts "
         "WHERE group_id = ? AND content IS NOT NULL AND content != '' "
-        "AND author_name NOT LIKE 'Polly%' "
-        "ORDER BY created_at DESC LIMIT ?",
-        (group_id, limit)
+        "AND author_name NOT LIKE 'Polly%'",
+        (group_id,)
     ).fetchall()
-    lines = [f"{r['author_name']}: {r['content']}" for r in reversed(rows)]
+    comments = conn.execute(
+        "SELECT c.created_at AS created_at, c.author_name AS author_name, "
+        "c.comment AS body FROM aviary_comments c "
+        "JOIN aviary_posts p ON p.id = c.post_id "
+        "WHERE p.group_id = ? AND c.comment IS NOT NULL AND c.comment != '' "
+        "AND c.author_name NOT LIKE 'Polly%'",
+        (group_id,)
+    ).fetchall()
+    rows = list(posts) + list(comments)
+    rows.sort(key=lambda r: (r["created_at"] or ""))
+    rows = rows[-limit:]  # keep the most recent N entries, still chronological
+    lines = [f"{r['author_name']}: {r['body']}" for r in rows]
     return "\n".join(lines)
 
 
@@ -4842,6 +4855,10 @@ async def chatter_polly(request: Request, group_id: int):
         if not thread_text:
             return JSONResponse({"error": "Nothing to talk about yet — post something first!"}, status_code=400)
 
+        grp = conn.execute("SELECT name FROM chatter_groups WHERE id = ?",
+                           (group_id,)).fetchone()
+        group_theme = grp["name"] if grp else None
+
         members = conn.execute("""
             SELECT COALESCE(a.name, up.name, t.name) as nm
             FROM chatter_group_members gm
@@ -4864,7 +4881,7 @@ async def chatter_polly(request: Request, group_id: int):
             conn.close()
 
     result = await asyncio.to_thread(
-        memory_capture.polly_interjection, thread_text, names, by)
+        memory_capture.polly_interjection, thread_text, names, by, group_theme)
 
     interjection = result.get("interjection") or "Tell me more? 🦜"
     questions = result.get("questions") or []

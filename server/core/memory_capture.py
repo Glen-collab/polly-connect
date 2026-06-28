@@ -198,23 +198,31 @@ POLLY_PERSONA = (
 )
 
 
-def polly_interjection(thread_text: str, member_names=None, birth_year=None) -> dict:
-    """Polly reads a Chatter/Wall thread and returns her 2 cents + follow-ups +
-    the same classification used for capture. Never raises.
+def polly_interjection(thread_text: str, member_names=None, birth_year=None,
+                       theme=None) -> dict:
+    """Polly reads a Chatter/Wall thread (the whole campfire — posts AND
+    comments) and returns her 2 cents + follow-ups + the same classification
+    used for capture. Never raises.
+
+    theme: the Chatter group's name (e.g. "College Life", "Grandma's House") —
+           Polly centers her reply and the narrative summary on it.
 
     Returns: {interjection, questions:[...], <classification keys...>}
     """
     thread_text = (thread_text or "").strip()
     names = ", ".join(member_names) if member_names else ""
     system = (
-        POLLY_PERSONA + "\n\nRead the conversation below and return STRICT JSON "
-        "(no markdown) with these keys:\n{\n"
+        POLLY_PERSONA + "\n\nRead the whole conversation below — it's a group of "
+        "friends or family sharing memories around a theme, like a campfire. "
+        "Take in every message, then return STRICT JSON (no markdown) with these keys:\n{\n"
         '  "interjection": "<1-3 warm sentences chiming into the conversation as '
-        "if you are part of it — react to what was said and gently invite more of "
-        'the story. Address people by name when natural.>",\n'
+        "if you are part of the group — react to what everyone said and gently "
+        'invite more of the story. Address people by name when natural.>",\n'
         '  "questions": ["1-3 short, thoughtful follow-up questions that deepen '
         'connection — never redirect attention to yourself"],\n'
         + _CLASSIFY_SPEC + "}\n\n" + _BUCKET_GUIDE
+        + (f"\nThis group's theme is: '{theme}'. Center your reply and the "
+           f"narrative summary on that theme." if theme else "")
         + (f"\nPeople in this group: {names}." if names else "")
         + (f"\nSpeaker's birth year (if known): {birth_year}." if birth_year else "")
     )
