@@ -4868,13 +4868,6 @@ async def chatter_polly(request: Request, group_id: int):
             WHERE gm.group_id = ?""", (group_id,)).fetchall()
         names = [m["nm"] for m in members if m["nm"]]
 
-        last_post = conn.execute(
-            "SELECT id, author_name FROM aviary_posts WHERE group_id = ? "
-            "AND author_name NOT LIKE 'Polly%' ORDER BY created_at DESC LIMIT 1",
-            (group_id,)).fetchone()
-        last_post_id = last_post["id"] if last_post else None
-        last_author = last_post["author_name"] if last_post else None
-
         by = _birth_year_for(conn, tid)
     finally:
         if not db._conn:
@@ -4899,14 +4892,9 @@ async def chatter_polly(request: Request, group_id: int):
         if not db._conn:
             conn.close()
 
-    # Capture the conversation into the legacy book (Polly button = explicit
-    # invite, so capture regardless of score; reuse the GPT pass we already did)
-    try:
-        memory_capture.capture(db, tid, thread_text, "chatter",
-                               source_ref=last_post_id, speaker=last_author,
-                               analysis=result)
-    except Exception as e:
-        logger.info("Polly capture skipped: %s", e)
+    # NOTE: nothing is saved to the legacy book here. Pressing Polly only makes
+    # her chime into the conversation. Adding a conversation to the book is now
+    # opt-in — via per-post "Save to Stories" or the "Narrate for my book" flow.
 
     return JSONResponse({
         "ok": True,
@@ -5322,10 +5310,9 @@ async def chatter_group_post(request: Request, group_id: int):
         if not db._conn:
             conn.close()
 
-    # Legacy Funnel: quietly score this post; high-value ones auto-capture into
-    # the memories table (low-value chatter just stays chatter). Fire-and-forget.
-    if content and content.strip():
-        _schedule_capture(db, tid, post_id, content.strip(), author, "chatter")
+    # Book is opt-in: chatter posts are NOT auto-captured into the legacy book.
+    # Add to the book deliberately via per-post "Save to Stories" or the
+    # "Narrate for my book" flow.
 
     return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
 
