@@ -252,23 +252,36 @@ def polly_interjection(thread_text: str, member_names=None, birth_year=None,
         return result
 
 
-def narrate_group(thread_text: str, theme=None) -> dict:
+def narrate_group(thread_text: str, theme=None, owner_name=None) -> dict:
     """Weave a whole Chatter group's conversation (posts + comments) into a
-    warm narrative for the legacy book. The user reviews/edits and names it
-    before it's saved. Returns {title, narrative}. Never raises.
+    warm narrative for the legacy book, told from the OWNER's point of view —
+    so each person who saves it gets a story centered on their own life, with
+    the friends woven in. The user reviews/edits and names it before saving.
+    Returns {title, narrative}. Never raises.
     """
     thread_text = (thread_text or "").strip()
+    who = (owner_name or "").strip()
+    pov = (
+        f"Write this as {who}'s OWN memory, told from {who}'s point of view — "
+        f"center it on {who}'s life and experiences, and tell the fun stories about "
+        f"the friends who were part of it and how everyone's lives intertwined with "
+        f"{who}'s. "
+        if who else
+        "Write it from the owner's own point of view — centered on their life and the "
+        "friends who were part of it, and how everyone's lives intertwined. "
+    )
     system = (
         POLLY_PERSONA + "\n\nBelow is a whole conversation among a group of "
         "friends or family sharing memories"
         + (f", themed around '{theme}'" if theme else "")
-        + ". Weave it into a warm, flowing narrative for a keepsake legacy book — "
-        "tell it like a story that captures the people, the moments, the humor and "
-        "the heart of what everyone shared. Keep real names exactly as written. "
-        "Return STRICT JSON (no markdown):\n{\n"
+        + ". " + pov
+        + "Weave it into a warm, flowing narrative for a keepsake legacy book — tell "
+        "it like a story that captures the people, the moments, the humor and the "
+        "heart. Keep real names exactly as written. Return STRICT JSON (no markdown):\n{\n"
         '  "title": "<a short, warm title for this narrative'
         + (f' (something like \"{theme}\")' if theme else "") + '>",\n'
-        '  "narrative": "<2-5 warm paragraphs weaving the conversation into a story>"\n}'
+        '  "narrative": "<2-5 warm paragraphs, centered on '
+        + (f"{who}" if who else "the owner") + ' with the friends woven in>"\n}'
     )
     try:
         parsed = _chat_json(system, thread_text, max_tokens=1200)

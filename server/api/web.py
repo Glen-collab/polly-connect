@@ -4963,7 +4963,9 @@ async def chatter_narrate(request: Request, group_id: int):
         if not db._conn:
             conn.close()
 
-    result = await asyncio.to_thread(memory_capture.narrate_group, thread_text, theme)
+    owner_name = session.get("name")
+    result = await asyncio.to_thread(
+        memory_capture.narrate_group, thread_text, theme, owner_name)
     return JSONResponse({
         "ok": True,
         "title": result.get("title") or theme or "Our Story",
