@@ -5658,16 +5658,17 @@ async def chatter_save_to_stories(request: Request, post_id: int):
         post = dict(post)
 
         attribution = f"[From Chatter — posted by {post['author_name']}]"
-        transcript = post.get("content") or ""
-        if transcript:
-            transcript = f"{attribution}\n\n{transcript}"
-        else:
-            transcript = attribution
+        clean = post.get("content") or ""
+        transcript = f"{attribution}\n\n{clean}" if clean else attribution
 
+        # Map the chatter voice file into audio_s3_key (same static/recordings
+        # folder stories serve from) so the saved story gets the audio player,
+        # a QR code, and the "QR in book" toggle — just like any other story.
         conn.execute("""
-            INSERT INTO stories (tenant_id, transcript, speaker_name, source, audio_filename, created_at)
-            VALUES (?, ?, ?, 'aviary', ?, CURRENT_TIMESTAMP)
-        """, (tid, transcript, post["author_name"], post.get("audio_filename")))
+            INSERT INTO stories (tenant_id, transcript, corrected_transcript, speaker_name,
+            source, audio_s3_key, created_at)
+            VALUES (?, ?, ?, ?, 'aviary', ?, CURRENT_TIMESTAMP)
+        """, (tid, transcript, clean or None, post["author_name"], post.get("audio_filename")))
 
         if post.get("photo_filename"):
             conn.execute("""
