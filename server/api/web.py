@@ -621,8 +621,11 @@ async def invite_signup_page(request: Request):
                     db.send_friend_request_by_tenant(my_tid, inviter_tid)
                     # Also auto-accept from their side
                     db.accept_friend_request(my_tid, inviter_tid)
-                    # Add inviter to my family tree
+                    # Add inviter to my family tree …
                     _auto_add_inviter_to_tree(db, my_tid, invitation)
+                    # … and me into the inviter's tree (bidirectional).
+                    _add_friend_to_tree(db, inviter_tid, session.get("name"),
+                                        session.get("email"))
                     db.update_invitation_status(int(invite_id), "converted",
                                                 converted_tenant_id=my_tid)
         return RedirectResponse("/web/dashboard", status_code=302)
