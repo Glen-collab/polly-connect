@@ -4952,6 +4952,36 @@ async def chatter_polly(request: Request, group_id: int):
     })
 
 
+# Free-tier "narrate teaser" limits. Admin (tenant 1) and paid plans are
+# unlimited; free users get a taste, then a warm nudge to upgrade.
+FREE_NARRATE_LIMIT = 3   # free story previews
+FREE_NARRATE_SAVES = 1   # free saves into the book
+_UPGRADE_MSG = ("You've started your story! Keep building your legacy book with "
+                "Polly — unlimited stories for $5.99/month.")
+
+
+def _narrate_unlimited(db, tid: int) -> bool:
+    """True if this tenant gets unlimited narrate/save (admin or an active paid plan)."""
+    if tid == 1:
+        return True
+    try:
+        from core import subscription
+        sub = subscription.get_subscription(db, tid)
+        return (sub.get("tier") in ("basic", "legacy")
+                and sub.get("status") not in ("expired", "canceled", "past_due"))
+    except Exception:
+        return False
+
+
+def _narrate_count(conn, tid: int) -> int:
+    """How many free narration previews this tenant has used (persisted)."""
+    conn.execute("CREATE TABLE IF NOT EXISTS chatter_narrate_usage "
+                 "(tenant_id INTEGER PRIMARY KEY, count INTEGER DEFAULT 0)")
+    row = conn.execute("SELECT count FROM chatter_narrate_usage WHERE tenant_id = ?",
+                       (tid,)).fetchone()
+    return (row[0] if row else 0) or 0
+
+
 @router.post("/chatter/{group_id}/narrate")
 async def chatter_narrate(request: Request, group_id: int):
     """Read the WHOLE group history (every post + comment) and weave it into a
@@ -4962,6 +4992,7 @@ async def chatter_narrate(request: Request, group_id: int):
         return JSONResponse({"error": "Not logged in"}, status_code=401)
     db = request.app.state.db
     tid = session["tenant_id"]
+    unlimited = _narrate_unlimited(db, tid)
     import sqlite3
     conn = db._get_connection()
     try:
@@ -4971,6 +5002,9 @@ async def chatter_narrate(request: Request, group_id: int):
             (group_id, tid)).fetchone()
         if not member:
             return JSONResponse({"error": "Not a member"}, status_code=403)
+        # Free-tier teaser gate: cap free previews.
+        if not unlimited and _narrate_count(conn, tid) >= FREE_NARRATE_LIMIT:
+            return JSONResponse({"ok": False, "upgrade": True, "error": _UPGRADE_MSG})
         thread_text = _recent_thread_text(conn, group_id, limit=400)
         if not thread_text:
             return JSONResponse({"error": "Nothing to narrate yet — share some memories first!"}, status_code=400)
@@ -4984,10 +5018,27 @@ async def chatter_narrate(request: Request, group_id: int):
     owner_name = session.get("name")
     result = await asyncio.to_thread(
         memory_capture.narrate_group, thread_text, theme, owner_name)
+
+    # Count this preview against the free allowance (only for free users).
+    remaining = None
+    if not unlimited:
+        conn = db._get_connection()
+        try:
+            used = _narrate_count(conn, tid)
+            conn.execute("DELETE FROM chatter_narrate_usage WHERE tenant_id = ?", (tid,))
+            conn.execute("INSERT INTO chatter_narrate_usage (tenant_id, count) VALUES (?, ?)",
+                         (tid, used + 1))
+            conn.commit()
+            remaining = max(0, FREE_NARRATE_LIMIT - (used + 1))
+        finally:
+            if not db._conn:
+                conn.close()
+
     return JSONResponse({
         "ok": True,
         "title": result.get("title") or theme or "Our Story",
         "narrative": result.get("narrative") or "",
+        "previews_left": remaining,
     })
 
 
@@ -5007,6 +5058,7 @@ async def chatter_narrate_save(request: Request, group_id: int):
     if not narrative:
         return JSONResponse({"error": "Nothing to save."}, status_code=400)
 
+    unlimited = _narrate_unlimited(db, tid)
     import sqlite3
     conn = db._get_connection()
     try:
@@ -5016,6 +5068,13 @@ async def chatter_narrate_save(request: Request, group_id: int):
             (group_id, tid)).fetchone()
         if not member:
             return JSONResponse({"error": "Not a member"}, status_code=403)
+        # Free-tier teaser gate: cap free saves into the book.
+        if not unlimited:
+            saved = conn.execute(
+                "SELECT COUNT(*) FROM stories WHERE tenant_id = ? AND source = 'chatter_narrative'",
+                (tid,)).fetchone()[0]
+            if saved >= FREE_NARRATE_SAVES:
+                return JSONResponse({"ok": False, "upgrade": True, "error": _UPGRADE_MSG})
     finally:
         if not db._conn:
             conn.close()

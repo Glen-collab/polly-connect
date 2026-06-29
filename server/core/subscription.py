@@ -1,10 +1,12 @@
 """
 Stripe subscription management for Polly Connect.
 
-Tiers:
-  - trial: Free tier (permanent, limited stories/photos/items)
-  - basic: $9.99/mo or $99/yr — unlimited stories, no book export
-  - legacy: $19.99/mo or $199/yr — full access including book export
+Tiers (live pricing — see templates/pricing.html):
+  - trial: Free forever — Chatter, Wall, up to 10 stories, narrate teaser
+  - basic ("Record Your Legacy"): $5.99/mo or $59.90/yr — unlimited stories &
+    recordings, unlimited photos/items, book PREVIEW (no export)
+  - legacy: full access incl. book export + QR voice codes — unlocked by the
+    $79 one-time "Your Legacy Book" purchase on the pricing page
 
 Feature gating is based on tenant subscription_tier + subscription_status.
 """

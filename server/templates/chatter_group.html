@@ -494,6 +494,7 @@ function narrateForBook() {
     .then(function(data) {
         btn.disabled = false;
         label.textContent = 'Narrate this for my book';
+        if (data.upgrade) { if (confirm(data.error + '\n\nSee plans?')) window.location.href = '/web/pricing'; return; }
         if (!data.ok) { alert(data.error || 'Could not narrate right now — try again.'); return; }
         document.getElementById('narrate-title').value = data.title || '';
         document.getElementById('narrate-text').value = data.narrative || '';
@@ -532,6 +533,8 @@ function saveNarrative() {
         if (data.ok) {
             closeNarrate();
             alert('Added to your book! You can find it in Stories & Answers.');
+        } else if (data.upgrade) {
+            if (confirm(data.error + '\n\nSee plans?')) window.location.href = '/web/pricing';
         } else {
             alert(data.error || 'Could not save — try again.');
         }
