@@ -754,58 +754,73 @@ async def invite_signup_submit(request: Request,
 
 
 def _add_friend_to_tree(db, owner_tid: int, friend_name: str, friend_email: str = None):
-    """Add a newly connected friend into owner_tid's family tree (ordered by
-    date via created_at default) as a 'friend', if not already present. This is
-    the reverse of _auto_add_inviter_to_tree so connections land in BOTH trees."""
+    """Add a connected friend into owner_tid's family tree as a 'friend',
+    deduping intelligently. Email is the reliable key: if someone with the same
+    email is already in the tree (e.g. a manually-added "Erik M."), upgrade that
+    entry to the real signup name instead of creating a duplicate. Otherwise
+    fall back to a name match, then insert. Used in BOTH connection directions."""
     if not owner_tid or not friend_name or not friend_name.strip():
         return
     import sqlite3 as _sq
+    name = friend_name.strip()
+    email = (friend_email or "").strip().lower() or None
     conn = db._get_connection()
     try:
         conn.row_factory = _sq.Row
+        # 1) Match by email first — most reliable. Upgrade the name to the
+        #    canonical signup name (so "Erik M." becomes "Erik Meyer").
+        if email:
+            row = conn.execute(
+                "SELECT id FROM family_members WHERE LOWER(email) = ? AND tenant_id = ? LIMIT 1",
+                (email, owner_tid)).fetchone()
+            if row:
+                conn.execute(
+                    "UPDATE family_members SET name = ?, name_normalized = ? WHERE id = ?",
+                    (name, name.lower(), row["id"]))
+                conn.commit()
+                return
+        # 2) Fall back to a name match to avoid an obvious duplicate; backfill the
+        #    email if we now have one and the existing row didn't.
         existing = conn.execute(
-            "SELECT 1 FROM family_members WHERE LOWER(name) = ? AND tenant_id = ?",
-            (friend_name.lower().strip(), owner_tid)).fetchone()
-        if not existing:
-            conn.execute("""
-                INSERT INTO family_members (name, name_normalized, relationship, relation_to_owner,
-                generation, tenant_id, added_by, email)
-                VALUES (?, ?, 'friend', 'friend', 0, ?, 'Polly Connect', ?)
-            """, (friend_name.strip(), friend_name.lower().strip(), owner_tid, friend_email))
-            conn.commit()
+            "SELECT id FROM family_members WHERE LOWER(name) = ? AND tenant_id = ? LIMIT 1",
+            (name.lower(), owner_tid)).fetchone()
+        if existing:
+            if email:
+                conn.execute(
+                    "UPDATE family_members SET email = COALESCE(email, ?) WHERE id = ?",
+                    (email, existing["id"]))
+                conn.commit()
+            return
+        # 3) New friend — insert.
+        conn.execute("""
+            INSERT INTO family_members (name, name_normalized, relationship, relation_to_owner,
+            generation, tenant_id, added_by, email)
+            VALUES (?, ?, 'friend', 'friend', 0, ?, 'Polly Connect', ?)
+        """, (name, name.lower(), owner_tid, email))
+        conn.commit()
     finally:
         if not db._conn:
             conn.close()
 
 
 def _auto_add_inviter_to_tree(db, new_tid: int, invitation: dict):
-    """Add the inviter as a family member in the new user's tree if not already there."""
-    inviter_name = invitation.get("inviter_name", "")
+    """Add the inviter into the new user's tree (email-aware dedupe via
+    _add_friend_to_tree)."""
+    inviter_name = (invitation.get("inviter_name") or "").strip()
     if not inviter_name:
         return
+    # Resolve the inviter's email so the add can dedupe/link by it.
     conn = db._get_connection()
     try:
         conn.row_factory = __import__("sqlite3").Row
-        existing = conn.execute(
-            "SELECT 1 FROM family_members WHERE LOWER(name) = ? AND tenant_id = ?",
-            (inviter_name.lower().strip(), new_tid)
-        ).fetchone()
-        if not existing:
-            # Look up inviter's email from their account
-            inviter_account = conn.execute(
-                "SELECT email FROM accounts WHERE tenant_id = ? AND role = 'owner' LIMIT 1",
-                (invitation["tenant_id"],)
-            ).fetchone()
-            inviter_email = inviter_account["email"] if inviter_account else None
-            conn.execute("""
-                INSERT INTO family_members (name, name_normalized, relationship, relation_to_owner,
-                generation, tenant_id, added_by, email)
-                VALUES (?, ?, 'friend', 'friend', 0, ?, 'Polly Connect', ?)
-            """, (inviter_name, inviter_name.lower().strip(), new_tid, inviter_email))
-            conn.commit()
+        row = conn.execute(
+            "SELECT email FROM accounts WHERE tenant_id = ? AND role = 'owner' LIMIT 1",
+            (invitation.get("tenant_id"),)).fetchone()
+        inviter_email = row["email"] if row else None
     finally:
         if not db._conn:
             conn.close()
+    _add_friend_to_tree(db, new_tid, inviter_name, inviter_email)
 
 
 # ── Welcome / Onboarding (first login) ──
