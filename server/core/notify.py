@@ -34,6 +34,29 @@ def send_notification(subject: str, body: str, to_email: str = None):
         return False
 
 
+def send_chatter_post_notification(poster_name: str, group_name: str, snippet: str,
+                                   to_email: str, group_url: str, optout_url: str):
+    """Email an away group member that someone posted in their Chatter group.
+    The opt-out is scoped clearly to the email — not to leaving the group."""
+    subject = f"\U0001F4AC {poster_name} posted in {group_name} on Polly"
+    body = f"""
+    <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto;">
+        <h2 style="color: #ea580c; margin-bottom: 4px;">New message in {group_name}</h2>
+        <p style="font-size: 15px; color: #333; margin-top: 0;"><strong>{poster_name}</strong> just posted:</p>
+        <div style="background: #fff7ed; border-left: 4px solid #fb923c; padding: 12px 16px; border-radius: 6px; color: #444; font-size: 15px;">{snippet}</div>
+        <p style="margin: 24px 0;">
+            <a href="{group_url}" style="background: #ea580c; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">Open the conversation</a>
+        </p>
+        <p style="color: #999; font-size: 12px; margin-top: 28px; border-top: 1px solid #eee; padding-top: 12px;">
+            You're getting this because you're in the &ldquo;{group_name}&rdquo; group on Polly.
+            <a href="{optout_url}" style="color: #999;">Turn off &ldquo;email me when someone posts&rdquo;</a> &mdash;
+            you'll stay in the group and the conversation, this only stops these emails.
+        </p>
+    </div>
+    """
+    return send_notification(subject, body, to_email)
+
+
 def notify_new_registration(name: str, email: str, household: str):
     """Notify admin when a new user registers."""
     subject = f"New Polly Connect Registration: {name}"

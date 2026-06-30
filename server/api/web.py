@@ -5532,7 +5532,168 @@ async def chatter_group_post(request: Request, group_id: int):
     # Add to the book deliberately via per-post "Save to Stories" or the
     # "Narrate for my book" flow.
 
+    # Notify away group members by email (posts only; throttled + opt-out aware).
+    try:
+        _queue_post_emails(db, group_id, tid, author, content, content_type)
+    except Exception as e:
+        logger.info("chatter post email queue skipped: %s", e)
+
     return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
+
+
+def _queue_post_emails(db, group_id, poster_tid, poster_name, content, content_type):
+    """Email away group members that someone posted (Option C): throttled to at
+    most one email per group per person per hour, skips anyone who viewed the
+    group in the last 5 min, and respects each person's opt-out. DB work stays on
+    this thread; only the SMTP send is backgrounded."""
+    import sqlite3, threading, uuid as _uuid
+    from datetime import datetime, timezone, timedelta
+    from core.notify import send_chatter_post_notification
+    now = datetime.now(timezone.utc)
+    nowiso = now.isoformat()
+
+    def _recent(ts, minutes):
+        if not ts:
+            return False
+        try:
+            t = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+            if t.tzinfo is None:
+                t = t.replace(tzinfo=timezone.utc)
+            return (now - t) < timedelta(minutes=minutes)
+        except Exception:
+            return False
+
+    snippet = (content or "").strip()
+    if not snippet:
+        snippet = {"photo": "shared a photo", "voice": "sent a voice message"}.get(
+            content_type, "posted a new message")
+    snippet = snippet[:160]
+
+    conn = db._get_connection()
+    group_name = "your group"
+    recipients = []
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("CREATE TABLE IF NOT EXISTS chatter_notify "
+                     "(tenant_id INTEGER PRIMARY KEY, posts_email INTEGER DEFAULT 1, optout_token TEXT)")
+        conn.execute("CREATE TABLE IF NOT EXISTS chatter_notify_throttle "
+                     "(tenant_id INTEGER, group_id INTEGER, last_at TEXT, PRIMARY KEY(tenant_id, group_id))")
+        grp = conn.execute("SELECT name FROM chatter_groups WHERE id = ?", (group_id,)).fetchone()
+        if grp:
+            group_name = grp["name"]
+        members = conn.execute("""
+            SELECT gm.tenant_id AS tid, gm.last_read_at AS last_read, a.email AS email
+            FROM chatter_group_members gm
+            LEFT JOIN accounts a ON a.tenant_id = gm.tenant_id AND a.role = 'owner'
+            WHERE gm.group_id = ? AND gm.tenant_id != ?
+        """, (group_id, poster_tid)).fetchall()
+        for m in members:
+            email = (m["email"] or "").strip()
+            if not email:
+                continue
+            pref = conn.execute(
+                "SELECT posts_email, optout_token FROM chatter_notify WHERE tenant_id = ?",
+                (m["tid"],)).fetchone()
+            if pref and pref["posts_email"] == 0:
+                continue  # opted out of these emails
+            if _recent(m["last_read"], 5):
+                continue  # actively viewing — they don't need an email
+            thr = conn.execute(
+                "SELECT last_at FROM chatter_notify_throttle WHERE tenant_id = ? AND group_id = ?",
+                (m["tid"], group_id)).fetchone()
+            if thr and _recent(thr["last_at"], 60):
+                continue  # already nudged about this group in the last hour
+            # ensure an opt-out token exists
+            token = pref["optout_token"] if (pref and pref["optout_token"]) else None
+            if not token:
+                token = _uuid.uuid4().hex
+                if pref:
+                    conn.execute("UPDATE chatter_notify SET optout_token = ? WHERE tenant_id = ?",
+                                 (token, m["tid"]))
+                else:
+                    conn.execute("INSERT INTO chatter_notify (tenant_id, posts_email, optout_token) VALUES (?, 1, ?)",
+                                 (m["tid"], token))
+            # stamp the throttle
+            if thr:
+                conn.execute("UPDATE chatter_notify_throttle SET last_at = ? WHERE tenant_id = ? AND group_id = ?",
+                             (nowiso, m["tid"], group_id))
+            else:
+                conn.execute("INSERT INTO chatter_notify_throttle (tenant_id, group_id, last_at) VALUES (?, ?, ?)",
+                             (m["tid"], group_id, nowiso))
+            recipients.append((email, token))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+    base = "https://polly-connect.com"
+    group_url = f"{base}/web/chatter/{group_id}"
+    for email, token in recipients:
+        optout_url = f"{base}/web/chatter-emails/off?t={token}"
+        threading.Thread(
+            target=send_chatter_post_notification,
+            args=(poster_name, group_name, snippet, email, group_url, optout_url),
+            daemon=True).start()
+
+
+@router.get("/chatter-emails/off", response_class=HTMLResponse)
+async def chatter_email_off(request: Request):
+    """One-click opt-out from chatter post emails (token in the email link).
+    Scoped to the emails only — the user stays in all their groups."""
+    db = request.app.state.db
+    token = request.query_params.get("t", "").strip()
+    ok = False
+    if token:
+        conn = db._get_connection()
+        try:
+            conn.execute("CREATE TABLE IF NOT EXISTS chatter_notify "
+                         "(tenant_id INTEGER PRIMARY KEY, posts_email INTEGER DEFAULT 1, optout_token TEXT)")
+            cur = conn.execute("UPDATE chatter_notify SET posts_email = 0 WHERE optout_token = ?", (token,))
+            conn.commit()
+            ok = cur.rowcount > 0
+        finally:
+            if not db._conn:
+                conn.close()
+    if ok:
+        head, msg = "You're all set", (
+            "You won't get emails when someone posts in Chatter anymore. "
+            "You're still in all your groups and conversations — this only turned off those emails.")
+        extra = (f'<p style="margin-top:24px;"><a href="/web/chatter-emails/on?t={token}" '
+                 f'style="color:#ea580c;">Changed your mind? Turn these emails back on</a></p>')
+    else:
+        head, msg = "Hmm", "We couldn't find that setting — these emails may already be off."
+        extra = ""
+    html = f"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Polly Connect</title></head>
+    <body style="font-family:sans-serif;max-width:480px;margin:60px auto;padding:0 20px;text-align:center;color:#333;">
+    <div style="font-size:42px;">&#x1F99C;</div><h2 style="color:#ea580c;">{head}</h2>
+    <p style="font-size:15px;line-height:1.5;">{msg}</p>{extra}
+    <p style="margin-top:28px;"><a href="/web/dashboard" style="color:#888;">Go to Polly</a></p>
+    </body></html>"""
+    return HTMLResponse(html)
+
+
+@router.get("/chatter-emails/on", response_class=HTMLResponse)
+async def chatter_email_on(request: Request):
+    """Re-enable chatter post emails via the token link."""
+    db = request.app.state.db
+    token = request.query_params.get("t", "").strip()
+    if token:
+        conn = db._get_connection()
+        try:
+            conn.execute("CREATE TABLE IF NOT EXISTS chatter_notify "
+                         "(tenant_id INTEGER PRIMARY KEY, posts_email INTEGER DEFAULT 1, optout_token TEXT)")
+            conn.execute("UPDATE chatter_notify SET posts_email = 1 WHERE optout_token = ?", (token,))
+            conn.commit()
+        finally:
+            if not db._conn:
+                conn.close()
+    html = """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Polly Connect</title></head>
+    <body style="font-family:sans-serif;max-width:480px;margin:60px auto;padding:0 20px;text-align:center;color:#333;">
+    <div style="font-size:42px;">&#x1F99C;</div><h2 style="color:#ea580c;">You're back on</h2>
+    <p style="font-size:15px;line-height:1.5;">We'll email you again when someone posts in your Chatter groups.</p>
+    <p style="margin-top:28px;"><a href="/web/dashboard" style="color:#888;">Go to Polly</a></p>
+    </body></html>"""
+    return HTMLResponse(html)
 
 
 @router.post("/chatter/{group_id}/invite")
