@@ -280,6 +280,7 @@ def narrate_group(thread_text: str, theme=None, owner_name=None) -> dict:
         "heart. Keep real names exactly as written. Return STRICT JSON (no markdown):\n{\n"
         '  "title": "<a short, warm title for this narrative'
         + (f' (something like \"{theme}\")' if theme else "") + '>",\n'
+        '  "year": <the 4-digit year these events most likely took place, or null if unclear>,\n'
         '  "narrative": "<2-5 warm paragraphs, centered on '
         + (f"{who}" if who else "the owner") + ' with the friends woven in>"\n}'
     )
@@ -289,10 +290,15 @@ def narrate_group(thread_text: str, theme=None, owner_name=None) -> dict:
         narrative = (str(parsed.get("narrative") or "")).strip()
         if not narrative:
             narrative = thread_text
-        return {"title": title, "narrative": narrative}
+        year = parsed.get("year")
+        try:
+            year = int(year) if year and 1800 <= int(year) <= 2100 else None
+        except (TypeError, ValueError):
+            year = None
+        return {"title": title, "narrative": narrative, "year": year}
     except Exception as e:
         logger.info("narrate_group fell back: %s", e)
-        return {"title": theme or "Our Story", "narrative": thread_text}
+        return {"title": theme or "Our Story", "narrative": thread_text, "year": None}
 
 
 # ── Capture: write the memory (the funnel's collection point) ─────────────

@@ -1793,6 +1793,13 @@ async def story_edit(request: Request, story_id: int):
             (story_id, session["tenant_id"])
         ).fetchone()
         story = dict(story) if story else None
+        # The chronological year lives on the linked memory (the book orders by it).
+        est_year = None
+        if story:
+            row = conn.execute(
+                "SELECT estimated_year FROM memories WHERE story_id = ? LIMIT 1",
+                (story_id,)).fetchone()
+            est_year = row[0] if row and row[0] else None
     finally:
         if not db._conn:
             conn.close()
@@ -1806,6 +1813,7 @@ async def story_edit(request: Request, story_id: int):
         "session": session,
         "story": story,
         "audio_url": audio_url,
+        "est_year": est_year,
     })
 
 
@@ -1839,6 +1847,16 @@ async def story_edit_save(request: Request, story_id: int):
                 UPDATE stories SET transcript = ?, corrected_transcript = ?, speaker_name = ?, qr_in_book = ?, photo_in_book = ?, private = ?
                 WHERE id = ? AND tenant_id = ?
             """, (transcript, transcript, speaker_name or None, qr_in_book, photo_in_book, private, story_id, session["tenant_id"]))
+        # Optional chronological year → the linked book memory (orders the book).
+        year_raw = (form.get("year") or "").strip()
+        try:
+            yi = int(year_raw)
+            if 1800 <= yi <= 2100:
+                conn.execute(
+                    "UPDATE memories SET estimated_year = ?, year_confidence = 'user' WHERE story_id = ?",
+                    (yi, story_id))
+        except (TypeError, ValueError):
+            pass
         conn.commit()
     finally:
         if not db._conn:
@@ -5025,6 +5043,12 @@ async def chatter_narrate(request: Request, group_id: int):
     result = await asyncio.to_thread(
         memory_capture.narrate_group, thread_text, theme, owner_name)
 
+    # Suggest a year for chronological placement: a year in the group name
+    # (e.g. "Barbell circa 2010") wins; otherwise use Polly's estimate.
+    import re as _re
+    ym = _re.search(r"\b(18|19|20)\d{2}\b", theme or "")
+    year_suggestion = int(ym.group(0)) if ym else result.get("year")
+
     # Count this preview against the free allowance (only for free users).
     remaining = None
     if not unlimited:
@@ -5044,6 +5068,7 @@ async def chatter_narrate(request: Request, group_id: int):
         "ok": True,
         "title": result.get("title") or theme or "Our Story",
         "narrative": result.get("narrative") or "",
+        "year": year_suggestion,
         "previews_left": remaining,
     })
 
@@ -5063,6 +5088,15 @@ async def chatter_narrate_save(request: Request, group_id: int):
     narrative = (form.get("narrative") or "").strip()
     if not narrative:
         return JSONResponse({"error": "Nothing to save."}, status_code=400)
+
+    # Optional year for chronological placement in the book.
+    year = None
+    try:
+        y = int((form.get("year") or "").strip())
+        if 1800 <= y <= 2100:
+            year = y
+    except (TypeError, ValueError):
+        year = None
 
     unlimited = _narrate_unlimited(db, tid)
     import sqlite3
@@ -5106,6 +5140,11 @@ async def chatter_narrate_save(request: Request, group_id: int):
             "verified_at = CURRENT_TIMESTAMP, corrected_transcript = ?, "
             "speaker_name = ? WHERE id = (SELECT story_id FROM memories WHERE id = ?)",
             (verifier, narrative, title, mem_id))
+        # Honor the user's chronological date (the book orders by estimated_year).
+        if year:
+            conn.execute(
+                "UPDATE memories SET estimated_year = ?, year_confidence = 'user' WHERE id = ?",
+                (year, mem_id))
         conn.commit()
     finally:
         if not db._conn:

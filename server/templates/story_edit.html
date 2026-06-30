@@ -10,11 +10,19 @@
 
 <form method="POST" action="/web/stories/{{ story.id }}/edit">
     <div class="bg-white rounded-lg shadow p-4 sm:p-6">
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Speaker Name</label>
-            <input type="text" name="speaker_name" value="{{ story.speaker_name or '' }}"
-                   class="w-full border rounded px-3 py-2 text-sm sm:text-base" placeholder="Who shared this story?">
+        <div class="mb-4 flex gap-3">
+            <div class="flex-1">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Speaker Name</label>
+                <input type="text" name="speaker_name" value="{{ story.speaker_name or '' }}"
+                       class="w-full border rounded px-3 py-2 text-sm sm:text-base" placeholder="Who shared this story?">
+            </div>
+            <div class="w-32">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Year <span class="text-gray-400 font-normal">(optional)</span></label>
+                <input type="number" name="year" min="1800" max="2100" value="{{ est_year or '' }}"
+                       class="w-full border rounded px-3 py-2 text-sm sm:text-base" placeholder="e.g. 2010">
+            </div>
         </div>
+        <p class="text-xs text-gray-400 -mt-2 mb-4">The year places this story chronologically in your legacy book. Leave blank to let Polly estimate it.</p>
 
         {% if story.audio_s3_key %}
         <div class="mb-4">

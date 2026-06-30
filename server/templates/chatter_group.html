@@ -138,10 +138,17 @@
     <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-5 max-h-[90vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-1">Add this to your book</h2>
         <p class="text-xs text-gray-500 mb-4">Polly wove your conversation into a story. Edit it, fix any names, give it a title, then add it to your legacy book.</p>
-        <div class="mb-3">
-            <label class="block text-sm text-gray-600 mb-1">Title</label>
-            <input type="text" id="narrate-title" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. College Life">
+        <div class="mb-3 flex gap-3">
+            <div class="flex-1">
+                <label class="block text-sm text-gray-600 mb-1">Title</label>
+                <input type="text" id="narrate-title" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. College Life">
+            </div>
+            <div class="w-28">
+                <label class="block text-sm text-gray-600 mb-1">Year <span class="text-gray-400 font-normal">(optional)</span></label>
+                <input type="number" id="narrate-year" min="1800" max="2100" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. 2010">
+            </div>
         </div>
+        <p class="text-xs text-gray-400 -mt-1 mb-3">The year helps Polly place this story in the right chapter of your book. Leave blank and Polly will estimate it.</p>
         <div class="mb-4">
             <label class="block text-sm text-gray-600 mb-1">Narrative</label>
             <textarea id="narrate-text" rows="12" class="w-full border rounded px-3 py-2 text-sm sm:text-base leading-relaxed"></textarea>
@@ -506,6 +513,7 @@ function narrateForBook() {
         if (data.upgrade) { if (confirm(data.error + '\n\nSee plans?')) window.location.href = '/web/pricing'; return; }
         if (!data.ok) { alert(data.error || 'Could not narrate right now — try again.'); return; }
         document.getElementById('narrate-title').value = data.title || '';
+        document.getElementById('narrate-year').value = data.year || '';
         document.getElementById('narrate-text').value = data.narrative || '';
         document.getElementById('narrate-modal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
@@ -525,11 +533,12 @@ function closeNarrate() {
 function saveNarrative() {
     var saveBtn = document.getElementById('narrate-save-btn');
     var title = document.getElementById('narrate-title').value.trim();
+    var year = document.getElementById('narrate-year').value.trim();
     var narrative = document.getElementById('narrate-text').value.trim();
     if (!narrative) { alert('There is nothing to save.'); return; }
     saveBtn.disabled = true;
     saveBtn.textContent = 'Adding...';
-    var body = 'title=' + encodeURIComponent(title) + '&narrative=' + encodeURIComponent(narrative);
+    var body = 'title=' + encodeURIComponent(title) + '&year=' + encodeURIComponent(year) + '&narrative=' + encodeURIComponent(narrative);
     fetch('/web/chatter/' + groupId + '/narrate/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
