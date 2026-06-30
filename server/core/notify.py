@@ -147,13 +147,18 @@ def send_family_invitation(inviter_name: str, invitee_name: str, invitee_email: 
 
 def send_chatter_invitation(inviter_name: str, invitee_name: str, invitee_email: str,
                             invitation_id: int,
-                            base_url: str = "https://polly-connect.com"):
+                            base_url: str = "https://polly-connect.com",
+                            group_name: str = None):
     """Friend/Chatter invite. Creates a SEPARATE free account for the invitee and
     connects them via Chatter + the shared Wall ONLY — never hands out a household
     access code, so the invitee can't see the inviter's private stories/photos/
-    family/legacy. Warm, legacy-selling copy."""
+    family/legacy. Warm, legacy-selling copy. If group_name is given, the invite
+    names the specific group they're being added to."""
     invite_url = f"{base_url}/web/invite-signup?invite={invitation_id}"
-    subject = f"{inviter_name} invited you to chat on Polly"
+    place = f"&ldquo;{group_name}&rdquo;" if group_name else "Chatter"
+    join_label = f"Join {group_name}" if group_name else f"Join {inviter_name} on Chatter"
+    subject = (f"{inviter_name} invited you to {group_name} on Polly" if group_name
+               else f"{inviter_name} invited you to chat on Polly")
     body = f"""
     <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto;">
         <div style="text-align: center; padding: 20px 0;">
@@ -166,7 +171,7 @@ def send_chatter_invitation(inviter_name: str, invitee_name: str, invitee_email:
         </h2>
 
         <p style="color: #374151; font-size: 15px; line-height: 1.6; text-align: center;">
-            <strong>{inviter_name}</strong> invited you to <strong>Chatter</strong> on Polly &mdash;
+            <strong>{inviter_name}</strong> invited you to <strong>{place}</strong> on Polly &mdash;
             a simple, private place to talk, share, and reminisce together.
         </p>
 
@@ -182,7 +187,7 @@ def send_chatter_invitation(inviter_name: str, invitee_name: str, invitee_email:
                style="display: inline-block; background: #ea580c; color: white; font-size: 18px;
                       font-weight: bold; padding: 14px 32px; border-radius: 8px;
                       text-decoration: none;">
-                Join {inviter_name} on Chatter
+                {join_label}
             </a>
         </div>
 

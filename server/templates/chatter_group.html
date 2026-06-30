@@ -13,10 +13,8 @@
             </p>
         </div>
         <div class="flex gap-2">
-            {% if invitable %}
             <button onclick="document.getElementById('invite-panel').classList.toggle('hidden')"
                     class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">+ Invite</button>
-            {% endif %}
             <form method="POST" action="/web/chatter/{{ group.id }}/leave" onsubmit="return confirm('Leave this group?')">
                 <button type="submit" class="text-xs text-red-400 hover:text-red-600 px-2 py-1.5">Leave</button>
             </form>
@@ -24,9 +22,9 @@
     </div>
 </div>
 
-{% if invitable %}
 <div id="invite-panel" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 max-w-2xl mx-auto">
-    <p class="text-sm font-medium text-blue-800 mb-2">Add someone to this group:</p>
+    {% if invitable %}
+    <p class="text-sm font-medium text-blue-800 mb-2">Add someone you're already connected with:</p>
     {% for c in invitable %}
     <form method="POST" action="/web/chatter/{{ group.id }}/invite" class="inline">
         <input type="hidden" name="invitee_tid" value="{{ c.connected_tenant_id }}">
@@ -35,8 +33,19 @@
         </button>
     </form>
     {% endfor %}
+    {% endif %}
+    <div class="{% if invitable %}mt-3 pt-3 border-t border-blue-200{% endif %}">
+        <p class="text-xs text-blue-700 mb-1.5">Invite someone new by email to <strong>{{ group.name }}</strong>:</p>
+        <form method="POST" action="/web/chatter/{{ group.id }}/invite" class="flex flex-col sm:flex-row gap-2">
+            <input type="text" name="invite_name" placeholder="Their name"
+                   class="border border-blue-200 rounded px-2 py-1.5 text-sm flex-1">
+            <input type="email" name="invite_email" placeholder="their@email.com" required
+                   class="border border-blue-200 rounded px-2 py-1.5 text-sm flex-1">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-blue-700 whitespace-nowrap">Send invite</button>
+        </form>
+        <p class="text-xs text-blue-400 mt-1">They'll get an email inviting them to &ldquo;{{ group.name }}&rdquo; and join this group when they sign up.</p>
+    </div>
 </div>
-{% endif %}
 
 {% if is_admin and members|length > 1 %}
 <div class="max-w-2xl mx-auto mb-4">

@@ -178,6 +178,9 @@ async def login_submit(request: Request, email: str = Form(...),
                 db.update_invitation_status(int(invite_id_val), "converted",
                                             converted_tenant_id=my_tid)
 
+    # Auto-join any chatter groups this email was invited to.
+    _join_pending_groups(db, account["tenant_id"], account.get("email"))
+
     # Check if owner needs onboarding
     dest = "/web/dashboard"
     if account.get("role") == "owner" and not account.get("is_admin"):
@@ -724,6 +727,9 @@ async def invite_signup_submit(request: Request,
             # Mark invitation converted
             db.update_invitation_status(int(invite_id_str), "converted",
                                         converted_tenant_id=new_tid)
+
+    # Auto-join any chatter groups this person was invited to by email.
+    _join_pending_groups(db, new_tid, email)
 
     # Notify admin
     try:
@@ -5696,38 +5702,119 @@ async def chatter_email_on(request: Request):
     return HTMLResponse(html)
 
 
+def _join_pending_groups(db, tid: int, email: str):
+    """On signup/login, auto-join any chatter groups this email was invited to
+    (carried via pending_group_members), so invited friends land directly in the
+    named group instead of an empty 'create a group' screen."""
+    if not tid or not email:
+        return
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("CREATE TABLE IF NOT EXISTS pending_group_members "
+                     "(group_id INTEGER, email TEXT, group_name TEXT, inviter_name TEXT)")
+        em = email.lower().strip()
+        rows = conn.execute(
+            "SELECT DISTINCT group_id FROM pending_group_members WHERE LOWER(email) = ?",
+            (em,)).fetchall()
+        for r in rows:
+            conn.execute(
+                "INSERT OR IGNORE INTO chatter_group_members (group_id, tenant_id, role) VALUES (?, ?, 'member')",
+                (r["group_id"], tid))
+        if rows:
+            conn.execute("DELETE FROM pending_group_members WHERE LOWER(email) = ?", (em,))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+
+
 @router.post("/chatter/{group_id}/invite")
 async def chatter_group_invite(request: Request, group_id: int):
-    """Invite a connection to a chatter group."""
+    """Add an existing connection to a chatter group, OR invite someone by email
+    directly into this named group (new users auto-join it when they sign up)."""
     session = await get_web_session(request)
     redirect = require_login(session)
     if redirect:
         return redirect
     form = await request.form()
-    invitee_tid = form.get("invitee_tid", "")
-    if not invitee_tid or not invitee_tid.isdigit():
-        return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
-
+    invitee_tid = (form.get("invitee_tid") or "").strip()
+    invite_email = (form.get("invite_email") or "").strip().lower()
+    invite_name = (form.get("invite_name") or "").strip() or "Friend"
     db = request.app.state.db
     tid = session["tenant_id"]
-    import sqlite3
+    import sqlite3, threading
+
     conn = db._get_connection()
     try:
-        # Verify I'm a member
+        conn.row_factory = sqlite3.Row
         member = conn.execute(
             "SELECT 1 FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
-            (group_id, tid)
-        ).fetchone()
+            (group_id, tid)).fetchone()
         if not member:
             return RedirectResponse("/web/chatter", status_code=303)
-        # Add them directly (no pending invite flow — keep it simple)
-        conn.execute(
-            "INSERT OR IGNORE INTO chatter_group_members (group_id, tenant_id, role) VALUES (?, ?, 'member')",
-            (group_id, int(invitee_tid)))
-        conn.commit()
+        grp = conn.execute("SELECT name FROM chatter_groups WHERE id = ?",
+                           (group_id,)).fetchone()
+        group_name = grp["name"] if grp else "the group"
+        # A) Existing connection picked by tenant id → add straight in.
+        if invitee_tid.isdigit():
+            conn.execute(
+                "INSERT OR IGNORE INTO chatter_group_members (group_id, tenant_id, role) VALUES (?, ?, 'member')",
+                (group_id, int(invitee_tid)))
+            conn.commit()
+            return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
     finally:
         if not db._conn:
             conn.close()
+
+    # B) Invite by email into this named group.
+    if invite_email and "@" in invite_email:
+        owner_name = session.get("name") or "Someone"
+        existing = db.get_account_by_email(invite_email)
+        if existing and existing.get("tenant_id") == tid:
+            return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
+        if existing:
+            # Already on Polly → connect as friends + add to the group now.
+            res = db.send_friend_request_by_tenant(tid, existing["tenant_id"])
+            if res:
+                db.accept_friend_request(tid, existing["tenant_id"])
+            conn2 = db._get_connection()
+            try:
+                conn2.execute(
+                    "INSERT OR IGNORE INTO chatter_group_members (group_id, tenant_id, role) VALUES (?, ?, 'member')",
+                    (group_id, existing["tenant_id"]))
+                conn2.commit()
+            finally:
+                if not db._conn:
+                    conn2.close()
+            return RedirectResponse(f"/web/chatter/{group_id}?invite_sent={invite_name}", status_code=303)
+        # New person → invitation + pending group membership + group-named email.
+        tenant = db.get_tenant(tid)
+        family_code = (tenant.get("family_code") if tenant else None) or db.generate_family_code(tid)
+        invitation_id = db.save_family_invitation(
+            tenant_id=tid, family_member_id=None, inviter_name=owner_name,
+            invitee_name=invite_name, invitee_email=invite_email,
+            voice_filename=None, family_code=family_code)
+        conn3 = db._get_connection()
+        try:
+            conn3.execute("CREATE TABLE IF NOT EXISTS pending_group_members "
+                          "(group_id INTEGER, email TEXT, group_name TEXT, inviter_name TEXT)")
+            conn3.execute(
+                "INSERT INTO pending_group_members (group_id, email, group_name, inviter_name) VALUES (?, ?, ?, ?)",
+                (group_id, invite_email, group_name, owner_name))
+            conn3.commit()
+        finally:
+            if not db._conn:
+                conn3.close()
+        from core.notify import send_chatter_invitation
+        threading.Thread(
+            target=send_chatter_invitation,
+            args=(owner_name, invite_name, invite_email, invitation_id),
+            kwargs={"group_name": group_name},
+            daemon=True).start()
+        return RedirectResponse(f"/web/chatter/{group_id}?invite_sent={invite_name}", status_code=303)
+
     return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
 
 
