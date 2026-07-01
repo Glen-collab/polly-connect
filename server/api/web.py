@@ -5887,6 +5887,46 @@ async def chatter_group_leave(request: Request, group_id: int):
     return RedirectResponse("/web/chatter", status_code=303)
 
 
+@router.post("/chatter/{group_id}/delete")
+async def chatter_group_delete(request: Request, group_id: int):
+    """Permanently delete a whole chatter group and all its messages. Only the
+    group's admin/creator can do this."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    import sqlite3
+    conn = db._get_connection()
+    try:
+        conn.row_factory = sqlite3.Row
+        member = conn.execute(
+            "SELECT role FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+            (group_id, tid)).fetchone()
+        if not member or member["role"] != "admin":
+            return RedirectResponse(f"/web/chatter/{group_id}", status_code=303)
+        # Cascade: comments + reactions on this group's posts, then posts,
+        # members, any pending/throttle rows, then the group itself.
+        conn.execute("DELETE FROM aviary_comments WHERE post_id IN "
+                     "(SELECT id FROM aviary_posts WHERE group_id = ?)", (group_id,))
+        conn.execute("DELETE FROM aviary_reactions WHERE post_id IN "
+                     "(SELECT id FROM aviary_posts WHERE group_id = ?)", (group_id,))
+        conn.execute("DELETE FROM aviary_posts WHERE group_id = ?", (group_id,))
+        conn.execute("DELETE FROM chatter_group_members WHERE group_id = ?", (group_id,))
+        for t in ("pending_group_members", "chatter_notify_throttle"):
+            try:
+                conn.execute(f"DELETE FROM {t} WHERE group_id = ?", (group_id,))
+            except Exception:
+                pass
+        conn.execute("DELETE FROM chatter_groups WHERE id = ?", (group_id,))
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    return RedirectResponse("/web/chatter", status_code=303)
+
+
 @router.post("/chatter/{group_id}/remove-member")
 async def chatter_group_remove_member(request: Request, group_id: int):
     """Remove a member from a chatter group (admin only)."""

@@ -18,6 +18,12 @@
             <form method="POST" action="/web/chatter/{{ group.id }}/leave" onsubmit="return confirm('Leave this group?')">
                 <button type="submit" class="text-xs text-red-400 hover:text-red-600 px-2 py-1.5">Leave</button>
             </form>
+            {% if is_admin %}
+            <form method="POST" action="/web/chatter/{{ group.id }}/delete"
+                  onsubmit="return confirm('Delete this group?\n\nThis permanently deletes the group and ALL of its messages for everyone. This cannot be undone.')">
+                <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1.5">Delete Group</button>
+            </form>
+            {% endif %}
         </div>
     </div>
 </div>
