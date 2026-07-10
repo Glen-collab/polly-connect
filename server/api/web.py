@@ -192,7 +192,7 @@ async def login_submit(request: Request, email: str = Form(...),
     response.set_cookie(
         "polly_session", session_id,
         max_age=settings.SESSION_DURATION_HOURS * 3600,
-        httponly=True, samesite="lax",
+        httponly=True, secure=True, samesite="lax",
     )
     return response
 
@@ -220,14 +220,25 @@ async def forgot_password_page(request: Request):
 async def forgot_password_submit(request: Request, email: str = Form(...)):
     db = request.app.state.db
     email = email.strip().lower()
-    account = db.get_account_by_email(email)
 
-    # Always show success to prevent email enumeration
+    # Always show the same message (enumeration-safe)
     success_msg = "If an account exists with that email, a reset link has been sent."
 
+    # Rate-limit to stop reset-email flooding / probing (shared IP limiter).
+    from core.rate_limit import is_rate_limited, record_attempt
+    client_ip = request.client.host if request.client else "unknown"
+    if is_rate_limited(client_ip):
+        return templates.TemplateResponse("forgot_password.html", {
+            "request": request, "error": None, "success": success_msg,
+            "email": "", "session": None,
+        })
+    record_attempt(client_ip)
+
+    account = db.get_account_by_email(email)
     if account:
         from core.password_reset import generate_reset_token
-        token = generate_reset_token(account["id"], email)
+        token = generate_reset_token(account["id"], email,
+                                     account.get("password_hash", ""))
         reset_url = f"https://polly-connect.com/web/reset-password?token={token}"
 
         try:
@@ -293,10 +304,10 @@ async def reset_password_submit(request: Request,
             "request": request, "token": token, "email": account["email"],
             "error": "Passwords don't match.", "session": None,
         })
-    if len(password) < 6:
+    if len(password) < 8:
         return templates.TemplateResponse("reset_password.html", {
             "request": request, "token": token, "email": account["email"],
-            "error": "Password must be at least 6 characters.", "session": None,
+            "error": "Password must be at least 8 characters.", "session": None,
         })
 
     new_hash = hash_password(password)
@@ -304,6 +315,9 @@ async def reset_password_submit(request: Request,
     try:
         conn.execute("UPDATE accounts SET password_hash = ? WHERE id = ?",
                      (new_hash, account["id"]))
+        # Invalidate all existing sessions for this account — a reset should
+        # log out anyone (incl. an attacker) holding an old session.
+        conn.execute("DELETE FROM web_sessions WHERE account_id = ?", (account["id"],))
         conn.commit()
     finally:
         if not db._conn:
@@ -601,7 +615,7 @@ async def register_submit(request: Request, name: str = Form(...),
     response.set_cookie(
         "polly_session", session_id,
         max_age=settings.SESSION_DURATION_HOURS * 3600,
-        httponly=True, samesite="lax",
+        httponly=True, secure=True, samesite="lax",
     )
     return response
 
@@ -754,7 +768,7 @@ async def invite_signup_submit(request: Request,
     response.set_cookie(
         "polly_session", session_id,
         max_age=settings.SESSION_DURATION_HOURS * 3600,
-        httponly=True, samesite="lax",
+        httponly=True, secure=True, samesite="lax",
     )
     return response
 
@@ -999,7 +1013,7 @@ async def family_login_submit(request: Request, name: str = Form(...),
     response.set_cookie(
         "polly_session", session_id,
         max_age=settings.SESSION_DURATION_HOURS * 3600,
-        httponly=True, samesite="lax",
+        httponly=True, secure=True, samesite="lax",
     )
     return response
 
@@ -1298,7 +1312,7 @@ async def onboarding_signup(request: Request,
     response.set_cookie(
         "polly_session", new_session_id,
         max_age=settings.SESSION_DURATION_HOURS * 3600,
-        httponly=True, samesite="lax",
+        httponly=True, secure=True, samesite="lax",
     )
     return response
 
