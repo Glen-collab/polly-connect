@@ -2168,10 +2168,17 @@ class PollyDB:
             if not self._conn:
                 conn.close()
 
-    def delete_by_id(self, item_id: int) -> bool:
+    def delete_by_id(self, item_id: int, tenant_id: int = None) -> bool:
+        """Delete an item by id. When tenant_id is given the delete is scoped to
+        that tenant, so a user can never delete another tenant's item."""
         conn = self._get_connection()
         try:
-            cursor = conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+            if tenant_id is not None:
+                cursor = conn.execute(
+                    "DELETE FROM items WHERE id = ? AND tenant_id = ?",
+                    (item_id, tenant_id))
+            else:
+                cursor = conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
             conn.commit()
             return cursor.rowcount > 0
         finally:

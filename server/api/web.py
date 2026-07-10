@@ -2595,7 +2595,7 @@ async def memory_delete(request: Request, item_id: int):
         return redirect
 
     db = request.app.state.db
-    db.delete_by_id(item_id)
+    db.delete_by_id(item_id, tenant_id=session["tenant_id"])
     return RedirectResponse("/web/memory", status_code=303)
 
 
@@ -5987,6 +5987,19 @@ async def chatter_delete_post(request: Request, post_id: int):
     return RedirectResponse("/web/chatter", status_code=303)
 
 
+def _member_of_post_group(conn, post_id, tid) -> bool:
+    """True if tenant `tid` is a member of the group that owns `post_id`.
+    Used to stop non-members reacting/commenting/copying another group's posts."""
+    row = conn.execute("SELECT group_id FROM aviary_posts WHERE id = ?",
+                       (post_id,)).fetchone()
+    if not row:
+        return False
+    gid = row[0]
+    return conn.execute(
+        "SELECT 1 FROM chatter_group_members WHERE group_id = ? AND tenant_id = ?",
+        (gid, tid)).fetchone() is not None
+
+
 @router.post("/chatter/{post_id}/react")
 async def chatter_react(request: Request, post_id: int):
     session = await get_web_session(request)
@@ -6001,6 +6014,8 @@ async def chatter_react(request: Request, post_id: int):
     import sqlite3
     conn = db._get_connection()
     try:
+        if not _member_of_post_group(conn, post_id, tid):
+            return JSONResponse({"error": "Not allowed"}, status_code=403)
         existing = conn.execute(
             "SELECT id, reaction FROM aviary_reactions WHERE post_id = ? AND tenant_id = ?",
             (post_id, tid)
@@ -6036,6 +6051,8 @@ async def chatter_comment(request: Request, post_id: int):
     import sqlite3
     conn = db._get_connection()
     try:
+        if not _member_of_post_group(conn, post_id, tid):
+            return JSONResponse({"error": "Not allowed"}, status_code=403)
         conn.execute(
             "INSERT INTO aviary_comments (post_id, tenant_id, author_name, comment) VALUES (?, ?, ?, ?)",
             (post_id, tid, author, comment_text))
@@ -6058,6 +6075,8 @@ async def chatter_save_to_stories(request: Request, post_id: int):
     conn = db._get_connection()
     try:
         conn.row_factory = sqlite3.Row
+        if not _member_of_post_group(conn, post_id, tid):
+            return JSONResponse({"error": "Not allowed"}, status_code=403)
         post = conn.execute("SELECT * FROM aviary_posts WHERE id = ?", (post_id,)).fetchone()
         if not post:
             return JSONResponse({"error": "Post not found"}, status_code=404)
