@@ -5563,6 +5563,8 @@ async def chatter_group_post(request: Request, group_id: int):
 
     if photo_file and hasattr(photo_file, "read"):
         photo_data = await photo_file.read()
+        if len(photo_data) > MAX_PHOTO_SIZE:
+            return RedirectResponse(f"/web/chatter/{group_id}?err=Photo+too+large", status_code=303)
         if len(photo_data) > 0:
             photo_filename = f"chatter_{uuid.uuid4().hex[:8]}.jpg"
             photos_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "photos")
@@ -5573,6 +5575,8 @@ async def chatter_group_post(request: Request, group_id: int):
     if audio_file and hasattr(audio_file, "read"):
         import subprocess
         audio_data = await audio_file.read()
+        if len(audio_data) > MAX_AUDIO_SIZE:
+            return RedirectResponse(f"/web/chatter/{group_id}?err=Recording+too+large", status_code=303)
         if len(audio_data) > 0:
             audio_filename = f"chatter_{uuid.uuid4().hex[:8]}.wav"
             recordings_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "recordings")

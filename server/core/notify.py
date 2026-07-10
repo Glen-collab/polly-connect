@@ -38,17 +38,25 @@ def send_chatter_post_notification(poster_name: str, group_name: str, snippet: s
                                    to_email: str, group_url: str, optout_url: str):
     """Email an away group member that someone posted in their Chatter group.
     The opt-out is scoped clearly to the email — not to leaving the group."""
-    subject = f"\U0001F4AC {poster_name} posted in {group_name} on Polly"
+    from markupsafe import escape
+    # Plain-text subject: strip CR/LF to prevent email-header injection.
+    s_poster = (poster_name or "").replace("\n", " ").replace("\r", " ")
+    s_group = (group_name or "").replace("\n", " ").replace("\r", " ")
+    subject = f"\U0001F4AC {s_poster} posted in {s_group} on Polly"
+    # HTML body: escape all user-controlled values to prevent HTML/phishing injection.
+    e_poster = escape(poster_name or "")
+    e_group = escape(group_name or "")
+    e_snippet = escape(snippet or "")
     body = f"""
     <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto;">
-        <h2 style="color: #ea580c; margin-bottom: 4px;">New message in {group_name}</h2>
-        <p style="font-size: 15px; color: #333; margin-top: 0;"><strong>{poster_name}</strong> just posted:</p>
-        <div style="background: #fff7ed; border-left: 4px solid #fb923c; padding: 12px 16px; border-radius: 6px; color: #444; font-size: 15px;">{snippet}</div>
+        <h2 style="color: #ea580c; margin-bottom: 4px;">New message in {e_group}</h2>
+        <p style="font-size: 15px; color: #333; margin-top: 0;"><strong>{e_poster}</strong> just posted:</p>
+        <div style="background: #fff7ed; border-left: 4px solid #fb923c; padding: 12px 16px; border-radius: 6px; color: #444; font-size: 15px;">{e_snippet}</div>
         <p style="margin: 24px 0;">
             <a href="{group_url}" style="background: #ea580c; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">Open the conversation</a>
         </p>
         <p style="color: #999; font-size: 12px; margin-top: 28px; border-top: 1px solid #eee; padding-top: 12px;">
-            You're getting this because you're in the &ldquo;{group_name}&rdquo; group on Polly.
+            You're getting this because you're in the &ldquo;{e_group}&rdquo; group on Polly.
             <a href="{optout_url}" style="color: #999;">Turn off &ldquo;email me when someone posts&rdquo;</a> &mdash;
             you'll stay in the group and the conversation, this only stops these emails.
         </p>
@@ -155,10 +163,18 @@ def send_chatter_invitation(inviter_name: str, invitee_name: str, invitee_email:
     family/legacy. Warm, legacy-selling copy. If group_name is given, the invite
     names the specific group they're being added to."""
     invite_url = f"{base_url}/web/invite-signup?invite={invitation_id}"
-    place = f"&ldquo;{group_name}&rdquo;" if group_name else "Chatter"
-    join_label = f"Join {group_name}" if group_name else f"Join {inviter_name} on Chatter"
-    subject = (f"{inviter_name} invited you to {group_name} on Polly" if group_name
-               else f"{inviter_name} invited you to chat on Polly")
+    from markupsafe import escape
+    # Plain-text subject: strip CR/LF (header-injection safe).
+    s_inviter = (inviter_name or "").replace("\n", " ").replace("\r", " ")
+    s_group = (group_name or "").replace("\n", " ").replace("\r", " ")
+    subject = (f"{s_inviter} invited you to {s_group} on Polly" if group_name
+               else f"{s_inviter} invited you to chat on Polly")
+    # HTML body: escape all user-controlled values.
+    inviter_name = str(escape(inviter_name or ""))
+    invitee_name = str(escape(invitee_name or ""))
+    e_group = str(escape(group_name)) if group_name else None
+    place = f"&ldquo;{e_group}&rdquo;" if e_group else "Chatter"
+    join_label = f"Join {e_group}" if e_group else f"Join {inviter_name} on Chatter"
     body = f"""
     <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto;">
         <div style="text-align: center; padding: 20px 0;">
