@@ -4621,6 +4621,17 @@ async def wall_upload_photo(request: Request):
     return JSONResponse({"ok": True})
 
 
+def _is_wall_party(conn, item_id, tid) -> bool:
+    """True if tenant `tid` is one of the two parties on this shared-wall item.
+    Stops outsiders reacting/commenting on a private wall by guessing item ids."""
+    row = conn.execute(
+        "SELECT from_tenant_id, to_tenant_id FROM shared_wall_items WHERE id = ?",
+        (item_id,)).fetchone()
+    if not row:
+        return False
+    return tid in (row[0], row[1])
+
+
 @router.post("/wall/{item_id}/react")
 async def wall_react(request: Request, item_id: int):
     """Toggle a reaction on a wall item."""
@@ -4635,7 +4646,15 @@ async def wall_react(request: Request, item_id: int):
         return JSONResponse({"error": "No reaction"}, status_code=400)
 
     db = request.app.state.db
-    db.react_to_wall_item(item_id, session["tenant_id"], reaction)
+    tid = session["tenant_id"]
+    conn = db._get_connection()
+    try:
+        if not _is_wall_party(conn, item_id, tid):
+            return JSONResponse({"error": "Not allowed"}, status_code=403)
+    finally:
+        if not db._conn:
+            conn.close()
+    db.react_to_wall_item(item_id, tid, reaction)
     return JSONResponse({"ok": True})
 
 
@@ -4653,6 +4672,13 @@ async def wall_comment(request: Request, item_id: int):
 
     db = request.app.state.db
     tid = session["tenant_id"]
+    conn = db._get_connection()
+    try:
+        if not _is_wall_party(conn, item_id, tid):
+            return JSONResponse({"error": "Not allowed"}, status_code=403)
+    finally:
+        if not db._conn:
+            conn.close()
     my_tenant = db.get_tenant(tid)
     tenant_name = my_tenant["name"] if my_tenant else "Someone"
 
@@ -4707,6 +4733,21 @@ async def wall_save_photo_to_library(request: Request):
 
     db = request.app.state.db
     tid = session["tenant_id"]
+
+    # Must be a party to the wall this photo was shared on, and the photo must
+    # be the exact one that wall item references (no copying arbitrary photos).
+    conn = db._get_connection()
+    try:
+        conn.row_factory = __import__("sqlite3").Row
+        wi = conn.execute(
+            "SELECT from_tenant_id, to_tenant_id, content_id FROM shared_wall_items WHERE id = ?",
+            (wall_item_id,)).fetchone()
+    finally:
+        if not db._conn:
+            conn.close()
+    if (not wi or tid not in (wi["from_tenant_id"], wi["to_tenant_id"])
+            or wi["content_id"] != photo_id):
+        return JSONResponse({"error": "Not allowed"}, status_code=403)
 
     # Get the original photo
     photo = db.get_photo_by_id(photo_id)
@@ -7030,9 +7071,18 @@ async def family_member_photos(request: Request, member_id: int):
 
     member_tid = member.get("tenant_id")
     if member_tid != tid:
-        # Allow viewing photos on connected family's tree
-        connected = db.get_connected_families(tid)
-        if not any(cf["connected_tenant_id"] == member_tid for cf in connected):
+        # Only if that family has explicitly SHARED their tree with me
+        # (matches the share_tree opt-in enforced on the tree page/edit routes).
+        conn = db._get_connection()
+        try:
+            row = conn.execute(
+                "SELECT share_tree FROM connected_families "
+                "WHERE tenant_id = ? AND connected_tenant_id = ? AND status = 'accepted'",
+                (member_tid, tid)).fetchone()
+        finally:
+            if not db._conn:
+                conn.close()
+        if not row or not row[0]:
             return JSONResponse({"error": "Not found"}, status_code=404)
 
     photos = db.get_photos_by_tag(member["name"], tenant_id=member_tid)
