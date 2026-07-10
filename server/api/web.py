@@ -330,6 +330,7 @@ async def reset_password_submit(request: Request,
 
 @router.get("/forgot-code", response_class=HTMLResponse)
 async def forgot_code_page(request: Request):
+    return RedirectResponse("/web/login", status_code=302)  # family code retired
     db = request.app.state.db
     household = request.query_params.get("household", "").strip()
     questions = []
@@ -365,6 +366,7 @@ async def forgot_code_page(request: Request):
 
 @router.post("/forgot-code")
 async def forgot_code_submit(request: Request):
+    return RedirectResponse("/web/login", status_code=302)  # family code retired
     form = await request.form()
     db = request.app.state.db
     household = form.get("household", "").strip()
@@ -943,6 +945,7 @@ async def welcome_save(request: Request):
 
 @router.get("/family", response_class=HTMLResponse)
 async def family_login_page(request: Request):
+    return RedirectResponse("/web/login", status_code=302)  # family login retired
     session = await get_web_session(request)
     if session:
         return RedirectResponse("/web/dashboard", status_code=302)
@@ -965,6 +968,7 @@ async def family_login_page(request: Request):
 @router.post("/family")
 async def family_login_submit(request: Request, name: str = Form(...),
                                code: str = Form(...)):
+    return RedirectResponse("/web/login", status_code=302)  # family login retired
     db = request.app.state.db
     code = code.strip()
     name = name.strip()
@@ -4261,6 +4265,7 @@ async def photo_record_story(request: Request, photo_id: int):
 
 @router.post("/settings/family-code/generate")
 async def family_code_generate(request: Request):
+    return RedirectResponse("/web/settings", status_code=303)  # family code retired
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -4273,6 +4278,7 @@ async def family_code_generate(request: Request):
 
 @router.post("/settings/family-code/revoke")
 async def family_code_revoke(request: Request):
+    return RedirectResponse("/web/settings", status_code=303)  # family code retired
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:
@@ -4286,6 +4292,7 @@ async def family_code_revoke(request: Request):
 @router.post("/settings/connections/add")
 async def connections_add(request: Request, family_code: str = Form(...),
                           member_id: str = Form("")):
+    return RedirectResponse("/web/family-tree", status_code=303)  # connect-by-code retired (use Chatter)
     session = await get_web_session(request)
     redirect = require_owner(session)
     if redirect:

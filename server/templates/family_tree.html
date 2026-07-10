@@ -509,17 +509,9 @@ function showPhotos(memberId) {
                     html += '</form>';
                     html += '</div>';
                 } else {
-                    // No email match — manual code entry
+                    // No email on file — connect them via a Chatter invite instead.
                     html += '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4">';
-                    html += '<button type="button" onclick="document.getElementById(\'polly-link-' + memberId + '\').classList.toggle(\'hidden\')" class="text-sm text-blue-600 font-medium hover:text-blue-800 w-full text-left">Connect ' + data.member_name + '\'s Polly</button>';
-                    html += '<div id="polly-link-' + memberId + '" class="hidden mt-2">';
-                    html += '<p class="text-xs text-gray-500 mb-2">If ' + data.member_name + ' has a Polly device, enter their 6-digit code to connect.</p>';
-                    html += '<form method="POST" action="/web/settings/connections/add" class="flex gap-2">';
-                    html += '<input type="hidden" name="member_id" value="' + memberId + '">';
-                    html += '<input type="text" name="family_code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="000000" class="border rounded-lg px-3 py-2 text-sm text-center font-mono tracking-widest focus:ring-2 focus:ring-blue-500" style="max-width:140px;">';
-                    html += '<button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">Connect</button>';
-                    html += '</form>';
-                    html += '</div>';
+                    html += '<p class="text-xs text-gray-500">To connect ' + data.member_name + ', invite them by email from <a href="/web/chatter" class="text-blue-600 hover:underline font-medium">Chatter</a> — they\'ll get their own free account.</p>';
                     html += '</div>';
                 }
             }
