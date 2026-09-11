@@ -1,11 +1,13 @@
 """
 Database module for Polly Connect
 Ported from The Parrot - SQLite-based storage for items and locations
+Extended with Legacy Book tables for story collection and book generation
 """
 
 import sqlite3
+import json
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 import re
 
@@ -97,9 +99,104 @@ class PollyDB:
             except sqlite3.OperationalError as e:
                 # FTS5 not available, will fall back to LIKE queries
                 print(f"[DB] FTS5 not available, using LIKE fallback: {e}")
+
+            # Initialize Legacy Book tables
+            self._init_legacy_tables(conn)
+
         finally:
             if not self._conn:
                 conn.close()
+
+    def _init_legacy_tables(self, conn):
+        """Initialize Legacy Book tables for story collection."""
+        # Profiles table - people being interviewed
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS profiles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                nickname TEXT,
+                birthdate TEXT,
+                relationship TEXT,
+                photo_path TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Stories table - collected story responses
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS stories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id INTEGER NOT NULL,
+                question_id TEXT NOT NULL,
+                question_text TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                week INTEGER,
+                theme TEXT,
+                question_type TEXT,
+                emotion_tags TEXT,
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                edited_at TIMESTAMP,
+                audio_path TEXT,
+                is_favorite BOOLEAN DEFAULT FALSE,
+                chapter_override TEXT,
+                notes TEXT,
+                FOREIGN KEY (profile_id) REFERENCES profiles(id)
+            )
+        """)
+
+        # Story photos table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS story_photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                story_id INTEGER NOT NULL,
+                photo_path TEXT NOT NULL,
+                caption TEXT,
+                sort_order INTEGER DEFAULT 0,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (story_id) REFERENCES stories(id)
+            )
+        """)
+
+        # Books table - generated book metadata
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS books (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                subtitle TEXT,
+                status TEXT DEFAULT 'draft',
+                format TEXT DEFAULT 'pdf',
+                file_path TEXT,
+                cover_image_path TEXT,
+                generated_at TIMESTAMP,
+                story_count INTEGER,
+                FOREIGN KEY (profile_id) REFERENCES profiles(id)
+            )
+        """)
+
+        # Book chapters table
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS book_chapters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                book_id INTEGER NOT NULL,
+                chapter_number INTEGER,
+                title TEXT NOT NULL,
+                theme TEXT,
+                content TEXT,
+                story_ids TEXT,
+                FOREIGN KEY (book_id) REFERENCES books(id)
+            )
+        """)
+
+        # Create indexes for legacy tables
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_stories_profile ON stories(profile_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_stories_question ON stories(question_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_story_photos_story ON story_photos(story_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_books_profile ON books(profile_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chapters_book ON book_chapters(book_id)")
+
+        conn.commit()
             
     @staticmethod
     def _normalize(text: str) -> str:
@@ -316,17 +413,438 @@ class PollyDB:
             locations = conn.execute(
                 "SELECT COUNT(DISTINCT location_normalized) FROM items"
             ).fetchone()[0]
-            
+
             recent = conn.execute("""
-                SELECT item, location FROM items 
+                SELECT item, location FROM items
                 ORDER BY updated_at DESC LIMIT 5
             """).fetchall()
-            
+
             return {
                 "total_items": total,
                 "unique_locations": locations,
                 "recent": [{"item": r[0], "location": r[1]} for r in recent]
             }
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # =====================
+    # Legacy Book - Profiles
+    # =====================
+
+    def create_profile(self, name: str, nickname: Optional[str] = None,
+                       birthdate: Optional[str] = None, relationship: Optional[str] = None,
+                       photo_path: Optional[str] = None) -> int:
+        """Create a new profile. Returns the profile ID."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO profiles (name, nickname, birthdate, relationship, photo_path)
+                VALUES (?, ?, ?, ?, ?)
+            """, (name, nickname, birthdate, relationship, photo_path))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_profile(self, profile_id: int) -> Optional[Dict]:
+        """Get a profile by ID."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM profiles WHERE id = ?", (profile_id,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def list_profiles(self) -> List[Dict]:
+        """List all profiles."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM profiles ORDER BY created_at DESC"
+            ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_profile(self, profile_id: int, **kwargs) -> bool:
+        """Update a profile. Returns True if updated."""
+        allowed_fields = {'name', 'nickname', 'birthdate', 'relationship', 'photo_path'}
+        updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+        if not updates:
+            return False
+
+        conn = self._get_connection()
+        try:
+            set_clause = ", ".join(f"{k} = ?" for k in updates.keys())
+            values = list(updates.values()) + [profile_id]
+            cursor = conn.execute(
+                f"UPDATE profiles SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                values
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_profile(self, profile_id: int) -> bool:
+        """Delete a profile and all related data. Returns True if deleted."""
+        conn = self._get_connection()
+        try:
+            # Delete related data first
+            conn.execute("DELETE FROM story_photos WHERE story_id IN (SELECT id FROM stories WHERE profile_id = ?)", (profile_id,))
+            conn.execute("DELETE FROM stories WHERE profile_id = ?", (profile_id,))
+            conn.execute("DELETE FROM book_chapters WHERE book_id IN (SELECT id FROM books WHERE profile_id = ?)", (profile_id,))
+            conn.execute("DELETE FROM books WHERE profile_id = ?", (profile_id,))
+            cursor = conn.execute("DELETE FROM profiles WHERE id = ?", (profile_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # =====================
+    # Legacy Book - Stories
+    # =====================
+
+    def create_story(self, profile_id: int, question_id: str, question_text: str,
+                     answer: str, week: Optional[int] = None, theme: Optional[str] = None,
+                     question_type: Optional[str] = None, emotion_tags: Optional[List[str]] = None,
+                     audio_path: Optional[str] = None, notes: Optional[str] = None) -> int:
+        """Create a new story. Returns the story ID."""
+        conn = self._get_connection()
+        try:
+            emotion_tags_json = json.dumps(emotion_tags) if emotion_tags else None
+            cursor = conn.execute("""
+                INSERT INTO stories (profile_id, question_id, question_text, answer,
+                                    week, theme, question_type, emotion_tags, audio_path, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (profile_id, question_id, question_text, answer, week, theme,
+                  question_type, emotion_tags_json, audio_path, notes))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_story(self, story_id: int) -> Optional[Dict]:
+        """Get a story by ID."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM stories WHERE id = ?", (story_id,)
+            ).fetchone()
+            if result:
+                story = dict(result)
+                if story.get('emotion_tags'):
+                    story['emotion_tags'] = json.loads(story['emotion_tags'])
+                return story
+            return None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def list_stories(self, profile_id: int, theme: Optional[str] = None) -> List[Dict]:
+        """List stories for a profile, optionally filtered by theme."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            if theme:
+                results = conn.execute(
+                    "SELECT * FROM stories WHERE profile_id = ? AND theme = ? ORDER BY week, recorded_at",
+                    (profile_id, theme)
+                ).fetchall()
+            else:
+                results = conn.execute(
+                    "SELECT * FROM stories WHERE profile_id = ? ORDER BY week, recorded_at",
+                    (profile_id,)
+                ).fetchall()
+
+            stories = []
+            for r in results:
+                story = dict(r)
+                if story.get('emotion_tags'):
+                    story['emotion_tags'] = json.loads(story['emotion_tags'])
+                stories.append(story)
+            return stories
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_story(self, story_id: int, **kwargs) -> bool:
+        """Update a story. Returns True if updated."""
+        allowed_fields = {'answer', 'emotion_tags', 'is_favorite', 'chapter_override', 'notes'}
+        updates = {}
+        for k, v in kwargs.items():
+            if k in allowed_fields:
+                if k == 'emotion_tags' and isinstance(v, list):
+                    updates[k] = json.dumps(v)
+                else:
+                    updates[k] = v
+        if not updates:
+            return False
+
+        conn = self._get_connection()
+        try:
+            set_clause = ", ".join(f"{k} = ?" for k in updates.keys())
+            values = list(updates.values()) + [story_id]
+            cursor = conn.execute(
+                f"UPDATE stories SET {set_clause}, edited_at = CURRENT_TIMESTAMP WHERE id = ?",
+                values
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_story(self, story_id: int) -> bool:
+        """Delete a story and its photos. Returns True if deleted."""
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM story_photos WHERE story_id = ?", (story_id,))
+            cursor = conn.execute("DELETE FROM stories WHERE id = ?", (story_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_answered_questions(self, profile_id: int) -> List[str]:
+        """Get list of question IDs already answered by a profile."""
+        conn = self._get_connection()
+        try:
+            results = conn.execute(
+                "SELECT question_id FROM stories WHERE profile_id = ?",
+                (profile_id,)
+            ).fetchall()
+            return [r[0] for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_profile_progress(self, profile_id: int) -> Dict:
+        """Get story collection progress for a profile."""
+        conn = self._get_connection()
+        try:
+            total_stories = conn.execute(
+                "SELECT COUNT(*) FROM stories WHERE profile_id = ?", (profile_id,)
+            ).fetchone()[0]
+
+            themes = conn.execute(
+                "SELECT theme, COUNT(*) FROM stories WHERE profile_id = ? GROUP BY theme",
+                (profile_id,)
+            ).fetchall()
+
+            weeks = conn.execute(
+                "SELECT DISTINCT week FROM stories WHERE profile_id = ? ORDER BY week",
+                (profile_id,)
+            ).fetchall()
+
+            favorites = conn.execute(
+                "SELECT COUNT(*) FROM stories WHERE profile_id = ? AND is_favorite = 1",
+                (profile_id,)
+            ).fetchone()[0]
+
+            return {
+                "total_stories": total_stories,
+                "themes": {t[0]: t[1] for t in themes if t[0]},
+                "weeks_completed": [w[0] for w in weeks if w[0]],
+                "favorites": favorites
+            }
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # =====================
+    # Legacy Book - Photos
+    # =====================
+
+    def add_story_photo(self, story_id: int, photo_path: str,
+                        caption: Optional[str] = None, sort_order: int = 0) -> int:
+        """Add a photo to a story. Returns the photo ID."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO story_photos (story_id, photo_path, caption, sort_order)
+                VALUES (?, ?, ?, ?)
+            """, (story_id, photo_path, caption, sort_order))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_story_photos(self, story_id: int) -> List[Dict]:
+        """Get all photos for a story."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM story_photos WHERE story_id = ? ORDER BY sort_order",
+                (story_id,)
+            ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_photo(self, photo_id: int) -> Optional[str]:
+        """Delete a photo. Returns the photo path if deleted."""
+        conn = self._get_connection()
+        try:
+            result = conn.execute(
+                "SELECT photo_path FROM story_photos WHERE id = ?", (photo_id,)
+            ).fetchone()
+            if result:
+                conn.execute("DELETE FROM story_photos WHERE id = ?", (photo_id,))
+                conn.commit()
+                return result[0]
+            return None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # =====================
+    # Legacy Book - Books
+    # =====================
+
+    def create_book(self, profile_id: int, title: str, subtitle: Optional[str] = None,
+                    format: str = 'pdf') -> int:
+        """Create a new book record. Returns the book ID."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                INSERT INTO books (profile_id, title, subtitle, format, status)
+                VALUES (?, ?, ?, ?, 'draft')
+            """, (profile_id, title, subtitle, format))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_book(self, book_id: int) -> Optional[Dict]:
+        """Get a book by ID."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            result = conn.execute(
+                "SELECT * FROM books WHERE id = ?", (book_id,)
+            ).fetchone()
+            return dict(result) if result else None
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def list_books(self, profile_id: int) -> List[Dict]:
+        """List all books for a profile."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM books WHERE profile_id = ? ORDER BY generated_at DESC",
+                (profile_id,)
+            ).fetchall()
+            return [dict(r) for r in results]
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_book(self, book_id: int, **kwargs) -> bool:
+        """Update a book. Returns True if updated."""
+        allowed_fields = {'title', 'subtitle', 'status', 'file_path',
+                         'cover_image_path', 'generated_at', 'story_count'}
+        updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+        if not updates:
+            return False
+
+        conn = self._get_connection()
+        try:
+            set_clause = ", ".join(f"{k} = ?" for k in updates.keys())
+            values = list(updates.values()) + [book_id]
+            cursor = conn.execute(
+                f"UPDATE books SET {set_clause} WHERE id = ?",
+                values
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def delete_book(self, book_id: int) -> bool:
+        """Delete a book and its chapters. Returns True if deleted."""
+        conn = self._get_connection()
+        try:
+            conn.execute("DELETE FROM book_chapters WHERE book_id = ?", (book_id,))
+            cursor = conn.execute("DELETE FROM books WHERE id = ?", (book_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            if not self._conn:
+                conn.close()
+
+    # =====================
+    # Legacy Book - Chapters
+    # =====================
+
+    def add_chapter(self, book_id: int, chapter_number: int, title: str,
+                    theme: Optional[str] = None, content: Optional[str] = None,
+                    story_ids: Optional[List[int]] = None) -> int:
+        """Add a chapter to a book. Returns the chapter ID."""
+        conn = self._get_connection()
+        try:
+            story_ids_json = json.dumps(story_ids) if story_ids else None
+            cursor = conn.execute("""
+                INSERT INTO book_chapters (book_id, chapter_number, title, theme, content, story_ids)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (book_id, chapter_number, title, theme, content, story_ids_json))
+            conn.commit()
+            return cursor.lastrowid
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def get_book_chapters(self, book_id: int) -> List[Dict]:
+        """Get all chapters for a book."""
+        conn = self._get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            results = conn.execute(
+                "SELECT * FROM book_chapters WHERE book_id = ? ORDER BY chapter_number",
+                (book_id,)
+            ).fetchall()
+            chapters = []
+            for r in results:
+                chapter = dict(r)
+                if chapter.get('story_ids'):
+                    chapter['story_ids'] = json.loads(chapter['story_ids'])
+                chapters.append(chapter)
+            return chapters
+        finally:
+            if not self._conn:
+                conn.close()
+
+    def update_chapter(self, chapter_id: int, content: str) -> bool:
+        """Update chapter content. Returns True if updated."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                "UPDATE book_chapters SET content = ? WHERE id = ?",
+                (content, chapter_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
         finally:
             if not self._conn:
                 conn.close()

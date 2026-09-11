@@ -7,8 +7,8 @@ from typing import Optional, List
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 
-from core.intent_parser import IntentParser
-from models.schemas import (
+from server.core.intent_parser import IntentParser
+from server.models.schemas import (
     CommandRequest, CommandResponse,
     ItemCreate, ItemResponse, 
     StatsResponse, ExportResponse

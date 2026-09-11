@@ -14,8 +14,8 @@ from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request
 import numpy as np
 
-from core.intent_parser import IntentParser
-from config import settings
+from server.core.intent_parser import IntentParser
+from server.config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

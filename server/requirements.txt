@@ -29,3 +29,13 @@ pydantic>=2.5.0
 
 # Development
 python-dotenv>=1.0.0
+
+# Legacy Book System - Book Generation
+reportlab>=4.0.0          # PDF generation
+ebooklib>=0.18            # EPUB generation
+Pillow>=10.0.0            # Image processing
+aiofiles>=23.0.0          # Async file handling
+
+# Legacy Book System - AI Narrative (optional, pick one)
+# anthropic>=0.18.0       # For Claude API narrative generation
+# openai>=1.0.0           # For OpenAI API narrative generation

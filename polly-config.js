@@ -202,5 +202,17 @@
         "notify_on_distress_keywords": true,
         "daily_summary": true,
         "weekly_digest": true
+    },
+
+    "legacy_book": {
+        "enabled": true,
+        "questions_per_session": 2,
+        "ask_follow_ups": true,
+        "auto_save_stories": true,
+        "notify_family_on_milestone": true,
+        "milestones": [10, 25, 50, 100, 200, 312],
+        "default_book_format": "pdf",
+        "ai_narrative_provider": "anthropic",
+        "include_photos_by_default": true
     }
 }

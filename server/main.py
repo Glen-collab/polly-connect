@@ -5,17 +5,20 @@ FastAPI server that handles audio streaming, transcription, intent parsing, and 
 
 import asyncio
 import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from api.audio import router as audio_router
-from api.commands import router as commands_router
-from api.devices import router as devices_router
-from core.database import PollyDB
-from core.transcription import WhisperTranscriber
-from core.tts import TTSEngine
-from config import settings
+from server.api.audio import router as audio_router
+from server.api.commands import router as commands_router
+from server.api.devices import router as devices_router
+from server.api.legacy_book import router as legacy_book_router
+from server.core.database import PollyDB
+from server.core.transcription import WhisperTranscriber
+from server.core.tts import TTSEngine
+from server.config import settings
 
 # Configure logging
 logging.basicConfig(
@@ -71,6 +74,12 @@ app.add_middleware(
 app.include_router(audio_router, prefix="/api/audio", tags=["audio"])
 app.include_router(commands_router, prefix="/api", tags=["commands"])
 app.include_router(devices_router, prefix="/api/devices", tags=["devices"])
+app.include_router(legacy_book_router, prefix="/api/legacy", tags=["legacy-book"])
+
+# Static files for legacy editor and uploads
+BASE_DIR = Path(__file__).parent.parent
+app.mount("/legacy-editor", StaticFiles(directory=BASE_DIR / "legacy-editor", html=True), name="legacy-editor")
+app.mount("/uploads", StaticFiles(directory=BASE_DIR / "uploads"), name="uploads")
 
 
 @app.get("/")
