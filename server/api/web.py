@@ -3866,7 +3866,10 @@ def _gpt_classify_story(text: str, birth_year=None, include_formatting: bool = F
     user_content = f"Question asked: {question}\n\nAnswer:\n{text}" if question else text
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        # Placement decides where a story lives in the book for good (chapters
+        # are sticky), so this uses the stronger model: gpt-4o-mini kept
+        # filing parents' stories about their kids under the parent's childhood.
+        model=os.getenv("POLLY_CLASSIFY_MODEL", "gpt-4o"),
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
