@@ -57,6 +57,32 @@ LIFE_BUCKETS = [
 ]
 MIN_PER_BUCKET = 5  # memories per bucket before a life stage counts as "full"
 
+CHAPTER_CAP = 10  # memories per chapter before a new one starts
+
+# Reading order of the book: life stage first, then arc within it
+PHASE_ORDER = ["childhood", "adolescence", "young_adult", "adult", "midlife",
+               "elder", "reflection", "unknown"]
+
+
+def _stable_order(ch: Dict) -> tuple:
+    """Reading order: life stage, then arc, then the chapter's earliest story.
+    Uses nothing that changes when a chapter is written (not titles, not
+    draft status), so the outline is the same before and after writing."""
+    p = ch["life_phase"] if ch["life_phase"] in PHASE_ORDER else "unknown"
+    b = LIFE_BUCKETS.index(ch["bucket"]) if ch["bucket"] in LIFE_BUCKETS else len(LIFE_BUCKETS)
+    catch_all = ch.get("catch_all", False)
+    return (catch_all, PHASE_ORDER.index(p), b, min(ch["memory_ids"], default=0))
+
+
+def _draft_ids(draft: Dict, field: str = "memory_ids") -> List[int]:
+    raw = draft.get(field) or "[]"
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (ValueError, TypeError):
+            raw = []
+    return [int(x) for x in raw]
+
 
 class BookBuilder:
     """Assembles memories into chapter outlines and narrative drafts."""
@@ -257,8 +283,40 @@ class BookBuilder:
                 key=lambda m: (m.get("estimated_year") or 9999, m.get("id", 0))
             )
 
+        # Sticky chapters: a memory a chapter's draft already tells stays in
+        # that chapter, so adding stories over the years never reshuffles
+        # chapters that are written. New memories join a written chapter of
+        # the same arc while it has room (it goes stale and is refreshed);
+        # overflow starts new chapters below.
         chapters = []
         chapter_num = 1
+        by_id = {m["id"]: m for m in memories}
+        claimed = set()
+        if tenant_id:
+            for d in self.db.get_chapter_drafts(tenant_id=tenant_id):
+                ids = [i for i in _draft_ids(d) if i in by_id and i not in claimed]
+                if not ids:
+                    continue
+                claimed.update(ids)
+                first = by_id[ids[0]]
+                chapters.append({
+                    "chapter_number": chapter_num,
+                    "title": d.get("title") or "Chapter",
+                    "bucket": d.get("bucket") or first.get("bucket") or "ordinary_world",
+                    "life_phase": d.get("life_phase") or first.get("life_phase") or "unknown",
+                    "memory_ids": ids,
+                    "draft_id": d["id"],
+                })
+                chapter_num += 1
+            for key in grouped:
+                grouped[key] = [m for m in grouped[key] if m["id"] not in claimed]
+            for ch in chapters:
+                key = (ch["bucket"], ch["life_phase"])
+                room = CHAPTER_CAP - len(ch["memory_ids"])
+                if room > 0 and grouped.get(key):
+                    ch["memory_ids"] += [m["id"] for m in grouped[key][:room]]
+                    grouped[key] = grouped[key][room:]
+        used_titles = {ch["title"] for ch in chapters}
         # Track how many memories have been assigned per bucket/life_phase
         # so the second template only fires when there are surplus memories (>10)
         assigned = {}
@@ -267,7 +325,7 @@ class BookBuilder:
             key = (template["bucket"], template["life_phase"])
             group_memories = grouped.get(key, [])
 
-            if not group_memories:
+            if not group_memories or template["title_template"] in used_titles:
                 continue
 
             # Skip memories already assigned to a previous template for this key
@@ -349,13 +407,29 @@ class BookBuilder:
         for mem in leftovers:
             b = mem.get("bucket") or "ordinary_world"
             p = mem.get("life_phase") or "unknown"
-            home = (next((c for c in chapters if (c["bucket"], c["life_phase"]) == (b, p)), None)
-                    or next((c for c in chapters if c["life_phase"] == p and p != "unknown"), None)
-                    or next((c for c in chapters if c["bucket"] == b), None))
+            # A little overflow is fine; past that a straggler opens a new
+            # chapter, so years of additions can't grow one chapter forever.
+            # Candidates in a fixed order that does not depend on which
+            # chapters are written yet — otherwise writing one chapter moves a
+            # straggler and makes another chapter stale.
+            roomy = sorted((c for c in chapters if len(c["memory_ids"]) < CHAPTER_CAP + 3),
+                           key=_stable_order)
+            home = (next((c for c in roomy if (c["bucket"], c["life_phase"]) == (b, p)), None)
+                    or next((c for c in roomy if c["life_phase"] == p and p != "unknown"), None)
+                    or next((c for c in roomy if c["bucket"] == b), None))
+            if home is None and any((c["bucket"], c["life_phase"]) == (b, p) for c in chapters):
+                # Its arc's chapters are all full: continue that arc
+                base = next(c["title"] for c in chapters if (c["bucket"], c["life_phase"]) == (b, p))
+                home = {"chapter_number": chapter_num,
+                        "title": base if base.endswith("(more)") else f"{base} (more)",
+                        "bucket": b, "life_phase": p, "memory_ids": []}
+                chapters.append(home)
+                chapter_num += 1
             if home is None:
                 if catch_all is None:
                     catch_all = {
                         "chapter_number": chapter_num,
+                        "catch_all": True,
                         "title": "More Memories",
                         "bucket": b,
                         "life_phase": p,
@@ -369,10 +443,17 @@ class BookBuilder:
                 home = catch_all
             home["memory_ids"].append(mem["id"])
             home["memory_count"] = len(home["memory_ids"])
-            if mem.get("estimated_year"):
-                yr = mem["estimated_year"]
-                lo, hi = home["year_range"] or (yr, yr)
-                home["year_range"] = (min(lo, yr), max(hi, yr))
+
+        # Reading order: life stage, then arc, then written chapters first.
+        # Numbers are display positions only — drafts attach by draft_id.
+        chapters.sort(key=_stable_order)
+        for n, ch in enumerate(chapters, 1):
+            ch["chapter_number"] = n
+            ch["memory_count"] = len(ch["memory_ids"])
+            years = [by_id[m].get("estimated_year") for m in ch["memory_ids"]
+                     if by_id[m].get("estimated_year")]
+            ch["year_range"] = (min(years), max(years)) if years else None
+            ch.setdefault("status", "ready" if ch["memory_count"] >= 5 else "needs_more")
 
         return chapters
 
@@ -515,65 +596,28 @@ class BookBuilder:
 
     @staticmethod
     def match_drafts(chapters: List[Dict], drafts: List[Dict]) -> None:
-        """Attach saved drafts to outline chapters by CONTENT, not number.
+        """Attach each chapter's draft — the one it is anchored to.
 
-        Chapter numbers shift whenever stories are added, so matching drafts
-        by chapter_number printed the wrong chapter's prose. Each draft goes
-        to the chapter sharing the most memories with it (used once).
-
-        Sets on each chapter:
-          draft            — the matched draft dict, or None
-          draft_stale      — True if the chapter's memories changed since drafting
-          uncovered_ids    — chapter memories the draft prose does not contain
-                             (new since drafting, or the AI verifiably skipped)
+        The outline anchors every written chapter to its draft (draft_id), so
+        there is no guessing by number or overlap. Sets on each chapter:
+          draft            — the draft dict, or None
+          draft_stale      — its memories changed since it was written
+                             (stories added, or taken out / unverified)
+          uncovered_ids    — chapter memories the prose does not tell (added
+                             since, or the AI verifiably skipped) — these
+                             print word-for-word after the chapter
         """
-        def ids(d, field="memory_ids"):
-            raw = d.get(field) or "[]"
-            if isinstance(raw, str):
-                try:
-                    raw = json.loads(raw)
-                except (ValueError, TypeError):
-                    raw = []
-            return [int(x) for x in raw]
-
-        pairs = []
-        for ci, ch in enumerate(chapters):
-            ch_ids = set(ch.get("memory_ids", []))
-            for di, d in enumerate(drafts):
-                # Prose about "The Hard Years" must never print under a
-                # different theme/life stage; such a draft stays unused (its
-                # memories print word-for-word) until the chapter is rewritten.
-                if (d.get("bucket"), d.get("life_phase")) != (ch["bucket"], ch["life_phase"]):
-                    continue
-                overlap = len(ch_ids & set(ids(d)))
-                if overlap:
-                    pairs.append((overlap, -abs(d.get("chapter_number", 0) - ch["chapter_number"]), ci, di))
-        pairs.sort(reverse=True)
-
+        by_id = {d["id"]: d for d in drafts}
         for ch in chapters:
-            ch["draft"] = None
-            ch["draft_stale"] = False
-            ch["uncovered_ids"] = list(ch.get("memory_ids", []))
-        used_c, used_d = set(), set()
-        for _, _, ci, di in pairs:
-            if ci in used_c or di in used_d:
-                continue
-            used_c.add(ci)
-            used_d.add(di)
-            ch, d = chapters[ci], drafts[di]
-            drafted = set(ids(d)) - set(ids(d, "missing_memory_ids"))
+            d = by_id.get(ch.get("draft_id"))
             ch["draft"] = d
-            ch["draft_stale"] = set(ids(d)) != set(ch.get("memory_ids", []))
-            ch["uncovered_ids"] = [m for m in ch.get("memory_ids", []) if m not in drafted]
-
-        # A memory told in one chapter's prose must not print again verbatim
-        # in the chapter it has since moved to — each memory prints once.
-        told = set()
-        for ch in chapters:
-            if ch["draft"]:
-                told |= set(ids(ch["draft"])) - set(ids(ch["draft"], "missing_memory_ids"))
-        for ch in chapters:
-            ch["uncovered_ids"] = [m for m in ch["uncovered_ids"] if m not in told]
+            if not d:
+                ch["draft_stale"] = False
+                ch["uncovered_ids"] = list(ch.get("memory_ids", []))
+                continue
+            told = set(_draft_ids(d)) - set(_draft_ids(d, "missing_memory_ids"))
+            ch["draft_stale"] = set(_draft_ids(d)) != set(ch.get("memory_ids", []))
+            ch["uncovered_ids"] = [m for m in ch.get("memory_ids", []) if m not in told]
 
     def get_book_progress(self, speaker: str = None, tenant_id: int = None) -> Dict:
         """Get overall book-building progress stats."""
@@ -1029,6 +1073,83 @@ Two-sentence summary:"""
             return result
         except Exception as e:
             logger.error(f"Summary generation failed: {e}")
+            return None
+
+    async def write_chapter(self, chapter: Dict, tenant_id: int, outline: List[Dict]) -> Optional[int]:
+        """Write (or rewrite) one chapter and save it. Returns the draft id.
+
+        The one path every writer uses — the Regenerate button, the
+        background refresher and scripts — so they all behave the same:
+        coverage-checked prose, a real title for generic chapters, a
+        continuity summary, and a rewrite that keeps the version it replaces.
+        """
+        previous_summaries = [c["draft"]["summary"] for c in outline
+                              if c["chapter_number"] < chapter["chapter_number"]
+                              and c.get("draft") and c["draft"].get("summary")]
+        content = await self.generate_chapter_draft(
+            chapter, tenant_id=tenant_id,
+            previous_summaries=previous_summaries or None)
+        if not content:
+            return None
+
+        title = chapter["title"]
+        if title.endswith("(more)") or title in ("More Memories", "Chapter"):
+            taken = {c["title"] for c in outline if c is not chapter}
+            title = await self._suggest_title(content, taken) or title
+        summary = await self.generate_chapter_summary(content)
+        missing = json.dumps(chapter.get("missing_memory_ids", []))
+        memory_ids = json.dumps(chapter.get("memory_ids", []))
+
+        if chapter.get("draft_id"):
+            conn = self.db._get_connection()
+            try:
+                # previous_content = content reads the OLD value (SQLite SET semantics)
+                conn.execute("""
+                    UPDATE chapter_drafts
+                    SET previous_content = content, content = ?, title = ?, bucket = ?,
+                        life_phase = ?, memory_ids = ?, missing_memory_ids = ?, summary = ?,
+                        chapter_number = ?, hand_edited = 0,
+                        created_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND tenant_id = ?
+                """, (content, title, chapter["bucket"], chapter["life_phase"], memory_ids,
+                      missing, summary, chapter["chapter_number"], chapter["draft_id"], tenant_id))
+                conn.commit()
+            finally:
+                if not self.db._conn:
+                    conn.close()
+            draft_id = chapter["draft_id"]
+        else:
+            draft_id = self.db.save_chapter_draft(
+                chapter_number=chapter["chapter_number"], title=title,
+                bucket=chapter["bucket"], life_phase=chapter["life_phase"],
+                memory_ids=memory_ids, content=content, tenant_id=tenant_id,
+                missing_memory_ids=missing)
+            if summary:
+                self.db.update_chapter_summary(draft_id, summary)
+        chapter["title"] = title
+        logger.info(f"Wrote chapter '{title}' for tenant {tenant_id} "
+                    f"({len(chapter.get('memory_ids', []))} memories, missing {missing})")
+        return draft_id
+
+    async def _suggest_title(self, content: str, taken: set) -> Optional[str]:
+        """A short, warm title for a chapter whose template title is generic."""
+        import asyncio
+
+        def call():
+            response = self.followup_gen._client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": (
+                    "Give this chapter of a family legacy book a warm, specific title of "
+                    "2 to 5 words, drawn from what it is about. Do not use any of these: "
+                    f"{', '.join(sorted(taken)) or 'none'}. Reply with the title only.\n\n"
+                    + content[:4000])}],
+                max_tokens=20, temperature=0.4)
+            return response.choices[0].message.content.strip().strip('"\'*').strip()
+        try:
+            title = await asyncio.to_thread(call)
+            return title if title and len(title) <= 60 and title not in taken else None
+        except Exception as e:
+            logger.warning(f"Title suggestion failed: {e}")
             return None
 
     def _call_chapter_openai(self, prompt: str) -> Optional[str]:

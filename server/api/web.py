@@ -3895,9 +3895,11 @@ def _apply_gpt_classification(db, story_id: int, tid: int, parsed: dict,
             (story_id, tid)
         ).fetchone()
         if mem:
+            # A year the owner typed in (year_confidence='user') always wins
             conn.execute("""
                 UPDATE memories
-                SET bucket = ?, life_phase = ?, estimated_year = ?,
+                SET bucket = ?, life_phase = ?,
+                    estimated_year = CASE WHEN year_confidence = 'user' THEN estimated_year ELSE ? END,
                     text_summary = ?, text = ?,
                     people = ?, locations = ?, emotions = ?
                 WHERE id = ?
@@ -8119,47 +8121,9 @@ async def book_chapter_generate(request: Request, chapter_num: int):
     if not chapter:
         return RedirectResponse("/web/book/chapters", status_code=302)
 
-    # Continuity: summaries of the drafts attached to earlier chapters
-    previous_summaries = [ch["draft"]["summary"] for ch in chapters
-                          if ch["chapter_number"] < chapter_num
-                          and ch["draft"] and ch["draft"].get("summary")]
-
-    # Generate AI draft with timeline + photo placement
-    content = await book_builder.generate_chapter_draft(
-        chapter, tenant_id=tid,
-        previous_summaries=previous_summaries if previous_summaries else None,
-    )
-
-    if content:
-        import json as _json
-        # Replace the draft this chapter was matched to (plus any leftover
-        # under the same number) so we don't pile up stale copies
-        conn = db._get_connection()
-        if chapter["draft"]:
-            conn.execute("DELETE FROM chapter_drafts WHERE id = ? AND tenant_id = ?",
-                         (chapter["draft"]["id"], tid))
-        conn.execute(
-            "DELETE FROM chapter_drafts WHERE chapter_number = ? AND tenant_id = ?",
-            (chapter_num, tid)
-        )
-        conn.commit()
-
+    draft_id = await book_builder.write_chapter(chapter, tid, chapters)
+    if draft_id:
         missing = chapter.get("missing_memory_ids", [])
-        draft_id = db.save_chapter_draft(
-            chapter_number=chapter_num,
-            title=chapter["title"],
-            bucket=chapter["bucket"],
-            life_phase=chapter["life_phase"],
-            memory_ids=_json.dumps(chapter.get("memory_ids", [])),
-            content=content,
-            tenant_id=tid,
-            missing_memory_ids=_json.dumps(missing),
-        )
-
-        # Generate and save summary for continuity with later chapters
-        summary = await book_builder.generate_chapter_summary(content)
-        if summary:
-            db.update_chapter_summary(draft_id, summary)
         if missing:
             msg = (f"Draft generated. {len(missing)} memor{'y' if len(missing) == 1 else 'ies'} "
                    "the AI couldn't fit will print word-for-word after the chapter.")
@@ -8169,7 +8133,7 @@ async def book_chapter_generate(request: Request, chapter_num: int):
         msg = "Could not generate draft. Make sure OPENAI_API_KEY is set."
 
     return RedirectResponse(
-        f"/web/book/chapters/{chapter_num}?msg={msg}",
+        f"/web/book/chapters/{chapter_num}?msg={_up.quote(msg)}",
         status_code=303,
     )
 
@@ -8301,15 +8265,18 @@ async def book_chapter_save(request: Request, chapter_num: int,
     # memories (so it keeps matching after chapter numbers shift)
     conn = db._get_connection()
     try:
+        # hand_edited: the background refresher must never rewrite this prose
         if chapter["draft"]:
             conn.execute(
-                "UPDATE chapter_drafts SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?",
+                "UPDATE chapter_drafts SET content = ?, hand_edited = 1, updated_at = CURRENT_TIMESTAMP "
+                "WHERE id = ? AND tenant_id = ?",
                 (content, chapter["draft"]["id"], tid)
             )
         else:
             conn.execute("""
-                INSERT INTO chapter_drafts (chapter_number, title, bucket, life_phase, memory_ids, content, tenant_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO chapter_drafts (chapter_number, title, bucket, life_phase, memory_ids,
+                                            content, tenant_id, hand_edited)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1)
             """, (chapter_num, chapter["title"], chapter["bucket"], chapter["life_phase"],
                   json.dumps(chapter["memory_ids"]), content, tid))
         conn.commit()

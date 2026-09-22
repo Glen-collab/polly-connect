@@ -752,10 +752,18 @@ class PollyDB:
                 # Memories the coverage check found absent from the prose —
                 # the PDF prints these verbatim after the chapter.
                 "missing_memory_ids": "ALTER TABLE chapter_drafts ADD COLUMN missing_memory_ids TEXT DEFAULT '[]'",
+                # Owner edited the prose by hand: never auto-rewrite it
+                "hand_edited": "ALTER TABLE chapter_drafts ADD COLUMN hand_edited INTEGER DEFAULT 0",
+                # The version a rewrite replaced, so a rewrite is never a loss
+                "previous_content": "ALTER TABLE chapter_drafts ADD COLUMN previous_content TEXT",
             }
             for col, sql in cd_migrations.items():
                 if col not in cols:
                     conn.execute(sql)
+                    if col == "hand_edited":
+                        # Drafts saved after generation were edited by hand
+                        conn.execute("UPDATE chapter_drafts SET hand_edited = 1 "
+                                     "WHERE updated_at IS NOT NULL AND updated_at > created_at")
 
             # Prayer requests table
             conn.execute("""

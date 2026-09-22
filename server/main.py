@@ -33,6 +33,7 @@ from core.memory_extractor import MemoryExtractor
 from core.engagement import EngagementTracker
 from core.verification import VerificationService
 from core.book_builder import BookBuilder
+from core.book_refresh import ChapterRefresher
 from core.vision import VisionService
 from core.auth import APIKeyMiddleware
 from core.squawk import SquawkManager
@@ -164,6 +165,10 @@ async def lifespan(app: FastAPI):
     # Start medication reminder background task
     await app.state.med_scheduler.start()
 
+    # Keep written books current as families add stories
+    app.state.chapter_refresher = ChapterRefresher(app.state.db, app.state.book_builder)
+    await app.state.chapter_refresher.start()
+
     # Clean up expired web sessions
     app.state.db.cleanup_expired_sessions()
     logger.info("Expired web sessions cleaned up")
@@ -173,6 +178,7 @@ async def lifespan(app: FastAPI):
 
     # Cleanup
     await app.state.med_scheduler.stop()
+    await app.state.chapter_refresher.stop()
     logger.info("Shutting down...")
 
 

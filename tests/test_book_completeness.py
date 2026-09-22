@@ -101,7 +101,9 @@ def test_drafts_match_by_content_and_new_stories_are_uncovered(db):
     assert ch["uncovered_ids"] == [new]
 
 
-def test_draft_from_another_theme_is_not_used(db):
+def test_written_chapter_keeps_its_memories(db):
+    """Sticky: a draft's memories stay in its chapter even if their bucket
+    no longer matches — the prose tells them there."""
     bb = BookBuilder(db)
     mids = [add(db, f"Childhood {i}", "ordinary_world", "childhood")[1] for i in range(3)]
     db.save_chapter_draft(chapter_number=1, title="The Hard Years",
@@ -109,8 +111,50 @@ def test_draft_from_another_theme_is_not_used(db):
                           memory_ids=json.dumps(mids), content="Hard prose.", tenant_id=TID)
     chapters = bb.generate_chapter_outline(tenant_id=TID)
     bb.match_drafts(chapters, db.get_chapter_drafts(tenant_id=TID))
-    assert all(c["draft"] is None for c in chapters)
-    assert sorted(m for c in chapters for m in c["uncovered_ids"]) == sorted(mids)
+    assert len(chapters) == 1 and chapters[0]["title"] == "The Hard Years"
+    assert chapters[0]["draft_stale"] is False and chapters[0]["uncovered_ids"] == []
+
+
+def test_adding_a_story_does_not_reshuffle_written_chapters(db):
+    bb = BookBuilder(db)
+    kids = [add(db, f"Childhood {i}", "ordinary_world", "childhood", year=1985 + i)[1] for i in range(10)]
+    adult = [add(db, f"Adult {i}", "transformation", "adult", year=2010 + i)[1] for i in range(5)]
+    for ch in bb.generate_chapter_outline(tenant_id=TID):
+        db.save_chapter_draft(chapter_number=ch["chapter_number"], title=ch["title"],
+                              bucket=ch["bucket"], life_phase=ch["life_phase"],
+                              memory_ids=json.dumps(ch["memory_ids"]), content="Prose.", tenant_id=TID)
+    # An OLDER childhood story arrives — it used to shift every chunk after it
+    add(db, "The earliest memory of all", "ordinary_world", "childhood", year=1980)
+    chapters = bb.generate_chapter_outline(tenant_id=TID)
+    bb.match_drafts(chapters, db.get_chapter_drafts(tenant_id=TID))
+    # Only the chapter the newcomer joined changes; everything else stays put
+    stale = [c for c in chapters if c["draft_stale"]]
+    assert len(stale) == 1 and set(kids) < set(stale[0]["memory_ids"])
+    assert any(set(c["memory_ids"]) == set(adult) and not c["draft_stale"] for c in chapters)
+
+
+def test_full_chapters_overflow_into_a_new_one(db):
+    bb = BookBuilder(db)
+    add(db, "Seed kid story", "ordinary_world", "childhood")
+    add(db, "Seed kid story 2", "ordinary_world", "childhood")
+    ch = bb.generate_chapter_outline(tenant_id=TID)[0]
+    full = ch["memory_ids"] + [add(db, f"Kid {i}", "ordinary_world", "childhood")[1] for i in range(11)]
+    db.save_chapter_draft(chapter_number=1, title="Where It All Started", bucket="ordinary_world",
+                          life_phase="childhood", memory_ids=json.dumps(full), content="P.", tenant_id=TID)
+    lone = add(db, "One more kid story", "ordinary_world", "childhood")[1]
+    chapters = bb.generate_chapter_outline(tenant_id=TID)
+    assert len(chapters) == 2
+    assert chapters[1]["memory_ids"] == [lone] and chapters[1]["title"].endswith("(more)")
+
+
+def test_chapters_read_in_life_order(db):
+    bb = BookBuilder(db)
+    for i in range(2):
+        add(db, f"Wisdom {i}", "return_with_knowledge", "reflection")
+        add(db, f"Kid {i}", "ordinary_world", "childhood")
+        add(db, f"Twenties {i}", "call_to_adventure", "young_adult")
+    phases = [c["life_phase"] for c in bb.generate_chapter_outline(tenant_id=TID)]
+    assert phases == ["childhood", "young_adult", "reflection"]
 
 
 def test_ai_skipped_memories_print_verbatim(db):
@@ -220,3 +264,106 @@ def test_book_toggle_beats_the_appendix(db):
     bb = BookBuilder(db)
     add(db, "Unverified and taken out", "ordinary_world", "childhood", verified=False, in_book=0)
     assert bb.appendix_stories(TID) == []
+
+
+# ── Background refresh (fake AI — no network, no cost) ──
+
+class _FakeAI:
+    """Stands in for followup_gen: writes prose that tells every memory."""
+    available = True
+
+    def __init__(self):
+        self.calls = 0
+        outer = self
+
+        class _Completions:
+            def create(self, model, messages, **kw):
+                outer.calls += 1
+                prompt = messages[-1]["content"]
+                if kw.get("response_format"):            # coverage check
+                    out = '{"missing": []}'
+                elif "title of 2 to 5 words" in prompt:
+                    out = "Summers at the Lake"
+                elif prompt.startswith("Summarize"):
+                    out = "Two sentences."
+                else:                                     # the chapter itself
+                    out = "\n\n".join(re.findall(r"\): (.*)", prompt)) or "Prose."
+                msg = type("M", (), {"content": out})
+                return type("R", (), {"choices": [type("C", (), {"message": msg})]})
+
+        self._client = type("Cl", (), {"chat": type("Ch", (), {"completions": _Completions()})})()
+
+
+def _written_book(db):
+    bb = BookBuilder(db, followup_generator=_FakeAI())
+    for i in range(3):
+        add(db, f"Lake story {i}", "ordinary_world", "adult")
+    for ch in bb.generate_chapter_outline(tenant_id=TID):
+        db.save_chapter_draft(chapter_number=ch["chapter_number"], title=ch["title"],
+                              bucket=ch["bucket"], life_phase=ch["life_phase"],
+                              memory_ids=json.dumps(ch["memory_ids"]), content="Old prose.", tenant_id=TID)
+    return bb
+
+
+def _age_everything(db):
+    conn = db._get_connection()
+    for t in ("stories", "memories"):
+        conn.execute(f"UPDATE {t} SET created_at = datetime('now', '-2 hours')")
+    conn.commit()
+    conn.close()
+
+
+def test_refresher_rewrites_stale_chapter_and_keeps_old_version(db):
+    import asyncio
+    from core.book_refresh import ChapterRefresher
+    bb = _written_book(db)
+    add(db, "A brand new lake story", "ordinary_world", "adult")
+    _age_everything(db)
+    r = ChapterRefresher(db, bb)
+    assert r._quiet(TID)
+    assert asyncio.run(r.refresh_tenant(TID)) == 1
+    d = db.get_chapter_drafts(tenant_id=TID)[0]
+    assert d["previous_content"] == "Old prose."
+    assert "A brand new lake story" in d["content"]
+    assert d["title"] == "Summers at the Lake"   # generic "(more)" title replaced
+    assert r.stale_chapters(TID)[1] == []        # fresh now
+
+
+def test_refresher_never_rewrites_hand_edited_chapter(db):
+    import asyncio
+    from core.book_refresh import ChapterRefresher
+    bb = _written_book(db)
+    conn = db._get_connection()
+    conn.execute("UPDATE chapter_drafts SET hand_edited = 1")
+    conn.commit()
+    conn.close()
+    add(db, "Another lake story", "ordinary_world", "adult")
+    _age_everything(db)
+    assert asyncio.run(ChapterRefresher(db, bb).refresh_tenant(TID)) == 0
+    assert db.get_chapter_drafts(tenant_id=TID)[0]["content"] == "Old prose."
+
+
+def test_refresher_waits_while_stories_are_still_coming_in(db):
+    from core.book_refresh import ChapterRefresher
+    bb = _written_book(db)
+    add(db, "Just now", "ordinary_world", "adult")
+    assert ChapterRefresher(db, bb)._quiet(TID) is False
+
+
+def test_writing_chapters_never_disturbs_other_chapters(db):
+    """The outline is a fixed point: anchoring (writing) chapters one at a
+    time leaves every other chapter's stories where they were."""
+    bb = BookBuilder(db)
+    for i in range(3):
+        add(db, f"Kid {i}", "ordinary_world", "childhood")
+        add(db, f"Twenties {i}", "call_to_adventure", "young_adult")
+    add(db, "Lone twenties plain day", "ordinary_world", "young_adult")   # straggler
+    add(db, "Lone twenties hard time", "trials_allies_enemies", "young_adult")
+    add(db, "Lone elder wisdom", "return_with_knowledge", "elder")
+    before = [sorted(c["memory_ids"]) for c in bb.generate_chapter_outline(tenant_id=TID)]
+    for ch in list(bb.generate_chapter_outline(tenant_id=TID))[::-1]:   # write in any order
+        db.save_chapter_draft(chapter_number=ch["chapter_number"], title=f"T{ch['chapter_number']}",
+                              bucket=ch["bucket"], life_phase=ch["life_phase"],
+                              memory_ids=json.dumps(ch["memory_ids"]), content="P.", tenant_id=TID)
+        after = [sorted(c["memory_ids"]) for c in bb.generate_chapter_outline(tenant_id=TID)]
+        assert after == before

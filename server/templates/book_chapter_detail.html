@@ -53,7 +53,11 @@
 
 {% if chapter.status == 'needs_refresh' %}
 <div class="bg-orange-50 border border-orange-200 text-orange-800 rounded-lg p-3 mb-4 text-sm">
-    Stories were added to this chapter since its draft was written. They are still in your book &mdash; they print word-for-word after the chapter &mdash; but <b>Regenerate Draft</b> to weave them into the story.
+    {% if draft.hand_edited %}
+    Stories were added to this chapter since you edited it. They are in your book &mdash; they print word-for-word after your chapter. Because you edited this chapter by hand, Polly won't rewrite it on its own. <b>Regenerate Draft</b> weaves them in (the new draft replaces your edits; your version is kept).
+    {% else %}
+    Stories were added to this chapter. They are in your book &mdash; word-for-word after the chapter for now &mdash; and Polly will weave them into the story automatically about half an hour after you finish adding stories. Or <b>Regenerate Draft</b> to do it now.
+    {% endif %}
 </div>
 {% endif %}
 
