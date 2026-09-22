@@ -3835,7 +3835,7 @@ def _gpt_classify_story(text: str, birth_year=None, include_formatting: bool = F
         "You are a transcript editor and biographer. " + task_section +
         '  "bucket": "<one of: ordinary_world | call_to_adventure | crossing_threshold | trials_allies_enemies | transformation | return_with_knowledge>",\n'
         '  "life_phase": "<one of: childhood | adolescence | young_adult | adult | midlife | elder | reflection | unknown>",\n'
-        '  "estimated_year": <4-digit year mentioned in the story, or null>,\n'
+        '  "estimated_year": <4-digit year the events HAPPENED (stated, or worked out from the speaker\'s age), or null>,\n'
         '  "people": ["names of people mentioned"],\n'
         '  "locations": ["named places"],\n'
         '  "emotions": ["dominant emotions: joy, love, nostalgia, sadness, fear, anger, pride, gratitude, humor, courage, peace, adventure"],\n'
@@ -3848,10 +3848,16 @@ def _gpt_classify_story(text: str, birth_year=None, include_formatting: bool = F
         "- trials_allies_enemies: hard times, struggles, who helped or hurt\n"
         "- transformation: how you changed, realized, grew\n"
         "- return_with_knowledge: wisdom, advice, what you'd tell someone now\n\n"
-        "Life phase guide (use the speaker's age IN the story, not now):\n"
+        "Life phase guide — the stage of the SPEAKER'S OWN life when it happened\n"
+        "(the person telling it; this is their book), not anyone else's age:\n"
         f"- Speaker's birth year (if known): {birth_year or 'unknown'}\n"
         "- childhood: 0-12, adolescence: 13-18, young_adult: 19-30,\n"
-        "  adult: 31-50, midlife: 51-70, elder: 70+, reflection: looking back from now\n\n"
+        "  adult: 31-50, midlife: 51-70, elder: 70+\n"
+        "- A parent or grandparent telling about, or talking WITH, their children or\n"
+        "  grandchildren (the kids' school, sports, games, sayings, a recorded chat\n"
+        "  where the speaker is 'Dad'/'Mom'/'Grandpa') is the speaker's adult/midlife/\n"
+        "  elder stage — never childhood. Childhood means the speaker was the child.\n"
+        "- reflection: advice, beliefs and lessons told from today, not a past event\n\n"
         "If the question the speaker was answering is given, use it as context "
         "for where the memory belongs, but classify by what the answer actually "
         "describes. A freeform memory has no question: place it as if you had "
