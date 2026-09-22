@@ -224,7 +224,7 @@ def _generate_qr_image(url: str, size_px: int = 120) -> Optional[io.BytesIO]:
         return None
 
 
-def _qr_label(story: dict, limit: int) -> str:
+def _qr_label(story: dict, limit: int, use_text: bool = True) -> str:
     """Caption under a story's QR code: its title/question, else the start of
     what was said, else — for audio-only moments (kids playing, Christmas
     chaos) — the date it was recorded."""
@@ -233,7 +233,7 @@ def _qr_label(story: dict, limit: int) -> str:
         return title
     text = ((story.get("corrected_transcript") or "").strip()
             or (story.get("transcript") or "").strip())
-    if text and not text.startswith("(no transcription"):
+    if use_text and text and not text.startswith("(no transcription"):
         return text[:limit].strip() + ("..." if len(text) > limit else "")
     from datetime import datetime
     try:
@@ -364,6 +364,8 @@ class LegacyBookPDF:
         for ch in printable:
             entry = f"Chapter {ch['print_number']}:&nbsp;&nbsp;&nbsp;{ch['title']}"
             story.append(Paragraph(entry, self.styles['TOCEntry']))
+        if self.tenant_id and self.book_builder.appendix_stories(self.tenant_id):
+            story.append(Paragraph("Appendix", self.styles['TOCEntry']))
         story.append(PageBreak())
 
         # ── Chapters ──
@@ -557,6 +559,44 @@ class LegacyBookPDF:
                         story, item, include_qr_codes, placed_stories
                     )
 
+            story.append(PageBreak())
+
+        # ── Appendix — stories not ✔ verified yet ──
+        # Kept, never dropped: the real voice (QR) with a title or date, but
+        # not the unchecked transcript. Typed stories print as typed.
+        appendix = self.book_builder.appendix_stories(self.tenant_id) if self.tenant_id else []
+        if appendix:
+            story.append(Paragraph("Appendix", self.styles['TOCTitle']))
+            story.append(Paragraph(
+                "More recordings, kept just as they were captured.",
+                self.styles['ChapterSubhead'],
+            ))
+            for s in appendix:
+                audio_key = s.get("audio_s3_key")
+                speaker = (s.get("speaker_name") or "").strip()
+                if audio_key:
+                    label = _qr_label(s, 60, use_text=False)
+                    if speaker:
+                        label = f"{speaker}: {label}"
+                    label = label.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    qr_buf = _generate_qr_image(f"{AUDIO_BASE_URL}/{audio_key}") if include_qr_codes else None
+                    if qr_buf:
+                        t = Table([[Image(qr_buf, width=QR_SIZE, height=QR_SIZE),
+                                    Paragraph(label, self.styles['BodyFirst'])]],
+                                  colWidths=[QR_SIZE + 12, TEXT_WIDTH - QR_SIZE - 12])
+                        t.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE')]))
+                        story.append(t)
+                        story.append(Spacer(1, 10))
+                    else:
+                        story.append(Paragraph(label, self.styles['BodyFirst']))
+                    global_used_audio.add(audio_key)
+                else:
+                    text = ((s.get("corrected_transcript") or "").strip()
+                            or (s.get("transcript") or "").strip())
+                    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    if speaker:
+                        text = f"<i>{speaker}:</i> {text}"
+                    story.append(Paragraph(text, self.styles['BodyText']))
             story.append(PageBreak())
 
         # ── Audio Index — orphaned QR codes (no inline photo) ──

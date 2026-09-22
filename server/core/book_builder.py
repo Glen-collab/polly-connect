@@ -161,10 +161,14 @@ class BookBuilder:
         """
         Generate a chapter outline from available memories.
 
-        Every in-book memory lands in exactly one chapter — nothing is dropped.
-        Verification is NOT a filter by default: the web "verify" checkmark
-        lives on stories, not memories, so filtering here silently emptied
-        the book. Exclusion is the 📖 include_in_book toggle only.
+        Chapters hold the stories the owner has VERIFIED (the ✔ on the story —
+        "the words are right, tell this one"). Unverified stories are not
+        dropped: the PDF keeps them in an appendix (QR + title, not the
+        unchecked transcript). Only the 📖 toggle leaves a story out entirely.
+        Every eligible memory lands in exactly one chapter.
+
+        The old filter read memories.verification_status, which the web ✔
+        never set, so verified stories silently never reached the book.
 
         Read-only: building the outline never writes to the database.
 
@@ -173,11 +177,13 @@ class BookBuilder:
         """
         memories = self.db.get_memories(
             speaker=speaker,
-            verification_status="verified" if verified_only else None,
             limit=9999,
             tenant_id=tenant_id,
             in_book_only=True,
         )
+        if tenant_id:
+            unreviewed = self.unreviewed_story_ids(tenant_id)
+            memories = [m for m in memories if m.get("story_id") not in unreviewed]
 
         if not memories:
             return []
@@ -370,6 +376,44 @@ class BookBuilder:
 
         return chapters
 
+    def unreviewed_story_ids(self, tenant_id: int) -> set:
+        """Stories the owner hasn't ✔ verified — they go to the appendix."""
+        conn = self.db._get_connection()
+        try:
+            return {r[0] for r in conn.execute(
+                "SELECT id FROM stories WHERE tenant_id = ? AND COALESCE(verified, 0) = 0",
+                (tenant_id,)).fetchall()}
+        finally:
+            if not self.db._conn:
+                conn.close()
+
+    def appendix_stories(self, tenant_id: int) -> List[Dict]:
+        """Unverified stories that still belong in the book (not 📖'd out),
+        oldest first. Wordless recordings are left to Voice Recordings."""
+        conn = self.db._get_connection()
+        try:
+            import sqlite3
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT s.* FROM stories s
+                WHERE s.tenant_id = ? AND COALESCE(s.verified, 0) = 0
+                  AND NOT EXISTS (SELECT 1 FROM memories m WHERE m.story_id = s.id
+                                  AND COALESCE(m.include_in_book, 1) = 0)
+                ORDER BY s.created_at, s.id
+            """, (tenant_id,)).fetchall()
+        finally:
+            if not self.db._conn:
+                conn.close()
+        out = []
+        for r in rows:
+            s = dict(r)
+            text = ((s.get("corrected_transcript") or "").strip()
+                    or (s.get("transcript") or "").strip())
+            if not text or text.startswith("(no transcription"):
+                continue
+            out.append(s)
+        return out
+
     def book_coverage(self, tenant_id: int) -> Dict:
         """Where every story lands in the book — or exactly why it doesn't.
 
@@ -414,6 +458,7 @@ class BookBuilder:
             if not self.db._conn:
                 conn.close()
 
+        appendix = {s["id"] for s in self.appendix_stories(tenant_id)}
         out, seen = [], set()
         for sid, created, source, text, mid, inb, has_qr, title in rows:
             if sid in seen:        # a story with >1 memory: first one decides
@@ -425,7 +470,17 @@ class BookBuilder:
                      "preview": (title or "").strip() if no_words else text[:140],
                      "memory_id": mid, "has_qr": bool(has_qr),
                      "chapter": None, "mode": None, "reason": None}
-            if mid is None and has_qr and (no_words or len(text) < 10):
+            if mid is not None and not inb:
+                entry["state"] = "excluded"
+                entry["reason"] = "You took this out of the book (📖)."
+            elif sid in appendix:
+                # Not ✔ verified: kept, but in the appendix — the voice (QR)
+                # and title, not the unchecked transcript.
+                entry["state"] = "in_book"
+                entry["chapter"] = "Appendix (not verified yet)"
+                entry["mode"] = ("QR code + title — verify it to move it into a chapter"
+                                 if has_qr else "printed as typed — verify it to move it into a chapter")
+            elif mid is None and has_qr and (no_words or len(text) < 10):
                 # Audio-only moments (kids playing, Christmas chaos): the QR
                 # code IS the story — it prints in the Voice Recordings section.
                 entry["state"] = "in_book"
@@ -442,9 +497,6 @@ class BookBuilder:
                                        "Voice Recordings, but the words aren't in the book yet.")
                 else:
                     entry["reason"] = "Never sorted into a chapter."
-            elif not inb:
-                entry["state"] = "excluded"
-                entry["reason"] = "You took this out of the book (📖)."
             elif mid in where:
                 entry["state"] = "in_book"
                 entry["chapter"], entry["mode"] = where[mid]
@@ -457,6 +509,7 @@ class BookBuilder:
             out.append(entry)
 
         return {"stories": out,
+                "appendix": sum(1 for e in out if (e["chapter"] or "").startswith("Appendix")),
                 "in_book": sum(1 for e in out if e["state"] == "in_book"),
                 "total": len(out)}
 

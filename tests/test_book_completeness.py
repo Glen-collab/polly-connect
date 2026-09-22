@@ -28,14 +28,20 @@ def db(tmp_path):
     return PollyDB(str(tmp_path / "book.db"))
 
 
-def add(db, text, bucket, phase, verified=False, in_book=1, year=None):
-    sid = db.save_story(transcript=text, source="web_typed", tenant_id=TID)
+def add(db, text, bucket, phase, verified=True, in_book=1, year=None, audio=None):
+    """verified = the owner's ✔ on the STORY (what puts it in a chapter)."""
+    sid = db.save_story(transcript=text, source="web_typed", tenant_id=TID, audio_s3_key=audio)
+    conn = db._get_connection()
+    conn.execute("UPDATE stories SET verified = ? WHERE id = ?", (int(verified), sid))
+    conn.commit()
+    conn.close()
     mid = db.save_memory(story_id=sid, bucket=bucket, life_phase=phase,
                          text=text, tenant_id=TID)
     conn = db._get_connection()
-    conn.execute("UPDATE memories SET verification_status = ?, include_in_book = ?, "
-                 "estimated_year = ? WHERE id = ?",
-                 ("verified" if verified else "unverified", in_book, year, mid))
+    # memories.verification_status stays 'unverified' on purpose — the web ✔
+    # never set it, and the book must not depend on it.
+    conn.execute("UPDATE memories SET include_in_book = ?, estimated_year = ? WHERE id = ?",
+                 (in_book, year, mid))
     conn.commit()
     return sid, mid
 
@@ -44,7 +50,7 @@ def placed(chapters):
     return [m for ch in chapters for m in ch["memory_ids"]]
 
 
-def test_unverified_memories_are_in_the_book(db):
+def test_story_checkmark_puts_it_in_a_chapter(db):
     mids = [add(db, f"Farm chores story {i}", "ordinary_world", "childhood")[1] for i in range(6)]
     ids = placed(BookBuilder(db).generate_chapter_outline(tenant_id=TID))
     assert sorted(ids) == sorted(mids)
@@ -123,12 +129,17 @@ def test_ai_skipped_memories_print_verbatim(db):
 def test_coverage_accounts_for_every_story(db):
     add(db, "In the book story", "ordinary_world", "childhood")
     add(db, "Taken out on purpose", "ordinary_world", "childhood", in_book=0)
-    orphan = db.save_story(transcript="A story that never got a memory row", tenant_id=TID)
+    orphan = db.save_story(transcript="A verified story that never got a memory row", tenant_id=TID)
+    conn = db._get_connection()
+    conn.execute("UPDATE stories SET verified = 1 WHERE id = ?", (orphan,))
+    conn.commit()
+    conn.close()
+    unchecked = db.save_story(transcript="Unverified, never sorted — kept in the appendix", tenant_id=TID)
     cov = BookBuilder(db).book_coverage(TID)
     states = {s["story_id"]: s["state"] for s in cov["stories"]}
-    assert cov["total"] == 3 and cov["in_book"] == 1
-    assert states[orphan] == "no_memory"
-    assert sorted(states.values()) == ["excluded", "in_book", "no_memory"]
+    assert cov["total"] == 4 and cov["in_book"] == 2 and cov["appendix"] == 1
+    assert states[orphan] == "no_memory" and states[unchecked] == "in_book"
+    assert sorted(states.values()) == ["excluded", "in_book", "in_book", "no_memory"]
 
 
 def test_pdf_prints_every_memory(db):
@@ -174,3 +185,38 @@ def test_book_toggle_removes_the_qr_too(db):
     pdf = LegacyBookPDF(db, BookBuilder(db), tenant_id=TID)
     orphans = pdf._get_orphan_audio([], set(), set())
     assert [o["audio_key"] for o in orphans] == [f"a{keep}.wav"]
+
+
+def test_unverified_story_goes_to_appendix_not_a_chapter(db):
+    bb = BookBuilder(db)
+    ok = add(db, "Checked and correct", "ordinary_world", "childhood")[1]
+    sid, bad = add(db, "Garbled transcript nobody checked", "ordinary_world", "childhood",
+                   verified=False, audio="web_x.wav")
+    ids = placed(bb.generate_chapter_outline(tenant_id=TID))
+    assert ok in ids and bad not in ids
+    assert [s["id"] for s in bb.appendix_stories(TID)] == [sid]
+    entry = next(e for e in bb.book_coverage(TID)["stories"] if e["story_id"] == sid)
+    assert entry["state"] == "in_book" and entry["chapter"].startswith("Appendix")
+
+
+def test_appendix_prints_qr_label_not_the_unchecked_text(db):
+    pytest.importorskip("reportlab")
+    pypdf = pytest.importorskip("pypdf")
+    from core.book_pdf import LegacyBookPDF
+    add(db, "A verified story in its chapter", "ordinary_world", "childhood")
+    sid, _ = add(db, "Garbled words that were never checked", "ordinary_world", "childhood",
+                 verified=False, audio="web_y.wav")
+    conn = db._get_connection()
+    conn.execute("UPDATE stories SET question_text = 'Christmas morning chaos' WHERE id = ?", (sid,))
+    conn.commit()
+    conn.close()
+    pdf = LegacyBookPDF(db, BookBuilder(db), tenant_id=TID).generate()
+    text = re.sub(r"\s+", " ", " ".join(p.extract_text() or "" for p in pypdf.PdfReader(io.BytesIO(pdf)).pages))
+    assert "Appendix" in text and "Christmas morning chaos" in text
+    assert "Garbled words that were never checked" not in text
+
+
+def test_book_toggle_beats_the_appendix(db):
+    bb = BookBuilder(db)
+    add(db, "Unverified and taken out", "ordinary_world", "childhood", verified=False, in_book=0)
+    assert bb.appendix_stories(TID) == []
