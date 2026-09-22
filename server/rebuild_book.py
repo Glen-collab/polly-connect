@@ -15,7 +15,8 @@ Run from /opt/polly-connect/server:
     set -a; . ../.env; set +a
     POLLY_DB_PATH=/opt/polly-connect/polly.db python3.11 rebuild_book.py --tenant 1
 Flags: --skip-classify (keep current placements), --classify-only,
-       --recheck (re-audit written chapters, rewrite only real gaps)
+       --recheck (re-audit written chapters, rewrite only real gaps),
+       --refresh (keep chapters; re-sort, then rewrite only chapters that changed)
 """
 import argparse
 import asyncio
@@ -27,7 +28,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from api.web import _gpt_classify_story, _apply_gpt_classification
+from api.web import _gpt_classify_story, _apply_gpt_classification, _family_context
 from core.book_builder import BookBuilder
 from core.database import PollyDB
 from core.followup_generator import FollowupGenerator
@@ -48,7 +49,23 @@ def archive_drafts(conn, tid):
     return n
 
 
+def snapshot_placements(bb, db, conn, tid):
+    """Record where each written chapter's stories sit now, so a re-sort
+    that changes a story's placement moves it (drafts from before
+    placements were tracked would otherwise hold on to every story)."""
+    n = 0
+    for d in db.get_chapter_drafts(tenant_id=tid):
+        if not d.get("placements"):
+            ids = json.loads(d.get("memory_ids") or "[]")
+            conn.execute("UPDATE chapter_drafts SET placements = ? WHERE id = ?",
+                         (json.dumps(bb.placements_of(ids, tid)), d["id"]))
+            n += 1
+    conn.commit()
+    return n
+
+
 def reclassify(db, conn, tid):
+    family = _family_context(db, tid)
     rows = conn.execute("""
         SELECT m.id, m.story_id, m.bucket, m.life_phase, m.speaker,
                COALESCE(NULLIF(TRIM(s.corrected_transcript), ''), s.transcript) AS text,
@@ -64,7 +81,8 @@ def reclassify(db, conn, tid):
             continue
         try:
             parsed = _gpt_classify_story(text, birth_year=r["birth_year"],
-                                         question=r["question_text"])
+                                         question=r["question_text"], family=family,
+                                         speaker=r["speaker"])
             _apply_gpt_classification(db, r["story_id"], tid, parsed,
                                       fallback_text=text, speaker=r["speaker"])
             old, new = f"{r['bucket']}/{r['life_phase']}", f"{parsed.get('bucket')}/{parsed.get('life_phase')}"
@@ -127,6 +145,8 @@ def main():
     ap.add_argument("--tenant", type=int, required=True)
     ap.add_argument("--skip-classify", action="store_true")
     ap.add_argument("--classify-only", action="store_true")
+    ap.add_argument("--refresh", action="store_true",
+                    help="re-sort (unless --skip-classify), then rewrite only chapters that changed")
     ap.add_argument("--recheck", action="store_true",
                     help="re-audit existing chapters; rewrite only ones with real gaps")
     a = ap.parse_args()
@@ -146,6 +166,16 @@ def main():
         print(f"Coverage: {cov['in_book']} of {cov['total']} ({cov['appendix']} in the appendix)")
         return
 
+    if a.refresh or a.classify_only:
+        print(f"Snapshotted placements for {snapshot_placements(bb, db, conn, a.tenant)} chapter(s)")
+    if a.refresh:
+        if not a.skip_classify:
+            reclassify(db, conn, a.tenant)
+        n = asyncio.run(write_all(bb, db, a.tenant))
+        cov = bb.book_coverage(a.tenant)
+        print(f"Rewrote {n} chapter(s). Coverage: {cov['in_book']} of {cov['total']} "
+              f"({cov['appendix']} in the appendix)")
+        return
     if not a.classify_only:
         print(f"Archived {archive_drafts(conn, a.tenant)} draft(s) to chapter_drafts_archive")
     if not a.skip_classify:

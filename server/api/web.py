@@ -3796,8 +3796,38 @@ def _photo_year(date_str: str):
 # background task after every story/photo/share save so chapter timeline
 # placement gets a GPT pass on every memory.
 
+def _family_context(db, tid: int) -> str:
+    """Who's who, for placing a story: the book's owner and their family tree
+    with birth years. Lets the classifier work out that "Brooklyn reading at
+    the end of 1st grade" is the owner's daughter (born 2019) around 2025-26,
+    i.e. the owner's adult years as a parent — not anyone's childhood."""
+    conn = db._get_connection()
+    try:
+        owner = conn.execute(
+            "SELECT COALESCE(NULLIF(name, ''), familiar_name), birth_year FROM user_profiles "
+            "WHERE tenant_id = ? LIMIT 1", (tid,)).fetchone()
+        fam = conn.execute(
+            "SELECT name, relationship, birth_year, deceased_year FROM family_members "
+            "WHERE tenant_id = ? AND COALESCE(relationship, '') NOT IN ('', 'friend') "
+            "ORDER BY birth_year IS NULL, birth_year LIMIT 60", (tid,)).fetchall()
+    finally:
+        if not db._conn:
+            conn.close()
+    if not owner and not fam:
+        return ""
+    who = (owner[0] if owner and owner[0] else "the owner")
+    lines = [f"This book belongs to {who}" + (f", born {owner[1]}." if owner and owner[1] else ".")]
+    if fam:
+        lines.append(f"{who}'s family (relationship to {who}, birth year):")
+        for name, rel, born, died in fam:
+            lines.append(f"- {name}: {rel}" + (f", born {born}" if born else "")
+                         + (f", died {died}" if died else ""))
+    return "\n".join(lines)
+
+
 def _gpt_classify_story(text: str, birth_year=None, include_formatting: bool = False,
-                        question: str = None) -> dict:
+                        question: str = None, family: str = None,
+                        speaker: str = None) -> dict:
     """Send the transcript to gpt-4o-mini and parse the JSON response.
 
     When include_formatting=True the response also includes a 'formatted'
@@ -3863,7 +3893,16 @@ def _gpt_classify_story(text: str, birth_year=None, include_formatting: bool = F
         "describes. A freeform memory has no question: place it as if you had "
         "asked the question it answers."
     )
+    if family:
+        system_prompt += (
+            "\n\n" + family + "\n\nUse this family to work out who people in the story are "
+            "and when it happened. A story about the owner's child or grandchild at a "
+            "given age or grade happened when that child was that age (1st grade is "
+            "about age 6-7), which dates it and puts it in the TELLER's own life stage "
+            "at that time — a parent's or grandparent's stage, never childhood.")
     user_content = f"Question asked: {question}\n\nAnswer:\n{text}" if question else text
+    if speaker:
+        user_content = f"Told by: {speaker}\n\n{user_content}"
 
     response = client.chat.completions.create(
         # Placement decides where a story lives in the book for good (chapters
@@ -3948,7 +3987,8 @@ def _gpt_reclassify_in_background(db, story_id: int, tid: int, text: str,
         if not text or len(text.strip()) < 10:
             return
         parsed = _gpt_classify_story(text, birth_year=birth_year,
-                                      include_formatting=False, question=question)
+                                      include_formatting=False, question=question,
+                                      family=_family_context(db, tid), speaker=speaker)
         _apply_gpt_classification(db, story_id, tid, parsed,
                                    fallback_text=text, speaker=speaker)
     except Exception as e:

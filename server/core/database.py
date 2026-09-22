@@ -756,6 +756,9 @@ class PollyDB:
                 "hand_edited": "ALTER TABLE chapter_drafts ADD COLUMN hand_edited INTEGER DEFAULT 0",
                 # The version a rewrite replaced, so a rewrite is never a loss
                 "previous_content": "ALTER TABLE chapter_drafts ADD COLUMN previous_content TEXT",
+                # {memory_id: "bucket/life_phase"} when the chapter was written;
+                # a story whose placement changes since then moves out
+                "placements": "ALTER TABLE chapter_drafts ADD COLUMN placements TEXT",
             }
             for col, sql in cd_migrations.items():
                 if col not in cols:

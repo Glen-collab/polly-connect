@@ -86,6 +86,10 @@ def strip_heading(text: str) -> str:
     return text
 
 
+def _placement(mem: Dict) -> str:
+    return f"{mem.get('bucket') or 'ordinary_world'}/{mem.get('life_phase') or 'unknown'}"
+
+
 def _draft_ids(draft: Dict, field: str = "memory_ids") -> List[int]:
     raw = draft.get(field) or "[]"
     if isinstance(raw, str):
@@ -306,7 +310,16 @@ class BookBuilder:
         claimed = set()
         if tenant_id:
             for d in self.db.get_chapter_drafts(tenant_id=tenant_id):
-                ids = [i for i in _draft_ids(d) if i in by_id and i not in claimed]
+                # A story stays anchored unless its own placement changed
+                # since the chapter was written (re-sorted, or moved by the
+                # owner) — then it goes where it now belongs and both
+                # chapters refresh.
+                try:
+                    placed_as = json.loads(d.get("placements") or "{}")
+                except (ValueError, TypeError):
+                    placed_as = {}
+                ids = [i for i in _draft_ids(d) if i in by_id and i not in claimed
+                       and placed_as.get(str(i), _placement(by_id[i])) == _placement(by_id[i])]
                 if not ids:
                     continue
                 claimed.update(ids)
@@ -1130,6 +1143,7 @@ Two-sentence summary:"""
         summary = await self.generate_chapter_summary(content)
         missing = json.dumps(chapter.get("missing_memory_ids", []))
         memory_ids = json.dumps(chapter.get("memory_ids", []))
+        placements = json.dumps(self.placements_of(chapter.get("memory_ids", []), tenant_id))
 
         if chapter.get("draft_id"):
             conn = self.db._get_connection()
@@ -1139,11 +1153,12 @@ Two-sentence summary:"""
                     UPDATE chapter_drafts
                     SET previous_content = content, content = ?, title = ?, bucket = ?,
                         life_phase = ?, memory_ids = ?, missing_memory_ids = ?, summary = ?,
-                        chapter_number = ?, hand_edited = 0,
+                        chapter_number = ?, hand_edited = 0, placements = ?,
                         created_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND tenant_id = ?
                 """, (content, title, chapter["bucket"], chapter["life_phase"], memory_ids,
-                      missing, summary, chapter["chapter_number"], chapter["draft_id"], tenant_id))
+                      missing, summary, chapter["chapter_number"], placements,
+                      chapter["draft_id"], tenant_id))
                 conn.commit()
             finally:
                 if not self.db._conn:
@@ -1157,6 +1172,14 @@ Two-sentence summary:"""
                 missing_memory_ids=missing)
             if summary:
                 self.db.update_chapter_summary(draft_id, summary)
+            conn = self.db._get_connection()
+            try:
+                conn.execute("UPDATE chapter_drafts SET placements = ? WHERE id = ?",
+                             (placements, draft_id))
+                conn.commit()
+            finally:
+                if not self.db._conn:
+                    conn.close()
         chapter["title"] = title
         logger.info(f"Wrote chapter '{title}' for tenant {tenant_id} "
                     f"({len(chapter.get('memory_ids', []))} memories, missing {missing})")
@@ -1178,6 +1201,15 @@ Two-sentence summary:"""
         missing = await asyncio.to_thread(self._find_missing_memories,
                                           strip_heading(draft.get("content") or ""), texts)
         return [mems[i - 1]["id"] for i in missing]
+
+    def placements_of(self, memory_ids: List[int], tenant_id: int) -> Dict[str, str]:
+        """{memory_id: "bucket/life_phase"} as the memories are sorted now."""
+        out = {}
+        for i in memory_ids:
+            m = self.db.get_memory_by_id(i, tenant_id=tenant_id)
+            if m:
+                out[str(i)] = _placement(m)
+        return out
 
     async def _suggest_title(self, content: str, taken: set) -> Optional[str]:
         """A short, warm title for a chapter whose template title is generic."""

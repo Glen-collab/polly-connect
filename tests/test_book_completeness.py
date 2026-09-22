@@ -367,3 +367,39 @@ def test_writing_chapters_never_disturbs_other_chapters(db):
                               memory_ids=json.dumps(ch["memory_ids"]), content="P.", tenant_id=TID)
         after = [sorted(c["memory_ids"]) for c in bb.generate_chapter_outline(tenant_id=TID)]
         assert after == before
+
+
+def test_resorted_story_moves_and_both_chapters_refresh(db):
+    import asyncio
+    bb = BookBuilder(db, followup_generator=_FakeAI())
+    kids = [add(db, f"Kid {i}", "ordinary_world", "childhood")[1] for i in range(3)]
+    dad = [add(db, f"Dad story {i}", "ordinary_world", "adult")[1] for i in range(3)]
+    outline = bb.generate_chapter_outline(tenant_id=TID)
+    for ch in outline:
+        asyncio.run(bb.write_chapter(ch, TID, outline))
+    # the sorter corrects a story: it was the parent's adult life, not childhood
+    conn = db._get_connection()
+    conn.execute("UPDATE memories SET life_phase = 'adult' WHERE id = ?", (kids[0],))
+    conn.commit()
+    conn.close()
+    chapters = bb.generate_chapter_outline(tenant_id=TID)
+    bb.match_drafts(chapters, db.get_chapter_drafts(tenant_id=TID))
+    child = next(c for c in chapters if c["life_phase"] == "childhood")
+    adult = next(c for c in chapters if c["life_phase"] == "adult")
+    assert kids[0] not in child["memory_ids"] and kids[0] in adult["memory_ids"]
+    assert child["draft_stale"] and adult["draft_stale"]
+    assert set(kids[1:]) <= set(child["memory_ids"]) and set(dad) <= set(adult["memory_ids"])
+
+
+def test_family_tree_reaches_the_sorter(db):
+    import api.web as web
+    conn = db._get_connection()
+    conn.execute("INSERT INTO user_profiles (tenant_id, name, birth_year) VALUES (?, 'Glen', 1978)", (TID,))
+    conn.execute("INSERT INTO family_members (name, name_normalized, relationship, birth_year, tenant_id) "
+                 "VALUES ('Brooklyn', 'brooklyn', 'daughter', 2019, ?), ('Pal', 'pal', 'friend', 1980, ?)",
+                 (TID, TID))
+    conn.commit()
+    conn.close()
+    ctx = web._family_context(db, TID)
+    assert "belongs to Glen, born 1978" in ctx and "Brooklyn: daughter, born 2019" in ctx
+    assert "Pal" not in ctx   # friends aren't family context
