@@ -248,34 +248,27 @@ class LegacyBookPDF:
 
         # Get chapters and drafts — use tenant_id only (speaker filter can miss mismatched names)
         chapters = self.book_builder.generate_chapter_outline(tenant_id=self.tenant_id)
-        drafts = {d["chapter_number"]: d for d in self.db.get_chapter_drafts(tenant_id=self.tenant_id)}
+        drafts = self.db.get_chapter_drafts(tenant_id=self.tenant_id)
 
-        # Filter to chapters that have drafts or enough content
-        printable = []
-        for ch in chapters:
-            if ch["chapter_number"] in drafts:
-                draft = drafts[ch["chapter_number"]]
-                ch["draft"] = draft
-                # Use the draft's memory_ids for photo/QR lookups
-                # (drafts may reference more memories than the outline chunk)
-                draft_mids = draft.get("memory_ids", "[]")
-                if isinstance(draft_mids, str):
-                    import json as _json
-                    try:
-                        draft_mids = _json.loads(draft_mids)
-                    except (ValueError, TypeError):
-                        draft_mids = []
-                if draft_mids:
-                    ch["memory_ids"] = draft_mids
-                printable.append(ch)
-            elif ch["status"] == "ready":
-                # No AI draft — use raw memory text
-                ch["draft"] = None
-                printable.append(ch)
-
-        if not printable:
-            # Generate a placeholder book
-            printable = []
+        # Every chapter prints. Drafts attach by shared memories (not by
+        # chapter number, which shifts as stories are added); whatever a
+        # draft's prose doesn't cover prints verbatim after it.
+        self.book_builder.match_drafts(chapters, drafts)
+        # Skip only chapters with nothing left to say (every memory already
+        # told in another chapter's prose); number the rest consecutively.
+        printable = [ch for ch in chapters if ch["draft"] or ch["uncovered_ids"]]
+        for i, ch in enumerate(printable, 1):
+            ch["print_number"] = i
+        for ch in printable:
+            if ch["draft"]:
+                # Photo/QR lookups cover both the chapter's memories and any
+                # the draft's prose still references.
+                import json as _json
+                try:
+                    draft_mids = _json.loads(ch["draft"].get("memory_ids") or "[]")
+                except (ValueError, TypeError):
+                    draft_mids = []
+                ch["media_memory_ids"] = list(dict.fromkeys(ch["memory_ids"] + draft_mids))
 
         # Determine title
         if not book_title:
@@ -350,7 +343,7 @@ class LegacyBookPDF:
         # ── Table of Contents ──
         story.append(Paragraph("Contents", self.styles['TOCTitle']))
         for ch in printable:
-            entry = f"Chapter {ch['chapter_number']}:&nbsp;&nbsp;&nbsp;{ch['title']}"
+            entry = f"Chapter {ch['print_number']}:&nbsp;&nbsp;&nbsp;{ch['title']}"
             story.append(Paragraph(entry, self.styles['TOCEntry']))
         story.append(PageBreak())
 
@@ -361,7 +354,7 @@ class LegacyBookPDF:
         for ch in printable:
             # Chapter heading
             story.append(Paragraph(
-                f"Chapter {ch['chapter_number']}",
+                f"Chapter {ch['print_number']}",
                 ParagraphStyle(
                     name='ChapterNum',
                     fontName='Times-Roman',
@@ -493,17 +486,22 @@ class LegacyBookPDF:
                         style = self.styles['BodyFirst'] if body_para_idx == 0 else self.styles['BodyText']
                         story.append(Paragraph(para, style))
                         body_para_idx += 1
-            else:
-                # No draft — use raw memory texts
-                memories = []
-                for mid in ch.get("memory_ids", []):
-                    mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
-                    if mem:
-                        memories.append(mem)
 
+            # Memories not told in the draft prose (no draft yet, added since
+            # drafting, or skipped by the AI) print in the speaker's own words.
+            memories = []
+            for mid in ch.get("uncovered_ids", []):
+                mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
+                if mem:
+                    memories.append(mem)
+
+            if memories or not (draft and draft.get("content")):
+                if draft and draft.get("content"):
+                    story.append(Spacer(1, 12))
+                    story.append(Paragraph("More from this chapter", self.styles['ChapterSubhead']))
                 if memories:
                     for i, mem in enumerate(memories):
-                        text = mem.get("text", mem.get("text_summary", ""))
+                        text = self._verbatim_text(mem)
                         if not text:
                             continue
                         text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -642,6 +640,21 @@ class LegacyBookPDF:
 
         return buf.getvalue()
 
+    def _verbatim_text(self, mem: dict) -> str:
+        """The memory in the speaker's own words, as last edited.
+
+        memories.text is a copy taken at save time; edits land on the story's
+        corrected_transcript, so prefer that (same order the chapter writer uses).
+        """
+        sid = mem.get("story_id")
+        if sid:
+            story = self.db.get_story_by_id(sid, tenant_id=self.tenant_id)
+            if story:
+                text = (story.get("corrected_transcript") or "").strip() or (story.get("transcript") or "").strip()
+                if text and not text.startswith("(no transcription"):
+                    return text
+        return (mem.get("text") or mem.get("text_summary") or "").strip()
+
     def _page_header_footer(self, canvas, doc):
         """Add page numbers to each page."""
         self._page_count += 1
@@ -667,7 +680,7 @@ class LegacyBookPDF:
         """Get photos linked to stories in this chapter."""
         photos = []
         seen_ids = set()
-        for mid in chapter.get("memory_ids", []):
+        for mid in (chapter.get("media_memory_ids") or chapter.get("memory_ids", [])):
             mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
             if mem and mem.get("story_id"):
                 story = self.db.get_story_by_id(mem["story_id"], tenant_id=self.tenant_id)
@@ -696,7 +709,7 @@ class LegacyBookPDF:
         """Get audio entries for memories in a chapter, filtered by qr_in_book."""
         entries = []
         seen_keys = set()
-        for mid in chapter.get("memory_ids", []):
+        for mid in (chapter.get("media_memory_ids") or chapter.get("memory_ids", [])):
             mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
             if mem and mem.get("story_id"):
                 story = self.db.get_story_by_id(mem["story_id"], tenant_id=self.tenant_id)
@@ -785,7 +798,7 @@ class LegacyBookPDF:
         items = {}
         seen_stories = set()
 
-        for mid in chapter.get("memory_ids", []):
+        for mid in (chapter.get("media_memory_ids") or chapter.get("memory_ids", [])):
             mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
             if not mem or not mem.get("story_id"):
                 continue
@@ -868,7 +881,7 @@ class LegacyBookPDF:
         # Walk ALL memories across all chapters
         all_memory_ids = set()
         for ch in chapters:
-            for mid in ch.get("memory_ids", []):
+            for mid in (ch.get("media_memory_ids") or ch.get("memory_ids", [])):
                 all_memory_ids.add(mid)
 
         # Also get ALL stories for this tenant that have audio
@@ -943,7 +956,7 @@ class LegacyBookPDF:
         items = []
         seen_stories = set()
 
-        for mid in chapter.get("memory_ids", []):
+        for mid in (chapter.get("media_memory_ids") or chapter.get("memory_ids", [])):
             mem = self.db.get_memory_by_id(mid, tenant_id=self.tenant_id)
             if not mem or not mem.get("story_id"):
                 continue

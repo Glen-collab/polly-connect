@@ -156,10 +156,17 @@ class BookBuilder:
         return None
 
     def generate_chapter_outline(self, speaker: str = None,
-                                  verified_only: bool = True,
+                                  verified_only: bool = False,
                                   tenant_id: int = None) -> List[Dict]:
         """
         Generate a chapter outline from available memories.
+
+        Every in-book memory lands in exactly one chapter — nothing is dropped.
+        Verification is NOT a filter by default: the web "verify" checkmark
+        lives on stories, not memories, so filtering here silently emptied
+        the book. Exclusion is the 📖 include_in_book toggle only.
+
+        Read-only: building the outline never writes to the database.
 
         Returns list of chapter dicts with:
           chapter_number, title, bucket, life_phase, memory_count, memory_ids, status
@@ -221,33 +228,19 @@ class BookBuilder:
                     est_year = self._guess_birth_year_from_text(text, tenant_id)
 
             if est_year:
+                # Guessed year is used for ordering only. It must NOT move the
+                # memory to another bucket or be saved: any year in the text
+                # matches ("...and here we are in 2026"), which used to shove
+                # childhood stories into the wisdom chapter on every page view.
                 mem["estimated_year"] = est_year
-                # Assign bucket/life_phase relative to current age
-                # A 47-year-old teaching their kids IS the wisdom chapter
                 if owner_birth_year:
-                    from datetime import datetime
-                    current_age = datetime.now().year - owner_birth_year
-                    age = est_year - owner_birth_year
-                    bucket, life_phase = self._age_to_bucket(age, current_age)
-                    mem["bucket"] = bucket
-                    mem["life_phase"] = life_phase
-                    mem["owner_age"] = age
-                # Persist to DB so we don't recalculate each time
-                try:
-                    conn = self.db._get_connection()
-                    conn.execute(
-                        "UPDATE memories SET estimated_year = ?, bucket = ?, life_phase = ? WHERE id = ?",
-                        (est_year, mem.get("bucket"), mem.get("life_phase"), mem["id"])
-                    )
-                    conn.commit()
-                except Exception as e:
-                    logger.warning(f"Could not persist auto-dated memory {mem['id']}: {e}")
+                    mem["owner_age"] = est_year - owner_birth_year
 
         # Group memories by bucket + life_phase
         grouped = {}
         for mem in memories:
-            key = (mem.get("bucket", "ordinary_world"),
-                   mem.get("life_phase", "unknown"))
+            key = (mem.get("bucket") or "ordinary_world",
+                   mem.get("life_phase") or "unknown")
             if key not in grouped:
                 grouped[key] = []
             grouped[key].append(mem)
@@ -340,7 +333,179 @@ class BookBuilder:
                 chapter_num += 1
             assigned[key] = len(group_memories)
 
+        # Stragglers: a lone memory in its bucket/phase (or the 1 left over
+        # after chunks of 10) is too small for its own chapter. Home it in the
+        # closest chapter — same bucket+phase, then same phase, then same
+        # bucket — or a final catch-all chapter. It is never dropped.
+        placed = {mid for ch in chapters for mid in ch["memory_ids"]}
+        leftovers = [m for m in memories if m["id"] not in placed]
+        catch_all = None
+        for mem in leftovers:
+            b = mem.get("bucket") or "ordinary_world"
+            p = mem.get("life_phase") or "unknown"
+            home = (next((c for c in chapters if (c["bucket"], c["life_phase"]) == (b, p)), None)
+                    or next((c for c in chapters if c["life_phase"] == p and p != "unknown"), None)
+                    or next((c for c in chapters if c["bucket"] == b), None))
+            if home is None:
+                if catch_all is None:
+                    catch_all = {
+                        "chapter_number": chapter_num,
+                        "title": "More Memories",
+                        "bucket": b,
+                        "life_phase": p,
+                        "memory_count": 0,
+                        "memory_ids": [],
+                        "year_range": None,
+                        "status": "needs_more",
+                    }
+                    chapters.append(catch_all)
+                    chapter_num += 1
+                home = catch_all
+            home["memory_ids"].append(mem["id"])
+            home["memory_count"] = len(home["memory_ids"])
+            if mem.get("estimated_year"):
+                yr = mem["estimated_year"]
+                lo, hi = home["year_range"] or (yr, yr)
+                home["year_range"] = (min(lo, yr), max(hi, yr))
+
         return chapters
+
+    def book_coverage(self, tenant_id: int) -> Dict:
+        """Where every story lands in the book — or exactly why it doesn't.
+
+        Mirrors the PDF: outline, drafts matched by content, uncovered
+        memories printed word-for-word. Returns
+          {"stories": [{story_id, preview, created_at, source, state, chapter,
+                        mode, reason, memory_id}], "in_book": n, "total": n}
+        state: "in_book" | "excluded" | "no_memory"
+        """
+        chapters = self.generate_chapter_outline(tenant_id=tenant_id)
+        self.match_drafts(chapters, self.db.get_chapter_drafts(tenant_id=tenant_id))
+
+        where = {}  # memory_id -> (chapter title, mode)
+        for ch in chapters:
+            if ch["draft"]:
+                d = ch["draft"]
+                try:
+                    told = set(json.loads(d.get("memory_ids") or "[]")) - \
+                        set(json.loads(d.get("missing_memory_ids") or "[]"))
+                except (ValueError, TypeError):
+                    told = set()
+                for mid in told:
+                    where.setdefault(mid, (ch["title"], "told in the AI chapter"))
+        for ch in chapters:
+            for mid in ch["uncovered_ids"]:
+                where.setdefault(mid, (ch["title"], "printed word-for-word"))
+
+        conn = self.db._get_connection()
+        try:
+            rows = conn.execute("""
+                SELECT s.id, s.created_at, s.source,
+                       COALESCE(NULLIF(TRIM(s.corrected_transcript), ''), s.transcript, '') AS text,
+                       m.id AS mid, COALESCE(m.include_in_book, 1) AS inb
+                FROM stories s
+                LEFT JOIN memories m ON m.story_id = s.id AND m.tenant_id = s.tenant_id
+                WHERE s.tenant_id = ?
+                ORDER BY s.created_at DESC, s.id DESC
+            """, (tenant_id,)).fetchall()
+        finally:
+            if not self.db._conn:
+                conn.close()
+
+        out, seen = [], set()
+        for sid, created, source, text, mid, inb in rows:
+            if sid in seen:        # a story with >1 memory: first one decides
+                continue
+            seen.add(sid)
+            text = (text or "").strip()
+            entry = {"story_id": sid, "created_at": created, "source": source,
+                     "preview": text[:140], "memory_id": mid,
+                     "chapter": None, "mode": None, "reason": None}
+            if mid is None:
+                entry["state"] = "no_memory"
+                if not text or text.startswith("(no transcription"):
+                    entry["reason"] = "No words yet — the recording didn't transcribe. Type the story on its edit page."
+                elif len(text) < 10:
+                    entry["reason"] = "Too short to place in a chapter."
+                else:
+                    entry["reason"] = "Never sorted into a chapter."
+            elif not inb:
+                entry["state"] = "excluded"
+                entry["reason"] = "You took this out of the book (📖)."
+            elif mid in where:
+                entry["state"] = "in_book"
+                entry["chapter"], entry["mode"] = where[mid]
+            else:
+                # Should be impossible — every in-book memory is placed.
+                entry["state"] = "no_memory"
+                entry["reason"] = "Not placed — please report this."
+            out.append(entry)
+
+        return {"stories": out,
+                "in_book": sum(1 for e in out if e["state"] == "in_book"),
+                "total": len(out)}
+
+    @staticmethod
+    def match_drafts(chapters: List[Dict], drafts: List[Dict]) -> None:
+        """Attach saved drafts to outline chapters by CONTENT, not number.
+
+        Chapter numbers shift whenever stories are added, so matching drafts
+        by chapter_number printed the wrong chapter's prose. Each draft goes
+        to the chapter sharing the most memories with it (used once).
+
+        Sets on each chapter:
+          draft            — the matched draft dict, or None
+          draft_stale      — True if the chapter's memories changed since drafting
+          uncovered_ids    — chapter memories the draft prose does not contain
+                             (new since drafting, or the AI verifiably skipped)
+        """
+        def ids(d, field="memory_ids"):
+            raw = d.get(field) or "[]"
+            if isinstance(raw, str):
+                try:
+                    raw = json.loads(raw)
+                except (ValueError, TypeError):
+                    raw = []
+            return [int(x) for x in raw]
+
+        pairs = []
+        for ci, ch in enumerate(chapters):
+            ch_ids = set(ch.get("memory_ids", []))
+            for di, d in enumerate(drafts):
+                # Prose about "The Hard Years" must never print under a
+                # different theme/life stage; such a draft stays unused (its
+                # memories print word-for-word) until the chapter is rewritten.
+                if (d.get("bucket"), d.get("life_phase")) != (ch["bucket"], ch["life_phase"]):
+                    continue
+                overlap = len(ch_ids & set(ids(d)))
+                if overlap:
+                    pairs.append((overlap, -abs(d.get("chapter_number", 0) - ch["chapter_number"]), ci, di))
+        pairs.sort(reverse=True)
+
+        for ch in chapters:
+            ch["draft"] = None
+            ch["draft_stale"] = False
+            ch["uncovered_ids"] = list(ch.get("memory_ids", []))
+        used_c, used_d = set(), set()
+        for _, _, ci, di in pairs:
+            if ci in used_c or di in used_d:
+                continue
+            used_c.add(ci)
+            used_d.add(di)
+            ch, d = chapters[ci], drafts[di]
+            drafted = set(ids(d)) - set(ids(d, "missing_memory_ids"))
+            ch["draft"] = d
+            ch["draft_stale"] = set(ids(d)) != set(ch.get("memory_ids", []))
+            ch["uncovered_ids"] = [m for m in ch.get("memory_ids", []) if m not in drafted]
+
+        # A memory told in one chapter's prose must not print again verbatim
+        # in the chapter it has since moved to — each memory prints once.
+        told = set()
+        for ch in chapters:
+            if ch["draft"]:
+                told |= set(ids(ch["draft"])) - set(ids(ch["draft"], "missing_memory_ids"))
+        for ch in chapters:
+            ch["uncovered_ids"] = [m for m in ch["uncovered_ids"] if m not in told]
 
     def get_book_progress(self, speaker: str = None, tenant_id: int = None) -> Dict:
         """Get overall book-building progress stats."""
@@ -683,16 +848,22 @@ Family timeline (use these to calculate when events happened):
             except Exception:
                 pass
 
+        n = len(memories)
         prompt = f"""You are writing a chapter of a family legacy book.
 Chapter {chapter.get('chapter_number', '?')}: "{chapter['title']}"
 Theme: {chapter['bucket'].replace('_', ' ')}
 Life phase: {chapter['life_phase']}
 {owner_block}{timeline_block}{family_block}{continuity_block}
-Here are the memories to weave into this chapter (sorted chronologically):
+Here are the {n} memories to weave into this chapter (sorted chronologically):
 
 {chr(10).join(memory_texts)}
 {photo_block}
-Write a warm, narrative chapter (7-10 paragraphs) that:
+EVERY ONE of the {n} memories above MUST appear in the chapter with its own
+specific people, places and details. Do not skip a memory, and do not fold two
+memories into one vague sentence. This is someone's family record — a missing
+memory is a lost memory.
+
+Write a warm, narrative chapter ({max(7, n + 2)}-{max(10, n + 4)} paragraphs) that:
 - Weaves these memories into a cohesive story in chronological order
 - Preserves the speaker's voice and emotional tone
 - MULTIPLE PERSPECTIVES: when two or more people remember the SAME event, day, or
@@ -709,19 +880,69 @@ Write a warm, narrative chapter (7-10 paragraphs) that:
 - When timeline dates are available, ground the narrative in specific years or decades (e.g. "It was the summer of '58..." instead of "Back then...")
 - When owner age is given, use it to anchor the perspective (e.g. "At nine years old, the world still felt enormous...")
 - Use family birth years to anchor events (e.g. if Brooklyn was born in 2018 and the story mentions her gymnastics, that's ~2024-2026)
-- Do NOT repeat stories or themes already covered in previous chapters
+- Previous chapters are listed only for continuity — do not retell THEIR stories,
+  but every memory listed above belongs in THIS chapter and must be told here
 - ONLY place [PHOTO:story_id] markers if photos are listed above as "Available photos for this chapter". Do NOT invent photo markers. If no photos are available, do not include any [PHOTO:...] markers at all.
 
 Write the chapter now:"""
 
+        import asyncio
         try:
-            import asyncio
             result = await asyncio.to_thread(self._call_chapter_openai, prompt)
-            return result
         except Exception as e:
             logger.error(f"Chapter generation failed: {e}")
+            return None
+        if not result:
+            return None
 
-        return None
+        # Coverage check: a second, cheap model confirms every memory made it
+        # into the prose. One retry naming what was skipped; anything still
+        # missing is recorded so the PDF prints it verbatim after the chapter.
+        chapter["missing_memory_ids"] = []
+        try:
+            missing = await asyncio.to_thread(self._find_missing_memories, result, memory_texts)
+            if missing:
+                names = ", ".join(f"Memory {i}" for i in missing)
+                retry = (prompt + f"\n\nIMPORTANT: a previous attempt left out {names}. "
+                         "Include every one of them this time.")
+                second = await asyncio.to_thread(self._call_chapter_openai, retry)
+                if second:
+                    missing2 = await asyncio.to_thread(self._find_missing_memories, second, memory_texts)
+                    if len(missing2) <= len(missing):
+                        result, missing = second, missing2
+            chapter["missing_memory_ids"] = [memories[i - 1]["id"] for i in missing]
+            if missing:
+                logger.warning(f"Chapter '{chapter['title']}': memories {chapter['missing_memory_ids']} "
+                               "not in prose after retry — will print verbatim")
+        except Exception as e:
+            # Keep the draft; marking everything missing would print the whole
+            # chapter twice. The coverage page still lists the chapter's stories.
+            logger.error(f"Coverage check failed for '{chapter['title']}': {e}")
+
+        return result
+
+    def _find_missing_memories(self, chapter_text: str, memory_texts: List[str]) -> List[int]:
+        """Return the 1-based numbers of memories whose specific content is
+        absent from chapter_text (gpt-4o-mini, JSON)."""
+        listing = "\n\n".join(t[:1200] for t in memory_texts)
+        response = self.followup_gen._client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": (
+                    "You audit a family book chapter against its source memories. "
+                    "A memory is PRESENT if the chapter tells its specific event or "
+                    "details (people, place, what happened) — paraphrase is fine. "
+                    "It is MISSING if the chapter omits it or reduces it to a generic "
+                    'phrase. Return JSON: {"missing": [memory numbers]}.')},
+                {"role": "user", "content": f"SOURCE MEMORIES:\n{listing}\n\nCHAPTER:\n{chapter_text}"},
+            ],
+            temperature=0,
+            max_tokens=200,
+            response_format={"type": "json_object"},
+        )
+        parsed = json.loads(response.choices[0].message.content)
+        valid = range(1, len(memory_texts) + 1)
+        return sorted({int(i) for i in parsed.get("missing", []) if str(i).isdigit() and int(i) in valid})
 
     async def generate_chapter_summary(self, content: str) -> Optional[str]:
         """Generate a 2-sentence summary of a chapter for continuity."""

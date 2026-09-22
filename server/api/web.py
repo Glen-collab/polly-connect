@@ -1880,7 +1880,50 @@ async def story_edit_save(request: Request, story_id: int):
         if not db._conn:
             conn.close()
 
+    _ensure_book_memory(request, story_id, session["tenant_id"])
     return RedirectResponse(f"/web/stories/{story_id}/edit", status_code=303)
+
+
+def _ensure_book_memory(request: Request, story_id: int, tid: int) -> bool:
+    """Give a story its book memory if it has none (failed transcription
+    fixed by typing, onboarding, messages, old device paths). The book only
+    reads memories, so a story without one is silently absent from it.
+    Returns True if a memory was created."""
+    db = request.app.state.db
+    story = db.get_story_by_id(story_id, tenant_id=tid)
+    if not story:
+        return False
+    text = (story.get("corrected_transcript") or story.get("transcript") or "").strip()
+    if len(text) < 10 or text.startswith("(no transcription"):
+        return False
+    conn = db._get_connection()
+    try:
+        exists = conn.execute(
+            "SELECT 1 FROM memories WHERE story_id = ? AND tenant_id = ? LIMIT 1",
+            (story_id, tid)).fetchone()
+    finally:
+        if not db._conn:
+            conn.close()
+    if exists:
+        return False
+    speaker = story.get("speaker_name")
+    question = story.get("question_text")
+    extractor = getattr(request.app.state, "memory_extractor", None)
+    mem_data = extractor.extract(text=text, question=question, speaker=speaker) if extractor else {}
+    db.save_memory(
+        story_id=story_id, speaker=speaker,
+        bucket=mem_data.get("bucket", "ordinary_world"),
+        life_phase=mem_data.get("life_phase", "unknown"),
+        text_summary=mem_data.get("text_summary", ""), text=text,
+        people=mem_data.get("people"), locations=mem_data.get("locations"),
+        emotions=mem_data.get("emotions"),
+        fingerprint=extractor.compute_fingerprint(mem_data) if extractor else None,
+        tenant_id=tid,
+    )
+    user = db.get_or_create_user(tenant_id=tid)
+    _schedule_gpt_reclassify(db, story_id, tid, text, birth_year=user.get("birth_year"),
+                             speaker=speaker, question=question)
+    return True
 
 
 @router.post("/stories/{story_id}/toggle-verify")
@@ -1904,6 +1947,10 @@ async def story_toggle_verify(request: Request, story_id: int):
         conn.execute(
             "UPDATE stories SET verified = ?, verified_at = datetime('now') WHERE id = ? AND tenant_id = ?",
             (new_val, story_id, tid))
+        # Keep the book memory's status in step with the story checkmark
+        conn.execute(
+            "UPDATE memories SET verification_status = ?, verified_at = datetime('now') WHERE story_id = ? AND tenant_id = ?",
+            ("verified" if new_val else "unverified", story_id, tid))
         conn.commit()
     finally:
         if not db._conn:
@@ -1967,6 +2014,7 @@ async def story_inline_save(request: Request, story_id: int):
         if not db._conn:
             conn.close()
 
+    _ensure_book_memory(request, story_id, tid)
     return JSONResponse({"ok": True})
 
 
@@ -3748,7 +3796,8 @@ def _photo_year(date_str: str):
 # background task after every story/photo/share save so chapter timeline
 # placement gets a GPT pass on every memory.
 
-def _gpt_classify_story(text: str, birth_year=None, include_formatting: bool = False) -> dict:
+def _gpt_classify_story(text: str, birth_year=None, include_formatting: bool = False,
+                        question: str = None) -> dict:
     """Send the transcript to gpt-4o-mini and parse the JSON response.
 
     When include_formatting=True the response also includes a 'formatted'
@@ -3802,14 +3851,19 @@ def _gpt_classify_story(text: str, birth_year=None, include_formatting: bool = F
         "Life phase guide (use the speaker's age IN the story, not now):\n"
         f"- Speaker's birth year (if known): {birth_year or 'unknown'}\n"
         "- childhood: 0-12, adolescence: 13-18, young_adult: 19-30,\n"
-        "  adult: 31-50, midlife: 51-70, elder: 70+, reflection: looking back from now"
+        "  adult: 31-50, midlife: 51-70, elder: 70+, reflection: looking back from now\n\n"
+        "If the question the speaker was answering is given, use it as context "
+        "for where the memory belongs, but classify by what the answer actually "
+        "describes. A freeform memory has no question: place it as if you had "
+        "asked the question it answers."
     )
+    user_content = f"Question asked: {question}\n\nAnswer:\n{text}" if question else text
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": text},
+            {"role": "user", "content": user_content},
         ],
         temperature=0.2,
         max_tokens=4000,
@@ -3874,7 +3928,8 @@ def _apply_gpt_classification(db, story_id: int, tid: int, parsed: dict,
 
 
 def _gpt_reclassify_in_background(db, story_id: int, tid: int, text: str,
-                                  birth_year=None, speaker: str = None) -> None:
+                                  birth_year=None, speaker: str = None,
+                                  question: str = None) -> None:
     """Sync helper meant to run in asyncio.to_thread. Calls GPT and
     updates the memory row. Failures are logged, not raised — heuristic
     data already saved earlier remains in place if GPT is unavailable."""
@@ -3882,7 +3937,7 @@ def _gpt_reclassify_in_background(db, story_id: int, tid: int, text: str,
         if not text or len(text.strip()) < 10:
             return
         parsed = _gpt_classify_story(text, birth_year=birth_year,
-                                      include_formatting=False)
+                                      include_formatting=False, question=question)
         _apply_gpt_classification(db, story_id, tid, parsed,
                                    fallback_text=text, speaker=speaker)
     except Exception as e:
@@ -3890,7 +3945,8 @@ def _gpt_reclassify_in_background(db, story_id: int, tid: int, text: str,
 
 
 def _schedule_gpt_reclassify(db, story_id: int, tid: int, text: str,
-                              birth_year=None, speaker: str = None):
+                              birth_year=None, speaker: str = None,
+                              question: str = None):
     """Fire-and-forget GPT classification. Safe to call from any route —
     if no event loop / no API key, falls through silently."""
     import asyncio as _asyncio
@@ -3898,7 +3954,7 @@ def _schedule_gpt_reclassify(db, story_id: int, tid: int, text: str,
         loop = _asyncio.get_running_loop()
         loop.create_task(_asyncio.to_thread(
             _gpt_reclassify_in_background,
-            db, story_id, tid, text, birth_year, speaker
+            db, story_id, tid, text, birth_year, speaker, question
         ))
     except RuntimeError:
         # No running loop — skip; we'll catch this on next save or via backfill.
@@ -3944,6 +4000,8 @@ async def web_record_story(request: Request):
     audio = form.get("audio")
     speaker_name = form.get("speaker_name", "")
     typed_text = (form.get("transcript_text") or "").strip()
+    # "Ask Me a Question" sends the prompt it asked; keep it with the answer
+    question_text = (form.get("question_text") or "").strip()[:500] or None
 
     # Auto-set speaker name from family member if not provided
     member_id = session.get("family_member_id")
@@ -3964,6 +4022,7 @@ async def web_record_story(request: Request):
             source="web_typed",
             user_id=user["id"],
             tenant_id=tid,
+            question_text=question_text,
             recorded_by_member_id=member_id,
         )
         memory_extractor = getattr(request.app.state, "memory_extractor", None)
@@ -3971,7 +4030,7 @@ async def web_record_story(request: Request):
             try:
                 mem_data = memory_extractor.extract(
                     text=typed_text,
-                    question=None,
+                    question=question_text,
                     speaker=speaker_name or None,
                 )
                 db.save_memory(
@@ -3992,7 +4051,8 @@ async def web_record_story(request: Request):
         # Background GPT classification to upgrade the heuristic placement.
         _schedule_gpt_reclassify(db, story_id, tid, typed_text,
                                   birth_year=user.get("birth_year"),
-                                  speaker=speaker_name or None)
+                                  speaker=speaker_name or None,
+                                  question=question_text)
         return JSONResponse({
             "transcript": typed_text,
             "story_id": story_id,
@@ -4046,6 +4106,7 @@ async def web_record_story(request: Request):
         source="web_recording",
         user_id=user["id"],
         tenant_id=tid,
+        question_text=question_text,
         recorded_by_member_id=member_id,
     )
 
@@ -4056,7 +4117,7 @@ async def web_record_story(request: Request):
             try:
                 mem_data = memory_extractor.extract(
                     text=transcription,
-                    question=None,
+                    question=question_text,
                     speaker=speaker_name or None,
                 )
                 db.save_memory(
@@ -4077,7 +4138,8 @@ async def web_record_story(request: Request):
         # Background GPT classification to upgrade the heuristic placement.
         _schedule_gpt_reclassify(db, story_id, tid, transcription,
                                   birth_year=user.get("birth_year"),
-                                  speaker=speaker_name or None)
+                                  speaker=speaker_name or None,
+                                  question=question_text)
 
     return JSONResponse({
         "transcript": transcription,
@@ -7733,6 +7795,21 @@ BUCKET_TARGETS = {
 }
 
 
+def _outline_with_drafts(db, book_builder, tid) -> list:
+    """Chapter outline with saved drafts attached by shared memories.
+
+    status becomes 'has_draft', or 'needs_refresh' when stories were added to
+    (or moved out of) the chapter since its draft was written."""
+    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
+    book_builder.match_drafts(chapters, db.get_chapter_drafts(tenant_id=tid))
+    for ch in chapters:
+        ch["bucket_label"] = BUCKET_LABELS.get(ch["bucket"], ch["bucket"])
+        ch["phase_label"] = PHASE_LABELS.get(ch["life_phase"], ch["life_phase"])
+        if ch["draft"]:
+            ch["status"] = "needs_refresh" if ch["draft_stale"] else "has_draft"
+    return chapters
+
+
 @router.get("/book", response_class=HTMLResponse)
 async def book_overview(request: Request):
     session = await get_web_session(request)
@@ -7748,15 +7825,7 @@ async def book_overview(request: Request):
     engagement = request.app.state.engagement
 
     progress = book_builder.get_book_progress(tenant_id=tid)
-    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
-
-    # Check which chapters already have drafts
-    existing_drafts = {d["chapter_number"]: d for d in db.get_chapter_drafts(tenant_id=tid)}
-    for ch in chapters:
-        ch["bucket_label"] = BUCKET_LABELS.get(ch["bucket"], ch["bucket"])
-        ch["phase_label"] = PHASE_LABELS.get(ch["life_phase"], ch["life_phase"])
-        if ch["chapter_number"] in existing_drafts:
-            ch["status"] = "has_draft"
+    chapters = _outline_with_drafts(db, book_builder, tid)
 
     # Arc coverage
     bucket_coverage = narrative_arc.get_bucket_coverage(tenant_id=tid)
@@ -7868,14 +7937,7 @@ async def book_chapters_list(request: Request):
     tid = session["tenant_id"]
     book_builder = request.app.state.book_builder
 
-    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
-    existing_drafts = {d["chapter_number"]: d for d in db.get_chapter_drafts(tenant_id=tid)}
-
-    for ch in chapters:
-        ch["bucket_label"] = BUCKET_LABELS.get(ch["bucket"], ch["bucket"])
-        ch["phase_label"] = PHASE_LABELS.get(ch["life_phase"], ch["life_phase"])
-        if ch["chapter_number"] in existing_drafts:
-            ch["status"] = "has_draft"
+    chapters = _outline_with_drafts(db, book_builder, tid)
 
     msg = request.query_params.get("msg")
     generating = request.query_params.get("generating") == "1"
@@ -7926,6 +7988,34 @@ async def book_memory_toggle(request: Request, memory_id: int):
             conn.close()
 
 
+@router.get("/book/coverage", response_class=HTMLResponse)
+async def book_coverage_page(request: Request):
+    """Every story, and where it lands in the printed book (or why not)."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    coverage = request.app.state.book_builder.book_coverage(tenant_id=session["tenant_id"])
+    return templates.TemplateResponse("book_coverage.html", {
+        "request": request,
+        "session": session,
+        "coverage": coverage,
+    })
+
+
+@router.post("/book/coverage/{story_id}/add")
+async def book_coverage_add(request: Request, story_id: int):
+    """Create the missing book memory for a story (then AI-sort it)."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    if session.get("role") == "family":
+        return JSONResponse({"error": "Not allowed"}, status_code=403)
+    if _ensure_book_memory(request, story_id, session["tenant_id"]):
+        return JSONResponse({"ok": True})
+    return JSONResponse({"error": "This story has no words to place yet — open it and type the story."})
+
+
 @router.get("/book/chapters/{chapter_num}", response_class=HTMLResponse)
 async def book_chapter_detail(request: Request, chapter_num: int):
     session = await get_web_session(request)
@@ -7937,18 +8027,11 @@ async def book_chapter_detail(request: Request, chapter_num: int):
     tid = session["tenant_id"]
     book_builder = request.app.state.book_builder
 
-    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
-    chapter = None
-    for ch in chapters:
-        if ch["chapter_number"] == chapter_num:
-            chapter = ch
-            break
+    chapters = _outline_with_drafts(db, book_builder, tid)
+    chapter = next((ch for ch in chapters if ch["chapter_number"] == chapter_num), None)
 
     if not chapter:
         return RedirectResponse("/web/book/chapters", status_code=302)
-
-    chapter["bucket_label"] = BUCKET_LABELS.get(chapter["bucket"], chapter["bucket"])
-    chapter["phase_label"] = PHASE_LABELS.get(chapter["life_phase"], chapter["life_phase"])
 
     # Fetch full memories with audio keys from linked stories
     memories = []
@@ -7963,16 +8046,10 @@ async def book_chapter_detail(request: Request, chapter_num: int):
                 mem["audio_key"] = None
             memories.append(mem)
 
-    # Check for existing draft
-    existing_drafts = db.get_chapter_drafts(tenant_id=tid)
-    draft = None
-    for d in existing_drafts:
-        if d["chapter_number"] == chapter_num:
-            draft = d
-            break
-
-    if draft:
-        chapter["status"] = "has_draft"
+    draft = chapter["draft"]
+    uncovered = set(chapter["uncovered_ids"])
+    for mem in memories:
+        mem["not_in_draft"] = bool(draft) and mem["id"] in uncovered
 
     ai_available = getattr(request.app.state, "followup_gen", None)
     ai_available = ai_available and ai_available.available if ai_available else False
@@ -8036,22 +8113,16 @@ async def book_chapter_generate(request: Request, chapter_num: int):
     if not purchased and chapter_num > limits["book_preview_chapters"]:
         return RedirectResponse("/web/book?buy=1&msg=" + _up.quote("Buy the Book to generate all your chapters."), status_code=303)
 
-    chapters = book_builder.generate_chapter_outline(tenant_id=tid)
-    chapter = None
-    for ch in chapters:
-        if ch["chapter_number"] == chapter_num:
-            chapter = ch
-            break
+    chapters = _outline_with_drafts(db, book_builder, tid)
+    chapter = next((ch for ch in chapters if ch["chapter_number"] == chapter_num), None)
 
     if not chapter:
         return RedirectResponse("/web/book/chapters", status_code=302)
 
-    # Gather previous chapter summaries for continuity
-    existing_drafts = db.get_chapter_drafts(tenant_id=tid)
-    previous_summaries = []
-    for d in sorted(existing_drafts, key=lambda x: x.get("chapter_number", 0)):
-        if d.get("chapter_number", 0) < chapter_num and d.get("summary"):
-            previous_summaries.append(d["summary"])
+    # Continuity: summaries of the drafts attached to earlier chapters
+    previous_summaries = [ch["draft"]["summary"] for ch in chapters
+                          if ch["chapter_number"] < chapter_num
+                          and ch["draft"] and ch["draft"].get("summary")]
 
     # Generate AI draft with timeline + photo placement
     content = await book_builder.generate_chapter_draft(
@@ -8061,15 +8132,20 @@ async def book_chapter_generate(request: Request, chapter_num: int):
 
     if content:
         import json as _json
-        # Delete any existing draft for this chapter so we don't pile up stale copies
+        # Replace the draft this chapter was matched to (plus any leftover
+        # under the same number) so we don't pile up stale copies
         conn = db._get_connection()
+        if chapter["draft"]:
+            conn.execute("DELETE FROM chapter_drafts WHERE id = ? AND tenant_id = ?",
+                         (chapter["draft"]["id"], tid))
         conn.execute(
             "DELETE FROM chapter_drafts WHERE chapter_number = ? AND tenant_id = ?",
             (chapter_num, tid)
         )
         conn.commit()
 
-        db.save_chapter_draft(
+        missing = chapter.get("missing_memory_ids", [])
+        draft_id = db.save_chapter_draft(
             chapter_number=chapter_num,
             title=chapter["title"],
             bucket=chapter["bucket"],
@@ -8077,17 +8153,18 @@ async def book_chapter_generate(request: Request, chapter_num: int):
             memory_ids=_json.dumps(chapter.get("memory_ids", [])),
             content=content,
             tenant_id=tid,
+            missing_memory_ids=_json.dumps(missing),
         )
 
         # Generate and save summary for continuity with later chapters
         summary = await book_builder.generate_chapter_summary(content)
         if summary:
-            drafts_after = db.get_chapter_drafts(tenant_id=tid)
-            for d in drafts_after:
-                if d.get("chapter_number") == chapter_num:
-                    db.update_chapter_summary(d["id"], summary)
-                    break
-        msg = "Draft generated successfully!"
+            db.update_chapter_summary(draft_id, summary)
+        if missing:
+            msg = (f"Draft generated. {len(missing)} memor{'y' if len(missing) == 1 else 'ies'} "
+                   "the AI couldn't fit will print word-for-word after the chapter.")
+        else:
+            msg = "Draft generated — every memory in this chapter is in it."
     else:
         msg = "Could not generate draft. Make sure OPENAI_API_KEY is set."
 
@@ -8215,27 +8292,26 @@ async def book_chapter_save(request: Request, chapter_num: int,
 
     db = request.app.state.db
     tid = session["tenant_id"]
+    chapters = _outline_with_drafts(db, request.app.state.book_builder, tid)
+    chapter = next((ch for ch in chapters if ch["chapter_number"] == chapter_num), None)
+    if not chapter:
+        return RedirectResponse("/web/book/chapters", status_code=302)
 
-    # Update existing draft content
+    # Update the draft matched to this chapter, or start one tied to its
+    # memories (so it keeps matching after chapter numbers shift)
     conn = db._get_connection()
     try:
-        import sqlite3
-        conn.row_factory = sqlite3.Row
-        existing = conn.execute(
-            "SELECT * FROM chapter_drafts WHERE chapter_number = ? AND tenant_id = ?",
-            (chapter_num, tid)
-        ).fetchone()
-
-        if existing:
+        if chapter["draft"]:
             conn.execute(
-                "UPDATE chapter_drafts SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (content, existing["id"])
+                "UPDATE chapter_drafts SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?",
+                (content, chapter["draft"]["id"], tid)
             )
         else:
             conn.execute("""
                 INSERT INTO chapter_drafts (chapter_number, title, bucket, life_phase, memory_ids, content, tenant_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (chapter_num, f"Chapter {chapter_num}", "", "", "[]", content, tid))
+            """, (chapter_num, chapter["title"], chapter["bucket"], chapter["life_phase"],
+                  json.dumps(chapter["memory_ids"]), content, tid))
         conn.commit()
     finally:
         if not db._conn:

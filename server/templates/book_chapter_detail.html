@@ -13,7 +13,7 @@
         <p class="text-sm text-gray-500">{{ chapter.bucket_label }} &middot; {{ chapter.phase_label }} &middot; {{ chapter.memory_count }} memories</p>
     </div>
     <div class="flex gap-2">
-        {% if chapter.status == 'ready' or chapter.status == 'has_draft' %}
+        {% if memories %}
         <form method="POST" action="/web/book/chapters/{{ chapter.chapter_number }}/generate">
             <button type="submit"
                     class="text-sm bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700"
@@ -48,6 +48,12 @@
 {% if not ai_available and not draft %}
 <div class="bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-lg p-3 mb-4 text-sm">
     AI draft generation requires OPENAI_API_KEY. You can still view the memories below and write chapters manually.
+</div>
+{% endif %}
+
+{% if chapter.status == 'needs_refresh' %}
+<div class="bg-orange-50 border border-orange-200 text-orange-800 rounded-lg p-3 mb-4 text-sm">
+    Stories were added to this chapter since its draft was written. They are still in your book &mdash; they print word-for-word after the chapter &mdash; but <b>Regenerate Draft</b> to weave them into the story.
 </div>
 {% endif %}
 
@@ -165,6 +171,9 @@
                 <span class="text-sm font-medium text-gray-700">{{ mem.speaker or 'Unknown' }}</span>
                 {% if mem.source and mem.source != 'story' and mem.source != 'voice' %}
                 <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded capitalize">{{ mem.source }}</span>
+                {% endif %}
+                {% if mem.not_in_draft %}
+                <span class="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded" title="Prints word-for-word after the chapter until you regenerate">Not in draft yet</span>
                 {% endif %}
                 {% if mem.verification_status == 'verified' %}
                 <span class="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Verified</span>

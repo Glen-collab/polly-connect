@@ -749,6 +749,9 @@ class PollyDB:
             cd_migrations = {
                 "summary": "ALTER TABLE chapter_drafts ADD COLUMN summary TEXT",
                 "needs_refresh": "ALTER TABLE chapter_drafts ADD COLUMN needs_refresh INTEGER DEFAULT 0",
+                # Memories the coverage check found absent from the prose —
+                # the PDF prints these verbatim after the chapter.
+                "missing_memory_ids": "ALTER TABLE chapter_drafts ADD COLUMN missing_memory_ids TEXT DEFAULT '[]'",
             }
             for col, sql in cd_migrations.items():
                 if col not in cols:
@@ -3535,14 +3538,17 @@ class PollyDB:
     def save_chapter_draft(self, chapter_number: int, title: str,
                            bucket: str, life_phase: str,
                            memory_ids: str, content: str,
-                           tenant_id: int = None) -> int:
+                           tenant_id: int = None,
+                           missing_memory_ids: str = "[]") -> int:
         conn = self._get_connection()
         try:
             cursor = conn.execute("""
                 INSERT INTO chapter_drafts
-                    (chapter_number, title, bucket, life_phase, memory_ids, content, tenant_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (chapter_number, title, bucket, life_phase, memory_ids, content, tenant_id))
+                    (chapter_number, title, bucket, life_phase, memory_ids, content, tenant_id,
+                     missing_memory_ids)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (chapter_number, title, bucket, life_phase, memory_ids, content, tenant_id,
+                  missing_memory_ids))
             conn.commit()
             return cursor.lastrowid
         finally:
