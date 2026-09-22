@@ -14,7 +14,8 @@ stories and rewriting buckets. Steps:
 Run from /opt/polly-connect/server:
     set -a; . ../.env; set +a
     POLLY_DB_PATH=/opt/polly-connect/polly.db python3.11 rebuild_book.py --tenant 1
-Flags: --skip-classify (keep current placements), --classify-only
+Flags: --skip-classify (keep current placements), --classify-only,
+       --recheck (re-audit written chapters, rewrite only real gaps)
 """
 import argparse
 import asyncio
@@ -98,11 +99,36 @@ async def write_all(bb, db, tid):
             return written
 
 
+async def recheck_all(bb, db, conn, tid):
+    """Strip model-written headings and re-audit every chapter with the
+    evidence-based checker; rewrite only chapters with real gaps."""
+    from core.book_builder import strip_heading
+    rewrite = 0
+    for d in db.get_chapter_drafts(tenant_id=tid):
+        missing = await bb.recheck_coverage(d, tid)
+        conn.execute("UPDATE chapter_drafts SET content = ?, missing_memory_ids = ? WHERE id = ?",
+                     (strip_heading(d["content"]), json.dumps(missing), d["id"]))
+        conn.commit()
+        print(f"  {d['title']:<36} {len(json.loads(d['memory_ids'])):>2} stories, "
+              f"was {len(json.loads(d.get('missing_memory_ids') or '[]'))} missing, now {len(missing)}")
+        rewrite += bool(missing)
+    if rewrite:
+        print(f"Rewriting {rewrite} chapter(s) with real gaps:")
+        outline = bb.generate_chapter_outline(tenant_id=tid)
+        bb.match_drafts(outline, db.get_chapter_drafts(tenant_id=tid))
+        for ch in outline:
+            if ch["draft"] and json.loads(ch["draft"].get("missing_memory_ids") or "[]"):
+                await bb.write_chapter(ch, tid, outline)
+                print(f"  {ch['title']:<36} now {len(ch.get('missing_memory_ids') or [])} missing")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tenant", type=int, required=True)
     ap.add_argument("--skip-classify", action="store_true")
     ap.add_argument("--classify-only", action="store_true")
+    ap.add_argument("--recheck", action="store_true",
+                    help="re-audit existing chapters; rewrite only ones with real gaps")
     a = ap.parse_args()
 
     db_path = os.getenv("POLLY_DB_PATH") or os.path.join(os.path.dirname(__file__), "..", "polly.db")
@@ -113,6 +139,12 @@ def main():
     bb = BookBuilder(db, followup_generator=fg)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+
+    if a.recheck:
+        asyncio.run(recheck_all(bb, db, conn, a.tenant))
+        cov = bb.book_coverage(a.tenant)
+        print(f"Coverage: {cov['in_book']} of {cov['total']} ({cov['appendix']} in the appendix)")
+        return
 
     if not a.classify_only:
         print(f"Archived {archive_drafts(conn, a.tenant)} draft(s) to chapter_drafts_archive")

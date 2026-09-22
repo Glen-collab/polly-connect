@@ -11,6 +11,8 @@ Target: 20 chapters, 150-200 pages over ~12 months of memory collection.
 """
 
 import json
+import os
+import re
 import logging
 from typing import Dict, List, Optional
 
@@ -72,6 +74,16 @@ def _stable_order(ch: Dict) -> tuple:
     b = LIFE_BUCKETS.index(ch["bucket"]) if ch["bucket"] in LIFE_BUCKETS else len(LIFE_BUCKETS)
     catch_all = ch.get("catch_all", False)
     return (catch_all, PHASE_ORDER.index(p), b, min(ch["memory_ids"], default=0))
+
+
+def strip_heading(text: str) -> str:
+    """Drop a heading line the model sometimes writes itself
+    ('**Chapter 9: "Ordinary World (more)"**') — the PDF prints its own
+    heading, and this one would carry a stale placeholder title."""
+    lines = (text or "").lstrip().split("\n")
+    if lines and re.match(r'^[#*\s]*chapter\b.{0,120}$', lines[0].strip(), re.IGNORECASE):
+        return "\n".join(lines[1:]).lstrip()
+    return text
 
 
 def _draft_ids(draft: Dict, field: str = "memory_ids") -> List[int]:
@@ -1006,6 +1018,7 @@ Write the chapter now:"""
             return None
         if not result:
             return None
+        result = strip_heading(result)
 
         # Coverage check: a second, cheap model confirms every memory made it
         # into the prose. One retry naming what was skipped; anything still
@@ -1019,6 +1032,7 @@ Write the chapter now:"""
                          "Include every one of them this time.")
                 second = await asyncio.to_thread(self._call_chapter_openai, retry)
                 if second:
+                    second = strip_heading(second)
                     missing2 = await asyncio.to_thread(self._find_missing_memories, second, memory_texts)
                     if len(missing2) <= len(missing):
                         result, missing = second, missing2
@@ -1035,26 +1049,43 @@ Write the chapter now:"""
 
     def _find_missing_memories(self, chapter_text: str, memory_texts: List[str]) -> List[int]:
         """Return the 1-based numbers of memories whose specific content is
-        absent from chapter_text (gpt-4o-mini, JSON)."""
+        absent from chapter_text.
+
+        Evidence-based: for every memory the auditor must quote the chapter
+        sentence that tells it. A memory counts as missing only when it can't
+        — and a "present" verdict whose quote isn't really in the chapter is
+        overruled. (gpt-4o-mini asked for a bare list flagged 8 of 10 stories
+        as missing from a chapter that plainly told them.)"""
         listing = "\n\n".join(t[:1200] for t in memory_texts)
         response = self.followup_gen._client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=os.getenv("POLLY_COVERAGE_MODEL", "gpt-4o"),
             messages=[
                 {"role": "system", "content": (
-                    "You audit a family book chapter against its source memories. "
-                    "A memory is PRESENT if the chapter tells its specific event or "
-                    "details (people, place, what happened) — paraphrase is fine. "
-                    "It is MISSING if the chapter omits it or reduces it to a generic "
-                    'phrase. Return JSON: {"missing": [memory numbers]}.')},
+                    "You audit a family book chapter against its numbered source memories. "
+                    "For EVERY memory, find the sentence in the chapter that tells it — "
+                    "its specific event, people or details; paraphrase counts. Return JSON: "
+                    '{"memories": [{"n": <memory number>, "quote": "<exact sentence copied '
+                    'from the chapter, or empty if none tells it>"}]}. '
+                    "Only leave quote empty when no sentence in the chapter tells that memory.")},
                 {"role": "user", "content": f"SOURCE MEMORIES:\n{listing}\n\nCHAPTER:\n{chapter_text}"},
             ],
             temperature=0,
-            max_tokens=200,
+            max_tokens=2500,
             response_format={"type": "json_object"},
         )
         parsed = json.loads(response.choices[0].message.content)
-        valid = range(1, len(memory_texts) + 1)
-        return sorted({int(i) for i in parsed.get("missing", []) if str(i).isdigit() and int(i) in valid})
+        flat = " ".join(chapter_text.split()).lower()
+        found = set()
+        for item in parsed.get("memories", []):
+            quote = " ".join(str(item.get("quote") or "").split()).lower().strip(' ."\'')
+            # the quote must really be in the chapter (first 40 chars is enough
+            # to tolerate small copy differences at the end)
+            if len(quote) >= 15 and quote[:40] in flat:
+                try:
+                    found.add(int(item.get("n")))
+                except (TypeError, ValueError):
+                    pass
+        return [i for i in range(1, len(memory_texts) + 1) if i not in found]
 
     async def generate_chapter_summary(self, content: str) -> Optional[str]:
         """Generate a 2-sentence summary of a chapter for continuity."""
@@ -1130,6 +1161,23 @@ Two-sentence summary:"""
         logger.info(f"Wrote chapter '{title}' for tenant {tenant_id} "
                     f"({len(chapter.get('memory_ids', []))} memories, missing {missing})")
         return draft_id
+
+    async def recheck_coverage(self, draft: Dict, tenant_id: int) -> List[int]:
+        """Re-audit a saved draft's prose against its memories. Returns the
+        ids of memories its prose does not tell."""
+        import asyncio
+        mems = [m for m in (self.db.get_memory_by_id(i, tenant_id=tenant_id)
+                            for i in _draft_ids(draft)) if m]
+        mems.sort(key=lambda m: (m.get("estimated_year") or 9999, m.get("id", 0)))
+        texts = []
+        for i, m in enumerate(mems, 1):
+            story = self.db.get_story_by_id(m["story_id"], tenant_id=tenant_id) if m.get("story_id") else None
+            text = ((story or {}).get("corrected_transcript") or (story or {}).get("transcript")
+                    or m.get("text") or "")
+            texts.append(f"Memory {i} ({m.get('speaker') or 'someone'}): {text}")
+        missing = await asyncio.to_thread(self._find_missing_memories,
+                                          strip_heading(draft.get("content") or ""), texts)
+        return [mems[i - 1]["id"] for i in missing]
 
     async def _suggest_title(self, content: str, taken: set) -> Optional[str]:
         """A short, warm title for a chapter whose template title is generic."""
