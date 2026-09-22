@@ -145,3 +145,32 @@ def test_pdf_prints_every_memory(db):
     flat = re.sub(r"\s+", " ", text)
     for t in texts:
         assert t in flat, f"missing from PDF: {t}"
+
+
+def test_audio_only_recording_is_in_the_book_as_a_qr(db):
+    sid = db.save_story(transcript="(no transcription — audio saved)",
+                        audio_s3_key="web_kids.wav", source="web_recording", tenant_id=TID)
+    cov = BookBuilder(db).book_coverage(TID)
+    entry = next(s for s in cov["stories"] if s["story_id"] == sid)
+    assert entry["state"] == "in_book"
+    assert entry["chapter"].startswith("Voice Recordings")
+
+
+def test_audio_only_qr_label_uses_title_then_date():
+    from core.book_pdf import _qr_label
+    base = {"transcript": "(no transcription — audio saved)", "created_at": "2025-12-25 08:01:00"}
+    assert _qr_label(base, 60) == "Voice recording, Dec 25, 2025"
+    assert _qr_label({**base, "question_text": "Christmas morning chaos"}, 60) == "Christmas morning chaos"
+
+
+def test_book_toggle_removes_the_qr_too(db):
+    pytest.importorskip("reportlab")
+    from core.book_pdf import LegacyBookPDF
+    keep, _ = add(db, "Keep this story please", "ordinary_world", "childhood")
+    drop, dmid = add(db, "Drop this story please", "ordinary_world", "childhood", in_book=0)
+    conn = db._get_connection()
+    conn.execute("UPDATE stories SET audio_s3_key = 'a' || id || '.wav' WHERE id IN (?, ?)", (keep, drop))
+    conn.commit()
+    pdf = LegacyBookPDF(db, BookBuilder(db), tenant_id=TID)
+    orphans = pdf._get_orphan_audio([], set(), set())
+    assert [o["audio_key"] for o in orphans] == [f"a{keep}.wav"]

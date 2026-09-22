@@ -5,7 +5,7 @@
 <a href="/web/book" class="text-emerald-600 hover:underline text-sm">&larr; Legacy Book</a>
 <div class="mb-4 sm:mb-6 mt-1">
     <h1 class="text-xl sm:text-2xl font-bold">Is every story in my book?</h1>
-    <p class="text-sm text-gray-500 mt-1">Every story you've saved, and exactly where it lands in the printed book.</p>
+    <p class="text-sm text-gray-500 mt-1">Every story you've saved, and exactly where it lands in the printed book. Recordings with no words print as a QR code &mdash; scan it to hear the moment.</p>
 </div>
 
 {% set missing = coverage.total - coverage.in_book %}
@@ -52,7 +52,7 @@
             <span class="text-xs font-medium text-emerald-700">{{ s.chapter }}</span>
             <span class="text-xs text-gray-400">&middot; {{ s.mode }}</span>
         </div>
-        <p class="text-sm text-gray-600 truncate">{{ s.preview }}</p>
+        <p class="text-sm text-gray-600 truncate">{% if s.preview %}{{ s.preview }}{% else %}&#x1F399; Voice recording, {{ s.created_at[:10] if s.created_at else '' }} &mdash; <span class="text-gray-400">add a title on its edit page</span>{% endif %}</p>
     </a>
     {% endfor %}
 </div>

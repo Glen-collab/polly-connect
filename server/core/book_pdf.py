@@ -224,6 +224,25 @@ def _generate_qr_image(url: str, size_px: int = 120) -> Optional[io.BytesIO]:
         return None
 
 
+def _qr_label(story: dict, limit: int) -> str:
+    """Caption under a story's QR code: its title/question, else the start of
+    what was said, else — for audio-only moments (kids playing, Christmas
+    chaos) — the date it was recorded."""
+    title = (story.get("question_text") or "").strip()
+    if title:
+        return title
+    text = ((story.get("corrected_transcript") or "").strip()
+            or (story.get("transcript") or "").strip())
+    if text and not text.startswith("(no transcription"):
+        return text[:limit].strip() + ("..." if len(text) > limit else "")
+    from datetime import datetime
+    try:
+        when = datetime.strptime((story.get("created_at") or "")[:10], "%Y-%m-%d")
+        return f"Voice recording, {when.strftime('%b')} {when.day}, {when.year}"
+    except ValueError:
+        return "Voice recording"
+
+
 class LegacyBookPDF:
     """Generates a print-ready 6x9 PDF for a family legacy book."""
 
@@ -844,17 +863,8 @@ class LegacyBookPDF:
                 ).fetchone()
                 if mem_row:
                     speaker = mem_row[0] or ""
-                item["speaker"] = speaker
-                # Get story snippet for QR label
-                transcript = story.get("corrected_transcript") or story.get("transcript") or ""
-                question = story.get("question_text") or ""
-                if question:
-                    item["qr_label"] = question
-                elif transcript:
-                    snippet = transcript[:50].strip()
-                    if len(transcript) > 50:
-                        snippet += "..."
-                    item["qr_label"] = snippet
+                item["speaker"] = speaker or (story.get("speaker_name") or "").strip()
+                item["qr_label"] = _qr_label(story, 50)
                 global_used_audio.add(audio_key)
                 has_content = True
 
@@ -892,8 +902,9 @@ class LegacyBookPDF:
             conn.row_factory = sqlite3.Row
             all_stories = conn.execute(
                 "SELECT s.id, s.audio_s3_key, s.qr_in_book, s.photo_id, s.photo_in_book, "
-                "s.question_text, COALESCE(s.corrected_transcript, s.transcript) as transcript "
-                "FROM stories s WHERE s.tenant_id = ? AND s.audio_s3_key IS NOT NULL",
+                "s.question_text, s.transcript, s.corrected_transcript, s.speaker_name, s.created_at "
+                "FROM stories s WHERE s.tenant_id = ? AND s.audio_s3_key IS NOT NULL "
+                "ORDER BY s.created_at, s.id",
                 (self.tenant_id,)
             ).fetchall()
         finally:
@@ -913,27 +924,17 @@ class LegacyBookPDF:
             conn = self.db._get_connection()
             try:
                 mem = conn.execute(
-                    "SELECT speaker FROM memories WHERE story_id = ? LIMIT 1",
+                    "SELECT speaker, COALESCE(include_in_book, 1) FROM memories WHERE story_id = ? LIMIT 1",
                     (s["id"],)
                 ).fetchone()
             finally:
                 if not self.db._conn:
                     conn.close()
+            if mem and not mem[1]:
+                continue  # taken out of the book with 📖 — its QR goes too
 
-            speaker = mem[0] if mem else ""
-
-            # Build a label (story description only — speaker is separate)
-            question = s.get("question_text", "")
-            transcript = s.get("transcript", "")
-            if question:
-                label = question
-            elif transcript:
-                snippet = transcript[:60].strip()
-                if len(transcript) > 60:
-                    snippet += "..."
-                label = snippet
-            else:
-                label = "Voice recording"
+            speaker = (mem[0] if mem else "") or (s.get("speaker_name") or "").strip()
+            label = _qr_label(s, 60)
 
             seen_audio.add(audio_key)
             orphans.append({

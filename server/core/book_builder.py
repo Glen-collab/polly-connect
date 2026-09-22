@@ -402,7 +402,9 @@ class BookBuilder:
             rows = conn.execute("""
                 SELECT s.id, s.created_at, s.source,
                        COALESCE(NULLIF(TRIM(s.corrected_transcript), ''), s.transcript, '') AS text,
-                       m.id AS mid, COALESCE(m.include_in_book, 1) AS inb
+                       m.id AS mid, COALESCE(m.include_in_book, 1) AS inb,
+                       (COALESCE(s.audio_s3_key, '') != '' AND COALESCE(s.qr_in_book, 1) = 1) AS has_qr,
+                       s.question_text
                 FROM stories s
                 LEFT JOIN memories m ON m.story_id = s.id AND m.tenant_id = s.tenant_id
                 WHERE s.tenant_id = ?
@@ -413,20 +415,31 @@ class BookBuilder:
                 conn.close()
 
         out, seen = [], set()
-        for sid, created, source, text, mid, inb in rows:
+        for sid, created, source, text, mid, inb, has_qr, title in rows:
             if sid in seen:        # a story with >1 memory: first one decides
                 continue
             seen.add(sid)
             text = (text or "").strip()
+            no_words = not text or text.startswith("(no transcription")
             entry = {"story_id": sid, "created_at": created, "source": source,
-                     "preview": text[:140], "memory_id": mid,
+                     "preview": (title or "").strip() if no_words else text[:140],
+                     "memory_id": mid, "has_qr": bool(has_qr),
                      "chapter": None, "mode": None, "reason": None}
-            if mid is None:
+            if mid is None and has_qr and (no_words or len(text) < 10):
+                # Audio-only moments (kids playing, Christmas chaos): the QR
+                # code IS the story — it prints in the Voice Recordings section.
+                entry["state"] = "in_book"
+                entry["chapter"] = "Voice Recordings (end of book)"
+                entry["mode"] = "QR code only — scan to hear it"
+            elif mid is None:
                 entry["state"] = "no_memory"
-                if not text or text.startswith("(no transcription"):
-                    entry["reason"] = "No words yet — the recording didn't transcribe. Type the story on its edit page."
+                if no_words:
+                    entry["reason"] = "No words and no recording to link — type the story on its edit page."
                 elif len(text) < 10:
                     entry["reason"] = "Too short to place in a chapter."
+                elif has_qr:
+                    entry["reason"] = ("Never sorted into a chapter. Its QR code prints in "
+                                       "Voice Recordings, but the words aren't in the book yet.")
                 else:
                     entry["reason"] = "Never sorted into a chapter."
             elif not inb:
@@ -435,6 +448,8 @@ class BookBuilder:
             elif mid in where:
                 entry["state"] = "in_book"
                 entry["chapter"], entry["mode"] = where[mid]
+                if has_qr:
+                    entry["mode"] += " + QR code"
             else:
                 # Should be impossible — every in-book memory is placed.
                 entry["state"] = "no_memory"
