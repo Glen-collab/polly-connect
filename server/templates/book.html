@@ -71,22 +71,22 @@
 <!-- Progress Overview -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
     <div class="bg-white rounded-lg shadow p-4 text-center">
-        <h3 class="text-gray-500 text-xs">Memories</h3>
+        <h3 class="text-gray-500 text-xs">Stories</h3>
         <p class="text-2xl font-bold text-emerald-600">{{ progress.total_memories }}</p>
-        <p class="text-xs text-gray-400">for your book</p>
+        <p class="text-xs text-gray-400">in your book</p>
     </div>
     <div class="bg-white rounded-lg shadow p-4 text-center">
         <h3 class="text-gray-500 text-xs">Chapters</h3>
-        <p class="text-2xl font-bold text-blue-600">{{ progress.chapters_ready }}</p>
-        <p class="text-xs text-gray-400">of {{ progress.total_chapters_outlined }} outlined</p>
+        <p class="text-2xl font-bold text-blue-600">{{ progress.total_chapters_outlined }}</p>
+        <p class="text-xs text-gray-400">{{ progress.chapters_ready }} written</p>
     </div>
     <div class="bg-white rounded-lg shadow p-4 text-center">
-        <h3 class="text-gray-500 text-xs">Est. Pages</h3>
-        <p class="text-2xl font-bold text-purple-600">{{ progress.estimated_pages }}</p>
-        <p class="text-xs text-gray-400">target: {{ progress.target_pages }}</p>
+        <h3 class="text-gray-500 text-xs">Pages</h3>
+        <p class="text-2xl font-bold text-purple-600">~{{ progress.estimated_pages }}</p>
+        <p class="text-xs text-gray-400">in the printed book</p>
     </div>
     <div class="bg-white rounded-lg shadow p-4 text-center">
-        <h3 class="text-gray-500 text-xs">Complete</h3>
+        <h3 class="text-gray-500 text-xs">Written</h3>
         <p class="text-2xl font-bold text-amber-600">{{ progress.percent_complete }}%</p>
         <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
             <div class="bg-amber-500 h-2 rounded-full" style="width: {{ progress.percent_complete }}%"></div>
@@ -154,7 +154,7 @@
     <h2 class="text-base font-semibold text-emerald-800 mb-2">What's Next?</h2>
     <p class="text-sm text-emerald-700">{{ gap_report }}</p>
     {% if progress.percent_complete >= 100 %}
-    <p class="text-sm text-emerald-700 mt-2 font-medium">You have enough memories for a full book! Head to the chapters page to review and generate drafts.</p>
+    <p class="text-sm text-emerald-700 mt-2 font-medium">Every chapter is written and up to date. Export your book below whenever you like &mdash; new stories keep weaving in as you add them.</p>
     {% endif %}
 </div>
 

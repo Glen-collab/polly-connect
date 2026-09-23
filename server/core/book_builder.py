@@ -675,34 +675,52 @@ class BookBuilder:
             ch["uncovered_ids"] = [m for m in ch.get("memory_ids", []) if m not in told]
 
     def get_book_progress(self, speaker: str = None, tenant_id: int = None) -> Dict:
-        """Get overall book-building progress stats."""
-        memories = self.db.get_memories(speaker=speaker, limit=9999, tenant_id=tenant_id)
+        """Book stats for the Legacy Book page and hubs.
+
+        chapters_ready = chapters written and current (a stale one is about
+        to be refreshed); percent_complete = share of chapters written;
+        estimated_pages is worked out from what will actually print —
+        calibrated on a real 73-page export: 6 pages front/back, half a page
+        per chapter opening, 300 words a page, 0.6 per photo, 0.2 per QR.
+        """
+        memories = self.db.get_memories(speaker=speaker, limit=9999, tenant_id=tenant_id,
+                                        in_book_only=True)
         outline = self.generate_chapter_outline(speaker, tenant_id=tenant_id)
-        ready_chapters = [c for c in outline if c["status"] == "ready"]
-
-        # Get actual page count if available (saved during PDF export)
-        actual_pages = 0
         if tenant_id:
-            try:
-                conn = self.db._get_connection()
-                row = conn.execute(
-                    "SELECT book_page_count FROM user_profiles WHERE tenant_id = ? LIMIT 1",
-                    (tenant_id,)
-                ).fetchone()
-                if row and row[0]:
-                    actual_pages = row[0]
-            except Exception:
-                pass
+            self.match_drafts(outline, self.db.get_chapter_drafts(tenant_id=tenant_id))
+        written = [c for c in outline if c.get("draft") and not c.get("draft_stale")]
 
-        est_pages = actual_pages if actual_pages else len(memories) * 2
+        words, photos, qrs = 0, 0, 0
+        for c in outline:
+            if c.get("draft"):
+                words += len((c["draft"].get("content") or "").split())
+            for mid in c.get("uncovered_ids", c["memory_ids"]):
+                m = self.db.get_memory_by_id(mid, tenant_id=tenant_id)
+                story = self.db.get_story_by_id(m["story_id"], tenant_id=tenant_id)                     if m and m.get("story_id") else None
+                if story:
+                    words += len(((story.get("corrected_transcript") or story.get("transcript")
+                                   or "")).split())
+        if tenant_id:
+            conn = self.db._get_connection()
+            try:
+                photos = conn.execute(
+                    "SELECT COUNT(*) FROM stories WHERE tenant_id = ? AND photo_id IS NOT NULL "
+                    "AND COALESCE(photo_in_book, 1) = 1", (tenant_id,)).fetchone()[0]
+                qrs = conn.execute(
+                    "SELECT COUNT(*) FROM stories WHERE tenant_id = ? AND COALESCE(audio_s3_key, '') != '' "
+                    "AND COALESCE(qr_in_book, 1) = 1", (tenant_id,)).fetchone()[0]
+            finally:
+                if not self.db._conn:
+                    conn.close()
+        est_pages = round(6 + 0.5 * len(outline) + words / 300 + 0.6 * photos + 0.2 * qrs)             if outline else 0
 
         return {
             "total_memories": len(memories),
             "total_chapters_outlined": len(outline),
-            "chapters_ready": len(ready_chapters),
+            "chapters_ready": len(written),
             "estimated_pages": est_pages,
             "target_pages": 175,
-            "percent_complete": min(100, int((est_pages / 175) * 100)) if est_pages else 0,
+            "percent_complete": int(100 * len(written) / len(outline)) if outline else 0,
         }
 
     async def generate_chapter_draft(self, chapter: Dict,

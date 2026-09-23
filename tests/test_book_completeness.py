@@ -501,3 +501,19 @@ def test_answered_web_question_is_not_asked_again(db):
     assert qe.get_next_question(user_id=1, tenant_id=TID)["id"] == "q1"
     db.save_story(transcript="On the farm", tenant_id=TID, question_text="Where did you grow up?")
     assert qe.get_next_question(user_id=1, tenant_id=TID)["id"] == "q2"
+
+
+def test_progress_counts_written_chapters_and_real_pages(db):
+    bb = BookBuilder(db)
+    for i in range(3):
+        add(db, f"Kid {i}", "ordinary_world", "childhood")
+        add(db, f"Adult {i}", "ordinary_world", "adult")
+    outline = bb.generate_chapter_outline(tenant_id=TID)
+    ch = outline[0]
+    db.save_chapter_draft(chapter_number=1, title=ch["title"], bucket=ch["bucket"], life_phase=ch["life_phase"],
+                          memory_ids=json.dumps(ch["memory_ids"]), content="word " * 600, tenant_id=TID)
+    p = bb.get_book_progress(tenant_id=TID)
+    assert (p["total_chapters_outlined"], p["chapters_ready"], p["percent_complete"]) == (2, 1, 50)
+    assert p["total_memories"] == 6
+    # 6 + 0.5*2 chapters + (600 prose + 6 words verbatim)/300
+    assert p["estimated_pages"] == 9
