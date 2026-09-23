@@ -403,3 +403,88 @@ def test_family_tree_reaches_the_sorter(db):
     ctx = web._family_context(db, TID)
     assert "belongs to Glen, born 1978" in ctx and "Brooklyn: daughter, born 2019" in ctx
     assert "Pal" not in ctx   # friends aren't family context
+
+
+# ── Owner placement, thin spots, questions ──
+
+def _owner_and_kid(db):
+    conn = db._get_connection()
+    conn.execute("INSERT INTO user_profiles (tenant_id, name, familiar_name, birth_year) "
+                 "VALUES (?, 'Glen Rogers', 'Glen', 1978)", (TID,))
+    conn.execute("INSERT INTO family_members (name, name_normalized, relationship, birth_year, tenant_id) "
+                 "VALUES ('Ali Rogers', 'ali rogers', 'wife', 1989, ?)", (TID,))
+    conn.commit()
+    conn.close()
+
+
+def test_a_year_places_the_story_in_the_tellers_life(db):
+    import api.web as web
+    _owner_and_kid(db)
+    _, glen = add(db, "Brooklyn reading at the end of 1st grade", "ordinary_world", "childhood")
+    _, ali = add(db, "My first apartment", "ordinary_world", "childhood")
+    conn = db._get_connection()
+    conn.execute("UPDATE memories SET speaker = 'Ali' WHERE id = ?", (ali,))
+    web._place_by_year(conn, TID, glen, 2026)   # Glen, 48 -> adult
+    web._place_by_year(conn, TID, ali, 2010)    # Ali, 21 -> young adult
+    conn.commit()
+    rows = dict(conn.execute("SELECT id, life_phase || '/' || placed_by_user || '/' || year_confidence "
+                             "FROM memories").fetchall())
+    conn.close()
+    assert rows[glen] == "adult/1/user" and rows[ali] == "young_adult/1/user"
+
+
+def test_ai_resort_never_overrides_the_owner(db):
+    import api.web as web
+    sid, mid = add(db, "Moved by hand", "ordinary_world", "adult")
+    conn = db._get_connection()
+    conn.execute("UPDATE memories SET placed_by_user = 1 WHERE id = ?", (mid,))
+    conn.commit()
+    conn.close()
+    web._apply_gpt_classification(db, sid, TID, {"bucket": "transformation", "life_phase": "childhood"},
+                                  fallback_text="Moved by hand")
+    m = db.get_memory_by_id(mid, tenant_id=TID)
+    assert (m["bucket"], m["life_phase"]) == ("ordinary_world", "adult")
+
+
+def test_pinned_story_joins_that_chapter(db):
+    bb = BookBuilder(db)
+    kids = [add(db, f"Kid {i}", "ordinary_world", "childhood")[1] for i in range(3)]
+    adults = [add(db, f"Adult {i}", "ordinary_world", "adult")[1] for i in range(3)]
+    for ch in bb.generate_chapter_outline(tenant_id=TID):
+        db.save_chapter_draft(chapter_number=ch["chapter_number"], title=ch["title"], bucket=ch["bucket"],
+                              life_phase=ch["life_phase"], memory_ids=json.dumps(ch["memory_ids"]),
+                              content="P.", tenant_id=TID)
+    adult_draft = next(d for d in db.get_chapter_drafts(tenant_id=TID) if d["life_phase"] == "adult")
+    conn = db._get_connection()
+    conn.execute("UPDATE memories SET pinned_draft_id = ?, placed_by_user = 1 WHERE id = ?",
+                 (adult_draft["id"], kids[0]))
+    conn.commit()
+    conn.close()
+    chapters = bb.generate_chapter_outline(tenant_id=TID)
+    adult = next(c for c in chapters if c.get("draft_id") == adult_draft["id"])
+    assert kids[0] in adult["memory_ids"]
+    assert all(kids[0] not in c["memory_ids"] for c in chapters if c is not adult)
+
+
+def test_thin_spots_find_short_chapters_and_untold_stages(db):
+    _owner_and_kid(db)
+    bb = BookBuilder(db)
+    for i in range(6):
+        add(db, f"Kid {i}", "ordinary_world", "childhood")
+    add(db, "One hard year", "trials_allies_enemies", "adult")
+    add(db, "Another hard year", "trials_allies_enemies", "adult")
+    spots = bb.thin_spots(TID)
+    untold = {s["life_phase"] for s in spots if s["title"] is None}
+    assert untold == {"adolescence", "young_adult"}          # lived, no stories yet
+    assert any(s["title"] and s["life_phase"] == "adult" for s in spots)
+    assert all(s["life_phase"] != "childhood" for s in spots)  # 6 stories: not thin
+
+
+def test_answered_web_question_is_not_asked_again(db):
+    from core.question_engine import QuestionEngine
+    week = [{"id": "q1", "question": "Where did you grow up?"}, {"id": "q2", "question": "Who taught you to fish?"}]
+    qe = QuestionEngine(db, type("D", (), {"questions": [{"week": 1, "questions": week}]})())
+    qe.get_current_week = lambda: 1
+    assert qe.get_next_question(user_id=1, tenant_id=TID)["id"] == "q1"
+    db.save_story(transcript="On the farm", tenant_id=TID, question_text="Where did you grow up?")
+    assert qe.get_next_question(user_id=1, tenant_id=TID)["id"] == "q2"

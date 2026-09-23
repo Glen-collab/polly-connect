@@ -216,6 +216,7 @@ var recordingStart = null;
 var timerInterval = null;
 var analyser = null;
 var currentQuestion = null;
+var askCount = 0;  // "Different question" walks the book's thin chapters, then the weekly bank
 
 function openRecorder() {
     currentQuestion = null;
@@ -227,13 +228,14 @@ function openRecorder() {
 
 async function askQuestion(reroll) {
     try {
-        var res = await fetch('/web/questions/next' + (reroll ? '?rand=1' : ''));
+        askCount = reroll ? askCount + 1 : 0;
+        var res = await fetch('/web/questions/next?n=' + askCount + (reroll ? '&rand=1' : ''));
         var data = await res.json();
         if (!data.ok) { alert(data.error || 'No questions available right now.'); return; }
         currentQuestion = data.question;
         var theme = data.theme ? String(data.theme).replace(/_/g, ' ') : '';
-        document.getElementById('question-theme').textContent =
-            theme + (data.week ? (theme ? ' · ' : '') + 'week ' + data.week : '');
+        document.getElementById('question-theme').textContent = data.label ||
+            (theme + (data.week ? (theme ? ' · ' : '') + 'week ' + data.week : ''));
         document.getElementById('question-text-display').textContent = data.question;
         document.getElementById('question-banner').classList.remove('hidden');
         document.getElementById('recorder-modal').classList.remove('hidden');

@@ -86,6 +86,27 @@ def strip_heading(text: str) -> str:
     return text
 
 
+# Life stage by age at the time (matches the classifier's guide)
+def phase_for_age(age: int) -> str:
+    if age <= 12:
+        return "childhood"
+    if age <= 18:
+        return "adolescence"
+    if age <= 30:
+        return "young_adult"
+    if age <= 50:
+        return "adult"
+    if age <= 70:
+        return "midlife"
+    return "elder"
+
+
+PHASE_LABELS_PLAIN = {"childhood": "childhood", "adolescence": "teenage years",
+                      "young_adult": "young adult years", "adult": "adult years",
+                      "midlife": "middle years", "elder": "later years",
+                      "reflection": "reflections looking back"}
+
+
 def _placement(mem: Dict) -> str:
     return f"{mem.get('bucket') or 'ordinary_world'}/{mem.get('life_phase') or 'unknown'}"
 
@@ -309,7 +330,13 @@ class BookBuilder:
         by_id = {m["id"]: m for m in memories}
         claimed = set()
         if tenant_id:
-            for d in self.db.get_chapter_drafts(tenant_id=tenant_id):
+            drafts_now = self.db.get_chapter_drafts(tenant_id=tenant_id)
+            draft_ids_now = {d["id"] for d in drafts_now}
+            # "Move to this chapter": a pinned story belongs to that written
+            # chapter no matter how it is sorted
+            pinned = {m["id"]: m["pinned_draft_id"] for m in memories
+                      if m.get("pinned_draft_id") in draft_ids_now}
+            for d in drafts_now:
                 # A story stays anchored unless its own placement changed
                 # since the chapter was written (re-sorted, or moved by the
                 # owner) — then it goes where it now belongs and both
@@ -319,7 +346,10 @@ class BookBuilder:
                 except (ValueError, TypeError):
                     placed_as = {}
                 ids = [i for i in _draft_ids(d) if i in by_id and i not in claimed
-                       and placed_as.get(str(i), _placement(by_id[i])) == _placement(by_id[i])]
+                       and pinned.get(i, d["id"]) == d["id"]
+                       and (i in pinned or placed_as.get(str(i), _placement(by_id[i]))
+                            == _placement(by_id[i]))]
+                ids += [i for i, pd in pinned.items() if pd == d["id"] and i not in ids and i not in claimed]
                 if not ids:
                     continue
                 claimed.update(ids)
@@ -1210,6 +1240,81 @@ Two-sentence summary:"""
             if m:
                 out[str(i)] = _placement(m)
         return out
+
+    def thin_spots(self, tenant_id: int, min_stories: int = 5) -> List[Dict]:
+        """Where the book needs stories, thinnest first: chapters with fewer
+        than min_stories, then earlier life stages with no chapter at all
+        (only stages the owner has already lived)."""
+        outline = self.generate_chapter_outline(tenant_id=tenant_id)
+        spots = [{"title": c["title"], "bucket": c["bucket"], "life_phase": c["life_phase"],
+                  "memory_ids": c["memory_ids"], "count": c["memory_count"]}
+                 for c in outline if c["memory_count"] < min_stories
+                 and c["life_phase"] != "unknown"]
+        spots.sort(key=lambda s: (s["count"], PHASE_ORDER.index(s["life_phase"])
+                                  if s["life_phase"] in PHASE_ORDER else 99))
+        born = self._owner_birth_year(tenant_id)
+        if born:
+            from datetime import datetime
+            lived = phase_for_age(datetime.now().year - born)
+            have = {c["life_phase"] for c in outline}
+            for p in PHASE_ORDER[:PHASE_ORDER.index(lived) + 1]:
+                if p not in have:
+                    spots.insert(0, {"title": None, "bucket": None, "life_phase": p,
+                                     "memory_ids": [], "count": 0})
+        return spots
+
+    def _owner_birth_year(self, tenant_id: int) -> Optional[int]:
+        conn = self.db._get_connection()
+        try:
+            row = conn.execute("SELECT birth_year FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+                               (tenant_id,)).fetchone()
+            return row[0] if row and row[0] else None
+        finally:
+            if not self.db._conn:
+                conn.close()
+
+    def gap_question(self, spot: Dict, tenant_id: int, family: str = "") -> Optional[str]:
+        """One warm question that invites a NEW story for a thin chapter
+        (or an untold life stage), written from what it already holds."""
+        told = []
+        for mid in spot["memory_ids"][:8]:
+            m = self.db.get_memory_by_id(mid, tenant_id=tenant_id)
+            if m:
+                told.append("- " + ((m.get("text_summary") or "").strip()
+                                    or (m.get("text") or "")[:200].strip()))
+        stage = PHASE_LABELS_PLAIN.get(spot["life_phase"], spot["life_phase"])
+        born = self._owner_birth_year(tenant_id)
+        when = ""
+        spans = {"childhood": (0, 12), "adolescence": (13, 18), "young_adult": (19, 30),
+                 "adult": (31, 50), "midlife": (51, 70)}
+        if born and spot["life_phase"] in spans:
+            from datetime import datetime
+            a, b = spans[spot["life_phase"]]
+            b = min(b, datetime.now().year - born)   # never a range into the future
+            when = f" (about {born + a}-{born + b}, ages {a}-{b})"
+        target = (f'the chapter "{spot["title"]}", about the storyteller\'s {stage}{when}'
+                  f'{", theme: " + spot["bucket"].replace("_", " ") if spot.get("bucket") else ""}'
+                  if spot["title"] else f"the storyteller's {stage}{when}, which has no stories yet")
+        prompt = (
+            f"You help someone record their family legacy book. {family}\n\n"
+            f"Their book needs more stories for {target}.\n"
+            + (("Stories already told there (do NOT ask about these again):\n"
+                + "\n".join(told) + "\n") if told else "")
+            + ("\nThis is a reflections chapter: ask for a lesson, belief or piece of advice "
+               "they would pass on today — not a past event.\n"
+               if spot["life_phase"] == "reflection" else
+               "\nAsk about a specific moment from that time of life, not a general feeling.\n")
+            + "\nWrite ONE question the way a curious grandchild would ask it: plain, "
+              "friendly, everyday words, one thing at a time (no 'and how did that...' add-ons). "
+              "Speak to them as 'you'. Name a family member only if the question is really "
+              "about that person. Under 25 words. Reply with the question only.")
+
+        response = self.followup_gen._client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=80, temperature=0.8)
+        q = response.choices[0].message.content.strip().strip('"').strip()
+        return q or None
 
     async def _suggest_title(self, content: str, taken: set) -> Optional[str]:
         """A short, warm title for a chapter whose template title is generic."""

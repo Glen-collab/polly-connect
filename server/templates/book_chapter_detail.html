@@ -192,6 +192,42 @@
                 {% endfor %}
             </div>
             <p class="text-sm text-gray-600">{{ mem.text or mem.text_summary }}</p>
+            <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                {% if mem.estimated_year %}
+                <span class="text-gray-400">{{ mem.estimated_year }}</span>
+                {% elif mem.life_phase != 'reflection' %}
+                {# reflections are lessons told from today: no "when" to ask #}
+                <span class="text-amber-700">&#x1F4C5; When did this happen?</span>
+                <span class="inline-flex items-center gap-1">
+                    <input type="number" id="yr-{{ mem.id }}" min="1800" max="2100" placeholder="Year"
+                           class="w-20 border rounded px-1.5 py-0.5">
+                    <button type="button" onclick="placeMem({{ mem.id }}, 'yr-{{ mem.id }}')"
+                            class="text-emerald-700 underline">Save</button>
+                </span>
+                {% endif %}
+                <button type="button" onclick="document.getElementById('wrong-{{ mem.id }}').hidden = !document.getElementById('wrong-{{ mem.id }}').hidden"
+                        class="text-gray-400 hover:text-gray-600">Wrong chapter?</button>
+            </div>
+            <div id="wrong-{{ mem.id }}" hidden class="mt-2 text-xs bg-gray-50 border rounded p-2 space-y-2">
+                <div class="flex flex-wrap items-center gap-1">
+                    <span class="text-gray-600">When did it happen?</span>
+                    <input type="number" id="yr2-{{ mem.id }}" min="1800" max="2100" placeholder="Year"
+                           class="w-20 border rounded px-1.5 py-0.5">
+                    <button type="button" onclick="placeMem({{ mem.id }}, 'yr2-{{ mem.id }}')"
+                            class="text-emerald-700 underline">Save year</button>
+                    <span class="text-gray-400">&mdash; Polly moves it to the right time of life</span>
+                </div>
+                {% if move_targets %}
+                <div class="flex flex-wrap items-center gap-1">
+                    <span class="text-gray-600">Or move it to</span>
+                    <select id="mv-{{ mem.id }}" class="border rounded px-1 py-0.5 max-w-full">
+                        {% for t in move_targets %}<option value="{{ t.value }}">{{ t.label }}</option>{% endfor %}
+                    </select>
+                    <button type="button" onclick="moveMem({{ mem.id }})" class="text-emerald-700 underline">Move</button>
+                </div>
+                {% endif %}
+            </div>
+            <p id="placed-{{ mem.id }}" class="text-xs text-emerald-700 mt-1" hidden></p>
             {% if mem.audio_key %}
             <audio controls preload="none" class="h-8 mt-2">
                 <source src="/static/recordings/{{ mem.audio_key }}" type="audio/wav">
@@ -214,6 +250,31 @@
 
 {% block scripts %}
 <script>
+function placeMem(memId, inputId) {
+    var year = (document.getElementById(inputId).value || '').trim();
+    if (!year) return;
+    sendPlace(memId, 'year=' + encodeURIComponent(year));
+}
+function moveMem(memId) {
+    sendPlace(memId, 'target=' + encodeURIComponent(document.getElementById('mv-' + memId).value));
+}
+function sendPlace(memId, body) {
+    fetch('/web/book/memory/' + memId + '/place', {
+        method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        var msg = document.getElementById('placed-' + memId);
+        msg.hidden = false;
+        if (!d.ok) { msg.className = 'text-xs text-red-600 mt-1'; msg.textContent = d.error || 'Could not save.'; return; }
+        msg.className = 'text-xs text-emerald-700 mt-1';
+        msg.textContent = d.chapter === {{ chapter.title|tojson }}
+            ? 'Saved — it belongs right here.'
+            : 'Moved to Ch ' + d.chapter_number + ': ' + d.chapter + '. Both chapters will update.';
+        document.getElementById('mem-row-' + memId).style.opacity = d.chapter === {{ chapter.title|tojson }} ? '1' : '0.45';
+    });
+}
+
 function toggleMemBook(memId) {
     fetch('/web/book/memory/' + memId + '/toggle-book', { method: 'POST' })
     .then(function(r) { return r.json(); })

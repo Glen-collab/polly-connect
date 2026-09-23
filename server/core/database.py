@@ -739,6 +739,11 @@ class PollyDB:
                 "include_in_book": "ALTER TABLE memories ADD COLUMN include_in_book INTEGER DEFAULT 1",
                 "is_quote": "ALTER TABLE memories ADD COLUMN is_quote INTEGER DEFAULT 0",
                 "story_value": "ALTER TABLE memories ADD COLUMN story_value REAL",
+                # The owner dated or moved this story themselves: the AI
+                # sorter never overrides their placement
+                "placed_by_user": "ALTER TABLE memories ADD COLUMN placed_by_user INTEGER DEFAULT 0",
+                # "Move to this chapter": pinned to a written chapter's draft
+                "pinned_draft_id": "ALTER TABLE memories ADD COLUMN pinned_draft_id INTEGER",
             }
             for col, sql in mem_migrations.items():
                 if col not in cols:

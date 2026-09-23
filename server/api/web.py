@@ -1870,9 +1870,15 @@ async def story_edit_save(request: Request, story_id: int):
         try:
             yi = int(year_raw)
             if 1800 <= yi <= 2100:
-                conn.execute(
-                    "UPDATE memories SET estimated_year = ?, year_confidence = 'user' WHERE story_id = ?",
-                    (yi, story_id))
+                # A year the owner enters also places the story in the
+                # teller's life stage. The box is pre-filled with the AI's
+                # estimate, so an unchanged AI year is not the owner's word.
+                for mid, cur, conf in conn.execute(
+                        "SELECT id, estimated_year, year_confidence FROM memories "
+                        "WHERE story_id = ? AND tenant_id = ?",
+                        (story_id, session["tenant_id"])).fetchall():
+                    if yi != cur or conf == "user":
+                        _place_by_year(conn, session["tenant_id"], mid, yi)
         except (TypeError, ValueError):
             pass
         conn.commit()
@@ -2019,7 +2025,7 @@ async def story_inline_save(request: Request, story_id: int):
 
 
 @router.get("/questions/next")
-async def web_next_question(request: Request, rand: int = 0):
+async def web_next_question(request: Request, rand: int = 0, n: int = 0):
     """Return a guided question for the in-app 'Ask Me a Question' button.
 
     Default: next unanswered question for the current week (per user).
@@ -2037,12 +2043,34 @@ async def web_next_question(request: Request, rand: int = 0):
         return JSONResponse({"ok": False, "error": "Questions unavailable"})
 
     import random
+    db = request.app.state.db
+    tid = session["tenant_id"]
+
+    # Fill the book where it's thin: the n-th ask (0 = first, "Different
+    # question" counts up) targets the n-th thinnest chapter / untold life
+    # stage with a question written for it; past the last one, the weekly
+    # bank takes a turn, then it cycles.
+    bb = request.app.state.book_builder
+    if bb._ai_available:
+        try:
+            spots = bb.thin_spots(tid)
+            if spots and n % (len(spots) + 1) < len(spots):
+                spot = spots[n % (len(spots) + 1)]
+                gq = await asyncio.to_thread(bb.gap_question, spot, tid, _family_context(db, tid))
+                if gq:
+                    from core.book_builder import PHASE_LABELS_PLAIN
+                    label = (f"For your chapter: {spot['title']}" if spot["title"] else
+                             f"Your {PHASE_LABELS_PLAIN.get(spot['life_phase'], spot['life_phase'])}"
+                             " — no stories yet")
+                    return JSONResponse({"ok": True, "question": gq, "label": label,
+                                         "life_phase": spot["life_phase"]})
+        except Exception as e:
+            logger.warning(f"Gap question failed, using the weekly bank: {e}")
+
     q = None
     if not rand:
-        db = request.app.state.db
-        tid = session["tenant_id"]
         user = db.get_or_create_user(tenant_id=tid)
-        q = qe.get_next_question(user_id=user["id"])
+        q = qe.get_next_question(user_id=user["id"], tenant_id=tid)
     if not q:
         week_qs = qe.get_week_questions()
         if not week_qs:
@@ -3825,6 +3853,44 @@ def _family_context(db, tid: int) -> str:
     return "\n".join(lines)
 
 
+def _teller_birth_year(conn, tid: int, speaker: str = None):
+    """Birth year of whoever told the story: a family member whose name
+    matches the speaker, else the book's owner."""
+    owner = conn.execute(
+        "SELECT name, familiar_name, birth_year FROM user_profiles WHERE tenant_id = ? LIMIT 1",
+        (tid,)).fetchone()
+    spk = (speaker or "").strip().lower()
+    owner_first = {v.strip().lower().split()[0] for v in (owner or [None, None])[:2]
+                   if v and v.strip()}
+    if spk and spk.split()[0] not in owner_first:
+        for name, born in conn.execute(
+                "SELECT name, birth_year FROM family_members WHERE tenant_id = ? "
+                "AND birth_year IS NOT NULL", (tid,)).fetchall():
+            n = (name or "").strip().lower()
+            if n and (n == spk or n.split()[0] == spk.split()[0]):
+                return born
+    return owner[2] if owner else None
+
+
+def _place_by_year(conn, tid: int, memory_id: int, year: int) -> None:
+    """The owner says when it happened: date it and put it in the teller's
+    life stage at that age. Owner placements are never overridden by the AI."""
+    row = conn.execute("SELECT speaker FROM memories WHERE id = ? AND tenant_id = ?",
+                       (memory_id, tid)).fetchone()
+    if not row:
+        return
+    born = _teller_birth_year(conn, tid, row[0])
+    from core.book_builder import phase_for_age
+    if born and year >= born:
+        conn.execute("UPDATE memories SET estimated_year = ?, year_confidence = 'user', "
+                     "life_phase = ?, placed_by_user = 1, pinned_draft_id = NULL "
+                     "WHERE id = ? AND tenant_id = ?",
+                     (year, phase_for_age(year - born), memory_id, tid))
+    else:
+        conn.execute("UPDATE memories SET estimated_year = ?, year_confidence = 'user' "
+                     "WHERE id = ? AND tenant_id = ?", (year, memory_id, tid))
+
+
 def _gpt_classify_story(text: str, birth_year=None, include_formatting: bool = False,
                         question: str = None, family: str = None,
                         speaker: str = None) -> dict:
@@ -3944,9 +4010,11 @@ def _apply_gpt_classification(db, story_id: int, tid: int, parsed: dict,
         ).fetchone()
         if mem:
             # A year the owner typed in (year_confidence='user') always wins
+            # The owner's own placement (dated or moved it) always wins
             conn.execute("""
                 UPDATE memories
-                SET bucket = ?, life_phase = ?,
+                SET bucket = CASE WHEN COALESCE(placed_by_user, 0) = 1 THEN bucket ELSE ? END,
+                    life_phase = CASE WHEN COALESCE(placed_by_user, 0) = 1 THEN life_phase ELSE ? END,
                     estimated_year = CASE WHEN year_confidence = 'user' THEN estimated_year ELSE ? END,
                     text_summary = ?, text = ?,
                     people = ?, locations = ?, emotions = ?
@@ -8039,6 +8107,62 @@ async def book_memory_toggle(request: Request, memory_id: int):
             conn.close()
 
 
+@router.post("/book/memory/{memory_id}/place")
+async def book_memory_place(request: Request, memory_id: int):
+    """'Wrong chapter?' — the owner dates a story (year → life stage) or
+    moves it to a chapter. Either way it's their call: the AI sorter never
+    overrides it, and the chapters it leaves and joins refresh."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    if session.get("role") == "family":
+        return JSONResponse({"error": "Not allowed"}, status_code=403)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    form = await request.form()
+    year_raw = (form.get("year") or "").strip()
+    target = (form.get("target") or "").strip()
+    conn = db._get_connection()
+    try:
+        if not conn.execute("SELECT 1 FROM memories WHERE id = ? AND tenant_id = ?",
+                            (memory_id, tid)).fetchone():
+            return JSONResponse({"error": "Not found"}, status_code=404)
+        if year_raw:
+            try:
+                year = int(year_raw)
+            except ValueError:
+                return JSONResponse({"error": "Enter a year like 1994."}, status_code=400)
+            if not 1800 <= year <= 2100:
+                return JSONResponse({"error": "Enter a year like 1994."}, status_code=400)
+            _place_by_year(conn, tid, memory_id, year)
+        elif target.startswith("d:"):
+            d = conn.execute("SELECT id, bucket, life_phase FROM chapter_drafts "
+                             "WHERE id = ? AND tenant_id = ?", (int(target[2:]), tid)).fetchone()
+            if not d:
+                return JSONResponse({"error": "That chapter is gone."}, status_code=404)
+            conn.execute("UPDATE memories SET pinned_draft_id = ?, bucket = ?, life_phase = ?, "
+                         "placed_by_user = 1 WHERE id = ? AND tenant_id = ?",
+                         (d[0], d[1], d[2], memory_id, tid))
+        elif target.startswith("p:") and "/" in target:
+            bucket, phase = target[2:].split("/", 1)
+            from core.book_builder import LIFE_BUCKETS, PHASE_ORDER
+            if bucket not in LIFE_BUCKETS or phase not in PHASE_ORDER:
+                return JSONResponse({"error": "Unknown chapter."}, status_code=400)
+            conn.execute("UPDATE memories SET pinned_draft_id = NULL, bucket = ?, life_phase = ?, "
+                         "placed_by_user = 1 WHERE id = ? AND tenant_id = ?",
+                         (bucket, phase, memory_id, tid))
+        else:
+            return JSONResponse({"error": "Pick a year or a chapter."}, status_code=400)
+        conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    chapters = request.app.state.book_builder.generate_chapter_outline(tenant_id=tid)
+    home = next((c for c in chapters if memory_id in c["memory_ids"]), None)
+    return JSONResponse({"ok": True, "chapter": home["title"] if home else None,
+                         "chapter_number": home["chapter_number"] if home else None})
+
+
 @router.get("/book/coverage", response_class=HTMLResponse)
 async def book_coverage_page(request: Request):
     """Every story, and where it lands in the printed book (or why not)."""
@@ -8126,10 +8250,18 @@ async def book_chapter_detail(request: Request, chapter_num: int):
 
     message = request.query_params.get("msg")
 
+    # "Wrong chapter?" targets: written chapters pin to their draft; others
+    # move by their theme + life stage
+    move_targets = [
+        {"value": f"d:{c['draft']['id']}" if c["draft"] else f"p:{c['bucket']}/{c['life_phase']}",
+         "label": f"Ch {c['chapter_number']}: {c['title']}"}
+        for c in chapters if c["chapter_number"] != chapter_num]
+
     return templates.TemplateResponse("book_chapter_detail.html", {
         "request": request,
         "session": session,
         "chapter": chapter,
+        "move_targets": move_targets,
         "memories": memories,
         "draft": draft,
         "song": song,

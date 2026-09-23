@@ -44,8 +44,12 @@ class QuestionEngine:
             return self.data.questions[wrapped].get("questions", [])
         return []
 
-    def get_next_question(self, user_id: int = None) -> Optional[Dict]:
-        """Get the next unanswered question for this week."""
+    def get_next_question(self, user_id: int = None, tenant_id: int = None) -> Optional[Dict]:
+        """Get the next unanswered question for this week.
+
+        A question counts as answered if a session recorded it (device) or a
+        saved story carries its text (web — the web never wrote sessions, so
+        it offered the same first question all week)."""
         week = self.get_current_week()
         questions = self.get_week_questions(week)
 
@@ -62,6 +66,12 @@ class QuestionEngine:
                     (user_id, week)
                 ).fetchall()
                 answered_ids = {r[0] for r in rows}
+                if tenant_id:
+                    asked = {(r[0] or "").strip().lower() for r in conn.execute(
+                        "SELECT question_text FROM stories WHERE tenant_id = ? "
+                        "AND question_text IS NOT NULL", (tenant_id,)).fetchall()}
+                    answered_ids |= {q.get("id") for q in questions
+                                     if (q.get("question") or "").strip().lower() in asked}
             finally:
                 if not self.db._conn:
                     conn.close()
