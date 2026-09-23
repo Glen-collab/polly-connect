@@ -3883,7 +3883,8 @@ def _place_by_year(conn, tid: int, memory_id: int, year: int) -> None:
     from core.book_builder import phase_for_age
     if born and year >= born:
         conn.execute("UPDATE memories SET estimated_year = ?, year_confidence = 'user', "
-                     "life_phase = ?, placed_by_user = 1, pinned_draft_id = NULL "
+                     "life_phase = ?, placed_by_user = MAX(COALESCE(placed_by_user, 0), 1), "
+                     "pinned_draft_id = NULL "
                      "WHERE id = ? AND tenant_id = ?",
                      (year, phase_for_age(year - born), memory_id, tid))
     else:
@@ -4010,11 +4011,13 @@ def _apply_gpt_classification(db, story_id: int, tid: int, parsed: dict,
         ).fetchone()
         if mem:
             # A year the owner typed in (year_confidence='user') always wins
-            # The owner's own placement (dated or moved it) always wins
+            # The owner's own placement always wins: a year they gave fixes the
+            # life stage (placed_by_user=1); moving it to a chapter fixes the
+            # theme too (=2). Otherwise the AI decides.
             conn.execute("""
                 UPDATE memories
-                SET bucket = CASE WHEN COALESCE(placed_by_user, 0) = 1 THEN bucket ELSE ? END,
-                    life_phase = CASE WHEN COALESCE(placed_by_user, 0) = 1 THEN life_phase ELSE ? END,
+                SET bucket = CASE WHEN COALESCE(placed_by_user, 0) >= 2 THEN bucket ELSE ? END,
+                    life_phase = CASE WHEN COALESCE(placed_by_user, 0) >= 1 THEN life_phase ELSE ? END,
                     estimated_year = CASE WHEN year_confidence = 'user' THEN estimated_year ELSE ? END,
                     text_summary = ?, text = ?,
                     people = ?, locations = ?, emotions = ?
@@ -7983,6 +7986,7 @@ async def book_overview(request: Request):
     return templates.TemplateResponse("book.html", {
         "request": request,
         "session": session,
+        "needs_date": _needs_date(request, tid)["count"],
         "user": user,
         "progress": progress,
         "chapters": chapters,
@@ -8141,7 +8145,7 @@ async def book_memory_place(request: Request, memory_id: int):
             if not d:
                 return JSONResponse({"error": "That chapter is gone."}, status_code=404)
             conn.execute("UPDATE memories SET pinned_draft_id = ?, bucket = ?, life_phase = ?, "
-                         "placed_by_user = 1 WHERE id = ? AND tenant_id = ?",
+                         "placed_by_user = 2 WHERE id = ? AND tenant_id = ?",
                          (d[0], d[1], d[2], memory_id, tid))
         elif target.startswith("p:") and "/" in target:
             bucket, phase = target[2:].split("/", 1)
@@ -8149,7 +8153,7 @@ async def book_memory_place(request: Request, memory_id: int):
             if bucket not in LIFE_BUCKETS or phase not in PHASE_ORDER:
                 return JSONResponse({"error": "Unknown chapter."}, status_code=400)
             conn.execute("UPDATE memories SET pinned_draft_id = NULL, bucket = ?, life_phase = ?, "
-                         "placed_by_user = 1 WHERE id = ? AND tenant_id = ?",
+                         "placed_by_user = 2 WHERE id = ? AND tenant_id = ?",
                          (bucket, phase, memory_id, tid))
         else:
             return JSONResponse({"error": "Pick a year or a chapter."}, status_code=400)
@@ -8161,6 +8165,99 @@ async def book_memory_place(request: Request, memory_id: int):
     home = next((c for c in chapters if memory_id in c["memory_ids"]), None)
     return JSONResponse({"ok": True, "chapter": home["title"] if home else None,
                          "chapter_number": home["chapter_number"] if home else None})
+
+
+def _needs_date(request: Request, tid: int) -> dict:
+    """Stories that need the owner: never sorted into the book, or in the
+    book with no year (reflections excluded — lessons have no date)."""
+    bb = request.app.state.book_builder
+    db = request.app.state.db
+    unsorted = [s for s in bb.book_coverage(tid)["stories"]
+                if s["state"] == "no_memory" and s["reason"]
+                and s["reason"].startswith("Never sorted")]
+    chapters = bb.generate_chapter_outline(tenant_id=tid)
+    where = {m: c["title"] for c in chapters for m in c["memory_ids"]}
+    conn = db._get_connection()
+    try:
+        rows = conn.execute("""
+            SELECT m.id, m.story_id, m.speaker, s.created_at, s.question_text,
+                   COALESCE(NULLIF(TRIM(s.corrected_transcript), ''), s.transcript, m.text, '')
+            FROM memories m JOIN stories s ON s.id = m.story_id
+            WHERE m.tenant_id = ? AND COALESCE(m.include_in_book, 1) = 1
+              AND m.estimated_year IS NULL AND COALESCE(m.life_phase, '') != 'reflection'
+            ORDER BY s.created_at
+        """, (tid,)).fetchall()
+        texts = {r[0]: r[1] for r in conn.execute(
+            "SELECT id, COALESCE(NULLIF(TRIM(corrected_transcript), ''), transcript, '') "
+            "FROM stories WHERE tenant_id = ?", (tid,)).fetchall()}
+    finally:
+        if not db._conn:
+            conn.close()
+    undated = [{"story_id": r[1], "speaker": r[2], "created_at": r[3], "question": r[4],
+                "text": r[5], "chapter": where.get(r[0], "Appendix")} for r in rows]
+    for s in unsorted:
+        s["text"] = texts.get(s["story_id"], s["preview"])
+    return {"unsorted": unsorted, "undated": undated,
+            "count": len(unsorted) + len(undated)}
+
+
+@router.get("/book/needs-date", response_class=HTMLResponse)
+async def book_needs_date(request: Request):
+    """One list of every story that needs the owner: not in the book yet,
+    or with no year. A year here adds and places it in one step."""
+    session = await get_web_session(request)
+    redirect = require_login(session)
+    if redirect:
+        return redirect
+    return templates.TemplateResponse("book_needs_date.html", {
+        "request": request,
+        "session": session,
+        "todo": _needs_date(request, session["tenant_id"]),
+    })
+
+
+@router.post("/book/story/{story_id}/date")
+async def book_story_date(request: Request, story_id: int):
+    """Date a story from the Needs-a-date list: puts it in the book if it
+    was never sorted, then places it by the teller's age that year. With no
+    year, just adds it (the AI sorts it)."""
+    session = await get_web_session(request)
+    if not session:
+        return JSONResponse({"error": "Not logged in"}, status_code=401)
+    if session.get("role") == "family":
+        return JSONResponse({"error": "Not allowed"}, status_code=403)
+    db = request.app.state.db
+    tid = session["tenant_id"]
+    form = await request.form()
+    year_raw = (form.get("year") or "").strip()
+    year = None
+    if year_raw:
+        try:
+            year = int(year_raw)
+        except ValueError:
+            year = 0
+        if not 1800 <= year <= 2100:
+            return JSONResponse({"error": "Enter a year like 1994."}, status_code=400)
+    if not db.get_story_by_id(story_id, tenant_id=tid):
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    _ensure_book_memory(request, story_id, tid)
+    conn = db._get_connection()
+    try:
+        mids = [r[0] for r in conn.execute(
+            "SELECT id FROM memories WHERE story_id = ? AND tenant_id = ?",
+            (story_id, tid)).fetchall()]
+        if not mids:
+            return JSONResponse({"error": "This story has no words yet — open it and type the story."})
+        if year:
+            for mid in mids:
+                _place_by_year(conn, tid, mid, year)
+            conn.commit()
+    finally:
+        if not db._conn:
+            conn.close()
+    chapters = request.app.state.book_builder.generate_chapter_outline(tenant_id=tid)
+    home = next((c for c in chapters if mids[0] in c["memory_ids"]), None)
+    return JSONResponse({"ok": True, "chapter": home["title"] if home else "the appendix"})
 
 
 @router.get("/book/coverage", response_class=HTMLResponse)

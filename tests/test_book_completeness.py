@@ -437,13 +437,26 @@ def test_ai_resort_never_overrides_the_owner(db):
     import api.web as web
     sid, mid = add(db, "Moved by hand", "ordinary_world", "adult")
     conn = db._get_connection()
-    conn.execute("UPDATE memories SET placed_by_user = 1 WHERE id = ?", (mid,))
+    conn.execute("UPDATE memories SET placed_by_user = 2 WHERE id = ?", (mid,))   # moved to a chapter
     conn.commit()
     conn.close()
     web._apply_gpt_classification(db, sid, TID, {"bucket": "transformation", "life_phase": "childhood"},
                                   fallback_text="Moved by hand")
     m = db.get_memory_by_id(mid, tenant_id=TID)
     assert (m["bucket"], m["life_phase"]) == ("ordinary_world", "adult")
+
+
+def test_a_given_year_fixes_the_life_stage_but_ai_still_picks_the_theme(db):
+    import api.web as web
+    sid, mid = add(db, "Dated by hand", "ordinary_world", "adult")
+    conn = db._get_connection()
+    conn.execute("UPDATE memories SET placed_by_user = 1 WHERE id = ?", (mid,))   # owner gave a year
+    conn.commit()
+    conn.close()
+    web._apply_gpt_classification(db, sid, TID, {"bucket": "trials_allies_enemies", "life_phase": "childhood"},
+                                  fallback_text="Dated by hand")
+    m = db.get_memory_by_id(mid, tenant_id=TID)
+    assert (m["bucket"], m["life_phase"]) == ("trials_allies_enemies", "adult")
 
 
 def test_pinned_story_joins_that_chapter(db):

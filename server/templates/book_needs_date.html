@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Needs a Date - Polly Connect{% endblock %}
+
+{% block content %}
+<a href="/web/book" class="text-emerald-600 hover:underline text-sm">&larr; Legacy Book</a>
+<div class="mb-4 sm:mb-6 mt-1">
+    <h1 class="text-xl sm:text-2xl font-bold">Stories that need a date</h1>
+    <p class="text-sm text-gray-500 mt-1">Type the year it happened and Polly puts the story in the right time of your life. Not sure? A close guess is fine.</p>
+</div>
+
+{% if todo.count == 0 %}
+<div class="rounded-lg p-4 bg-emerald-50 border border-emerald-200 text-emerald-800">
+    Every story has a home and a date. &#x1F389;
+</div>
+{% endif %}
+
+{% macro row(s, add) %}
+<div class="bg-white rounded-lg shadow p-4" id="nd-{{ s.story_id }}">
+    <div class="flex flex-wrap items-center gap-2 mb-1 text-xs text-gray-400">
+        {% if s.speaker %}<span class="font-medium text-gray-600">{{ s.speaker }}</span>{% endif %}
+        <span>recorded {{ s.created_at[:10] if s.created_at else '' }}</span>
+        {% if not add %}<span>&middot; now in <span class="text-gray-600">{{ s.chapter }}</span></span>{% endif %}
+    </div>
+    {% if s.question %}<p class="text-xs text-blue-600 italic mb-1">Q: {{ s.question }}</p>{% endif %}
+    <details class="text-sm text-gray-700">
+        <summary class="cursor-pointer break-words">{{ s.text[:160] }}{% if s.text|length > 160 %}&hellip; <span class="text-emerald-700 text-xs">read all</span>{% endif %}</summary>
+        {% if s.text|length > 160 %}<p class="mt-2 whitespace-pre-line break-words">{{ s.text }}</p>{% endif %}
+    </details>
+    <div class="flex flex-wrap items-center gap-2 mt-3">
+        <input type="number" id="ndy-{{ s.story_id }}" min="1800" max="2100" placeholder="Year"
+               inputmode="numeric" class="w-24 border rounded px-2 py-1.5 text-sm">
+        <button type="button" onclick="dateStory({{ s.story_id }})"
+                class="text-sm bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-700">
+            {{ 'Add to book' if add else 'Save year' }}
+        </button>
+        {% if add %}<button type="button" onclick="dateStory({{ s.story_id }}, true)"
+                class="text-xs text-gray-500 underline">add without a date</button>{% endif %}
+        <a href="/web/stories/{{ s.story_id }}/edit" class="text-xs text-gray-400 underline ml-auto">edit story</a>
+    </div>
+    <p id="ndm-{{ s.story_id }}" class="text-xs mt-2" hidden></p>
+</div>
+{% endmacro %}
+
+{% if todo.unsorted %}
+<h2 class="text-base font-semibold text-gray-700 mb-2">Not in your book yet ({{ todo.unsorted|length }})</h2>
+<div class="space-y-3 mb-8">
+    {% for s in todo.unsorted %}{{ row(s, true) }}{% endfor %}
+</div>
+{% endif %}
+
+{% if todo.undated %}
+<h2 class="text-base font-semibold text-gray-700 mb-2">In your book, no date yet ({{ todo.undated|length }})</h2>
+<div class="space-y-3">
+    {% for s in todo.undated %}{{ row(s, false) }}{% endfor %}
+</div>
+{% endif %}
+
+<script>
+function dateStory(id, noYear) {
+    var year = noYear ? '' : (document.getElementById('ndy-' + id).value || '').trim();
+    var msg = document.getElementById('ndm-' + id);
+    if (!noYear && !year) { msg.hidden = false; msg.className = 'text-xs mt-2 text-amber-700'; msg.textContent = 'Type the year first.'; return; }
+    fetch('/web/book/story/' + id + '/date', {
+        method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'year=' + encodeURIComponent(year)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        msg.hidden = false;
+        if (!d.ok) { msg.className = 'text-xs mt-2 text-red-600'; msg.textContent = d.error || 'Could not save.'; return; }
+        msg.className = 'text-xs mt-2 text-emerald-700';
+        msg.textContent = '✓ ' + (year ? year + ' — ' : '') + 'now in ' + d.chapter;
+        var card = document.getElementById('nd-' + id);
+        card.style.opacity = '0.5';
+        card.querySelectorAll('input, button').forEach(function(el) { el.disabled = true; });
+    });
+}
+</script>
+{% endblock %}

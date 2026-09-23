@@ -37,8 +37,8 @@
             <button onclick="covFix('/web/book/memory/{{ s.memory_id }}/toggle-book', {{ s.story_id }})"
                     class="text-sm bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-700">Put back in book</button>
             {% elif s.reason and s.reason.startswith('Never sorted') %}
-            <button onclick="covFix('/web/book/coverage/{{ s.story_id }}/add', {{ s.story_id }})"
-                    class="text-sm bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-700">Add to book</button>
+            <a href="/web/book/needs-date#nd-{{ s.story_id }}"
+               class="text-sm bg-emerald-600 text-white px-3 py-1.5 rounded hover:bg-emerald-700">Give it a date</a>
             {% endif %}
             <a href="/web/stories/{{ s.story_id }}/edit" class="text-sm bg-gray-200 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-300">Edit story</a>
         </div>
