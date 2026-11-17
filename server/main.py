@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from api.audio import router as audio_router
 from api.commands import router as commands_router
 from api.devices import router as devices_router
-from api.homeassistant import router as ha_router
+
 from api.web import router as web_router
 from api.firmware import router as firmware_router
 from core.database import PollyDB
@@ -260,7 +260,7 @@ app.add_middleware(
 app.include_router(audio_router, prefix="/api/audio", tags=["audio"])
 app.include_router(commands_router, prefix="/api", tags=["commands"])
 app.include_router(devices_router, prefix="/api/devices", tags=["devices"])
-app.include_router(ha_router, prefix="/api/commands", tags=["homeassistant"])
+# Home Assistant / Alexa hook retired: never used, and it ran commands without a tenant.
 app.include_router(web_router, prefix="/web", tags=["web"])
 app.include_router(firmware_router, prefix="/api/firmware", tags=["firmware"])
 

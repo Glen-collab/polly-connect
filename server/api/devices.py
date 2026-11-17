@@ -47,5 +47,9 @@ async def provision_device(request: Request, body: DeviceProvision):
 
 
 @router.get("/")
-async def list_devices():
+async def list_devices(request: Request):
+    # Every family's devices: admin (global key) only, never a single device's key.
+    auth = getattr(request.state, "api_auth", None)
+    if not auth or not auth.get("is_global"):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
     return {"devices": list(devices.values())}

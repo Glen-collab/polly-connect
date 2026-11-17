@@ -11,24 +11,33 @@ import secrets
 from typing import Optional
 
 from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
 
 # API key from environment (generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))")
 API_KEY = os.getenv("POLLY_API_KEY", "")
+# Only for a laptop with no key: POLLY_AUTH_DISABLED=1. Without it, a missing key
+# means NOTHING authenticates (fail closed), never "everything does".
+AUTH_DISABLED = os.getenv("POLLY_AUTH_DISABLED", "") == "1"
+if not API_KEY and not AUTH_DISABLED:
+    logger.warning("POLLY_API_KEY is not set: only per-device keys will authenticate")
 
 # Paths that don't require API key auth
 # Web portal uses its own cookie-based session auth
-PUBLIC_PATHS = {"/", "/health", "/docs", "/openapi.json", "/redoc", "/api/devices/provision"}
+# Stripe signs its webhook; the handler verifies that signature itself.
+PUBLIC_PATHS = {"/", "/health", "/docs", "/openapi.json", "/redoc", "/api/devices/provision",
+                "/api/stripe/webhook"}
 PUBLIC_PREFIXES = ["/web/", "/static/", "/api/firmware/"]
 
 
 def verify_api_key(key: str) -> bool:
-    """Constant-time comparison of API key."""
-    if not API_KEY:
-        # No key configured = auth disabled (local dev)
+    """Constant-time comparison against the global key. No key configured = no match."""
+    if AUTH_DISABLED:
         return True
+    if not API_KEY or not key:
+        return False
     return secrets.compare_digest(key, API_KEY)
 
 
@@ -39,13 +48,11 @@ def verify_websocket_key(connect_data: dict) -> bool:
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
-    """Middleware that checks X-API-Key header on non-WebSocket requests."""
+    """Checks X-API-Key on non-WebSocket requests. Accepts the global key or a
+    per-device key, and puts the caller on request.state.api_auth
+    ({device_id, tenant_id, user_id, is_global}) so routes can scope to it."""
 
     async def dispatch(self, request: Request, call_next):
-        # Skip auth if no key configured (local dev mode)
-        if not API_KEY:
-            return await call_next(request)
-
         # Skip public paths
         if request.url.path in PUBLIC_PATHS:
             return await call_next(request)
@@ -58,11 +65,16 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         if request.headers.get("upgrade", "").lower() == "websocket":
             return await call_next(request)
 
-        # Check API key header
         key = request.headers.get("X-API-Key", "")
-        if not verify_api_key(key):
-            raise HTTPException(status_code=401, detail="Invalid or missing API key")
-
+        info = verify_device_api_key(key, request.app.state.db)
+        if info and info.get("claim_code") and not info.get("claimed_at"):
+            info = None  # an unclaimed device belongs to nobody yet
+        if not info:
+            # A JSONResponse, not HTTPException: raised inside BaseHTTPMiddleware
+            # that becomes a 500 instead of a 401.
+            return JSONResponse({"detail": "Invalid or missing API key"}, status_code=401)
+        info["is_global"] = info.get("device_id") is None
+        request.state.api_auth = info
         return await call_next(request)
 
 
@@ -77,6 +89,8 @@ def verify_device_api_key(key: str, db) -> Optional[dict]:
     Returns {device_id, tenant_id, user_id} or None.
     Falls back to global API key → tenant #1 for backward compat.
     """
+    if AUTH_DISABLED:
+        return {"device_id": None, "tenant_id": 1, "user_id": None}
     if not key:
         return None
 

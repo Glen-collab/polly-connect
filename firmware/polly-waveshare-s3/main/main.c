@@ -77,7 +77,7 @@ static const char *TAG = "POLLY-WS";
 // Device identity — loaded from NVS at boot (set during claim code provisioning)
 // Fallback defines used only if NVS has no credentials (legacy/dev devices)
 #define DEVICE_ID_FALLBACK       "polly-waveshare"
-#define DEVICE_API_KEY_FALLBACK  "qtde_XgbmZ2jExSBRH0jtsKIgjMkcEwl-BoabvVj7GE"
+#define DEVICE_API_KEY_FALLBACK  ""  /* set locally before flashing; never commit a key */
 
 static char g_device_id[64] = {0};
 static char g_api_key[64] = {0};

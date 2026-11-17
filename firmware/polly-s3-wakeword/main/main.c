@@ -80,7 +80,7 @@ static const char *TAG = "POLLY";
 
 // Device identity & API key (change these per-device when flashing)
 #define DEVICE_ID       "polly001"
-#define DEVICE_API_KEY  "oyiyfCEOd0QXTv5EPL8f9XBnFkNDAp8UwoTi5yRzAVw"  // polly001 registered to tenant 1 (Glen)
+#define DEVICE_API_KEY  ""  /* set locally before flashing; never commit a key */  // polly001 registered to tenant 1 (Glen)
 
 // I2S Microphone (INMP441) pins
 #define I2S_MIC_SCK     GPIO_NUM_6
