@@ -21,11 +21,20 @@
 </div>
 {% endif %}
 
+{% set saved_id = request.query_params.get('saved', '') %}
+{% if saved_id.isdigit() %}
+{% set saved_here = (stories or [])|selectattr('id', 'equalto', saved_id|int)|list %}
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4">
+    <p class="text-sm text-emerald-800 font-medium">&#x2714; Your story is saved{% if saved_here %} &mdash; it's the one outlined in green below{% endif %}.</p>
+</div>
+{% endif %}
+
 {% if stories %}
 <p class="text-sm text-gray-500 mb-3">{{ total }} stor{{ 'ies' if total != 1 else 'y' }} &middot; Page {{ page }} of {{ total_pages }}</p>
 <div class="space-y-3 sm:space-y-4">
     {% for story in stories %}
-    <div class="bg-white rounded-lg shadow p-4 sm:p-6">
+    <div id="story-{{ story.id }}" class="bg-white rounded-lg shadow p-4 sm:p-6 scroll-mt-4
+        {% if request.query_params.get('saved') == story.id|string %}ring-2 ring-emerald-500{% endif %}">
         <div class="flex justify-between items-start mb-2">
             <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">{{ story.source }}{% if story.source == 'photo_story' %} (photo){% endif %}</span>
             <span class="text-xs text-gray-400">{{ story.created_at }}</span>
@@ -120,7 +129,10 @@
 
 <!-- Record a Memory Modal -->
 <div id="recorder-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-5">
+    <!-- Scrolls inside itself: the page behind is locked while this is open, so a long
+         answer must never push the buttons off a phone screen. -->
+    <div id="recorder-card" class="bg-white rounded-lg shadow-xl max-w-md w-full p-5 overflow-y-auto overscroll-contain"
+         style="max-height: 90vh; max-height: 90dvh;">
         <h2 class="text-lg font-semibold mb-1">Record a Memory</h2>
         <p class="text-xs text-gray-500 mb-4">Capture a moment — voices, laughter, sounds. Even if Polly can't transcribe it, the audio is saved forever.</p>
 
@@ -178,15 +190,20 @@
         </div>
 
         <!-- Done state -->
+        <!-- Shown only after the server has written the story, so "saved" is the truth.
+             Buttons come first so they're on screen however long the answer is. -->
         <div id="rec-done" class="hidden w-full">
-            <div class="bg-emerald-50 rounded p-3 mb-3">
-                <p class="text-sm text-emerald-700 font-medium">Memory saved!</p>
-                <p id="rec-transcript" class="text-xs text-gray-600 mt-1"></p>
+            <div class="bg-emerald-50 border border-emerald-200 rounded p-3 mb-3">
+                <p class="text-base text-emerald-800 font-semibold">&#x2714; Saved to your stories</p>
+                <p class="text-xs text-emerald-700 mt-0.5">It's already stored. Nothing else to tap.</p>
+                <p id="rec-note" class="hidden text-xs text-amber-700 mt-1"></p>
             </div>
-            <div class="flex gap-2">
-                <button onclick="closeRecorder(); location.reload();" class="flex-1 bg-emerald-600 text-white px-4 py-2 rounded text-sm hover:bg-emerald-700">Done</button>
-                <button onclick="resetRecorder()" class="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300">Record Another</button>
+            <div class="flex gap-2 mb-3">
+                <button onclick="finishRecorder()" class="flex-1 bg-emerald-600 text-white px-4 py-3 rounded-lg text-sm font-medium hover:bg-emerald-700">Done &mdash; show it</button>
+                <button onclick="resetRecorder()" class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg text-sm hover:bg-gray-300">Record Another</button>
             </div>
+            <p class="text-xs text-gray-500 mb-1">What Polly heard:</p>
+            <p id="rec-transcript" class="text-sm text-gray-700 whitespace-pre-wrap break-words bg-gray-50 border rounded p-3"></p>
         </div>
 
         <!-- Error state -->
@@ -200,7 +217,7 @@
             </div>
         </div>
 
-        <button onclick="closeRecorder()" class="mt-3 w-full text-center text-sm text-gray-400 hover:text-gray-600">Cancel</button>
+        <button id="rec-cancel" onclick="closeRecorder()" class="mt-3 w-full text-center text-sm text-gray-400 hover:text-gray-600">Cancel</button>
     </div>
 </div>
 {% endblock %}
@@ -266,6 +283,36 @@ function showState(state) {
         document.getElementById(id).classList.add('hidden');
     });
     document.getElementById('rec-' + state).classList.remove('hidden');
+    // "Cancel" after a save reads like "throw it away" — it's already stored.
+    document.getElementById('rec-cancel').classList.toggle('hidden', state === 'done');
+    document.getElementById('recorder-card').scrollTop = 0;
+}
+
+var savedStoryId = null;
+
+function showSaved(data, fallbackText) {
+    savedStoryId = data.story_id || null;
+    var note = document.getElementById('rec-note');
+    if (data.transcription_failed) {
+        note.textContent = "Polly couldn't make out the words, but the audio is saved. You can type it in on the story's Edit page.";
+        note.classList.remove('hidden');
+    } else {
+        note.classList.add('hidden');
+    }
+    var t = data.transcript;
+    if (!t || t === '[Audio memory]') t = fallbackText || 'Audio saved.';
+    document.getElementById('rec-transcript').textContent = t;
+    showState('done');
+}
+
+// Land on the stories list with the new one highlighted, so you can see it's really there.
+function finishRecorder() {
+    closeRecorder();
+    if (savedStoryId) {
+        location.href = '/web/stories?saved=' + savedStoryId + '#story-' + savedStoryId;
+    } else {
+        location.reload();
+    }
 }
 
 function startRecording() {
@@ -359,8 +406,7 @@ function submitTextOnly() {
             showState('error');
             return;
         }
-        document.getElementById('rec-transcript').textContent = data.transcript || text;
-        showState('done');
+        showSaved(data, text);
     })
     .catch(function(err) {
         document.getElementById('rec-error-msg').textContent = 'Save failed. Check your connection and try again.';
@@ -397,9 +443,7 @@ function stopRecording() {
             showState('error');
             return;
         }
-        var msg = data.transcript === '[Audio memory]' ? 'Audio memory saved (no transcription needed)' : data.transcript;
-        document.getElementById('rec-transcript').textContent = msg;
-        showState('done');
+        showSaved(data, 'Audio memory saved (no transcription needed)');
     })
     .catch(function(err) {
         document.getElementById('rec-error-msg').textContent = 'Upload failed. Check your connection and try again.';
