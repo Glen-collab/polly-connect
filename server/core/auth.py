@@ -17,12 +17,16 @@ from starlette.middleware.base import BaseHTTPMiddleware
 logger = logging.getLogger(__name__)
 
 # API key from environment (generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))")
-API_KEY = os.getenv("POLLY_API_KEY", "")
+# Read at call time, not import time: config.py loads .env, and it may be imported
+# after this module.
 # Only for a laptop with no key: POLLY_AUTH_DISABLED=1. Without it, a missing key
 # means NOTHING authenticates (fail closed), never "everything does".
-AUTH_DISABLED = os.getenv("POLLY_AUTH_DISABLED", "") == "1"
-if not API_KEY and not AUTH_DISABLED:
-    logger.warning("POLLY_API_KEY is not set: only per-device keys will authenticate")
+def _api_key() -> str:
+    return os.getenv("POLLY_API_KEY", "")
+
+
+def _auth_disabled() -> bool:
+    return os.getenv("POLLY_AUTH_DISABLED", "") == "1"
 
 # Paths that don't require API key auth
 # Web portal uses its own cookie-based session auth
@@ -34,11 +38,12 @@ PUBLIC_PREFIXES = ["/web/", "/static/", "/api/firmware/"]
 
 def verify_api_key(key: str) -> bool:
     """Constant-time comparison against the global key. No key configured = no match."""
-    if AUTH_DISABLED:
+    if _auth_disabled():
         return True
-    if not API_KEY or not key:
+    api_key = _api_key()
+    if not api_key or not key:
         return False
-    return secrets.compare_digest(key, API_KEY)
+    return secrets.compare_digest(key, api_key)
 
 
 def verify_websocket_key(connect_data: dict) -> bool:
@@ -89,7 +94,7 @@ def verify_device_api_key(key: str, db) -> Optional[dict]:
     Returns {device_id, tenant_id, user_id} or None.
     Falls back to global API key → tenant #1 for backward compat.
     """
-    if AUTH_DISABLED:
+    if _auth_disabled():
         return {"device_id": None, "tenant_id": 1, "user_id": None}
     if not key:
         return None
